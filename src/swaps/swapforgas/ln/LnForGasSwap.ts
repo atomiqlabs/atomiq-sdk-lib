@@ -242,13 +242,13 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
                 if(txStatus==="success") {
                     this.state = LnForGasSwapState.FINISHED;
                     this.scTxId = response.data.txId;
-                    if(save) await this._save();
+                    if(save) await this._saveAndEmit();
                     return true;
                 }
                 return null;
             case InvoiceStatusResponseCodes.EXPIRED:
                 this.state = LnForGasSwapState.EXPIRED;
-                if(save) await this._save();
+                if(save) await this._saveAndEmit();
                 return false;
             case InvoiceStatusResponseCodes.PENDING:
             case InvoiceStatusResponseCodes.TX_SENT:
@@ -256,7 +256,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
                 return null;
             default:
                 this.state = LnForGasSwapState.FAILED;
-                if(save) await this._save();
+                if(save) await this._saveAndEmit();
                 return false;
         }
     }
