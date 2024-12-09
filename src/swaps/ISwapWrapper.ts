@@ -6,7 +6,7 @@ import {
     RefundEvent, SignatureData,
     SignatureVerificationError,
     SwapEvent
-} from "crosslightning-base";
+} from "@atomiqlabs/base";
 import {EventEmitter} from "events";
 import {ISwap} from "./ISwap";
 import {SwapWrapperStorage} from "./SwapWrapperStorage";

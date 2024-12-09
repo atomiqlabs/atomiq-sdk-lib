@@ -3,7 +3,7 @@ import {EventEmitter} from "events";
 import * as BN from "bn.js";
 import {Buffer} from "buffer";
 import {ISwapWrapper} from "./ISwapWrapper";
-import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "crosslightning-base";
+import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isPriceInfoType, PriceInfoType} from "../prices/abstract/ISwapPrice";
 import {getLogger, LoggerType, timeoutPromise, tryWithRetries} from "../utils/Utils";
 import {Token, TokenAmount} from "./Tokens";

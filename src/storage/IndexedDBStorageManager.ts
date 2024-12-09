@@ -1,4 +1,4 @@
-import {IStorageManager, StorageObject} from "crosslightning-base";
+import {IStorageManager, StorageObject} from "@atomiqlabs/base";
 import {getLogger, LoggerType} from "../utils/Utils";
 
 /**

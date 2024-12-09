@@ -1,7 +1,7 @@
 import {SwapType} from "../swaps/SwapType";
 import {SwapHandlerInfoType} from "./IntermediaryDiscovery";
 import * as BN from "bn.js";
-import {ChainSwapType, SwapContract} from "crosslightning-base";
+import {ChainSwapType, SwapContract} from "@atomiqlabs/base";
 import {LNNodeLiquidity} from "../btc/LightningNetworkApi";
 import {tryWithRetries} from "../utils/Utils";
 

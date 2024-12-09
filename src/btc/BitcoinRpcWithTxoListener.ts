@@ -1,4 +1,4 @@
-import {BitcoinRpc, BtcBlock, BtcTx} from "crosslightning-base";
+import {BitcoinRpc, BtcBlock, BtcTx} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 
 export type BtcTxWithBlockheight = BtcTx & {

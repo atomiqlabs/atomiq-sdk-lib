@@ -1,12 +1,12 @@
 import {Intermediary, ServicesType} from "./Intermediary";
 import {SwapType} from "../swaps/SwapType";
 import * as BN from "bn.js";
-import {SwapContract} from "crosslightning-base/dist";
+import {SwapContract} from "@atomiqlabs/base";
 import {EventEmitter} from "events";
 import {Buffer} from "buffer";
 import {getLogger, httpGet, tryWithRetries} from "../utils/Utils";
 import {IntermediaryAPI} from "./IntermediaryAPI";
-import {ChainType} from "crosslightning-base";
+import {ChainType} from "@atomiqlabs/base";
 
 export enum SwapHandlerType {
     TO_BTC = "TO_BTC",

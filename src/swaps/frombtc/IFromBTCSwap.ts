@@ -5,7 +5,7 @@ import * as BN from "bn.js";
 import {
     ChainType,
     SignatureVerificationError,
-} from "crosslightning-base";
+} from "@atomiqlabs/base";
 import {PriceInfoType} from "../../prices/abstract/ISwapPrice";
 import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../Tokens";
 

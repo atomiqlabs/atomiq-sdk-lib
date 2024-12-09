@@ -1,4 +1,4 @@
-import {BtcRelay, BtcStoredHeader, RelaySynchronizer} from "crosslightning-base/dist";
+import {BtcRelay, BtcStoredHeader, RelaySynchronizer} from "@atomiqlabs/base";
 import {MempoolBitcoinBlock} from "../MempoolBitcoinBlock";
 import {MempoolBitcoinRpc} from "../MempoolBitcoinRpc";
 

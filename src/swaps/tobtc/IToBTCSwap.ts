@@ -6,7 +6,7 @@ import {
     SignatureVerificationError,
     SwapCommitStatus,
     SwapData
-} from "crosslightning-base";
+} from "@atomiqlabs/base";
 import {PriceInfoType} from "../../prices/abstract/ISwapPrice";
 import {
     IntermediaryAPI,

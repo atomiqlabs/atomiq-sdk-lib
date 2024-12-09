@@ -3,7 +3,7 @@ import {ToBTCLNWrapper} from "./ToBTCLNWrapper";
 import {isIToBTCSwapInit, IToBTCSwap, IToBTCSwapInit} from "../IToBTCSwap";
 import {SwapType} from "../../SwapType";
 import * as BN from "bn.js";
-import {ChainType, SwapData} from "crosslightning-base";
+import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import * as createHash from "create-hash";
 import {IntermediaryError} from "../../../errors/IntermediaryError";

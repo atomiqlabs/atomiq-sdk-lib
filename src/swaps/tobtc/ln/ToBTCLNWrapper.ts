@@ -7,7 +7,7 @@ import {
     ChainSwapType, ChainType,
     IStorageManager,
     SwapCommitStatus
-} from "crosslightning-base";
+} from "@atomiqlabs/base";
 import {Intermediary, SingleChainReputationType} from "../../../intermediaries/Intermediary";
 import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";

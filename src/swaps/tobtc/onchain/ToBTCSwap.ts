@@ -2,7 +2,7 @@ import {ToBTCWrapper} from "./ToBTCWrapper";
 import {isIToBTCSwapInit, IToBTCSwap, IToBTCSwapInit} from "../IToBTCSwap";
 import {SwapType} from "../../SwapType";
 import * as BN from "bn.js";
-import {ChainType, SwapData} from "crosslightning-base";
+import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../Tokens";

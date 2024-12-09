@@ -2,12 +2,11 @@ import {ToBTCSwap, ToBTCSwapInit} from "./ToBTCSwap";
 import {IToBTCWrapper} from "../IToBTCWrapper";
 import {
     ChainSwapType, ChainType,
-    IStorageManager,
-} from "crosslightning-base";
+    IStorageManager, BitcoinRpc
+} from "@atomiqlabs/base";
 import {Intermediary, SingleChainReputationType} from "../../../intermediaries/Intermediary";
 import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
-import {BitcoinRpc} from "crosslightning-base/dist";
 import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {Network, networks, address} from "bitcoinjs-lib";
 import * as BN from "bn.js";

@@ -1,4 +1,4 @@
-import {BtcBlock} from "crosslightning-base";
+import {BtcBlock} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 
 export type MempoolBitcoinBlockType = {

@@ -1,7 +1,7 @@
 {
-  "name": "crosslightning-sdk-base",
+  "name": "@atomiqlabs/sdk-lib",
   "version": "10.2.0",
-  "description": "CrossLightning SDK chain-agnostic base",
+  "description": "Basic SDK functionality library for atomiq",
   "main": "./dist/index.js",
   "types:": "./dist/index.d.ts",
   "scripts": {
@@ -22,6 +22,7 @@
   "author": "adambor",
   "license": "ISC",
   "dependencies": {
+    "@atomiqlabs/base": "7.2.0",
     "@bitcoinerlab/secp256k1": "1.0.5",
     "aes-js": "3.1.2",
     "bech32": "2.0.0",
@@ -30,7 +31,6 @@
     "bolt11": "1.4.1",
     "buffer": "6.0.3",
     "create-hash": "1.2.0",
-    "crosslightning-base": "7.2.0",
     "events": "3.3.0",
     "randombytes": "2.1.0"
   },

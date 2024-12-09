@@ -1,4 +1,4 @@
-import {IStorageManager, StorageObject} from "crosslightning-base";
+import {IStorageManager, StorageObject} from "@atomiqlabs/base";
 
 /**
  * StorageManager using browser's local storage API

@@ -1,7 +1,7 @@
 import {decode as bolt11Decode} from "bolt11";
 import {SwapType} from "../../SwapType";
 import * as BN from "bn.js";
-import {ChainType, SwapData} from "crosslightning-base";
+import {ChainType, SwapData} from "@atomiqlabs/base";
 import {LnForGasWrapper} from "./LnForGasWrapper";
 import {Buffer} from "buffer";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";

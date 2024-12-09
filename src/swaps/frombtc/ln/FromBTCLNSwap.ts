@@ -3,7 +3,7 @@ import {FromBTCLNWrapper} from "./FromBTCLNWrapper";
 import {IFromBTCSwap} from "../IFromBTCSwap";
 import {SwapType} from "../../SwapType";
 import * as BN from "bn.js";
-import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "crosslightning-base";
+import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isISwapInit, ISwapInit} from "../../ISwap";
 import {Buffer} from "buffer";
 import {LNURL, LNURLWithdraw, LNURLWithdrawParamsWithUrl} from "../../../utils/LNURL";

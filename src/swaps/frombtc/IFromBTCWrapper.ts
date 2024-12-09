@@ -5,7 +5,7 @@ import * as randomBytes from "randombytes";
 import {Intermediary} from "../../intermediaries/Intermediary";
 import {IntermediaryError} from "../../errors/IntermediaryError";
 import {tryWithRetries} from "../../utils/Utils";
-import {ChainType} from "crosslightning-base";
+import {ChainType} from "@atomiqlabs/base";
 
 export abstract class IFromBTCWrapper<
     T extends ChainType,

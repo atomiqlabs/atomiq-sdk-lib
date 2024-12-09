@@ -1,4 +1,4 @@
-import {BtcBlockWithTxs, BtcSyncInfo, BtcTx} from "crosslightning-base";
+import {BtcBlockWithTxs, BtcSyncInfo, BtcTx} from "@atomiqlabs/base";
 import {MempoolBitcoinBlock} from "./MempoolBitcoinBlock";
 import {BitcoinTransaction, MempoolApi, TxVout} from "./MempoolApi";
 import {Buffer} from "buffer";

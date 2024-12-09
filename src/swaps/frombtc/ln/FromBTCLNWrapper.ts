@@ -10,7 +10,7 @@ import {
     IStorageManager,
     RefundEvent,
     SwapCommitStatus
-} from "crosslightning-base";
+} from "@atomiqlabs/base";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {Buffer} from "buffer";
 import {UserError} from "../../../errors/UserError";

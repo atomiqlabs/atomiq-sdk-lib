@@ -1,5 +1,5 @@
 import {ISwap} from "./ISwap";
-import {IStorageManager} from "crosslightning-base";
+import {IStorageManager} from "@atomiqlabs/base";
 import {ISwapWrapper} from "./ISwapWrapper";
 
 export class SwapWrapperStorage<T extends ISwap<any>> {

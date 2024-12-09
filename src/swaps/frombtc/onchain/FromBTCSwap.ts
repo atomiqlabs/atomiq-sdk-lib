@@ -4,7 +4,7 @@ import {address} from "bitcoinjs-lib";
 import * as createHash from "create-hash";
 import {FromBTCWrapper} from "./FromBTCWrapper";
 import * as BN from "bn.js";
-import {ChainType, SwapCommitStatus, SwapData} from "crosslightning-base";
+import {ChainType, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isISwapInit, ISwapInit} from "../../ISwap";
 import {Buffer} from "buffer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";

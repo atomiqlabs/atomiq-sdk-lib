@@ -1,5 +1,5 @@
 import {IToBTCSwap, ToBTCSwapState} from "./IToBTCSwap";
-import {ChainType, ClaimEvent, InitializeEvent, RefundEvent, SwapCommitStatus} from "crosslightning-base";
+import {ChainType, ClaimEvent, InitializeEvent, RefundEvent, SwapCommitStatus} from "@atomiqlabs/base";
 import {AmountData, ISwapWrapper, ISwapWrapperOptions} from "../ISwapWrapper";
 import {tryWithRetries} from "../../utils/Utils";
 import {Intermediary, SingleChainReputationType} from "../../intermediaries/Intermediary";

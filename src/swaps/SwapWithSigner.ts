@@ -1,5 +1,5 @@
 import {ISwap} from "./ISwap";
-import {ChainType} from "crosslightning-base";
+import {ChainType} from "@atomiqlabs/base";
 import {IToBTCSwap} from "./tobtc/IToBTCSwap";
 import {IFromBTCSwap} from "./frombtc/IFromBTCSwap";
 import {FromBTCLNSwap} from "./frombtc/ln/FromBTCLNSwap";

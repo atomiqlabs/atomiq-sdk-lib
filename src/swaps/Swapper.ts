@@ -3,7 +3,7 @@ import {ISwapPrice} from "../prices/abstract/ISwapPrice";
 import {
     ChainType,
     IStorageManager
-} from "crosslightning-base";
+} from "@atomiqlabs/base";
 import {ToBTCLNWrapper} from "./tobtc/ln/ToBTCLNWrapper";
 import {ToBTCWrapper} from "./tobtc/onchain/ToBTCWrapper";
 import {FromBTCLNWrapper} from "./frombtc/ln/FromBTCLNWrapper";
@@ -23,7 +23,7 @@ import {ToBTCLNSwap} from "./tobtc/ln/ToBTCLNSwap";
 import {ToBTCSwap} from "./tobtc/onchain/ToBTCSwap";
 import {MempoolApi} from "../btc/mempool/MempoolApi";
 import {MempoolBitcoinRpc} from "../btc/mempool/MempoolBitcoinRpc";
-import {BtcRelay, RelaySynchronizer} from "crosslightning-base/dist";
+import {BtcRelay, RelaySynchronizer} from "@atomiqlabs/base";
 import {MempoolBtcRelaySynchronizer} from "../btc/mempool/synchronizer/MempoolBtcRelaySynchronizer";
 import {LnForGasWrapper} from "./swapforgas/ln/LnForGasWrapper";
 import {LnForGasSwap} from "./swapforgas/ln/LnForGasSwap";

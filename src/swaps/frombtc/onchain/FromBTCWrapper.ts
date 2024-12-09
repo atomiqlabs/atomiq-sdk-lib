@@ -10,8 +10,9 @@ import {
     RefundEvent,
     RelaySynchronizer,
     SwapCommitStatus,
-    SwapData
-} from "crosslightning-base";
+    SwapData,
+    BtcRelay
+} from "@atomiqlabs/base";
 import {EventEmitter} from "events";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {BitcoinRpcWithTxoListener} from "../../../btc/BitcoinRpcWithTxoListener";
@@ -22,7 +23,6 @@ import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {SwapType} from "../../SwapType";
 import {extendAbortController, tryWithRetries} from "../../../utils/Utils";
-import {BtcRelay} from "crosslightning-base/dist";
 import {FromBTCResponseType, IntermediaryAPI} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
 
