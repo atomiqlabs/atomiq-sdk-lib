@@ -99,6 +99,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
             blockhash: tx.status?.block_hash,
             confirmations,
             txid: tx.txid,
+            vsize: tx.weight/4,
             hex: rawTx==null ? null : rawTx.toString("hex"),
             outs: tx.vout.map((e, index) => {
                 return {
