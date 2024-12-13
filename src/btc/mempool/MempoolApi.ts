@@ -233,15 +233,10 @@ export class MempoolApi {
      * Returns raw binary encoded bitcoin transaction, also strips the witness data from the transaction
      *
      * @param txId
-     * @param stripWitness (defaults to true) strips the witness data from the transaction
      */
-    async getRawTransaction(txId: string, stripWitness: boolean = true): Promise<Buffer> {
+    async getRawTransaction(txId: string): Promise<Buffer> {
         const rawTransaction: string = await this.request<string>("tx/"+txId+"/hex", "str");
-
-        //Strip witness data
-        const btcTx = Transaction.fromHex(rawTransaction);
-        if(stripWitness) btcTx.ins.forEach(txIn => txIn.witness = []);
-        return btcTx.toBuffer();
+        return Buffer.from(rawTransaction, "hex")
     }
 
     /**

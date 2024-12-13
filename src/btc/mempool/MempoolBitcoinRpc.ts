@@ -7,6 +7,9 @@ import * as BN from "bn.js";
 import {BitcoinRpcWithTxoListener, BtcTxWithBlockheight} from "../BitcoinRpcWithTxoListener";
 import {LightningNetworkApi, LNNodeLiquidity} from "../LightningNetworkApi";
 import {timeoutPromise} from "../../utils/Utils";
+import {Transaction} from "bitcoinjs-lib";
+import {padding} from "aes-js";
+import strip = padding.pkcs7.strip;
 
 const BITCOIN_BLOCKTIME = 600 * 1000;
 const BITCOIN_BLOCKSIZE = 1024*1024;
@@ -94,13 +97,22 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
             confirmations = blockheight-tx.status.block_height+1;
         }
 
+        let strippedRawTx: string;
+        if(rawTx!=null) {
+            //Strip witness data
+            const btcTx = Transaction.fromBuffer(rawTx);
+            btcTx.ins.forEach(txIn => txIn.witness = []);
+            strippedRawTx = btcTx.toHex();
+        }
+
         return {
             blockheight: tx.status?.block_height,
             blockhash: tx.status?.block_hash,
             confirmations,
             txid: tx.txid,
             vsize: tx.weight/4,
-            hex: rawTx==null ? null : rawTx.toString("hex"),
+            hex: strippedRawTx,
+            raw: rawTx==null ? null : rawTx.toString("hex"),
             outs: tx.vout.map((e, index) => {
                 return {
                     value: e.value,
