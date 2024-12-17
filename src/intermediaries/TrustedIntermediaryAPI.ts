@@ -1,7 +1,75 @@
-import {httpGet, tryWithRetries} from "../utils/Utils";
+import {httpGet, httpPost, tryWithRetries} from "../utils/Utils";
 import {RequestError} from "../errors/RequestError";
 import BN from "bn.js";
 import {FieldTypeEnum, RequestSchemaResult, verifySchema} from "../utils/paramcoders/SchemaVerifier";
+
+
+export enum AddressStatusResponseCodes {
+    EXPIRED=10001,
+    PAID=10000,
+    AWAIT_PAYMENT=10010,
+    AWAIT_CONFIRMATION=10011,
+    PENDING=10013,
+    TX_SENT=10012,
+    REFUNDED=10014,
+    DOUBLE_SPENT=10015,
+    REFUNDABLE=10016
+}
+
+export type AddressStatusResponse = {
+    code: AddressStatusResponseCodes.TX_SENT | AddressStatusResponseCodes.PAID,
+    msg: string,
+    data: {
+        adjustedAmount: string,
+        adjustedTotal: string,
+        txId: string,
+        scTxId: string
+    }
+} | {
+    code: AddressStatusResponseCodes.AWAIT_CONFIRMATION | AddressStatusResponseCodes.PENDING,
+    msg: string,
+    data: {
+        adjustedAmount: string,
+        adjustedTotal: string,
+        txId: string
+    }
+} | {
+    code: AddressStatusResponseCodes.REFUNDABLE,
+    msg: string,
+    data: {
+        adjustedAmount: string
+    }
+} | {
+    code: AddressStatusResponseCodes.REFUNDED | AddressStatusResponseCodes.DOUBLE_SPENT,
+    msg: string,
+    data: {
+        txId: string
+    }
+} | {
+    code: AddressStatusResponseCodes.AWAIT_PAYMENT | AddressStatusResponseCodes.EXPIRED,
+    msg: string
+};
+
+export type TrustedFromBTCInit = {
+    address: string,
+    amount: BN,
+    refundAddress?: string
+};
+
+const TrustedFromBTCResponseSchema = {
+    paymentHash: FieldTypeEnum.String,
+    sequence: FieldTypeEnum.BN,
+    btcAddress: FieldTypeEnum.String,
+    amountSats: FieldTypeEnum.BN,
+    swapFeeSats: FieldTypeEnum.BN,
+    swapFee: FieldTypeEnum.BN,
+    total: FieldTypeEnum.BN,
+    intermediaryKey: FieldTypeEnum.String,
+    recommendedFee: FieldTypeEnum.Number,
+    expiresAt: FieldTypeEnum.Number
+} as const;
+
+export type TrustedFromBTCResponseType = RequestSchemaResult<typeof TrustedFromBTCResponseSchema>;
 
 export enum InvoiceStatusResponseCodes {
     EXPIRED=10001,
@@ -85,6 +153,90 @@ export class TrustedIntermediaryAPI {
 
         if(resp.code!==10000) throw RequestError.parse(JSON.stringify(resp), 400);
         return verifySchema(resp.data, TrustedFromBTCLNResponseSchema);
+    }
+
+    /**
+     * Fetches the address status from the intermediary node
+     *
+     * @param url Url of the trusted intermediary
+     * @param paymentHash Payment hash of the swap
+     * @param sequence Sequence number of the swap
+     * @param timeout Timeout in milliseconds
+     * @param abortSignal
+     * @throws {RequestError} if non-200 http response is returned
+     */
+    static async getAddressStatus(
+        url: string,
+        paymentHash: string,
+        sequence: BN,
+        timeout?: number,
+        abortSignal?: AbortSignal
+    ): Promise<AddressStatusResponse> {
+        return tryWithRetries(() => httpGet<AddressStatusResponse>(
+            url+"/getAddressStatus?paymentHash="+encodeURIComponent(paymentHash)+"&sequence="+encodeURIComponent(sequence.toString(10)),
+            timeout, abortSignal
+        ), null, RequestError, abortSignal);
+    }
+
+    /**
+     * Sets the refund address for an on-chain gas swap
+     *
+     * @param url Url of the trusted intermediary
+     * @param paymentHash Payment hash of the swap
+     * @param sequence Sequence number of the swap
+     * @param refundAddress Refund address to set for the swap
+     * @param timeout Timeout in milliseconds
+     * @param abortSignal
+     * @throws {RequestError} if non-200 http response is returned
+     */
+    static async setRefundAddress(
+        url: string,
+        paymentHash: string,
+        sequence: BN,
+        refundAddress: string,
+        timeout?: number,
+        abortSignal?: AbortSignal
+    ): Promise<void> {
+        return tryWithRetries(() => httpGet<void>(
+            url+"/setRefundAddress" +
+                "?paymentHash="+encodeURIComponent(paymentHash)+
+                "&sequence="+encodeURIComponent(sequence.toString(10))+
+                "&refundAddress="+encodeURIComponent(refundAddress),
+            timeout, abortSignal
+        ), null, RequestError, abortSignal);
+    }
+
+    /**
+     * Initiate a trusted swap from BTC to SC native currency, retries!
+     *
+     * @param baseUrl Base url of the trusted swap intermediary
+     * @param init Initialization parameters
+     * @param timeout Timeout in milliseconds for the request
+     * @param abortSignal
+     * @throws {RequestError} If the response is non-200
+     */
+    static async initTrustedFromBTC(
+        baseUrl: string,
+        init: TrustedFromBTCInit,
+        timeout?: number,
+        abortSignal?: AbortSignal
+    ): Promise<TrustedFromBTCResponseType> {
+        const resp = await tryWithRetries(
+            () => httpPost<{code: number, msg: string, data?: any}>(
+                baseUrl+"/frombtc_trusted/getAddress",
+                {
+                    address: init.address,
+                    amount: init.amount.toString(10),
+                    refundAddress: init.refundAddress,
+                    exactOut: true
+                },
+                timeout,
+                abortSignal
+            ), null, RequestError, abortSignal
+        );
+
+        if(resp.code!==10000) throw RequestError.parse(JSON.stringify(resp), 400);
+        return verifySchema(resp.data, TrustedFromBTCResponseSchema);
     }
 
 }

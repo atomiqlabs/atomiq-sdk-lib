@@ -10,6 +10,19 @@ export interface BitcoinRpcWithTxoListener<T extends BtcBlock> extends BitcoinRp
     getTransaction(txId: string): Promise<BtcTxWithBlockheight>;
 
     /**
+     * Returns an estimate after which time the tx will confirm with the required amount of confirmations,
+     *  confirmationDelay of -1 means the transaction won't confirm in the near future
+     *
+     * @param tx
+     * @param requiredConfirmations
+     * @private
+     *
+     * @returns estimated confirmation delay, -1 if the transaction won't confirm in the near future, null if the
+     *  transaction was replaced or was confirmed in the meantime
+     */
+    getConfirmationDelay(tx: BtcTx, requiredConfirmations: number): Promise<number | null>
+
+    /**
      * Checks if an address received the transaction with the required txoHash, returns info about that
      *  specific transaction if found, or null if not found
      *

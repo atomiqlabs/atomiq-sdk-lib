@@ -8,8 +8,6 @@ import {BitcoinRpcWithTxoListener, BtcTxWithBlockheight} from "../BitcoinRpcWith
 import {LightningNetworkApi, LNNodeLiquidity} from "../LightningNetworkApi";
 import {timeoutPromise} from "../../utils/Utils";
 import {Transaction} from "bitcoinjs-lib";
-import {padding} from "aes-js";
-import strip = padding.pkcs7.strip;
 
 const BITCOIN_BLOCKTIME = 600 * 1000;
 const BITCOIN_BLOCKSIZE = 1024*1024;
@@ -66,7 +64,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
      * @returns estimated confirmation delay, -1 if the transaction won't confirm in the near future, null if the
      *  transaction was replaced or was confirmed in the meantime
      */
-    private async getConfirmationDelay(tx: BtcTx, requiredConfirmations: number): Promise<number | null> {
+    async getConfirmationDelay(tx: BtcTx, requiredConfirmations: number): Promise<number | null> {
         if(tx.confirmations>requiredConfirmations) return 0;
         if(tx.confirmations===0) {
             //Get CPFP data
