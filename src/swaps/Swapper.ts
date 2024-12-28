@@ -741,7 +741,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             token: tokenAddress,
             exactIn: false
         };
-        expirySeconds ??= 4*24*3600;
+        expirySeconds ??= 5*24*3600;
         return this.createSwap(
             chainIdentifier as ChainIdentifier,
             (candidates: Intermediary[], abortSignal: AbortSignal, chain) => Promise.resolve(chain.tobtcln.create(
@@ -795,7 +795,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             token: tokenAddress,
             exactIn
         };
-        expirySeconds ??= 4*24*3600;
+        expirySeconds ??= 5*24*3600;
         return this.createSwap(
             chainIdentifier as ChainIdentifier,
             (candidates: Intermediary[], abortSignal: AbortSignal, chain) => chain.tobtcln.createViaLNURL(
