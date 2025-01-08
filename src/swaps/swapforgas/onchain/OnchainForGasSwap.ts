@@ -44,7 +44,7 @@ export function isOnchainForGasSwapInit<T extends SwapData>(obj: any): obj is On
 }
 
 export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> {
-    protected readonly TYPE: SwapType = SwapType.FROM_BTC;
+    protected readonly TYPE: SwapType = SwapType.TRUSTED_FROM_BTC;
 
     //State: PR_CREATED
     private readonly paymentHash: string;
@@ -188,7 +188,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
     }
 
     isQuoteSoftExpired(): boolean {
-        return this.isQuoteExpired();
+        return this.expiry<Date.now();
     }
 
     isFailed(): boolean {
@@ -250,7 +250,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             this.state===OnchainForGasSwapState.EXPIRED ||
             this.state===OnchainForGasSwapState.REFUNDED
         ) return false;
-        if(this.state===OnchainForGasSwapState.FINISHED) return true;
+        if(this.state===OnchainForGasSwapState.FINISHED) return false;
 
         const response = await TrustedIntermediaryAPI.getAddressStatus(
             this.url, this.paymentHash, this.sequence, this.wrapper.options.getRequestTimeout
@@ -260,13 +260,16 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
                 if(this.txId!=null) {
                     this.txId = null;
                     if(save) await this._save();
+                    return true;
                 }
-                return null;
+                return false;
             case AddressStatusResponseCodes.AWAIT_CONFIRMATION:
             case AddressStatusResponseCodes.PENDING:
             case AddressStatusResponseCodes.TX_SENT:
                 const inputAmount = new BN(response.data.adjustedAmount, 10);
                 const outputAmount = new BN(response.data.adjustedTotal, 10);
+                const adjustedFee = response.data.adjustedFee==null ? null : new BN(response.data.adjustedFee, 10);
+                const adjustedFeeSats = response.data.adjustedFeeSats==null ? null : new BN(response.data.adjustedFeeSats, 10);
                 const txId = response.data.txId;
                 if(
                     this.txId!=txId ||
@@ -276,9 +279,12 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
                     this.txId = txId;
                     this.inputAmount = inputAmount;
                     this.outputAmount = outputAmount;
+                    if(adjustedFee!=null) this.swapFee = adjustedFee;
+                    if(adjustedFeeSats!=null) this.swapFeeBtc = adjustedFeeSats;
                     if(save) await this._save();
+                    return true;
                 }
-                return null;
+                return false;
             case AddressStatusResponseCodes.PAID:
                 const txStatus = await this.wrapper.contract.getTxIdStatus(response.data.txId);
                 if(txStatus==="success") {
@@ -287,11 +293,11 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
                     if(save) await this._saveAndEmit();
                     return true;
                 }
-                return null;
+                return false;
             case AddressStatusResponseCodes.EXPIRED:
                 this.state = OnchainForGasSwapState.EXPIRED;
                 if(save) await this._saveAndEmit();
-                return false;
+                return true;
             case AddressStatusResponseCodes.REFUNDABLE:
                 if(this.state===OnchainForGasSwapState.REFUNDABLE) return null;
                 this.state = OnchainForGasSwapState.REFUNDABLE;
@@ -301,11 +307,11 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
                 this.state = OnchainForGasSwapState.REFUNDED;
                 this.refundTxId = response.data.txId;
                 if(save) await this._saveAndEmit();
-                return false;
+                return true;
             default:
                 this.state = OnchainForGasSwapState.FAILED;
                 if(save) await this._saveAndEmit();
-                return false;
+                return true;
         }
     }
 
@@ -323,8 +329,8 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         abortSignal?: AbortSignal,
         checkIntervalSeconds: number = 5,
         updateCallback?: (txId: string, txEtaMs: number) => void
-    ): Promise<void> {
-        if(this.state!==OnchainForGasSwapState.PR_CREATED && this.state!==OnchainForGasSwapState.REFUNDABLE) throw new Error("Must be in PR_CREATED state!");
+    ): Promise<boolean> {
+        if(this.state!==OnchainForGasSwapState.PR_CREATED) throw new Error("Must be in PR_CREATED state!");
 
         if(!this.initiated) {
             this.initiated = true;
@@ -333,7 +339,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
 
         while(
             !abortSignal.aborted &&
-            (this.state===OnchainForGasSwapState.PR_CREATED || this.state===OnchainForGasSwapState.REFUNDABLE)
+            this.state===OnchainForGasSwapState.PR_CREATED
         ) {
             await this.checkAddress(true);
             if(this.txId!=null && updateCallback!=null) {
@@ -347,12 +353,52 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
                     updateCallback(res.txid, delay);
                 }
             }
-            if(this.state===OnchainForGasSwapState.PR_CREATED || this.state===OnchainForGasSwapState.REFUNDABLE)
+            if(this.state===OnchainForGasSwapState.PR_CREATED)
                 await timeoutPromise(checkIntervalSeconds*1000, abortSignal);
         }
 
+        if(
+            (this.state as OnchainForGasSwapState)===OnchainForGasSwapState.REFUNDABLE ||
+            (this.state as OnchainForGasSwapState)===OnchainForGasSwapState.REFUNDED
+        ) return false;
         if(this.isQuoteExpired()) throw new PaymentAuthError("Swap expired");
         if(this.isFailed()) throw new PaymentAuthError("Swap failed");
+        return true;
+    }
+
+    async waitTillRefunded(
+        abortSignal?: AbortSignal,
+        checkIntervalSeconds: number = 5,
+    ): Promise<void> {
+        if(this.state===OnchainForGasSwapState.REFUNDED) return;
+        if(this.state!==OnchainForGasSwapState.REFUNDABLE) throw new Error("Must be in REFUNDABLE state!");
+
+        while(
+            !abortSignal.aborted &&
+            this.state===OnchainForGasSwapState.REFUNDABLE
+        ) {
+            await this.checkAddress(true);
+            if(this.state===OnchainForGasSwapState.REFUNDABLE)
+                await timeoutPromise(checkIntervalSeconds*1000, abortSignal);
+        }
+        if(this.isQuoteExpired()) throw new PaymentAuthError("Swap expired");
+        if(this.isFailed()) throw new PaymentAuthError("Swap failed");
+    }
+
+    async setRefundAddress(refundAddress: string): Promise<void> {
+        if(this.refundAddress!=null) {
+            if(this.refundAddress!==refundAddress) throw new Error("Different refund address already set!");
+            return;
+        }
+        await TrustedIntermediaryAPI.setRefundAddress(
+            this.url, this.paymentHash, this.sequence, refundAddress, this.wrapper.options.getRequestTimeout
+        );
+        this.refundAddress = refundAddress;
+    }
+
+    async refund(refundAddress?: string, abortSignal?: AbortSignal): Promise<void> {
+        if(refundAddress!=null) await this.setRefundAddress(refundAddress);
+        await this.waitTillRefunded(abortSignal);
     }
 
 

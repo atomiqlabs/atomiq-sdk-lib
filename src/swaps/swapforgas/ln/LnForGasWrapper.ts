@@ -5,6 +5,8 @@ import {TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediar
 import {decode as bolt11Decode} from "bolt11";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {ChainType} from "@atomiqlabs/base";
+import {Intermediary} from "../../../intermediaries/Intermediary";
+import {SwapType} from "../../SwapType";
 
 export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForGasSwap<T>> {
     protected readonly swapDeserializer = LnForGasSwap;
@@ -14,12 +16,12 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
      *
      * @param signer
      * @param amount            Amount you wish to receive in base units (satoshis)
-     * @param url               Intermediary/Counterparty swap service url
+     * @param lp               Intermediary/Counterparty swap service url
      */
-    async create(signer: string, amount: BN, url: string): Promise<LnForGasSwap<T>> {
+    async create(signer: string, amount: BN, lp: Intermediary): Promise<LnForGasSwap<T>> {
         if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
 
-        const resp = await TrustedIntermediaryAPI.initTrustedFromBTCLN(url, {
+        const resp = await TrustedIntermediaryAPI.initTrustedFromBTCLN(lp.url, {
             address: signer,
             amount
         }, this.options.getRequestTimeout);
@@ -30,7 +32,7 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
         if(!resp.total.eq(amount)) throw new IntermediaryError("Invalid total returned");
 
         const pricingInfo = await this.verifyReturnedPrice(
-            {swapFeePPM: 10000, swapBaseFee: 10}, false, amountIn,
+            lp.services[SwapType.TRUSTED_FROM_BTCLN], false, amountIn,
             amount, this.contract.getNativeCurrencyAddress(), resp
         );
 
@@ -39,7 +41,7 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
             outputAmount: resp.total,
             recipient: signer,
             pricingInfo,
-            url,
+            url: lp.url,
             expiry: decodedPr.timeExpireDate*1000,
             swapFee: resp.swapFee,
             feeRate: "",
@@ -54,11 +56,6 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
             //Check if it's maybe already paid
             const res = await swap.checkInvoicePaid(false);
             if(res!==null) return true;
-
-            if(swap.getTimeoutTime()<Date.now()) {
-                swap.state = LnForGasSwapState.EXPIRED;
-                return true;
-            }
         }
         return false;
     }

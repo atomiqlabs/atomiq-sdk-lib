@@ -1,15 +1,14 @@
 import * as BN from "bn.js";
 import {ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediaryAPI";
-import {decode as bolt11Decode} from "bolt11";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
-import {BtcRelay, ChainType, IStorageManager, RelaySynchronizer} from "@atomiqlabs/base";
+import {ChainType, IStorageManager} from "@atomiqlabs/base";
 import {OnchainForGasSwap, OnchainForGasSwapInit, OnchainForGasSwapState} from "./OnchainForGasSwap";
 import {BitcoinRpcWithTxoListener} from "../../../btc/BitcoinRpcWithTxoListener";
-import {FromBTCSwap} from "../../frombtc/onchain/FromBTCSwap";
 import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
-import {networks} from "bitcoinjs-lib";
+import {Intermediary} from "../../../intermediaries/Intermediary";
+import {SwapType} from "../../SwapType";
 
 export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
     protected readonly swapDeserializer = OnchainForGasSwap;
@@ -45,38 +44,42 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
     }
 
     /**
-     * Returns a newly created swap, receiving 'amount' on lightning network
+     * Returns a newly created swap, receiving 'amount' base units of gas token
      *
      * @param signer
-     * @param amount            Amount you wish to receive in base units (satoshis)
-     * @param url               Intermediary/Counterparty swap service url
+     * @param amount            Amount you wish to receive in base units
+     * @param lp                Intermediary/Counterparty swap service url
+     * @param refundAddress     Bitcoin address to receive refund on in case the counterparty cannot execute the swap
      */
-    async create(signer: string, amount: BN, url: string): Promise<OnchainForGasSwap<T>> {
+    async create(signer: string, amount: BN, lp: Intermediary, refundAddress?: string): Promise<OnchainForGasSwap<T>> {
         if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
 
-        const resp = await TrustedIntermediaryAPI.initTrustedFromBTCLN(url, {
+        const resp = await TrustedIntermediaryAPI.initTrustedFromBTC(lp.url, {
             address: signer,
-            amount
+            amount,
+            refundAddress
         }, this.options.getRequestTimeout);
-
-        const decodedPr = bolt11Decode(resp.pr);
-        const amountIn = new BN(decodedPr.millisatoshis).add(new BN(999)).div(new BN(1000));
 
         if(!resp.total.eq(amount)) throw new IntermediaryError("Invalid total returned");
 
         const pricingInfo = await this.verifyReturnedPrice(
-            {swapFeePPM: 10000, swapBaseFee: 10}, false, amountIn,
+            lp.services[SwapType.TRUSTED_FROM_BTC], false, resp.amountSats,
             amount, this.contract.getNativeCurrencyAddress(), resp
         );
 
         const quote = new OnchainForGasSwap(this, {
-            pr: resp.pr,
+            paymentHash: resp.paymentHash,
+            sequence: resp.sequence,
+            address: resp.btcAddress,
+            inputAmount: resp.amountSats,
             outputAmount: resp.total,
             recipient: signer,
+            refundAddress,
             pricingInfo,
-            url,
-            expiry: decodedPr.timeExpireDate*1000,
+            url: lp.url,
+            expiry: resp.expiresAt,
             swapFee: resp.swapFee,
+            swapFeeBtc: resp.swapFeeSats,
             feeRate: "",
             exactIn: false
         } as OnchainForGasSwapInit<T["Data"]>);
@@ -87,13 +90,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
     protected async checkPastSwap(swap: OnchainForGasSwap<T>): Promise<boolean> {
         if(swap.state===OnchainForGasSwapState.PR_CREATED) {
             //Check if it's maybe already paid
-            const res = await swap.checkInvoicePaid(false);
-            if(res!==null) return true;
-
-            if(swap.getTimeoutTime()<Date.now()) {
-                swap.state = OnchainForGasSwapState.EXPIRED;
-                return true;
-            }
+            return await swap.checkAddress(false);
         }
         return false;
     }

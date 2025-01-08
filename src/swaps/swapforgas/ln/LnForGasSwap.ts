@@ -35,7 +35,7 @@ export function isLnForGasSwapInit<T extends SwapData>(obj: any): obj is LnForGa
 }
 
 export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> {
-    protected readonly TYPE: SwapType = SwapType.FROM_BTCLN;
+    protected readonly TYPE: SwapType = SwapType.TRUSTED_FROM_BTCLN;
 
     //State: PR_CREATED
     private readonly pr: string;
@@ -166,7 +166,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     }
 
     isQuoteSoftExpired(): boolean {
-        return this.isQuoteExpired();
+        return this.getTimeoutTime()<Date.now();
     }
 
     isFailed(): boolean {

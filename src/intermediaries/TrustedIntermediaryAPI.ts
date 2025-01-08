@@ -22,6 +22,8 @@ export type AddressStatusResponse = {
     data: {
         adjustedAmount: string,
         adjustedTotal: string,
+        adjustedFee?: string,
+        adjustedFeeSats?: string,
         txId: string,
         scTxId: string
     }
@@ -31,6 +33,8 @@ export type AddressStatusResponse = {
     data: {
         adjustedAmount: string,
         adjustedTotal: string,
+        adjustedFee?: string,
+        adjustedFeeSats?: string,
         txId: string
     }
 } | {
