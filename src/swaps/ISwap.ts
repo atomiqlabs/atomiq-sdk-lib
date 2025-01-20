@@ -6,7 +6,7 @@ import {ISwapWrapper} from "./ISwapWrapper";
 import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isPriceInfoType, PriceInfoType} from "../prices/abstract/ISwapPrice";
 import {getLogger, LoggerType, timeoutPromise, tryWithRetries} from "../utils/Utils";
-import {SCToken, Token, TokenAmount} from "./Tokens";
+import {SCToken, Token, TokenAmount, toTokenAmount} from "./Tokens";
 import {SwapDirection} from "./SwapDirection";
 
 export type ISwapInit<T extends SwapData> = {
@@ -438,8 +438,18 @@ export abstract class ISwap<
     /**
      * Returns the transaction fee paid on the smart chain
      */
-    abstract getSmartChainNetworkFee?(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
-
+    async getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>> {
+        const swapContract: T["Contract"] & {getRawCommitFee?: (data: T["Data"], feeRate?: string) => Promise<BN>} = this.wrapper.contract;
+        return toTokenAmount(
+            await (
+                swapContract.getRawCommitFee!=null ?
+                    swapContract.getRawCommitFee(this.data, this.feeRate) :
+                    swapContract.getCommitFee(this.data, this.feeRate)
+            ),
+            this.wrapper.getNativeToken(),
+            this.wrapper.prices
+        );
+    }
 
     //////////////////////////////
     //// Storage

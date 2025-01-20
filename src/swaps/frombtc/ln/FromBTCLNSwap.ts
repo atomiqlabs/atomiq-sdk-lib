@@ -197,8 +197,14 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * Estimated transaction fee for commit & claim txs combined
      */
     async getCommitAndClaimFee(): Promise<BN> {
-        const commitFee = await this.wrapper.contract.getCommitFee(this.data, this.feeRate);
-        const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, this.feeRate);
+        const feeRate = this.feeRate ?? await this.wrapper.contract.getInitFeeRate(
+            this.data.getOfferer(),
+            this.data.getClaimer(),
+            this.data.getToken(),
+            this.data.getHash()
+        );
+        const commitFee = await this.wrapper.contract.getCommitFee(this.data, feeRate);
+        const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate);
         return commitFee.add(claimFee);
     }
 

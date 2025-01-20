@@ -175,10 +175,6 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         return toTokenAmount(this.data.getClaimerBounty(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
 
-    async getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>> {
-        return toTokenAmount(await this.getCommitFee(), this.wrapper.getNativeToken(), this.wrapper.prices);
-    }
-
     //////////////////////////////
     //// Bitcoin tx
 

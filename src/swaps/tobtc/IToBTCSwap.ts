@@ -232,9 +232,6 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         return this.wrapper.contract.getRefundFee(this.data);
     }
 
-    async getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>> {
-        return toTokenAmount(await this.getCommitFee(), this.wrapper.getNativeToken(), this.wrapper.prices);
-    }
 
     //////////////////////////////
     //// Commit
