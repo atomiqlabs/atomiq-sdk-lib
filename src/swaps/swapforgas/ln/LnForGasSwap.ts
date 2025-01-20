@@ -35,6 +35,8 @@ export function isLnForGasSwapInit<T extends SwapData>(obj: any): obj is LnForGa
 }
 
 export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> {
+    getSmartChainNetworkFee = null;
+
     protected readonly TYPE: SwapType = SwapType.FROM_BTCLN;
 
     //State: PR_CREATED

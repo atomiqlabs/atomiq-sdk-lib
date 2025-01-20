@@ -360,7 +360,7 @@ export class FromBTCWrapper<
         intermediary: Intermediary
     }[] {
         options ??= {};
-        options.blockSafetyFactor ??= 2;
+        options.blockSafetyFactor ??= 1;
         options.feeSafetyFactor ??= new BN(2);
 
         const sequence: BN = this.getRandomSequence();
