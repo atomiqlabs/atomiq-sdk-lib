@@ -1,4 +1,3 @@
-import {Transaction} from "bitcoinjs-lib";
 import * as BN from "bn.js";
 import {Buffer} from "buffer";
 import {fetchWithTimeout, tryWithRetries} from "../../utils/Utils";

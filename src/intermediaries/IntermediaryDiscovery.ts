@@ -183,6 +183,20 @@ export class IntermediaryDiscovery extends EventEmitter {
         };
     }
 
+    private async loadIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary> {
+        try {
+            const nodeInfo = await this.getNodeInfo(url, abortSignal);
+            const services: ServicesType = {};
+            for(let key in nodeInfo.info.services) {
+                services[swapHandlerTypeToSwapType(key as SwapHandlerType)] = nodeInfo.info.services[key];
+            }
+            return new Intermediary(url, nodeInfo.addresses, services);
+        } catch (e) {
+            logger.error("fetchIntermediaries(): Error contacting intermediary "+url+": ", e);
+            return null;
+        }
+    }
+
     /**
      * Fetches data about all intermediaries in the network, pinging every one of them and ensuring they are online
      *
@@ -195,21 +209,23 @@ export class IntermediaryDiscovery extends EventEmitter {
 
         logger.debug("fetchIntermediaries(): Pinging intermediaries: ", urls.join());
 
-        const promises: Promise<Intermediary | null>[] = urls.map(url => this.getNodeInfo(url, abortSignal).then((node) => {
-            const services: ServicesType = {};
-            for(let key in node.info.services) {
-                services[swapHandlerTypeToSwapType(key as SwapHandlerType)] = node.info.services[key];
-            }
-            return new Intermediary(url, node.addresses, services);
-        }).catch(e => {
-            logger.error("fetchIntermediaries(): Error contacting intermediary "+url+": ", e);
-            return null;
-        }));
+        const promises: Promise<Intermediary | null>[] = urls.map(url => this.loadIntermediary(url, abortSignal));
 
         const activeNodes: Intermediary[] = (await Promise.all(promises)).filter(intermediary => intermediary!=null);
         if(activeNodes.length===0) throw new Error("No online intermediary found!");
 
         return activeNodes;
+    }
+
+    /**
+     * Returns the intermediary at the provided URL, either from the already fetched list of LPs or fetches the data on-demand
+     *
+     * @param url
+     */
+    getIntermediary(url: string): Promise<Intermediary> {
+        const foundLp = this.intermediaries.find(lp => lp.url===url);
+        if(foundLp!=null) return Promise.resolve(foundLp);
+        return this.loadIntermediary(url);
     }
 
     /**

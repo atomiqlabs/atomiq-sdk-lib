@@ -4,4 +4,6 @@ export enum SwapType {
     FROM_BTCLN=1,
     TO_BTC=2,
     TO_BTCLN=3,
+    TRUSTED_FROM_BTC=4,
+    TRUSTED_FROM_BTCLN=5
 };

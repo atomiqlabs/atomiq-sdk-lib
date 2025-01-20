@@ -39,6 +39,8 @@ import {getLogger, objectMap} from "../utils/Utils";
 import {OutOfBoundsError} from "../errors/RequestError";
 import {SwapperWithChain} from "./SwapperWithChain";
 import {BtcToken, SCToken, Token} from "./Tokens";
+import {OnchainForGasSwap} from "./swapforgas/onchain/OnchainForGasSwap";
+import {OnchainForGasWrapper} from "./swapforgas/onchain/OnchainForGasWrapper";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -50,6 +52,7 @@ export type SwapperOptions = {
     postRequestTimeout?: number,
     defaultAdditionalParameters?: {[key: string]: any},
     storagePrefix?: string
+    defaultTrustedIntermediaryUrl?: string
 };
 
 export type MultiChain = {
@@ -62,11 +65,11 @@ export type ChainSpecificData<T extends ChainType> = {
     frombtcln: FromBTCLNWrapper<T>,
     frombtc: FromBTCWrapper<T>,
     lnforgas: LnForGasWrapper<T>,
+    onchainforgas: OnchainForGasWrapper<T>,
     chainEvents: T["Events"],
     swapContract: T["Contract"],
     btcRelay: BtcRelay<any, T["TX"], MempoolBitcoinBlock, T["Signer"]>,
-    synchronizer: RelaySynchronizer<any, T["TX"], MempoolBitcoinBlock>,
-    defaultTrustedIntermediaryUrl?: string
+    synchronizer: RelaySynchronizer<any, T["TX"], MempoolBitcoinBlock>
 };
 
 export type MultiChainData<T extends MultiChain> = {
@@ -83,9 +86,9 @@ export type CtorChainData<T extends ChainType> = {
         fromBtc?: IStorageManager<FromBTCSwap<T>>,
         toBtcLn?: IStorageManager<ToBTCLNSwap<T>>,
         fromBtcLn?: IStorageManager<FromBTCLNSwap<T>>,
-        lnForGas?: IStorageManager<LnForGasSwap<T>>
-    },
-    defaultTrustedIntermediaryUrl?: string
+        lnForGas?: IStorageManager<LnForGasSwap<T>>,
+        onchainForGas?: IStorageManager<OnchainForGasSwap<T>>
+    }
 };
 
 export type CtorMultiChainData<T extends MultiChain> = {
@@ -137,6 +140,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
     protected readonly logger = getLogger(this.constructor.name+": ");
 
     protected readonly swapStateListener: (swap: ISwap) => void;
+
+    private defaultTrustedIntermediary: Intermediary;
 
     readonly chains: MultiChainData<T>;
 
@@ -194,7 +199,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         };
 
         this.chains = objectMap<CtorMultiChainData<T>, MultiChainData<T>>(chainsData, <InputKey extends keyof CtorMultiChainData<T>>(chainData: CtorMultiChainData<T>[InputKey], key: string) => {
-            const {swapContract, chainEvents, btcRelay, defaultTrustedIntermediaryUrl} = chainData;
+            const {swapContract, chainEvents, btcRelay} = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
 
             const _storagePrefix = storagePrefix+key+"-";
@@ -271,12 +276,27 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                     postRequestTimeout: options.postRequestTimeout
                 }
             );
+            const onchainforgas = new OnchainForGasWrapper<T[InputKey]>(
+                key,
+                chainData.storage?.onchainForGas || new LocalStorageManager<OnchainForGasSwap<T[InputKey]>>(_storagePrefix + "OnchainForGas"),
+                swapContract,
+                chainEvents,
+                pricing,
+                tokens,
+                chainData.swapDataConstructor,
+                bitcoinRpc,
+                {
+                    getRequestTimeout: options.getRequestTimeout,
+                    postRequestTimeout: options.postRequestTimeout
+                }
+            );
 
             tobtcln.events.on("swapState", this.swapStateListener);
             tobtc.events.on("swapState", this.swapStateListener);
             frombtcln.events.on("swapState", this.swapStateListener);
             frombtc.events.on("swapState", this.swapStateListener);
             lnforgas.events.on("swapState", this.swapStateListener);
+            onchainforgas.events.on("swapState", this.swapStateListener);
 
             return {
                 chainEvents,
@@ -289,7 +309,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 frombtcln,
                 frombtc,
                 lnforgas,
-                defaultTrustedIntermediaryUrl
+                onchainforgas
             }
         });
 
@@ -442,7 +462,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 tobtc,
                 frombtcln,
                 frombtc,
-                lnforgas
+                lnforgas,
+                onchainforgas
             } = this.chains[chainIdentifier];
             await swapContract.start();
             this.logger.info("init(): Intialized swap contract: "+chainIdentifier);
@@ -459,12 +480,18 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             this.logger.info("init(): Initializing From BTC: "+chainIdentifier);
             await frombtc.init();
 
-            this.logger.info("init(): Initializing To LN for gas: "+chainIdentifier);
+            this.logger.info("init(): Initializing From BTCLN to gas: "+chainIdentifier);
             await lnforgas.init();
+            this.logger.info("init(): Initializing From BTC to gas: "+chainIdentifier);
+            await onchainforgas.init();
         }
 
         this.logger.info("init(): Initializing intermediary discovery");
         await this.intermediaryDiscovery.init();
+
+        if(this.options.defaultTrustedIntermediaryUrl!=null) {
+            this.defaultTrustedIntermediary = await this.intermediaryDiscovery.getIntermediary(this.options.defaultTrustedIntermediaryUrl);
+        }
     }
 
     /**
@@ -477,18 +504,21 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 tobtc,
                 frombtcln,
                 frombtc,
-                lnforgas
+                lnforgas,
+                onchainforgas
             } = this.chains[chainIdentifier];
             tobtcln.events.off("swapState", this.swapStateListener);
             tobtc.events.off("swapState", this.swapStateListener);
             frombtcln.events.off("swapState", this.swapStateListener);
             frombtc.events.off("swapState", this.swapStateListener);
             lnforgas.events.off("swapState", this.swapStateListener);
+            onchainforgas.events.off("swapState", this.swapStateListener);
             await tobtcln.stop();
             await tobtc.stop();
             await frombtcln.stop();
             await frombtc.stop();
             await lnforgas.stop();
+            await onchainforgas.stop();
         }
     }
 
@@ -1000,14 +1030,35 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param chainId
      * @param signer
      * @param amount                    Amount of native token to receive, in base units
-     * @param trustedIntermediaryUrl    URL of the trusted intermediary to use, otherwise uses default
-     * @throws {Error} If no trusted intermediary specified
+     * @param trustedIntermediaryOrUrl  URL or Intermediary object of the trusted intermediary to use, otherwise uses default
+     * @throws {Error}                  If no trusted intermediary specified
      */
-    createTrustedLNForGasSwap<C extends ChainIds<T>>(chainId: C | string, signer: string, amount: BN, trustedIntermediaryUrl?: string): Promise<LnForGasSwap<T[C]>> {
+    createTrustedLNForGasSwap<C extends ChainIds<T>>(chainId: C | string, signer: string, amount: BN, trustedIntermediaryOrUrl?: Intermediary | string): Promise<LnForGasSwap<T[C]>> {
         if(this.chains[chainId]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainId);
-        const useUrl = trustedIntermediaryUrl || this.chains[chainId].defaultTrustedIntermediaryUrl;
-        if(useUrl==null) throw new Error("No trusted intermediary URL specified!");
+        const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary;
+        if(useUrl==null) throw new Error("No trusted intermediary specified!");
         return this.chains[chainId as C].lnforgas.create(signer, amount, useUrl);
+    }
+
+    /**
+     * Creates trusted BTC on-chain for Gas swap
+     *
+     * @param chainId
+     * @param signer
+     * @param amount                    Amount of native token to receive, in base units
+     * @param refundAddress             Bitcoin refund address, in case the swap fails
+     * @param trustedIntermediaryOrUrl  URL or Intermediary object of the trusted intermediary to use, otherwise uses default
+     * @throws {Error}                  If no trusted intermediary specified
+     */
+    createTrustedOnchainForGasSwap<C extends ChainIds<T>>(
+        chainId: C | string, signer: string,
+        amount: BN, refundAddress?: string,
+        trustedIntermediaryOrUrl?: Intermediary | string
+    ): Promise<OnchainForGasSwap<T[C]>> {
+        if(this.chains[chainId]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainId);
+        const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary;
+        if(useUrl==null) throw new Error("No trusted intermediary specified!");
+        return this.chains[chainId as C].onchainforgas.create(signer, amount, useUrl, refundAddress);
     }
 
     /**

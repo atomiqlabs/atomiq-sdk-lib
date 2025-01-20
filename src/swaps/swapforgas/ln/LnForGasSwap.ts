@@ -36,8 +36,7 @@ export function isLnForGasSwapInit<T extends SwapData>(obj: any): obj is LnForGa
 
 export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> {
     getSmartChainNetworkFee = null;
-
-    protected readonly TYPE: SwapType = SwapType.FROM_BTCLN;
+    protected readonly TYPE: SwapType = SwapType.TRUSTED_FROM_BTCLN;
 
     //State: PR_CREATED
     private readonly pr: string;
@@ -168,7 +167,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     }
 
     isQuoteSoftExpired(): boolean {
-        return this.isQuoteExpired();
+        return this.getTimeoutTime()<Date.now();
     }
 
     isFailed(): boolean {
@@ -275,8 +274,10 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     async waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds: number = 5): Promise<void> {
         if(this.state!==LnForGasSwapState.PR_CREATED) throw new Error("Must be in PR_CREATED state!");
 
-        this.initiated = true;
-        await this._saveAndEmit();
+        if(!this.initiated) {
+            this.initiated = true;
+            await this._saveAndEmit();
+        }
 
         while(!abortSignal.aborted && this.state===LnForGasSwapState.PR_CREATED) {
             await this.checkInvoicePaid(true);
