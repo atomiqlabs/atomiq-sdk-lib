@@ -16,7 +16,7 @@ import {
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
 import {extendAbortController, getLogger, timeoutPromise, tryWithRetries} from "../../../utils/Utils";
-import {BitcoinTokens, BtcToken, TokenAmount, toTokenAmount} from "../../Tokens";
+import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
 
 export enum FromBTCLNSwapState {
     FAILED = -4,
@@ -197,9 +197,13 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * Estimated transaction fee for commit & claim txs combined
      */
     async getCommitAndClaimFee(): Promise<BN> {
-        const commitFee = await tryWithRetries(() => this.getCommitFee());
-        const claimFee = await tryWithRetries(() => this.getClaimFee());
+        const commitFee = await this.wrapper.contract.getCommitFee(this.data, this.feeRate);
+        const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, this.feeRate);
         return commitFee.add(claimFee);
+    }
+
+    async getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>> {
+        return toTokenAmount(await this.getCommitAndClaimFee(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
 
 

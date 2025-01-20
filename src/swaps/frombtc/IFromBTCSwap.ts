@@ -138,11 +138,11 @@ export abstract class IFromBTCSwap<
     }
 
     getSecurityDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getSecurityDeposit(), this.wrapper.tokens[this.wrapper.contract.getNativeCurrencyAddress()], this.wrapper.prices);
+        return toTokenAmount(this.data.getSecurityDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
 
     getTotalDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getTotalDeposit(), this.wrapper.tokens[this.wrapper.contract.getNativeCurrencyAddress()], this.wrapper.prices);
+        return toTokenAmount(this.data.getTotalDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
 
     getInitiator(): string {
