@@ -396,7 +396,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         this.refundAddress = refundAddress;
     }
 
-    async refund(refundAddress?: string, abortSignal?: AbortSignal): Promise<void> {
+    async requestRefund(refundAddress?: string, abortSignal?: AbortSignal): Promise<void> {
         if(refundAddress!=null) await this.setRefundAddress(refundAddress);
         await this.waitTillRefunded(abortSignal);
     }

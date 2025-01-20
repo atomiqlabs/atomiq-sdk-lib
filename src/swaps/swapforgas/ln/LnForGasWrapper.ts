@@ -16,12 +16,14 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
      *
      * @param signer
      * @param amount            Amount you wish to receive in base units (satoshis)
-     * @param lp               Intermediary/Counterparty swap service url
+     * @param lpOrUrl           Intermediary/Counterparty swap service Intermediary object or raw url
      */
-    async create(signer: string, amount: BN, lp: Intermediary): Promise<LnForGasSwap<T>> {
+    async create(signer: string, amount: BN, lpOrUrl: Intermediary | string): Promise<LnForGasSwap<T>> {
         if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
 
-        const resp = await TrustedIntermediaryAPI.initTrustedFromBTCLN(lp.url, {
+        const lpUrl = typeof(lpOrUrl)==="string" ? lpOrUrl : lpOrUrl.url;
+
+        const resp = await TrustedIntermediaryAPI.initTrustedFromBTCLN(this.chainIdentifier, lpUrl, {
             address: signer,
             amount
         }, this.options.getRequestTimeout);
@@ -32,7 +34,10 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
         if(!resp.total.eq(amount)) throw new IntermediaryError("Invalid total returned");
 
         const pricingInfo = await this.verifyReturnedPrice(
-            lp.services[SwapType.TRUSTED_FROM_BTCLN], false, amountIn,
+            typeof(lpOrUrl)==="string" ?
+                {swapFeePPM: 10000, swapBaseFee: 10} :
+                lpOrUrl.services[SwapType.TRUSTED_FROM_BTCLN],
+            false, amountIn,
             amount, this.contract.getNativeCurrencyAddress(), resp
         );
 
@@ -41,7 +46,7 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
             outputAmount: resp.total,
             recipient: signer,
             pricingInfo,
-            url: lp.url,
+            url: lpUrl,
             expiry: decodedPr.timeExpireDate*1000,
             swapFee: resp.swapFee,
             feeRate: "",

@@ -48,13 +48,15 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
      *
      * @param signer
      * @param amount            Amount you wish to receive in base units
-     * @param lp                Intermediary/Counterparty swap service url
+     * @param lpOrUrl           Intermediary/Counterparty swap service Intermediary object or raw url
      * @param refundAddress     Bitcoin address to receive refund on in case the counterparty cannot execute the swap
      */
-    async create(signer: string, amount: BN, lp: Intermediary, refundAddress?: string): Promise<OnchainForGasSwap<T>> {
+    async create(signer: string, amount: BN, lpOrUrl: Intermediary | string, refundAddress?: string): Promise<OnchainForGasSwap<T>> {
         if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
 
-        const resp = await TrustedIntermediaryAPI.initTrustedFromBTC(lp.url, {
+        const lpUrl = typeof(lpOrUrl)==="string" ? lpOrUrl : lpOrUrl.url;
+
+        const resp = await TrustedIntermediaryAPI.initTrustedFromBTC(this.chainIdentifier, lpUrl, {
             address: signer,
             amount,
             refundAddress
@@ -63,7 +65,10 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         if(!resp.total.eq(amount)) throw new IntermediaryError("Invalid total returned");
 
         const pricingInfo = await this.verifyReturnedPrice(
-            lp.services[SwapType.TRUSTED_FROM_BTC], false, resp.amountSats,
+            typeof(lpOrUrl)==="string" ?
+                {swapFeePPM: 10000, swapBaseFee: 10} :
+                lpOrUrl.services[SwapType.TRUSTED_FROM_BTC],
+            false, resp.amountSats,
             amount, this.contract.getNativeCurrencyAddress(), resp
         );
 
@@ -76,7 +81,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
             recipient: signer,
             refundAddress,
             pricingInfo,
-            url: lp.url,
+            url: lpUrl,
             expiry: resp.expiresAt,
             swapFee: resp.swapFee,
             swapFeeBtc: resp.swapFeeSats,

@@ -133,6 +133,7 @@ export class TrustedIntermediaryAPI {
     /**
      * Initiate a trusted swap from BTCLN to SC native currency, retries!
      *
+     * @param chainIdentifier
      * @param baseUrl Base url of the trusted swap intermediary
      * @param init Initialization parameters
      * @param timeout Timeout in milliseconds for the request
@@ -140,6 +141,7 @@ export class TrustedIntermediaryAPI {
      * @throws {RequestError} If the response is non-200
      */
     static async initTrustedFromBTCLN(
+        chainIdentifier: string,
         baseUrl: string,
         init: TrustedFromBTCLNInit,
         timeout?: number,
@@ -148,8 +150,9 @@ export class TrustedIntermediaryAPI {
         const resp = await tryWithRetries(
             () => httpGet<{code: number, msg: string, data?: any}>(
                 baseUrl+"/lnforgas/createInvoice" +
-                    "?address="+encodeURIComponent(init.address)+"" +
-                    "&amount="+encodeURIComponent(init.amount.toString(10)),
+                    "?address="+encodeURIComponent(init.address) +
+                    "&amount="+encodeURIComponent(init.amount.toString(10))+
+                    "&chain="+encodeURIComponent(chainIdentifier),
                 timeout,
                 abortSignal
             ), null, RequestError, abortSignal
@@ -213,6 +216,7 @@ export class TrustedIntermediaryAPI {
     /**
      * Initiate a trusted swap from BTC to SC native currency, retries!
      *
+     * @param chainIdentifier
      * @param baseUrl Base url of the trusted swap intermediary
      * @param init Initialization parameters
      * @param timeout Timeout in milliseconds for the request
@@ -220,6 +224,7 @@ export class TrustedIntermediaryAPI {
      * @throws {RequestError} If the response is non-200
      */
     static async initTrustedFromBTC(
+        chainIdentifier: string,
         baseUrl: string,
         init: TrustedFromBTCInit,
         timeout?: number,
@@ -227,7 +232,7 @@ export class TrustedIntermediaryAPI {
     ): Promise<TrustedFromBTCResponseType> {
         const resp = await tryWithRetries(
             () => httpPost<{code: number, msg: string, data?: any}>(
-                baseUrl+"/frombtc_trusted/getAddress",
+                baseUrl+"/frombtc_trusted/getAddress?chain="+encodeURIComponent(chainIdentifier),
                 {
                     address: init.address,
                     amount: init.amount.toString(10),
