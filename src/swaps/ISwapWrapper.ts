@@ -394,4 +394,11 @@ export abstract class ISwapWrapper<
         return array;
     }
 
+    /**
+     * Returns the smart chain's native token used to pay for fees
+     */
+    public getNativeToken(): SCToken<T["ChainId"]> {
+        return this.tokens[this.contract.getNativeCurrencyAddress()];
+    }
+
 }
