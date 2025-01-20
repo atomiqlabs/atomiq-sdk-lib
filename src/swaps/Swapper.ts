@@ -1035,7 +1035,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      */
     createTrustedLNForGasSwap<C extends ChainIds<T>>(chainId: C | string, signer: string, amount: BN, trustedIntermediaryOrUrl?: Intermediary | string): Promise<LnForGasSwap<T[C]>> {
         if(this.chains[chainId]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainId);
-        const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary;
+        const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary ?? this.options.defaultTrustedIntermediaryUrl;
         if(useUrl==null) throw new Error("No trusted intermediary specified!");
         return this.chains[chainId as C].lnforgas.create(signer, amount, useUrl);
     }
@@ -1056,7 +1056,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         trustedIntermediaryOrUrl?: Intermediary | string
     ): Promise<OnchainForGasSwap<T[C]>> {
         if(this.chains[chainId]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainId);
-        const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary;
+        const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary ?? this.options.defaultTrustedIntermediaryUrl;
         if(useUrl==null) throw new Error("No trusted intermediary specified!");
         return this.chains[chainId as C].onchainforgas.create(signer, amount, useUrl, refundAddress);
     }

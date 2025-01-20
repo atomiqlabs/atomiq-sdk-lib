@@ -13,6 +13,8 @@ export enum SwapHandlerType {
     FROM_BTC = "FROM_BTC",
     TO_BTCLN = "TO_BTCLN",
     FROM_BTCLN = "FROM_BTCLN",
+    FROM_BTC_TRUSTED = "FROM_BTC_TRUSTED",
+    FROM_BTCLN_TRUSTED = "FROM_BTCLN_TRUSTED",
 }
 
 export type SwapHandlerInfoType = {
@@ -67,6 +69,10 @@ function swapHandlerTypeToSwapType(swapHandlerType: SwapHandlerType): SwapType {
             return SwapType.FROM_BTCLN;
         case SwapHandlerType.TO_BTCLN:
             return SwapType.TO_BTCLN;
+        case SwapHandlerType.FROM_BTC_TRUSTED:
+            return SwapType.TRUSTED_FROM_BTC;
+        case SwapHandlerType.FROM_BTCLN_TRUSTED:
+            return SwapType.TRUSTED_FROM_BTCLN;
     }
 }
 
