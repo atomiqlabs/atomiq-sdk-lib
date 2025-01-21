@@ -18,7 +18,8 @@ export enum LnForGasSwapState {
     EXPIRED = -2,
     FAILED = -1,
     PR_CREATED = 0,
-    FINISHED = 1
+    PR_PAID = 1,
+    FINISHED = 2
 }
 
 export type LnForGasSwapInit<T extends SwapData> = ISwapInit<T> & {
@@ -36,6 +37,7 @@ export function isLnForGasSwapInit<T extends SwapData>(obj: any): obj is LnForGa
 
 export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> {
     getSmartChainNetworkFee = null;
+    protected readonly currentVersion: number = 2;
     protected readonly TYPE: SwapType = SwapType.TRUSTED_FROM_BTCLN;
 
     //State: PR_CREATED
@@ -78,6 +80,10 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     }
 
     protected upgradeVersion() {
+        if(this.version == 1) {
+            if(this.state===1) this.state = LnForGasSwapState.FINISHED;
+            this.version = 2;
+        }
         if(this.version == null) {
             //Noop
             this.version = 1;
@@ -237,22 +243,38 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         const response = await TrustedIntermediaryAPI.getInvoiceStatus(
             this.url, paymentHash, this.wrapper.options.getRequestTimeout
         );
+        this.logger.debug("checkInvoicePaid(): LP response: ", response);
         switch(response.code) {
             case InvoiceStatusResponseCodes.PAID:
-                const txStatus = await this.wrapper.contract.getTxIdStatus(response.data.txId);
+                this.scTxId = response.data.txId;
+                const txStatus = await this.wrapper.contract.getTxIdStatus(this.scTxId);
                 if(txStatus==="success") {
                     this.state = LnForGasSwapState.FINISHED;
-                    this.scTxId = response.data.txId;
                     if(save) await this._saveAndEmit();
                     return true;
                 }
                 return null;
             case InvoiceStatusResponseCodes.EXPIRED:
-                this.state = LnForGasSwapState.EXPIRED;
+                if(this.state===LnForGasSwapState.PR_CREATED) {
+                    this.state = LnForGasSwapState.EXPIRED;
+                } else {
+                    this.state = LnForGasSwapState.FAILED;
+                }
                 if(save) await this._saveAndEmit();
                 return false;
-            case InvoiceStatusResponseCodes.PENDING:
             case InvoiceStatusResponseCodes.TX_SENT:
+                this.scTxId = response.data.txId;
+                if(this.state===LnForGasSwapState.PR_CREATED) {
+                    this.state = LnForGasSwapState.PR_PAID;
+                    if(save) await this._saveAndEmit();
+                }
+                return null;
+            case InvoiceStatusResponseCodes.PENDING:
+                if(this.state===LnForGasSwapState.PR_CREATED) {
+                    this.state = LnForGasSwapState.PR_PAID;
+                    if(save) await this._saveAndEmit();
+                }
+                return null;
             case InvoiceStatusResponseCodes.AWAIT_PAYMENT:
                 return null;
             default:
@@ -279,13 +301,13 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
             await this._saveAndEmit();
         }
 
-        while(!abortSignal.aborted && this.state===LnForGasSwapState.PR_CREATED) {
+        while(!abortSignal.aborted && (this.state===LnForGasSwapState.PR_CREATED || this.state===LnForGasSwapState.PR_PAID)) {
             await this.checkInvoicePaid(true);
-            if(this.state===LnForGasSwapState.PR_CREATED) await timeoutPromise(checkIntervalSeconds*1000, abortSignal);
+            if(this.state===LnForGasSwapState.PR_CREATED || this.state===LnForGasSwapState.PR_PAID) await timeoutPromise(checkIntervalSeconds*1000, abortSignal);
         }
 
-        if(this.isQuoteExpired()) throw new PaymentAuthError("Swap expired");
         if(this.isFailed()) throw new PaymentAuthError("Swap failed");
+        if(this.isQuoteExpired()) throw new PaymentAuthError("Swap expired");
     }
 
 
