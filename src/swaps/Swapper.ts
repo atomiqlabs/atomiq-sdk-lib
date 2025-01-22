@@ -1254,7 +1254,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             commitFee = commitFee.mul(new BN(Math.floor(feeMultiplier*1000000))).div(new BN(1000000));
         }
 
-        return balance.sub(commitFee);
+        return BN.max(balance.sub(commitFee), new BN(0));
     }
 
     /**
