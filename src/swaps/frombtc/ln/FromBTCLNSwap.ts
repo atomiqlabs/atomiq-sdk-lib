@@ -197,19 +197,48 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * Estimated transaction fee for commit & claim txs combined
      */
     async getCommitAndClaimFee(): Promise<BN> {
-        const feeRate = this.feeRate ?? await this.wrapper.contract.getInitFeeRate(
+        const swapContract: T["Contract"] & {getRawCommitFee?: (data: T["Data"], feeRate?: string) => Promise<BN>} = this.wrapper.contract;
+        const feeRate = this.feeRate ?? await swapContract.getInitFeeRate(
             this.data.getOfferer(),
             this.data.getClaimer(),
             this.data.getToken(),
             this.data.getHash()
         );
-        const commitFee = await this.wrapper.contract.getCommitFee(this.data, feeRate);
+        const commitFee = await (
+            swapContract.getRawCommitFee!=null ?
+                swapContract.getRawCommitFee(this.data, this.feeRate) :
+                swapContract.getCommitFee(this.data, this.feeRate)
+        );
         const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate);
         return commitFee.add(claimFee);
     }
 
     async getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>> {
         return toTokenAmount(await this.getCommitAndClaimFee(), this.wrapper.getNativeToken(), this.wrapper.prices);
+    }
+
+    async hasEnoughForTxFees(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
+        const [balance, feeRate] = await Promise.all([
+            this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.contract.getNativeCurrencyAddress(), false),
+            this.feeRate!=null ? Promise.resolve<string>(this.feeRate) : this.wrapper.contract.getInitFeeRate(
+                this.data.getOfferer(),
+                this.data.getClaimer(),
+                this.data.getToken(),
+                this.data.getHash()
+            )
+        ]);
+        const commitFee = await this.wrapper.contract.getCommitFee(this.data, feeRate);
+        const claimFee = await (
+            this.wrapper.contract.getRawClaimFee!=null ?
+                this.wrapper.contract.getRawClaimFee(this.getInitiator(), this.data, feeRate) :
+                this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate)
+        );
+        const totalFee = commitFee.add(claimFee).add(this.data.getTotalDeposit());
+        return {
+            enoughBalance: balance.gte(totalFee),
+            balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
+            required: toTokenAmount(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices)
+        };
     }
 
 

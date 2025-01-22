@@ -328,4 +328,12 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         return this.recipient;
     }
 
+    hasEnoughForTxFees(): Promise<{ enoughBalance: boolean; balance: TokenAmount; required: TokenAmount }> {
+        return Promise.resolve({
+            balance: toTokenAmount(new BN(0), this.wrapper.getNativeToken(), this.wrapper.prices),
+            enoughBalance: true,
+            required: toTokenAmount(new BN(0), this.wrapper.getNativeToken(), this.wrapper.prices)
+        });
+    }
+
 }

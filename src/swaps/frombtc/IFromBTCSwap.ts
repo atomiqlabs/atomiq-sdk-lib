@@ -153,6 +153,19 @@ export abstract class IFromBTCSwap<
         return this.wrapper.contract.getClaimFee(this.getInitiator(), this.data);
     }
 
+    async hasEnoughForTxFees(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
+        const [balance, commitFee] = await Promise.all([
+            this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.contract.getNativeCurrencyAddress(), false),
+            this.getCommitFee()
+        ]);
+        const totalFee = commitFee.add(this.data.getTotalDeposit());
+        return {
+            enoughBalance: balance.gte(totalFee),
+            balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
+            required: toTokenAmount(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices)
+        };
+    }
+
 
     //////////////////////////////
     //// Commit

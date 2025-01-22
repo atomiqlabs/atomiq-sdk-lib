@@ -451,6 +451,11 @@ export abstract class ISwap<
         );
     }
 
+    /**
+     * Checks if the initiator/sender has enough balance to cover the transaction fee for processing the swap
+     */
+    abstract hasEnoughForTxFees(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}>;
+
     //////////////////////////////
     //// Storage
 

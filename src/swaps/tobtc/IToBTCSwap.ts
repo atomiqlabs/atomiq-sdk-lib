@@ -15,7 +15,7 @@ import {
 } from "../../intermediaries/IntermediaryAPI";
 import {IntermediaryError} from "../../errors/IntermediaryError";
 import {extendAbortController, timeoutPromise, tryWithRetries} from "../../utils/Utils";
-import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../Tokens";
+import {BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../Tokens";
 
 export type IToBTCSwapInit<T extends SwapData> = ISwapInit<T> & {
     networkFee: BN,
@@ -230,6 +230,38 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
      */
     getRefundFee(): Promise<BN> {
         return this.wrapper.contract.getRefundFee(this.data);
+    }
+
+    /**
+     * Checks if the intiator/sender has enough balance to go through with the swap
+     */
+    async hasEnoughBalance(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
+        const [balance, commitFee] = await Promise.all([
+            this.wrapper.contract.getBalance(this.getInitiator(), this.data.getToken(), false),
+            this.data.getToken()===this.wrapper.contract.getNativeCurrencyAddress() ? this.getCommitFee() : Promise.resolve<BN>(null)
+        ]);
+        let required = this.data.getAmount();
+        if(commitFee!=null) required = required.add(commitFee);
+        return {
+            enoughBalance: balance.gte(required),
+            balance: toTokenAmount(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
+            required: toTokenAmount(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices)
+        };
+    }
+
+    /**
+     * Check if the initiator/sender has enough balance to cover the transaction fee for processing the swap
+     */
+    async hasEnoughForTxFees(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
+        const [balance, commitFee] = await Promise.all([
+            this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.contract.getNativeCurrencyAddress(), false),
+            this.getCommitFee()
+        ]);
+        return {
+            enoughBalance: balance.gte(commitFee),
+            balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
+            required: toTokenAmount(commitFee, this.wrapper.getNativeToken(), this.wrapper.prices)
+        };
     }
 
 
