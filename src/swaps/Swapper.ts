@@ -1240,10 +1240,12 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         let [balance, commitFee] = await Promise.all([
             this.getBalance(chainIdentifier, signer, token),
             this.chains[chainIdentifier].swapContract.getCommitFee(
+                //Use large amount, such that the fee for wrapping more tokens is always included!
                 await swapContract.createSwapData(
-                    ChainSwapType.HTLC, signer, null, token, null, null,
-                    null, null, null, null, true,
-                    false, null, null
+                    ChainSwapType.HTLC, signer, null, token,
+                    new BN("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "hex"),
+                    null, null, null, null, null,
+                    true, false, null, null
                 ),
             )
         ]);

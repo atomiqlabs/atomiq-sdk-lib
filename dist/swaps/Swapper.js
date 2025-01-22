@@ -807,7 +807,9 @@ class Swapper extends events_1.EventEmitter {
                 return yield this.getBalance(chainIdentifier, signer, token);
             let [balance, commitFee] = yield Promise.all([
                 this.getBalance(chainIdentifier, signer, token),
-                this.chains[chainIdentifier].swapContract.getCommitFee(yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token, null, null, null, null, null, null, true, false, null, null))
+                this.chains[chainIdentifier].swapContract.getCommitFee(
+                //Use large amount, such that the fee for wrapping more tokens is always included!
+                yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token, new BN("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "hex"), null, null, null, null, null, true, false, null, null))
             ]);
             if (feeMultiplier != null) {
                 commitFee = commitFee.mul(new BN(Math.floor(feeMultiplier * 1000000))).div(new BN(1000000));
