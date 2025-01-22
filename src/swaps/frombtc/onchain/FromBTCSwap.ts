@@ -133,7 +133,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
     }
 
     isActionable(): boolean {
-        return this.isClaimable() || this.state===FromBTCSwapState.CLAIM_COMMITED;
+        return this.isClaimable() || (this.state===FromBTCSwapState.CLAIM_COMMITED && this.getTimeoutTime()>Date.now());
     }
 
     isSuccessful(): boolean {

@@ -119,7 +119,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
         return this.state === FromBTCSwapState.BTC_TX_CONFIRMED;
     }
     isActionable() {
-        return this.isClaimable() || this.state === FromBTCSwapState.CLAIM_COMMITED;
+        return this.isClaimable() || (this.state === FromBTCSwapState.CLAIM_COMMITED && this.getTimeoutTime() > Date.now());
     }
     isSuccessful() {
         return this.state === FromBTCSwapState.CLAIM_CLAIMED;
