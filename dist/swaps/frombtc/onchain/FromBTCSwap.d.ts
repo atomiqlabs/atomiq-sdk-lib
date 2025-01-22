@@ -48,6 +48,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     getTimeoutTime(): number;
     isFinished(): boolean;
     isClaimable(): boolean;
+    isActionable(): boolean;
     isSuccessful(): boolean;
     isFailed(): boolean;
     isQuoteExpired(): boolean;

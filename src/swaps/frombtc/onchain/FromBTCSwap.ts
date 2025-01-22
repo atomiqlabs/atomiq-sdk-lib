@@ -132,6 +132,10 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         return this.state===FromBTCSwapState.BTC_TX_CONFIRMED;
     }
 
+    isActionable(): boolean {
+        return this.isClaimable() || this.state===FromBTCSwapState.CLAIM_COMMITED;
+    }
+
     isSuccessful(): boolean {
         return this.state===FromBTCSwapState.CLAIM_CLAIMED;
     }
