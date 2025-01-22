@@ -206,10 +206,14 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         );
         const commitFee = await (
             swapContract.getRawCommitFee!=null ?
-                swapContract.getRawCommitFee(this.data, this.feeRate) :
-                swapContract.getCommitFee(this.data, this.feeRate)
+                swapContract.getRawCommitFee(this.data, feeRate) :
+                swapContract.getCommitFee(this.data, feeRate)
         );
-        const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate);
+        const claimFee = await (
+            swapContract.getRawClaimFee!=null ?
+                swapContract.getRawClaimFee(this.getInitiator(), this.data, feeRate) :
+                swapContract.getClaimFee(this.getInitiator(), this.data, feeRate)
+        );
         return commitFee.add(claimFee);
     }
 
@@ -228,11 +232,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
             )
         ]);
         const commitFee = await this.wrapper.contract.getCommitFee(this.data, feeRate);
-        const claimFee = await (
-            this.wrapper.contract.getRawClaimFee!=null ?
-                this.wrapper.contract.getRawClaimFee(this.getInitiator(), this.data, feeRate) :
-                this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate)
-        );
+        const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate);
         const totalFee = commitFee.add(claimFee).add(this.data.getTotalDeposit());
         return {
             enoughBalance: balance.gte(totalFee),

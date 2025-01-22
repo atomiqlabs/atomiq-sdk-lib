@@ -225,12 +225,7 @@ export class FromBTCWrapper<
                 tryWithRetries(() => this.btcRelay.getFeePerBlock(), null, null, abortController.signal),
                 tryWithRetries(() => this.btcRelay.getTipData(), null, null, abortController.signal),
                 this.btcRpc.getTipHeight(),
-                tryWithRetries<BN>(
-                    () => this.contract.getRawClaimFee!=null ?
-                        this.contract.getRawClaimFee(signer, dummySwapData) :
-                        this.contract.getClaimFee(signer, dummySwapData),
-                    null, null, abortController.signal
-                )
+                tryWithRetries<BN>(() => this.contract.getClaimFee(signer, dummySwapData), null, null, abortController.signal)
             ]);
 
             const currentBtcRelayBlock = btcRelayData.blockheight;

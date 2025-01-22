@@ -168,9 +168,11 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             const swapContract = this.wrapper.contract;
             const feeRate = (_a = this.feeRate) !== null && _a !== void 0 ? _a : yield swapContract.getInitFeeRate(this.data.getOfferer(), this.data.getClaimer(), this.data.getToken(), this.data.getHash());
             const commitFee = yield (swapContract.getRawCommitFee != null ?
-                swapContract.getRawCommitFee(this.data, this.feeRate) :
-                swapContract.getCommitFee(this.data, this.feeRate));
-            const claimFee = yield this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate);
+                swapContract.getRawCommitFee(this.data, feeRate) :
+                swapContract.getCommitFee(this.data, feeRate));
+            const claimFee = yield (swapContract.getRawClaimFee != null ?
+                swapContract.getRawClaimFee(this.getInitiator(), this.data, feeRate) :
+                swapContract.getClaimFee(this.getInitiator(), this.data, feeRate));
             return commitFee.add(claimFee);
         });
     }
@@ -186,9 +188,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                 this.feeRate != null ? Promise.resolve(this.feeRate) : this.wrapper.contract.getInitFeeRate(this.data.getOfferer(), this.data.getClaimer(), this.data.getToken(), this.data.getHash())
             ]);
             const commitFee = yield this.wrapper.contract.getCommitFee(this.data, feeRate);
-            const claimFee = yield (this.wrapper.contract.getRawClaimFee != null ?
-                this.wrapper.contract.getRawClaimFee(this.getInitiator(), this.data, feeRate) :
-                this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate));
+            const claimFee = yield this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate);
             const totalFee = commitFee.add(claimFee).add(this.data.getTotalDeposit());
             return {
                 enoughBalance: balance.gte(totalFee),

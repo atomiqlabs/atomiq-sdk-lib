@@ -168,9 +168,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                     (0, Utils_1.tryWithRetries)(() => this.btcRelay.getFeePerBlock(), null, null, abortController.signal),
                     (0, Utils_1.tryWithRetries)(() => this.btcRelay.getTipData(), null, null, abortController.signal),
                     this.btcRpc.getTipHeight(),
-                    (0, Utils_1.tryWithRetries)(() => this.contract.getRawClaimFee != null ?
-                        this.contract.getRawClaimFee(signer, dummySwapData) :
-                        this.contract.getClaimFee(signer, dummySwapData), null, null, abortController.signal)
+                    (0, Utils_1.tryWithRetries)(() => this.contract.getClaimFee(signer, dummySwapData), null, null, abortController.signal)
                 ]);
                 const currentBtcRelayBlock = btcRelayData.blockheight;
                 const addBlock = Math.max(currentBtcBlock - currentBtcRelayBlock, 0);
