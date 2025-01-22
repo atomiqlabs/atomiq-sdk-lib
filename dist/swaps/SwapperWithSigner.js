@@ -177,6 +177,12 @@ class SwapperWithSigner {
         return this.swapper.getBalance(this.signer.getAddress(), token);
     }
     /**
+     * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
+     */
+    getSpendableBalance(token, feeMultiplier) {
+        return this.swapper.getSpendableBalance(this.signer.getAddress(), token, feeMultiplier);
+    }
+    /**
      * Returns the native token balance of the wallet
      */
     getNativeBalance() {

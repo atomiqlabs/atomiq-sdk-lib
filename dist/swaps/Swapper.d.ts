@@ -3,7 +3,7 @@
 /// <reference types="node" />
 import { BitcoinNetwork } from "../btc/BitcoinNetwork";
 import { ISwapPrice } from "../prices/abstract/ISwapPrice";
-import { ChainType, IStorageManager } from "@atomiqlabs/base";
+import { BtcRelay, ChainType, IStorageManager, RelaySynchronizer } from "@atomiqlabs/base";
 import { ToBTCLNWrapper } from "./tobtc/ln/ToBTCLNWrapper";
 import { ToBTCWrapper } from "./tobtc/onchain/ToBTCWrapper";
 import { FromBTCLNWrapper } from "./frombtc/ln/FromBTCLNWrapper";
@@ -21,7 +21,6 @@ import { ToBTCLNSwap } from "./tobtc/ln/ToBTCLNSwap";
 import { ToBTCSwap } from "./tobtc/onchain/ToBTCSwap";
 import { MempoolApi } from "../btc/mempool/MempoolApi";
 import { MempoolBitcoinRpc } from "../btc/mempool/MempoolBitcoinRpc";
-import { BtcRelay, RelaySynchronizer } from "@atomiqlabs/base";
 import { LnForGasWrapper } from "./swapforgas/ln/LnForGasWrapper";
 import { LnForGasSwap } from "./swapforgas/ln/LnForGasSwap";
 import { EventEmitter } from "events";
@@ -360,6 +359,8 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
     getClaimableSwaps<C extends ChainIds<T>>(chainId: C | string, signer?: string): Promise<IFromBTCSwap<T[C]>[]>;
     getBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier | string>): Promise<BN>;
     getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, token: string): Promise<BN>;
+    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier | string>, feeMultiplier?: number): Promise<BN>;
+    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, token: string, feeMultiplier?: number): Promise<BN>;
     /**
      * Returns the native token balance of the wallet
      */

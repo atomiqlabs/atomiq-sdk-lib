@@ -1,9 +1,6 @@
 import {BitcoinNetwork} from "../btc/BitcoinNetwork";
 import {ISwapPrice} from "../prices/abstract/ISwapPrice";
-import {
-    ChainType,
-    IStorageManager
-} from "@atomiqlabs/base";
+import {BtcRelay, ChainSwapType, ChainType, IStorageManager, RelaySynchronizer} from "@atomiqlabs/base";
 import {ToBTCLNWrapper} from "./tobtc/ln/ToBTCLNWrapper";
 import {ToBTCWrapper} from "./tobtc/onchain/ToBTCWrapper";
 import {FromBTCLNWrapper} from "./frombtc/ln/FromBTCLNWrapper";
@@ -23,7 +20,6 @@ import {ToBTCLNSwap} from "./tobtc/ln/ToBTCLNSwap";
 import {ToBTCSwap} from "./tobtc/onchain/ToBTCSwap";
 import {MempoolApi} from "../btc/mempool/MempoolApi";
 import {MempoolBitcoinRpc} from "../btc/mempool/MempoolBitcoinRpc";
-import {BtcRelay, RelaySynchronizer} from "@atomiqlabs/base";
 import {MempoolBtcRelaySynchronizer} from "../btc/mempool/synchronizer/MempoolBtcRelaySynchronizer";
 import {LnForGasWrapper} from "./swapforgas/ln/LnForGasWrapper";
 import {LnForGasSwap} from "./swapforgas/ln/LnForGasSwap";
@@ -33,7 +29,7 @@ import {IndexedDBStorageManager} from "../storage/IndexedDBStorageManager";
 import {MempoolBitcoinBlock} from "../btc/mempool/MempoolBitcoinBlock";
 import {LocalStorageManager} from "../storage/LocalStorageManager";
 import {Intermediary} from "../intermediaries/Intermediary";
-import {isLNURLPay, isLNURLWithdraw, isLNURLWithdrawParams, LNURL, LNURLPay, LNURLWithdraw} from "../utils/LNURL";
+import {isLNURLPay, isLNURLWithdraw, LNURL, LNURLPay, LNURLWithdraw} from "../utils/LNURL";
 import {AmountData, WrapperCtorTokens} from "./ISwapWrapper";
 import {getLogger, objectMap} from "../utils/Utils";
 import {OutOfBoundsError} from "../errors/RequestError";
@@ -1208,6 +1204,55 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         }
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         return this.chains[chainIdentifier].swapContract.getBalance(signer, token, false);
+    }
+
+    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier | string>, feeMultiplier?: number): Promise<BN>;
+    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, token: string, feeMultiplier?: number): Promise<BN>;
+
+    /**
+     * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
+     */
+    async getSpendableBalance<ChainIdentifier extends ChainIds<T>>(
+        chainIdentifierOrSigner: ChainIdentifier | string,
+        signerOrToken: string | SCToken<ChainIdentifier | string>,
+        tokenOrFeeMultiplier?: string | number,
+        feeMultiplier?: number
+    ): Promise<BN> {
+        let chainIdentifier: ChainIdentifier | string;
+        let signer: string;
+        let token: string;
+        if(typeof(signerOrToken)==="string") {
+            chainIdentifier = chainIdentifierOrSigner;
+            signer = signerOrToken;
+            token = tokenOrFeeMultiplier as string;
+        } else {
+            chainIdentifier = signerOrToken.chainId;
+            token = signerOrToken.address;
+            signer = chainIdentifierOrSigner;
+            feeMultiplier = tokenOrFeeMultiplier as number;
+        }
+        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+
+        const swapContract = this.chains[chainIdentifier].swapContract;
+
+        if(swapContract.getNativeCurrencyAddress()!==token) return await this.getBalance(chainIdentifier, signer, token);
+
+        let [balance, commitFee] = await Promise.all([
+            this.getBalance(chainIdentifier, signer, token),
+            this.chains[chainIdentifier].swapContract.getCommitFee(
+                await swapContract.createSwapData(
+                    ChainSwapType.HTLC, signer, null, token, null, null,
+                    null, null, null, null, true,
+                    false, null, null
+                ),
+            )
+        ]);
+
+        if(feeMultiplier!=null) {
+            commitFee = commitFee.mul(new BN(Math.floor(feeMultiplier*1000000))).div(new BN(1000000));
+        }
+
+        return balance.sub(commitFee);
     }
 
     /**

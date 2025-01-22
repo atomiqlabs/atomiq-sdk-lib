@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Swapper = void 0;
 const BitcoinNetwork_1 = require("../btc/BitcoinNetwork");
+const base_1 = require("@atomiqlabs/base");
 const ToBTCLNWrapper_1 = require("./tobtc/ln/ToBTCLNWrapper");
 const ToBTCWrapper_1 = require("./tobtc/onchain/ToBTCWrapper");
 const FromBTCLNWrapper_1 = require("./frombtc/ln/FromBTCLNWrapper");
@@ -779,6 +780,40 @@ class Swapper extends events_1.EventEmitter {
         if (this.chains[chainIdentifier] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
         return this.chains[chainIdentifier].swapContract.getBalance(signer, token, false);
+    }
+    /**
+     * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
+     */
+    getSpendableBalance(chainIdentifierOrSigner, signerOrToken, tokenOrFeeMultiplier, feeMultiplier) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let chainIdentifier;
+            let signer;
+            let token;
+            if (typeof (signerOrToken) === "string") {
+                chainIdentifier = chainIdentifierOrSigner;
+                signer = signerOrToken;
+                token = tokenOrFeeMultiplier;
+            }
+            else {
+                chainIdentifier = signerOrToken.chainId;
+                token = signerOrToken.address;
+                signer = chainIdentifierOrSigner;
+                feeMultiplier = tokenOrFeeMultiplier;
+            }
+            if (this.chains[chainIdentifier] == null)
+                throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+            const swapContract = this.chains[chainIdentifier].swapContract;
+            if (swapContract.getNativeCurrencyAddress() !== token)
+                return yield this.getBalance(chainIdentifier, signer, token);
+            let [balance, commitFee] = yield Promise.all([
+                this.getBalance(chainIdentifier, signer, token),
+                this.chains[chainIdentifier].swapContract.getCommitFee(yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token, null, null, null, null, null, null, true, false, null, null))
+            ]);
+            if (feeMultiplier != null) {
+                commitFee = commitFee.mul(new BN(Math.floor(feeMultiplier * 1000000))).div(new BN(1000000));
+            }
+            return balance.sub(commitFee);
+        });
     }
     /**
      * Returns the native token balance of the wallet

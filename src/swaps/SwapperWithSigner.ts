@@ -271,6 +271,13 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
     }
 
     /**
+     * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
+     */
+    getSpendableBalance(token: string | SCToken<ChainIdentifier>, feeMultiplier: number): Promise<BN> {
+        return this.swapper.getSpendableBalance(this.signer.getAddress(), token, feeMultiplier);
+    }
+
+    /**
      * Returns the native token balance of the wallet
      */
     getNativeBalance(): Promise<BN> {

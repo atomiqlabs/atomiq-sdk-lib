@@ -123,6 +123,10 @@ export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier exte
      */
     getBalance(signer: string, token: string | SCToken<ChainIdentifier>): Promise<BN>;
     /**
+     * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
+     */
+    getSpendableBalance(signer: string, token: string | SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<BN>;
+    /**
      * Returns the native token balance of the wallet
      */
     getNativeBalance(signer: string): Promise<BN>;
