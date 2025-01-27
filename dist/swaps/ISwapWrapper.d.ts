@@ -176,4 +176,12 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * Returns the smart chain's native token used to pay for fees
      */
     getNativeToken(): SCToken<T["ChainId"]>;
+    /**
+     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
+     */
+    getActionableSwaps(signer?: string): Promise<S[]>;
+    /**
+     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
+     */
+    getActionableSwapsSync(signer?: string): S[];
 }

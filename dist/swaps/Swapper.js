@@ -720,13 +720,13 @@ class Swapper extends events_1.EventEmitter {
                 const res = [];
                 for (let chainId in this.chains) {
                     const chainData = this.chains[chainId];
-                    [].concat(yield chainData.tobtcln.getRefundableSwaps(), yield chainData.tobtc.getRefundableSwaps(), yield chainData.frombtcln.getClaimableSwaps(), yield chainData.frombtc.getClaimableSwaps()).forEach(val => res.push(val));
+                    [].concat(yield chainData.tobtcln.getActionableSwaps(), yield chainData.tobtc.getActionableSwaps(), yield chainData.frombtcln.getActionableSwaps(), yield chainData.frombtc.getActionableSwaps()).forEach(val => res.push(val));
                 }
                 return res;
             }
             else {
                 const chainData = this.chains[chainId];
-                return [].concat(yield chainData.tobtcln.getRefundableSwaps(signer), yield chainData.tobtc.getRefundableSwaps(signer), yield chainData.frombtcln.getClaimableSwaps(signer), yield chainData.frombtc.getClaimableSwaps(signer));
+                return [].concat(yield chainData.tobtcln.getActionableSwaps(signer), yield chainData.tobtc.getActionableSwaps(signer), yield chainData.frombtcln.getActionableSwaps(signer), yield chainData.frombtc.getActionableSwaps(signer));
             }
         });
     }

@@ -1107,20 +1107,20 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             for(let chainId in this.chains) {
                 const chainData = this.chains[chainId];
                 [].concat(
-                    await chainData.tobtcln.getRefundableSwaps(),
-                    await chainData.tobtc.getRefundableSwaps(),
-                    await chainData.frombtcln.getClaimableSwaps(),
-                    await chainData.frombtc.getClaimableSwaps(),
+                    await chainData.tobtcln.getActionableSwaps(),
+                    await chainData.tobtc.getActionableSwaps(),
+                    await chainData.frombtcln.getActionableSwaps(),
+                    await chainData.frombtc.getActionableSwaps(),
                 ).forEach(val => res.push(val));
             }
             return res;
         } else {
             const chainData = this.chains[chainId];
             return [].concat(
-                await chainData.tobtcln.getRefundableSwaps(signer),
-                await chainData.tobtc.getRefundableSwaps(signer),
-                await chainData.frombtcln.getClaimableSwaps(signer),
-                await chainData.frombtc.getClaimableSwaps(signer),
+                await chainData.tobtcln.getActionableSwaps(signer),
+                await chainData.tobtc.getActionableSwaps(signer),
+                await chainData.frombtcln.getActionableSwaps(signer),
+                await chainData.frombtc.getActionableSwaps(signer),
             );
         }
     }

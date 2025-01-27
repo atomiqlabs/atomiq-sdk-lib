@@ -265,5 +265,17 @@ class ISwapWrapper {
     getNativeToken() {
         return this.tokens[this.contract.getNativeCurrencyAddress()];
     }
+    /**
+     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
+     */
+    getActionableSwaps(signer) {
+        return Promise.resolve(this.getActionableSwapsSync(signer));
+    }
+    /**
+     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
+     */
+    getActionableSwapsSync(signer) {
+        return this.getAllSwapsSync(signer).filter(swap => swap.isActionable());
+    }
 }
 exports.ISwapWrapper = ISwapWrapper;

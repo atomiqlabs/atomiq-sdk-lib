@@ -401,4 +401,18 @@ export abstract class ISwapWrapper<
         return this.tokens[this.contract.getNativeCurrencyAddress()];
     }
 
+    /**
+     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
+     */
+    public getActionableSwaps(signer?: string): Promise<S[]> {
+        return Promise.resolve(this.getActionableSwapsSync(signer));
+    }
+
+    /**
+     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
+     */
+    public getActionableSwapsSync(signer?: string): S[] {
+        return this.getAllSwapsSync(signer).filter(swap => swap.isActionable());
+    }
+
 }
