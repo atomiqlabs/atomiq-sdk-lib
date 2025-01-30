@@ -142,7 +142,7 @@ export abstract class IToBTCWrapper<
     protected processEventClaim(swap: S, event: ClaimEvent<T["Data"]>): Promise<boolean> {
         if(swap.state!==ToBTCSwapState.REFUNDED) {
             swap.state = ToBTCSwapState.CLAIMED;
-            swap._setPaymentResult({secret: event.secret, txId: event.secret});
+            swap._setPaymentResult({secret: event.secret, txId: Buffer.from(event.secret, "hex").reverse().toString("hex")});
             return Promise.resolve(true);
         }
         return Promise.resolve(false);

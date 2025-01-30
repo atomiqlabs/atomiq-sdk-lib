@@ -139,7 +139,7 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
     processEventClaim(swap, event) {
         if (swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDED) {
             swap.state = IToBTCSwap_1.ToBTCSwapState.CLAIMED;
-            swap._setPaymentResult({ secret: event.secret, txId: event.secret });
+            swap._setPaymentResult({ secret: event.secret, txId: Buffer.from(event.secret, "hex").reverse().toString("hex") });
             return Promise.resolve(true);
         }
         return Promise.resolve(false);
