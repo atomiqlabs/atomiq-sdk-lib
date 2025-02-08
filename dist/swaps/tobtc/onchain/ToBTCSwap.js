@@ -26,6 +26,7 @@ function isToBTCSwapInit(obj) {
 exports.isToBTCSwapInit = isToBTCSwapInit;
 class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
     constructor(wrapper, initOrObject) {
+        var _a, _b;
         if (isToBTCSwapInit(initOrObject))
             initOrObject.url += "/tobtc";
         super(wrapper, initOrObject);
@@ -37,6 +38,8 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
             this.confirmationTarget = initOrObject.confirmationTarget;
             this.satsPerVByte = initOrObject.satsPerVByte;
             this.txId = initOrObject.txId;
+            this.requiredConfirmations = (_a = initOrObject.requiredConfirmations) !== null && _a !== void 0 ? _a : this.data.getConfirmationsHint();
+            this.nonce = (_b = (initOrObject.nonce == null ? null : new BN(initOrObject.nonce))) !== null && _b !== void 0 ? _b : this.data.getNonceHint();
         }
         this.tryCalculateSwapFee();
     }
@@ -50,7 +53,7 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
                 const btcTx = yield this.wrapper.btcRpc.getTransaction(result.txId);
                 if (btcTx == null)
                     return false;
-                const foundVout = btcTx.outs.find(vout => this.data.getHash() === this.wrapper.contract.getHashForOnchain(buffer_1.Buffer.from(vout.scriptPubKey.hex, "hex"), new BN(vout.value), this.data.getEscrowNonce()).toString("hex"));
+                const foundVout = btcTx.outs.find(vout => this.data.getClaimHash() === this.wrapper.contract.getHashForOnchain(buffer_1.Buffer.from(vout.scriptPubKey.hex, "hex"), new BN(vout.value), this.requiredConfirmations, this.nonce).toString("hex"));
                 if (foundVout == null)
                     throw new IntermediaryError_1.IntermediaryError("Invalid btc txId returned");
             }
@@ -89,7 +92,7 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
     //////////////////////////////
     //// Storage
     serialize() {
-        return Object.assign(Object.assign({}, super.serialize()), { address: this.address, amount: this.amount.toString(10), confirmationTarget: this.confirmationTarget, satsPerVByte: this.satsPerVByte, txId: this.txId });
+        return Object.assign(Object.assign({}, super.serialize()), { address: this.address, amount: this.amount.toString(10), confirmationTarget: this.confirmationTarget, satsPerVByte: this.satsPerVByte, nonce: this.nonce == null ? null : this.nonce.toString(10), requiredConfirmations: this.requiredConfirmations, txId: this.txId });
     }
 }
 exports.ToBTCSwap = ToBTCSwap;

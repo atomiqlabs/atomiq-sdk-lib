@@ -22,6 +22,7 @@ export declare enum FromBTCLNSwapState {
 export type FromBTCLNSwapInit<T extends SwapData> = ISwapInit<T> & {
     pr: string;
     secret: string;
+    initialSwapData: T;
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
@@ -33,13 +34,16 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     protected readonly lnurlFailSignal: AbortController;
     protected readonly pr: string;
     protected readonly secret: string;
+    protected initialSwapData: T["Data"];
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
     prPosted?: boolean;
+    protected getSwapData(): T["Data"];
     constructor(wrapper: FromBTCLNWrapper<T>, init: FromBTCLNSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNWrapper<T>, obj: any);
     protected upgradeVersion(): void;
+    getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
     getAddress(): string;
     /**

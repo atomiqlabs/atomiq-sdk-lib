@@ -9,6 +9,8 @@ export type ToBTCSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     amount: BN;
     confirmationTarget: number;
     satsPerVByte: number;
+    requiredConfirmations: number;
+    nonce: BN;
 };
 export declare function isToBTCSwapInit<T extends SwapData>(obj: any): obj is ToBTCSwapInit<T>;
 export declare class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
@@ -19,6 +21,8 @@ export declare class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSw
     private readonly amount;
     private readonly confirmationTarget;
     private readonly satsPerVByte;
+    private readonly requiredConfirmations;
+    private readonly nonce;
     private txId?;
     constructor(wrapper: ToBTCWrapper<T>, serializedObject: any);
     constructor(wrapper: ToBTCWrapper<T>, init: ToBTCSwapInit<T["Data"]>);

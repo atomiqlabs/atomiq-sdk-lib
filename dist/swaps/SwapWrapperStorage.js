@@ -27,7 +27,7 @@ class SwapWrapperStorage {
      */
     removeSwapData(swapData) {
         return __awaiter(this, void 0, void 0, function* () {
-            const id = swapData.getPaymentHash().toString("hex");
+            const id = swapData.getIdentifierHashString();
             if (this.storage.data[id] == null)
                 return false;
             yield this.storage.removeData(id);
@@ -42,11 +42,11 @@ class SwapWrapperStorage {
     removeSwapDataArr(arr) {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.storage.removeDataArr != null) {
-                yield this.storage.removeDataArr(arr.map(swap => swap.getPaymentHash().toString("hex")));
+                yield this.storage.removeDataArr(arr.map(swap => swap.getIdentifierHashString()));
                 return;
             }
             for (let swapData of arr) {
-                const id = swapData.getPaymentHash().toString("hex");
+                const id = swapData.getIdentifierHashString();
                 yield this.storage.removeData(id);
             }
         });
@@ -57,7 +57,7 @@ class SwapWrapperStorage {
      * @param swapData Swap to save
      */
     saveSwapData(swapData) {
-        const id = swapData.getPaymentHash().toString("hex");
+        const id = swapData.getIdentifierHashString();
         return this.storage.saveData(id, swapData);
     }
     /**
@@ -69,12 +69,12 @@ class SwapWrapperStorage {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.storage.saveDataArr != null) {
                 yield this.storage.saveDataArr(arr.map(swap => {
-                    return { id: swap.getPaymentHash().toString("hex"), object: swap };
+                    return { id: swap.getIdentifierHashString(), object: swap };
                 }));
                 return;
             }
             for (let swapData of arr) {
-                const id = swapData.getPaymentHash().toString("hex");
+                const id = swapData.getIdentifierHashString();
                 yield this.storage.saveData(id, swapData);
             }
         });
@@ -88,7 +88,7 @@ class SwapWrapperStorage {
     loadSwapData(wrapper, type) {
         return __awaiter(this, void 0, void 0, function* () {
             const res = yield this.storage.loadData(type.bind(null, wrapper));
-            return new Map(res.map(value => [value.getPaymentHashString(), value]));
+            return new Map(res.map(value => [value.getIdentifierHashString(), value]));
         });
     }
 }

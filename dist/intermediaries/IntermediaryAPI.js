@@ -49,7 +49,7 @@ const ToBTCLNPrepareExactInSchema = {
 };
 /////////////////////////
 ///// From BTC
-const FromBTCResponseSchema = Object.assign({ amount: SchemaVerifier_1.FieldTypeEnum.BN, btcAddress: SchemaVerifier_1.FieldTypeEnum.String, address: SchemaVerifier_1.FieldTypeEnum.String, swapFee: SchemaVerifier_1.FieldTypeEnum.BN, total: SchemaVerifier_1.FieldTypeEnum.BN }, SwapResponseSchema);
+const FromBTCResponseSchema = Object.assign({ amount: SchemaVerifier_1.FieldTypeEnum.BN, btcAddress: SchemaVerifier_1.FieldTypeEnum.String, address: SchemaVerifier_1.FieldTypeEnum.String, swapFee: SchemaVerifier_1.FieldTypeEnum.BN, total: SchemaVerifier_1.FieldTypeEnum.BN, confirmations: SchemaVerifier_1.FieldTypeEnum.NumberOptional }, SwapResponseSchema);
 /////////////////////////
 ///// From BTCLN
 const FromBTCLNResponseSchema = {

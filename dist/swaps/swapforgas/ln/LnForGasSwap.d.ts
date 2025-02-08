@@ -42,6 +42,7 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
     getMarketPrice(): number;
     getTxId(): string | null;
     getRecipient(): string;
+    getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap

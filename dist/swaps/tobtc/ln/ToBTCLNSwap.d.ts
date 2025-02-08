@@ -42,7 +42,9 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
      * Value between 0 and 1, where 0 is not likely and 1 is very likely
      */
     getConfidence(): number;
+    getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
+    protected getLpIdentifier(): string;
     getRecipient(): string;
     /**
      * Is this an LNURL-pay swap?

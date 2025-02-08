@@ -118,8 +118,10 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                 break;
             case IToBTCSwap_1.ToBTCSwapState.COMMITED:
             case IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED:
-                if (this.contract.isExpired(swap.getInitiator(), swap.data))
-                    swap._saveAndEmit(IToBTCSwap_1.ToBTCSwapState.REFUNDABLE);
+                this.contract.isExpired(swap.getInitiator(), swap.data).then(expired => {
+                    if (expired)
+                        swap._saveAndEmit(IToBTCSwap_1.ToBTCSwapState.REFUNDABLE);
+                });
                 break;
         }
     }
@@ -139,7 +141,7 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
     processEventClaim(swap, event) {
         if (swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDED) {
             swap.state = IToBTCSwap_1.ToBTCSwapState.CLAIMED;
-            swap._setPaymentResult({ secret: event.secret, txId: Buffer.from(event.secret, "hex").reverse().toString("hex") });
+            swap._setPaymentResult({ secret: event.result, txId: Buffer.from(event.result, "hex").reverse().toString("hex") });
             return Promise.resolve(true);
         }
         return Promise.resolve(false);

@@ -32,6 +32,7 @@ export enum FromBTCLNSwapState {
 export type FromBTCLNSwapInit<T extends SwapData> = ISwapInit<T> & {
     pr: string,
     secret: string,
+    initialSwapData: T,
     lnurl?: string,
     lnurlK1?: string,
     lnurlCallback?: string
@@ -54,11 +55,16 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
 
     protected readonly pr: string;
     protected readonly secret: string;
+    protected initialSwapData: T["Data"];
 
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
     prPosted?: boolean = false;
+
+    protected getSwapData() {
+        return this.data ?? this.initialSwapData;
+    }
 
     constructor(wrapper: FromBTCLNWrapper<T>, init: FromBTCLNSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNWrapper<T>, obj: any);
@@ -73,13 +79,21 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         } else {
             this.pr = initOrObject.pr;
             this.secret = initOrObject.secret;
+
+            this.initialSwapData = SwapData.deserialize<T["Data"]>(initOrObject.initialSwapData);
+
             this.lnurl = initOrObject.lnurl;
             this.lnurlK1 = initOrObject.lnurlK1;
             this.lnurlCallback = initOrObject.lnurlCallback;
             this.prPosted = initOrObject.prPosted;
+
+            if(this.state===FromBTCLNSwapState.PR_CREATED && this.data!=null) {
+                this.initialSwapData = this.data;
+                delete this.data;
+            }
         }
         this.tryCalculateSwapFee();
-        this.logger = getLogger(this.constructor.name+"("+this.getPaymentHashString()+"): ");
+        this.logger = getLogger(this.constructor.name+"("+this.getIdentifierHashString()+"): ");
     }
 
     protected upgradeVersion() {
@@ -110,6 +124,12 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
 
     //////////////////////////////
     //// Getters & utils
+
+    getIdentifierHash(): Buffer {
+        const paymentHashBuffer = this.getPaymentHash();
+        if(this.randomNonce==null) return paymentHashBuffer;
+        return Buffer.concat([paymentHashBuffer, Buffer.from(this.randomNonce, "hex")]);
+    }
 
     getPaymentHash(): Buffer {
         if(this.pr==null) return null;
@@ -197,22 +217,22 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * Estimated transaction fee for commit & claim txs combined
      */
     async getCommitAndClaimFee(): Promise<BN> {
-        const swapContract: T["Contract"] & {getRawCommitFee?: (data: T["Data"], feeRate?: string) => Promise<BN>} = this.wrapper.contract;
+        const swapContract: T["Contract"] = this.wrapper.contract;
         const feeRate = this.feeRate ?? await swapContract.getInitFeeRate(
-            this.data.getOfferer(),
-            this.data.getClaimer(),
-            this.data.getToken(),
-            this.data.getHash()
+            this.getSwapData().getOfferer(),
+            this.getSwapData().getClaimer(),
+            this.getSwapData().getToken(),
+            this.getSwapData().getClaimHash()
         );
         const commitFee = await (
             swapContract.getRawCommitFee!=null ?
-                swapContract.getRawCommitFee(this.data, feeRate) :
-                swapContract.getCommitFee(this.data, feeRate)
+                swapContract.getRawCommitFee(this.getSwapData(), feeRate) :
+                swapContract.getCommitFee(this.getSwapData(), feeRate)
         );
         const claimFee = await (
             swapContract.getRawClaimFee!=null ?
-                swapContract.getRawClaimFee(this.getInitiator(), this.data, feeRate) :
-                swapContract.getClaimFee(this.getInitiator(), this.data, feeRate)
+                swapContract.getRawClaimFee(this.getInitiator(), this.getSwapData(), feeRate) :
+                swapContract.getClaimFee(this.getInitiator(), this.getSwapData(), feeRate)
         );
         return commitFee.add(claimFee);
     }
@@ -225,15 +245,15 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         const [balance, feeRate] = await Promise.all([
             this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.contract.getNativeCurrencyAddress(), false),
             this.feeRate!=null ? Promise.resolve<string>(this.feeRate) : this.wrapper.contract.getInitFeeRate(
-                this.data.getOfferer(),
-                this.data.getClaimer(),
-                this.data.getToken(),
-                this.data.getHash()
+                this.getSwapData().getOfferer(),
+                this.getSwapData().getClaimer(),
+                this.getSwapData().getToken(),
+                this.getSwapData().getClaimHash()
             )
         ]);
-        const commitFee = await this.wrapper.contract.getCommitFee(this.data, feeRate);
-        const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate);
-        const totalFee = commitFee.add(claimFee).add(this.data.getTotalDeposit());
+        const commitFee = await this.wrapper.contract.getCommitFee(this.getSwapData(), feeRate);
+        const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.getSwapData(), feeRate);
+        const totalFee = commitFee.add(claimFee).add(this.getSwapData().getTotalDeposit());
         return {
             enoughBalance: balance.gte(totalFee),
             balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
@@ -276,7 +296,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
 
         let resp: PaymentAuthorizationResponse = {code: PaymentAuthorizationResponseCodes.PENDING, msg: ""};
         while(!abortController.signal.aborted && resp.code===PaymentAuthorizationResponseCodes.PENDING) {
-            resp = await IntermediaryAPI.getPaymentAuthorization(this.url, this.data.getHash());
+            resp = await IntermediaryAPI.getPaymentAuthorization(this.url, this.getPaymentHash().toString("hex"));
             if(resp.code===PaymentAuthorizationResponseCodes.PENDING)
                 await timeoutPromise(checkIntervalSeconds*1000, abortController.signal);
         }
@@ -291,13 +311,14 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                 swapData,
                 sigData
             ));
-            this.data = swapData;
-            this.signatureData = {
-                prefix: sigData.prefix,
-                timeout: sigData.timeout,
-                signature: sigData.signature
-            };
             if(this.state===FromBTCLNSwapState.PR_CREATED || this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
+                delete this.initialSwapData;
+                this.data = swapData;
+                this.signatureData = {
+                    prefix: sigData.prefix,
+                    timeout: sigData.timeout,
+                    signature: sigData.signature
+                };
                 await this._saveAndEmit(FromBTCLNSwapState.PR_PAID);
             }
             return;
@@ -325,7 +346,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
             this.state===FromBTCLNSwapState.FAILED
         ) return true;
         if(this.state===FromBTCLNSwapState.QUOTE_EXPIRED || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) return false;
-        const resp = await IntermediaryAPI.getPaymentAuthorization(this.url, this.data.getHash());
+        const resp = await IntermediaryAPI.getPaymentAuthorization(this.url, this.getPaymentHash().toString("hex"));
         switch(resp.code) {
             case PaymentAuthorizationResponseCodes.AUTH_DATA:
                 const data = new this.wrapper.swapDataDeserializer(resp.data.data);
@@ -336,6 +357,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                         resp.data
                     ));
                     this.state = FromBTCLNSwapState.PR_PAID;
+                    delete this.initialSwapData;
                     this.data = data;
                     this.signatureData = {
                         prefix: resp.data.prefix,
@@ -371,11 +393,11 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     protected async checkIntermediaryReturnedAuthData(signer: string, data: T["Data"], signature: SignatureData): Promise<void> {
         data.setClaimer(signer);
 
-        if (data.getOfferer() !== this.data.getOfferer()) throw new IntermediaryError("Invalid offerer used");
-        if (!data.isToken(this.data.getToken())) throw new IntermediaryError("Invalid token used");
-        if (data.getSecurityDeposit().gt(this.data.getSecurityDeposit())) throw new IntermediaryError("Invalid security deposit!");
-        if (data.getAmount().lt(this.data.getAmount())) throw new IntermediaryError("Invalid amount received!");
-        if (data.getHash() !== this.data.getHash()) throw new IntermediaryError("Invalid payment hash used!");
+        if (data.getOfferer() !== this.getSwapData().getOfferer()) throw new IntermediaryError("Invalid offerer used");
+        if (!data.isToken(this.getSwapData().getToken())) throw new IntermediaryError("Invalid token used");
+        if (data.getSecurityDeposit().gt(this.getSwapData().getSecurityDeposit())) throw new IntermediaryError("Invalid security deposit!");
+        if (data.getAmount().lt(this.getSwapData().getAmount())) throw new IntermediaryError("Invalid amount received!");
+        if (data.getClaimHash() !== this.getSwapData().getClaimHash()) throw new IntermediaryError("Invalid payment hash used!");
 
         await Promise.all([
             tryWithRetries(
@@ -384,7 +406,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                 SignatureVerificationError
             ),
             tryWithRetries<SwapCommitStatus>(
-                () => this.wrapper.contract.getPaymentHashStatus(data.getHash())
+                () => this.wrapper.contract.getCommitStatus(data.getClaimer(), data)
             ).then(status => {
                 if (status !== SwapCommitStatus.NOT_COMMITED)
                     throw new Error("Swap already committed on-chain!");

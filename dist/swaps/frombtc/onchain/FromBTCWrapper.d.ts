@@ -50,8 +50,9 @@ export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper
      * Returns the swap expiry, leaving enough time for the user to send a transaction and for it to confirm
      *
      * @param data Parsed swap data
+     * @param requiredConfirmations Confirmations required to claim the tx
      */
-    getOnchainSendTimeout(data: SwapData): BN;
+    getOnchainSendTimeout(data: SwapData, requiredConfirmations: number): BN;
     /**
      * Pre-fetches claimer (watchtower) bounty data for the swap. Doesn't throw, instead returns null and aborts the
      *  provided abortController

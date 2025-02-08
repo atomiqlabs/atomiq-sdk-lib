@@ -98,20 +98,18 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                     swap._saveAndEmit(FromBTCLNSwap_1.FromBTCLNSwapState.QUOTE_SOFT_EXPIRED);
                 break;
             case FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED:
-                if (this.contract.isExpired(swap.getInitiator(), swap.data))
-                    swap._saveAndEmit(FromBTCLNSwap_1.FromBTCLNSwapState.EXPIRED);
+                this.contract.isExpired(swap.getInitiator(), swap.data).then(expired => {
+                    if (expired)
+                        swap._saveAndEmit(FromBTCLNSwap_1.FromBTCLNSwapState.EXPIRED);
+                });
                 break;
         }
     }
     processEventInitialize(swap, event) {
         return __awaiter(this, void 0, void 0, function* () {
             if (swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.PR_PAID || swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-                const swapData = yield event.swapData();
-                if (swap.data != null && !swap.data.equals(swapData))
-                    return false;
                 if (swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.PR_PAID || swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.QUOTE_SOFT_EXPIRED)
                     swap.state = FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED;
-                swap.data = swapData;
                 return true;
             }
         });
@@ -277,7 +275,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                             expiry: decodedPr.timeExpireDate * 1000,
                             swapFee: resp.swapFee,
                             feeRate: yield preFetches.feeRatePromise,
-                            data: yield this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, paymentHash.toString("hex"), null, null, null, null, false, true, resp.securityDeposit, new BN(0)),
+                            initialSwapData: yield this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, this.contract.getHashForHtlc(paymentHash).toString("hex"), this.getRandomSequence(), new BN(Math.floor(Date.now() / 1000)), false, true, resp.securityDeposit, new BN(0)),
                             pr: resp.pr,
                             secret: secret.toString("hex"),
                             exactIn: (_a = amountData.exactIn) !== null && _a !== void 0 ? _a : true

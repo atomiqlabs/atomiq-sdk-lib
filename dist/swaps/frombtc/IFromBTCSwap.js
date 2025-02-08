@@ -30,10 +30,6 @@ class IFromBTCSwap extends ISwap_1.ISwap {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
         }
     }
-    /**
-     * Returns the txoHash to be used in init transactions
-     */
-    getTxoHash() { return null; }
     //////////////////////////////
     //// Pricing
     refreshPriceData() {
@@ -119,7 +115,7 @@ class IFromBTCSwap extends ISwap_1.ISwap {
                 throw new Error("Must be in CREATED state!");
             this.initiated = true;
             yield this._saveAndEmit();
-            return yield this.wrapper.contract.txsInit(this.data, this.signatureData, this.getTxoHash == null ? null : this.getTxoHash(), skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
+            return yield this.wrapper.contract.txsInit(this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
         });
     }
 }

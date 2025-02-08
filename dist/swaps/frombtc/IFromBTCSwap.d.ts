@@ -1,5 +1,3 @@
-/// <reference types="node" />
-/// <reference types="node" />
 import { IFromBTCWrapper } from "./IFromBTCWrapper";
 import { Fee, ISwap, ISwapInit } from "../ISwap";
 import * as BN from "bn.js";
@@ -15,10 +13,6 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
      * @protected
      */
     protected tryCalculateSwapFee(): void;
-    /**
-     * Returns the txoHash to be used in init transactions
-     */
-    getTxoHash(): Buffer;
     refreshPriceData(): Promise<PriceInfoType>;
     getSwapPrice(): number;
     getMarketPrice(): number;

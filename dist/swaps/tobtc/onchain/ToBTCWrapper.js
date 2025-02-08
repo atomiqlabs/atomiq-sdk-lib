@@ -87,11 +87,10 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @param options Options as passed to the swap create function
      * @param data LP's returned parsed swap data
      * @param hash Payment hash of the swap
-     * @param nonce Escrow nonce that should be used for the swap
      * @private
      * @throws {IntermediaryError} if returned data are not correct
      */
-    verifyReturnedData(resp, amountData, lp, options, data, hash, nonce) {
+    verifyReturnedData(resp, amountData, lp, options, data, hash) {
         if (!resp.totalFee.eq(resp.swapFee.add(resp.networkFee)))
             throw new IntermediaryError_1.IntermediaryError("Invalid totalFee returned");
         if (amountData.exactIn) {
@@ -114,9 +113,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             throw new IntermediaryError_1.IntermediaryError("Expiry time returned too high!");
         }
         if (!data.getAmount().eq(resp.total) ||
-            data.getHash() !== hash ||
-            !data.getEscrowNonce().eq(nonce) ||
-            data.getConfirmations() !== options.confirmations ||
+            data.getClaimHash() !== hash ||
             data.getType() !== base_1.ChainSwapType.CHAIN_NONCED ||
             !data.isPayIn() ||
             !data.isToken(amountData.token) ||
@@ -136,15 +133,16 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @param abortSignal           Abort signal for aborting the process
      */
     create(signer, address, amountData, lps, options, additionalParams, abortSignal) {
+        var _a, _b;
         if (!this.isInitialized)
             throw new Error("Not initialized, call init() first!");
         options !== null && options !== void 0 ? options : (options = {});
-        options.confirmationTarget = 3;
-        options.confirmations = 2;
+        (_a = options.confirmationTarget) !== null && _a !== void 0 ? _a : (options.confirmationTarget = 3);
+        (_b = options.confirmations) !== null && _b !== void 0 ? _b : (options.confirmations = 2);
         const nonce = this.getRandomNonce();
         const outputScript = this.btcAddressToOutputScript(address);
         const _hash = !amountData.exactIn ?
-            this.contract.getHashForOnchain(outputScript, amountData.amount, nonce).toString("hex") :
+            this.contract.getHashForOnchain(outputScript, amountData.amount, options.confirmations, nonce).toString("hex") :
             null;
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePreFetchPromise = this.preFetchPrice(amountData, _abortController.signal);
@@ -176,11 +174,11 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                             };
                         }), null, RequestError_1.RequestError, abortController.signal);
                         let hash = amountData.exactIn ?
-                            this.contract.getHashForOnchain(outputScript, resp.amount, nonce).toString("hex") :
+                            this.contract.getHashForOnchain(outputScript, resp.amount, options.confirmations, nonce).toString("hex") :
                             _hash;
                         const data = new this.swapDataDeserializer(resp.data);
                         data.setOfferer(signer);
-                        this.verifyReturnedData(resp, amountData, lp, options, data, hash, nonce);
+                        this.verifyReturnedData(resp, amountData, lp, options, data, hash);
                         const [pricingInfo, signatureExpiry, reputation] = yield Promise.all([
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTC], true, resp.amount, data.getAmount(), amountData.token, resp, pricePreFetchPromise, abortController.signal),
                             this.verifyReturnedSignature(data, resp, feeRatePromise, signDataPromise, abortController.signal),
@@ -200,7 +198,9 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                             amount: resp.amount,
                             confirmationTarget: options.confirmationTarget,
                             satsPerVByte: resp.satsPervByte.toNumber(),
-                            exactIn: (_a = amountData.exactIn) !== null && _a !== void 0 ? _a : false
+                            exactIn: (_a = amountData.exactIn) !== null && _a !== void 0 ? _a : false,
+                            requiredConfirmations: options.confirmations,
+                            nonce
                         });
                         yield quote._save();
                         return quote;

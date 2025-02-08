@@ -52,6 +52,7 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
     getMarketPrice(): number;
     getTxId(): string | null;
     getRecipient(): string;
+    getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
     getAddress(): string;
     /**

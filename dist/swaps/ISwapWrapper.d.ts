@@ -42,6 +42,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
         [tokenAddress: string]: SCToken<T["ChainId"]>;
     };
     swapData: Map<string, S>;
+    swapDataByEscrowHash: Map<string, S>;
     isInitialized: boolean;
     tickInterval: NodeJS.Timeout;
     /**
@@ -160,6 +161,8 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * Initializes the swap wrapper, needs to be called before any other action can be taken
      */
     init(): Promise<void>;
+    saveSwapData(swap: S): Promise<void>;
+    removeSwapData(swap: S): Promise<void>;
     /**
      * Un-subscribes from event listeners on Solana
      */

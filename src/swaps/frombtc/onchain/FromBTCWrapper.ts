@@ -25,6 +25,7 @@ import {SwapType} from "../../SwapType";
 import {extendAbortController, tryWithRetries} from "../../../utils/Utils";
 import {FromBTCResponseType, IntermediaryAPI} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
+import * as randomBytes from "randombytes";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: BN,
@@ -125,7 +126,7 @@ export class FromBTCWrapper<
                     return true;
                 case SwapCommitStatus.COMMITED:
                     const res = await swap.getBitcoinPayment();
-                    if(res!=null && res.confirmations>=swap.data.getConfirmations()) {
+                    if(res!=null && res.confirmations>=swap.requiredConfirmations) {
                         swap.txId = res.txId;
                         swap.vout = res.vout;
                         swap.state = FromBTCSwapState.BTC_TX_CONFIRMED;
@@ -146,19 +147,18 @@ export class FromBTCWrapper<
             case FromBTCSwapState.EXPIRED:
                 //Check if bitcoin payment was received every 2 minutes
                 if(Math.floor(Date.now()/1000)%120===0) swap.getBitcoinPayment().then(res => {
-                    if(res!=null && res.confirmations>=swap.data.getConfirmations()) {
+                    if(res!=null && res.confirmations>=swap.requiredConfirmations) {
                         swap.txId = res.txId;
                         swap.vout = res.vout;
                         return swap._saveAndEmit(FromBTCSwapState.BTC_TX_CONFIRMED);
                     }
-                }).catch(e => this.logger.error("tickSwap("+swap.getPaymentHashString()+"): ", e));
+                }).catch(e => this.logger.error("tickSwap("+swap.getIdentifierHashString()+"): ", e));
                 break;
         }
     }
 
     protected processEventInitialize(swap: FromBTCSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean> {
         if(swap.state===FromBTCSwapState.PR_CREATED || swap.state===FromBTCSwapState.QUOTE_SOFT_EXPIRED) {
-            if(swap.data!=null && !swap.data.getSequence().eq(event.sequence)) return Promise.resolve(false);
             swap.state = FromBTCSwapState.CLAIM_COMMITED;
             return Promise.resolve(true);
         }
@@ -185,9 +185,10 @@ export class FromBTCWrapper<
      * Returns the swap expiry, leaving enough time for the user to send a transaction and for it to confirm
      *
      * @param data Parsed swap data
+     * @param requiredConfirmations Confirmations required to claim the tx
      */
-    getOnchainSendTimeout(data: SwapData): BN {
-        const tsDelta = (this.options.blocksTillTxConfirms + data.getConfirmations()) * this.options.bitcoinBlocktime * this.options.safetyFactor;
+    getOnchainSendTimeout(data: SwapData, requiredConfirmations: number): BN {
+        const tsDelta = (this.options.blocksTillTxConfirms + requiredConfirmations) * this.options.bitcoinBlocktime * this.options.safetyFactor;
         return data.getExpiry().sub(new BN(tsDelta));
     }
 
@@ -215,9 +216,12 @@ export class FromBTCWrapper<
     } | null> {
         const startTimestamp = new BN(Math.floor(Date.now()/1000));
 
+        const dummyAmount = new BN(randomBytes(3));
         const dummySwapData = await this.contract.createSwapData(
-            ChainSwapType.CHAIN, null, signer, amountData.token,
-            null, null, null, null, null, null, false, true, null, null
+            ChainSwapType.CHAIN, signer, signer, amountData.token,
+            dummyAmount, this.contract.getHashForOnchain(randomBytes(20), dummyAmount, 3).toString("hex"),
+            this.getRandomSequence(), new BN(Math.floor(Date.now()/1000)), false, true,
+            new BN(randomBytes(2)), new BN(randomBytes(2))
         );
 
         try {
@@ -302,7 +306,8 @@ export class FromBTCWrapper<
             if(!resp.total.eq(amountData.amount)) throw new IntermediaryError("Invalid total returned");
         }
 
-        if(data.getConfirmations()>this.options.maxConfirmations) throw new IntermediaryError("Requires too many confirmations");
+        const requiredConfirmations = resp.confirmations ?? lp.services[SwapType.FROM_BTC].data.confirmations;
+        if(requiredConfirmations>this.options.maxConfirmations) throw new IntermediaryError("Requires too many confirmations");
 
         const totalClaimerBounty = this.getClaimerBounty(data, options, claimerBounty);
 
@@ -319,17 +324,20 @@ export class FromBTCWrapper<
         }
 
         //Check that we have enough time to send the TX and for it to confirm
-        const expiry = this.getOnchainSendTimeout(data);
+        const expiry = this.getOnchainSendTimeout(data, requiredConfirmations);
         const currentTimestamp = new BN(Math.floor(Date.now()/1000));
         if(expiry.sub(currentTimestamp).lt(new BN(this.options.minSendWindow))) {
             throw new IntermediaryError("Send window too low");
         }
 
         const lockingScript = address.toOutputScript(resp.btcAddress, this.options.bitcoinNetwork);
-        const desiredHash = this.contract.getHashForOnchain(lockingScript, resp.amount, new BN(0));
-        const suppliedHash = Buffer.from(data.getHash(),"hex");
-        if(!desiredHash.equals(suppliedHash)) {
-            throw new IntermediaryError("Invalid payment hash returned!");
+        const desiredExtraData = this.contract.getExtraData(lockingScript, resp.amount, requiredConfirmations);
+        const desiredClaimHash = this.contract.getHashForOnchain(lockingScript, resp.amount, requiredConfirmations);
+        if(!desiredClaimHash.equals(Buffer.from(data.getClaimHash(), "hex"))) {
+            throw new IntermediaryError("Invalid claim hash returned!");
+        }
+        if(!desiredExtraData.equals(Buffer.from(data.getExtraData(), "hex"))) {
+            throw new IntermediaryError("Invalid extra data returned!");
         }
     }
 
@@ -417,7 +425,8 @@ export class FromBTCWrapper<
                             data,
                             address: resp.btcAddress,
                             amount: resp.amount,
-                            exactIn: amountData.exactIn ?? true
+                            exactIn: amountData.exactIn ?? true,
+                            requiredConfirmations: resp.confirmations ?? lp.services[SwapType.FROM_BTC].data.confirmations
                         } as FromBTCSwapInit<T["Data"]>);
                         await quote._save();
                         return quote;

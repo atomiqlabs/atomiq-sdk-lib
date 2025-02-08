@@ -16,7 +16,7 @@ export class MempoolBtcRelaySynchronizer<B extends BtcStoredHeader<any>, TX> imp
         this.bitcoinRpc = bitcoinRpc;
     }
 
-    async syncToLatestTxs(signer: string): Promise<{
+    async syncToLatestTxs(signer: string, feeRate?: string): Promise<{
         txs: TX[]
         targetCommitedHeader: B,
         computedHeaderMap: {[blockheight: number]: B},
@@ -60,8 +60,8 @@ export class MempoolBtcRelaySynchronizer<B extends BtcStoredHeader<any>, TX> imp
         };
         let startForkId = null;
 
-        let forkFee: string;
-        let mainFee: string;
+        let forkFee: string = feeRate;
+        let mainFee: string = feeRate;
         const saveHeaders = async (headerCache: MempoolBitcoinBlock[]) => {
             if(cacheData.forkId===-1) {
                 if(mainFee==null) mainFee = await this.btcRelay.getMainFeeRate(signer);

@@ -1,12 +1,9 @@
-/// <reference types="node" />
-/// <reference types="node" />
 import { IFromBTCSwap } from "../IFromBTCSwap";
 import { SwapType } from "../../SwapType";
 import { FromBTCWrapper } from "./FromBTCWrapper";
 import * as BN from "bn.js";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { ISwapInit } from "../../ISwap";
-import { Buffer } from "buffer";
 import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
 export declare enum FromBTCSwapState {
     FAILED = -4,
@@ -21,6 +18,7 @@ export declare enum FromBTCSwapState {
 export type FromBTCSwapInit<T extends SwapData> = ISwapInit<T> & {
     address: string;
     amount: BN;
+    requiredConfirmations: number;
 };
 export declare function isFromBTCSwapInit<T extends SwapData>(obj: any): obj is FromBTCSwapInit<T>;
 export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T, FromBTCSwapState> {
@@ -29,12 +27,12 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     readonly wrapper: FromBTCWrapper<T>;
     readonly address: string;
     readonly amount: BN;
+    readonly requiredConfirmations: number;
     txId?: string;
     vout?: number;
     constructor(wrapper: FromBTCWrapper<T>, init: FromBTCSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCWrapper<T>, obj: any);
     protected upgradeVersion(): void;
-    getTxoHash(): Buffer;
     getAddress(): string;
     /**
      * Returns bitcoin address where the on-chain BTC should be sent to

@@ -178,6 +178,7 @@ const FromBTCResponseSchema = {
     address: FieldTypeEnum.String,
     swapFee: FieldTypeEnum.BN,
     total: FieldTypeEnum.BN,
+    confirmations: FieldTypeEnum.NumberOptional,
     ...SwapResponseSchema
 } as const;
 

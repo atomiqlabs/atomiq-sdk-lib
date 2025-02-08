@@ -37,6 +37,7 @@ import {SwapperWithChain} from "./SwapperWithChain";
 import {BtcToken, SCToken, Token} from "./Tokens";
 import {OnchainForGasSwap} from "./swapforgas/onchain/OnchainForGasSwap";
 import {OnchainForGasWrapper} from "./swapforgas/onchain/OnchainForGasWrapper";
+import * as randomBytes from "randombytes";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -1239,13 +1240,14 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
 
         let [balance, commitFee] = await Promise.all([
             this.getBalance(chainIdentifier, signer, token),
-            this.chains[chainIdentifier].swapContract.getCommitFee(
+            swapContract.getCommitFee(
                 //Use large amount, such that the fee for wrapping more tokens is always included!
                 await swapContract.createSwapData(
                     ChainSwapType.HTLC, signer, null, token,
                     new BN("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "hex"),
-                    null, null, null, null, null,
-                    true, false, null, null
+                    swapContract.getHashForHtlc(randomBytes(32)).toString("hex"),
+                    new BN(randomBytes(8)), new BN(Math.floor(Date.now()/1000)),
+                    true, false, new BN(randomBytes(2)), new BN(randomBytes(2))
                 ),
             )
         ]);

@@ -12,8 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.FromBTCSwap = exports.isFromBTCSwapInit = exports.FromBTCSwapState = void 0;
 const IFromBTCSwap_1 = require("../IFromBTCSwap");
 const SwapType_1 = require("../../SwapType");
-const bitcoinjs_lib_1 = require("bitcoinjs-lib");
-const createHash = require("create-hash");
 const BN = require("bn.js");
 const base_1 = require("@atomiqlabs/base");
 const ISwap_1 = require("../../ISwap");
@@ -39,6 +37,7 @@ function isFromBTCSwapInit(obj) {
 exports.isFromBTCSwapInit = isFromBTCSwapInit;
 class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
     constructor(wrapper, initOrObject) {
+        var _a;
         if (isFromBTCSwapInit(initOrObject))
             initOrObject.url += "/frombtc";
         super(wrapper, initOrObject);
@@ -52,6 +51,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             this.amount = new BN(initOrObject.amount);
             this.txId = initOrObject.txId;
             this.vout = initOrObject.vout;
+            this.requiredConfirmations = (_a = initOrObject.requiredConfirmations) !== null && _a !== void 0 ? _a : this.data.getConfirmationsHint();
         }
         this.tryCalculateSwapFee();
     }
@@ -82,13 +82,6 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
     }
     //////////////////////////////
     //// Getters & utils
-    getTxoHash() {
-        const parsedOutputScript = bitcoinjs_lib_1.address.toOutputScript(this.address, this.wrapper.options.bitcoinNetwork);
-        return createHash("sha256").update(buffer_1.Buffer.concat([
-            buffer_1.Buffer.from(this.amount.toArray("le", 8)),
-            parsedOutputScript
-        ])).digest();
-    }
     getAddress() {
         return this.address;
     }
@@ -110,7 +103,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
      *  to that address anymore
      */
     getTimeoutTime() {
-        return this.wrapper.getOnchainSendTimeout(this.data).toNumber() * 1000;
+        return this.wrapper.getOnchainSendTimeout(this.data, this.requiredConfirmations).toNumber() * 1000;
     }
     isFinished() {
         return this.state === FromBTCSwapState.CLAIM_CLAIMED || this.state === FromBTCSwapState.QUOTE_EXPIRED || this.state === FromBTCSwapState.FAILED;
@@ -136,7 +129,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
     canCommit() {
         if (this.state !== FromBTCSwapState.PR_CREATED)
             return false;
-        const expiry = this.wrapper.getOnchainSendTimeout(this.data);
+        const expiry = this.wrapper.getOnchainSendTimeout(this.data, this.requiredConfirmations);
         const currentTimestamp = new BN(Math.floor(Date.now() / 1000));
         return expiry.sub(currentTimestamp).gte(new BN(this.wrapper.options.minSendWindow));
     }
@@ -168,9 +161,9 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.state !== FromBTCSwapState.CLAIM_COMMITED && this.state !== FromBTCSwapState.EXPIRED)
                 throw new Error("Must be in COMMITED state!");
-            const result = yield this.wrapper.btcRpc.waitForAddressTxo(this.address, this.getTxoHash(), this.data.getConfirmations(), (confirmations, txId, vout, txEtaMs) => {
+            const result = yield this.wrapper.btcRpc.waitForAddressTxo(this.address, buffer_1.Buffer.from(this.data.getTxoHashHint(), "hex"), this.requiredConfirmations, (confirmations, txId, vout, txEtaMs) => {
                 if (updateCallback != null)
-                    updateCallback(txId, confirmations, this.data.getConfirmations(), txEtaMs);
+                    updateCallback(txId, confirmations, this.requiredConfirmations, txEtaMs);
             }, abortSignal, checkIntervalSeconds);
             if (abortSignal != null)
                 abortSignal.throwIfAborted();
@@ -188,14 +181,14 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
      */
     getBitcoinPayment() {
         return __awaiter(this, void 0, void 0, function* () {
-            const result = yield this.wrapper.btcRpc.checkAddressTxos(this.address, this.getTxoHash());
+            const result = yield this.wrapper.btcRpc.checkAddressTxos(this.address, buffer_1.Buffer.from(this.data.getTxoHashHint(), "hex"));
             if (result == null)
                 return null;
             return {
                 txId: result.tx.txid,
                 vout: result.vout,
                 confirmations: result.tx.confirmations,
-                targetConfirmations: this.data.getConfirmations()
+                targetConfirmations: this.requiredConfirmations
             };
         });
     }
@@ -262,12 +255,13 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             if (!this.canClaim())
                 throw new Error("Must be in BTC_TX_CONFIRMED state!");
             const tx = yield this.wrapper.btcRpc.getTransaction(this.txId);
-            return yield this.wrapper.contract.txsClaimWithTxData(signer !== null && signer !== void 0 ? signer : this.getInitiator(), this.data, tx.blockheight, {
+            return yield this.wrapper.contract.txsClaimWithTxData(signer !== null && signer !== void 0 ? signer : this.getInitiator(), this.data, {
                 blockhash: tx.blockhash,
-                confirmations: this.data.getConfirmations(),
+                confirmations: tx.confirmations,
                 txid: tx.txid,
-                hex: tx.hex
-            }, this.vout, null, this.wrapper.synchronizer, true);
+                hex: tx.hex,
+                height: tx.blockheight
+            }, this.requiredConfirmations, this.vout, null, this.wrapper.synchronizer, true);
         });
     }
     /**
@@ -345,7 +339,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
     //////////////////////////////
     //// Storage
     serialize() {
-        return Object.assign(Object.assign({}, super.serialize()), { address: this.address, amount: this.amount.toString(10), txId: this.txId, vout: this.vout });
+        return Object.assign(Object.assign({}, super.serialize()), { address: this.address, amount: this.amount.toString(10), requiredConfirmations: this.requiredConfirmations, txId: this.txId, vout: this.vout });
     }
 }
 exports.FromBTCSwap = FromBTCSwap;

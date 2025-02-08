@@ -46,11 +46,6 @@ export abstract class IFromBTCSwap<
         }
     }
 
-    /**
-     * Returns the txoHash to be used in init transactions
-     */
-    getTxoHash(): Buffer {return null;}
-
 
     //////////////////////////////
     //// Pricing
@@ -196,8 +191,7 @@ export abstract class IFromBTCSwap<
         await this._saveAndEmit();
 
         return await this.wrapper.contract.txsInit(
-            this.data, this.signatureData,
-            this.getTxoHash==null ? null : this.getTxoHash(), skipChecks, this.feeRate
+            this.data, this.signatureData, skipChecks, this.feeRate
         ).catch(e => Promise.reject(e instanceof SignatureVerificationError ? new Error("Request timed out") : e));
     }
 

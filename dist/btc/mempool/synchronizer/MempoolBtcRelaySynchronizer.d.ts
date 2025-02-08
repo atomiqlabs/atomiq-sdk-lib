@@ -5,7 +5,7 @@ export declare class MempoolBtcRelaySynchronizer<B extends BtcStoredHeader<any>,
     bitcoinRpc: MempoolBitcoinRpc;
     btcRelay: BtcRelay<B, TX, MempoolBitcoinBlock>;
     constructor(btcRelay: BtcRelay<B, TX, MempoolBitcoinBlock>, bitcoinRpc: MempoolBitcoinRpc);
-    syncToLatestTxs(signer: string): Promise<{
+    syncToLatestTxs(signer: string, feeRate?: string): Promise<{
         txs: TX[];
         targetCommitedHeader: B;
         computedHeaderMap: {

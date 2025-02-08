@@ -125,17 +125,16 @@ export class FromBTCLNWrapper<
                 if(swap.expiry<Date.now()) swap._saveAndEmit(FromBTCLNSwapState.QUOTE_SOFT_EXPIRED);
                 break;
             case FromBTCLNSwapState.CLAIM_COMMITED:
-                if(this.contract.isExpired(swap.getInitiator(), swap.data)) swap._saveAndEmit(FromBTCLNSwapState.EXPIRED);
+                this.contract.isExpired(swap.getInitiator(), swap.data).then(expired => {
+                    if(expired) swap._saveAndEmit(FromBTCLNSwapState.EXPIRED)
+                });
                 break;
         }
     }
 
     protected async processEventInitialize(swap: FromBTCLNSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean> {
         if(swap.state===FromBTCLNSwapState.PR_PAID || swap.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-            const swapData = await event.swapData();
-            if(swap.data!=null && !swap.data.equals(swapData)) return false;
             if(swap.state===FromBTCLNSwapState.PR_PAID || swap.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) swap.state = FromBTCLNSwapState.CLAIM_COMMITED;
-            swap.data = swapData;
             return true;
         }
     }
@@ -337,9 +336,10 @@ export class FromBTCLNWrapper<
                             expiry: decodedPr.timeExpireDate*1000,
                             swapFee: resp.swapFee,
                             feeRate: await preFetches.feeRatePromise,
-                            data: await this.contract.createSwapData(
+                            initialSwapData: await this.contract.createSwapData(
                                 ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token,
-                                resp.total, paymentHash.toString("hex"), null, null, null, null, false, true,
+                                resp.total, this.contract.getHashForHtlc(paymentHash).toString("hex"),
+                                this.getRandomSequence(), new BN(Math.floor(Date.now()/1000)), false, true,
                                 resp.securityDeposit, new BN(0)
                             ),
                             pr: resp.pr,

@@ -13,6 +13,8 @@ export type ToBTCSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     amount: BN;
     confirmationTarget: number;
     satsPerVByte: number;
+    requiredConfirmations: number;
+    nonce: BN;
 };
 
 export function isToBTCSwapInit<T extends SwapData>(obj: any): obj is ToBTCSwapInit<T> {
@@ -34,6 +36,9 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
     private readonly confirmationTarget: number;
     private readonly satsPerVByte: number;
 
+    private readonly requiredConfirmations: number;
+    private readonly nonce: BN;
+
     private txId?: string;
 
     constructor(wrapper: ToBTCWrapper<T>, serializedObject: any);
@@ -50,6 +55,9 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
             this.confirmationTarget = initOrObject.confirmationTarget;
             this.satsPerVByte = initOrObject.satsPerVByte;
             this.txId = initOrObject.txId;
+
+            this.requiredConfirmations = initOrObject.requiredConfirmations ?? this.data.getConfirmationsHint();
+            this.nonce = (initOrObject.nonce==null ? null : new BN(initOrObject.nonce)) ?? this.data.getNonceHint();
         }
         this.tryCalculateSwapFee();
     }
@@ -61,10 +69,11 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
             const btcTx = await this.wrapper.btcRpc.getTransaction(result.txId);
             if(btcTx==null) return false;
 
-            const foundVout = btcTx.outs.find(vout => this.data.getHash()===this.wrapper.contract.getHashForOnchain(
+            const foundVout = btcTx.outs.find(vout => this.data.getClaimHash()===this.wrapper.contract.getHashForOnchain(
                 Buffer.from(vout.scriptPubKey.hex, "hex"),
                 new BN(vout.value),
-                this.data.getEscrowNonce()
+                this.requiredConfirmations,
+                this.nonce
             ).toString("hex"));
 
             if(foundVout==null) throw new IntermediaryError("Invalid btc txId returned");
@@ -121,6 +130,8 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
             amount: this.amount.toString(10),
             confirmationTarget: this.confirmationTarget,
             satsPerVByte: this.satsPerVByte,
+            nonce: this.nonce==null ? null : this.nonce.toString(10),
+            requiredConfirmations: this.requiredConfirmations,
             txId: this.txId
         };
     }

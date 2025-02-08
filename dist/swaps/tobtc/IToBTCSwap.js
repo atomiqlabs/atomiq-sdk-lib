@@ -74,6 +74,13 @@ class IToBTCSwap extends ISwap_1.ISwap {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoSend(this.chainIdentifier, this.getOutput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
         }
     }
+    /**
+     * Returns the payment hash identifier to be sent to the LP for getStatus and getRefund
+     * @protected
+     */
+    getLpIdentifier() {
+        return this.getClaimHash();
+    }
     //////////////////////////////
     //// Pricing
     refreshPriceData() {
@@ -107,7 +114,7 @@ class IToBTCSwap extends ISwap_1.ISwap {
         return this.isRefundable();
     }
     isRefundable() {
-        return this.state === ToBTCSwapState.REFUNDABLE || (this.state === ToBTCSwapState.COMMITED && this.wrapper.contract.isExpired(this.getInitiator(), this.data));
+        return this.state === ToBTCSwapState.REFUNDABLE;
     }
     isQuoteExpired() {
         return this.state === ToBTCSwapState.QUOTE_EXPIRED;
@@ -243,7 +250,7 @@ class IToBTCSwap extends ISwap_1.ISwap {
                 throw new Error("Must be in CREATED state!");
             this.initiated = true;
             yield this._saveAndEmit();
-            return yield this.wrapper.contract.txsInitPayIn(this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
+            return yield this.wrapper.contract.txsInit(this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
         });
     }
     /**
@@ -323,7 +330,7 @@ class IToBTCSwap extends ISwap_1.ISwap {
                     yield this._saveAndEmit(ToBTCSwapState.REFUNDABLE);
                     return false;
                 case IntermediaryAPI_1.RefundAuthorizationResponseCodes.EXPIRED:
-                    if (this.wrapper.contract.isExpired(this.getInitiator(), this.data))
+                    if (yield this.wrapper.contract.isExpired(this.getInitiator(), this.data))
                         throw new Error("Swap expired");
                     throw new IntermediaryError_1.IntermediaryError("Swap expired");
                 case IntermediaryAPI_1.RefundAuthorizationResponseCodes.NOT_FOUND:
@@ -337,7 +344,7 @@ class IToBTCSwap extends ISwap_1.ISwap {
         return __awaiter(this, void 0, void 0, function* () {
             let resp = { code: IntermediaryAPI_1.RefundAuthorizationResponseCodes.PENDING, msg: "" };
             while (!abortSignal.aborted && (resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.PENDING || resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.NOT_FOUND)) {
-                resp = yield IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.data.getHash(), this.data.getSequence());
+                resp = yield IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
                 if (resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.PAID) {
                     const validResponse = yield this._setPaymentResult(resp.data, true);
                     if (validResponse) {
@@ -370,7 +377,7 @@ class IToBTCSwap extends ISwap_1.ISwap {
             if (this.isFinished() || this.isRefundable())
                 return true;
             //Check if that maybe already concluded according to the LP
-            const resp = yield IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.data.getHash(), this.data.getSequence());
+            const resp = yield IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             switch (resp.code) {
                 case IntermediaryAPI_1.RefundAuthorizationResponseCodes.PAID:
                     const processed = yield this._setPaymentResult(resp.data, true);
@@ -420,11 +427,11 @@ class IToBTCSwap extends ISwap_1.ISwap {
         return __awaiter(this, void 0, void 0, function* () {
             if (!this.isRefundable())
                 throw new Error("Must be in REFUNDABLE state or expired!");
-            if (this.wrapper.contract.isExpired(this.getInitiator(), this.data)) {
+            if (yield this.wrapper.contract.isExpired(this.getInitiator(), this.data)) {
                 return yield this.wrapper.contract.txsRefund(this.data, true, true);
             }
             else {
-                const res = yield IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.data.getHash(), this.data.getSequence());
+                const res = yield IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
                 if (res.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA) {
                     return yield this.wrapper.contract.txsRefundWithAuthorization(this.data, res.data, true, true);
                 }

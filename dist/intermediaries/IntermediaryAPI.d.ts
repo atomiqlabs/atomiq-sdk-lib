@@ -149,6 +149,7 @@ declare const FromBTCResponseSchema: {
     readonly address: FieldTypeEnum.String;
     readonly swapFee: FieldTypeEnum.BN;
     readonly total: FieldTypeEnum.BN;
+    readonly confirmations: FieldTypeEnum.NumberOptional;
 };
 export type FromBTCResponseType = RequestSchemaResult<typeof FromBTCResponseSchema>;
 export type FromBTCInit = BaseFromBTCSwapInit & {
