@@ -10,6 +10,7 @@ const createHash = require("create-hash");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const LNURL_1 = require("../../../utils/LNURL");
 const Tokens_1 = require("../../Tokens");
+const Utils_1 = require("../../../utils/Utils");
 function isToBTCLNSwapInit(obj) {
     return typeof (obj.confidence) === "number" &&
         typeof (obj.pr) === "string" &&
@@ -32,6 +33,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
             this.successAction = initOrObj.successAction;
             this.secret = initOrObj.secret;
         }
+        this.logger = (0, Utils_1.getLogger)("ToBTCLN(" + this.getIdentifierHashString() + "): ");
         this.tryCalculateSwapFee();
     }
     _setPaymentResult(result, check = false) {

@@ -52,7 +52,7 @@ class LnForGasSwap extends ISwap_1.ISwap {
             this.scTxId = initOrObj.scTxId;
         }
         this.tryCalculateSwapFee();
-        this.logger = (0, Utils_1.getLogger)(this.constructor.name + "(" + this.getIdentifierHashString() + "): ");
+        this.logger = (0, Utils_1.getLogger)("LnForGas(" + this.getIdentifierHashString() + "): ");
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
         }

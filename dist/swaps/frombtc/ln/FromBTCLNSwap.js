@@ -74,7 +74,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             }
         }
         this.tryCalculateSwapFee();
-        this.logger = (0, Utils_1.getLogger)(this.constructor.name + "(" + this.getIdentifierHashString() + "): ");
+        this.logger = (0, Utils_1.getLogger)("FromBTCLN(" + this.getIdentifierHashString() + "): ");
     }
     upgradeVersion() {
         if (this.version == null) {

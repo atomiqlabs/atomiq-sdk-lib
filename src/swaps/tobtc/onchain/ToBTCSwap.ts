@@ -6,6 +6,7 @@ import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../Tokens";
+import {getLogger} from "../../../utils/Utils";
 
 
 export type ToBTCSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
@@ -59,6 +60,7 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
             this.requiredConfirmations = initOrObject.requiredConfirmations ?? this.data.getConfirmationsHint();
             this.nonce = (initOrObject.nonce==null ? null : new BN(initOrObject.nonce)) ?? this.data.getNonceHint();
         }
+        this.logger = getLogger("ToBTC("+this.getIdentifierHashString()+"): ");
         this.tryCalculateSwapFee();
     }
 

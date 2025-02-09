@@ -86,8 +86,8 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             this.txId = initOrObj.txId;
             this.refundTxId = initOrObj.refundTxId;
         }
+        this.logger = getLogger("OnchainForGas("+this.getIdentifierHashString()+"): ");
         this.tryCalculateSwapFee();
-        this.logger = getLogger(this.constructor.name+"("+this.getIdentifierHashString()+"): ");
 
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(

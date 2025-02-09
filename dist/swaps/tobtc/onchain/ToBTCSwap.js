@@ -16,6 +16,7 @@ const BN = require("bn.js");
 const buffer_1 = require("buffer");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const Tokens_1 = require("../../Tokens");
+const Utils_1 = require("../../../utils/Utils");
 function isToBTCSwapInit(obj) {
     return typeof (obj.address) === "string" &&
         BN.isBN(obj.amount) &&
@@ -41,6 +42,7 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
             this.requiredConfirmations = (_a = initOrObject.requiredConfirmations) !== null && _a !== void 0 ? _a : this.data.getConfirmationsHint();
             this.nonce = (_b = (initOrObject.nonce == null ? null : new BN(initOrObject.nonce))) !== null && _b !== void 0 ? _b : this.data.getNonceHint();
         }
+        this.logger = (0, Utils_1.getLogger)("ToBTC(" + this.getIdentifierHashString() + "): ");
         this.tryCalculateSwapFee();
     }
     _setPaymentResult(result, check = false) {

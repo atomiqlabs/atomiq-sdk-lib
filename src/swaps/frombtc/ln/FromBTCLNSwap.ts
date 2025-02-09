@@ -93,7 +93,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
             }
         }
         this.tryCalculateSwapFee();
-        this.logger = getLogger(this.constructor.name+"("+this.getIdentifierHashString()+"): ");
+        this.logger = getLogger("FromBTCLN("+this.getIdentifierHashString()+"): ");
     }
 
     protected upgradeVersion() {

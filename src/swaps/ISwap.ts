@@ -146,7 +146,6 @@ export abstract class ISwap<
 
             this.randomNonce = swapInitOrObj.randomNonce;
         }
-        this.logger = getLogger(this.constructor.name+"("+this.getIdentifierHashString()+"): ");
         if(this.version!==this.currentVersion) {
             this.upgradeVersion();
         }

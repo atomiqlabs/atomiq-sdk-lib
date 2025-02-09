@@ -9,6 +9,7 @@ import * as createHash from "create-hash";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {LNURL, LNURLDecodedSuccessAction, LNURLPaySuccessAction, isLNURLPaySuccessAction} from "../../../utils/LNURL";
 import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../Tokens";
+import {getLogger} from "../../../utils/Utils";
 
 export type ToBTCLNSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     confidence: number;
@@ -50,6 +51,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
             this.successAction = initOrObj.successAction;
             this.secret = initOrObj.secret;
         }
+        this.logger = getLogger("ToBTCLN("+this.getIdentifierHashString()+"): ");
         this.tryCalculateSwapFee();
     }
 

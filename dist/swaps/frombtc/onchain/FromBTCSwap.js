@@ -54,6 +54,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             this.requiredConfirmations = (_a = initOrObject.requiredConfirmations) !== null && _a !== void 0 ? _a : this.data.getConfirmationsHint();
         }
         this.tryCalculateSwapFee();
+        this.logger = (0, Utils_1.getLogger)("FromBTC(" + this.getIdentifierHashString() + "): ");
     }
     upgradeVersion() {
         if (this.version == null) {

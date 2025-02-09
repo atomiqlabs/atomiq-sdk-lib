@@ -8,7 +8,7 @@ import {ChainType, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isISwapInit, ISwapInit} from "../../ISwap";
 import {Buffer} from "buffer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
-import {extendAbortController} from "../../../utils/Utils";
+import {extendAbortController, getLogger} from "../../../utils/Utils";
 
 export enum FromBTCSwapState {
     FAILED = -4,
@@ -61,6 +61,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
             this.requiredConfirmations = initOrObject.requiredConfirmations ?? this.data.getConfirmationsHint();
         }
         this.tryCalculateSwapFee();
+        this.logger = getLogger("FromBTC("+this.getIdentifierHashString()+"): ");
     }
 
     protected upgradeVersion() {
