@@ -73,7 +73,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                 }
                 return false;
             }
-            if (swap.state === FromBTCSwap_1.FromBTCSwapState.CLAIM_COMMITED || swap.state === FromBTCSwap_1.FromBTCSwapState.BTC_TX_CONFIRMED) {
+            if (swap.state === FromBTCSwap_1.FromBTCSwapState.CLAIM_COMMITED || swap.state === FromBTCSwap_1.FromBTCSwapState.BTC_TX_CONFIRMED || swap.state === FromBTCSwap_1.FromBTCSwapState.EXPIRED) {
                 const status = yield (0, Utils_1.tryWithRetries)(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
                 switch (status) {
                     case base_1.SwapCommitStatus.PAID:

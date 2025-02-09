@@ -149,7 +149,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         return this.state === FromBTCLNSwapState.CLAIM_CLAIMED;
     }
     isFailed() {
-        return this.state === FromBTCLNSwapState.FAILED;
+        return this.state === FromBTCLNSwapState.FAILED || this.state === FromBTCLNSwapState.EXPIRED;
     }
     isQuoteExpired() {
         return this.state === FromBTCLNSwapState.QUOTE_EXPIRED;

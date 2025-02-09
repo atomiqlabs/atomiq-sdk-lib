@@ -140,7 +140,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
     }
 
     isFailed(): boolean {
-        return this.state===FromBTCSwapState.FAILED;
+        return this.state===FromBTCSwapState.FAILED || (this.state===FromBTCSwapState.EXPIRED && this.txId!=null);
     }
 
     isQuoteExpired(): boolean {

@@ -122,7 +122,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
         return this.state === FromBTCSwapState.CLAIM_CLAIMED;
     }
     isFailed() {
-        return this.state === FromBTCSwapState.FAILED;
+        return this.state === FromBTCSwapState.FAILED || (this.state === FromBTCSwapState.EXPIRED && this.txId != null);
     }
     isQuoteExpired() {
         return this.state === FromBTCSwapState.QUOTE_EXPIRED;

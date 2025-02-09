@@ -72,7 +72,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                 }
                 return false;
             }
-            if (swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED) {
+            if (swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED || swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.EXPIRED) {
                 //Check if it's already successfully paid
                 const commitStatus = yield (0, Utils_1.tryWithRetries)(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
                 if (commitStatus === base_1.SwapCommitStatus.PAID) {

@@ -99,7 +99,7 @@ export class FromBTCLNWrapper<
             return false;
         }
 
-        if(swap.state===FromBTCLNSwapState.CLAIM_COMMITED) {
+        if(swap.state===FromBTCLNSwapState.CLAIM_COMMITED || swap.state===FromBTCLNSwapState.EXPIRED) {
             //Check if it's already successfully paid
             const commitStatus = await tryWithRetries(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
             if(commitStatus===SwapCommitStatus.PAID) {

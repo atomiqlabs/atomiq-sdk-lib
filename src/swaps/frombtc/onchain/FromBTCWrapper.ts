@@ -114,7 +114,7 @@ export class FromBTCWrapper<
             return false;
         }
 
-        if(swap.state===FromBTCSwapState.CLAIM_COMMITED || swap.state===FromBTCSwapState.BTC_TX_CONFIRMED) {
+        if(swap.state===FromBTCSwapState.CLAIM_COMMITED || swap.state===FromBTCSwapState.BTC_TX_CONFIRMED || swap.state===FromBTCSwapState.EXPIRED) {
             const status = await tryWithRetries(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
             switch(status) {
                 case SwapCommitStatus.PAID:
