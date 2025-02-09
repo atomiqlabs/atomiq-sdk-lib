@@ -13,6 +13,7 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
      * @protected
      */
     protected tryCalculateSwapFee(): void;
+    protected getSwapData(): T["Data"];
     refreshPriceData(): Promise<PriceInfoType>;
     getSwapPrice(): number;
     getMarketPrice(): number;

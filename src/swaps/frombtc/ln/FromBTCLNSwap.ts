@@ -62,7 +62,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     lnurlCallback?: string;
     prPosted?: boolean = false;
 
-    protected getSwapData() {
+    protected getSwapData(): T["Data"] {
         return this.data ?? this.initialSwapData;
     }
 
