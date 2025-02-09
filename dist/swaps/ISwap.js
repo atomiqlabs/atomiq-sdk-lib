@@ -82,6 +82,7 @@ class ISwap {
             this.initiated = swapInitOrObj.initiated;
             this.exactIn = swapInitOrObj.exactIn;
             this.createdAt = (_a = swapInitOrObj.createdAt) !== null && _a !== void 0 ? _a : swapInitOrObj.expiry;
+            this.randomNonce = swapInitOrObj.randomNonce;
         }
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + "(" + this.getIdentifierHashString() + "): ");
         if (this.version !== this.currentVersion) {

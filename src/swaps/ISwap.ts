@@ -143,6 +143,8 @@ export abstract class ISwap<
             this.initiated = swapInitOrObj.initiated;
             this.exactIn = swapInitOrObj.exactIn;
             this.createdAt = swapInitOrObj.createdAt ?? swapInitOrObj.expiry;
+
+            this.randomNonce = swapInitOrObj.randomNonce;
         }
         this.logger = getLogger(this.constructor.name+"("+this.getIdentifierHashString()+"): ");
         if(this.version!==this.currentVersion) {
