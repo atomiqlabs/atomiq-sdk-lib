@@ -31,6 +31,7 @@ export declare class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSw
         txId?: string;
     }, check?: boolean): Promise<boolean>;
     getOutput(): TokenAmount<T["ChainId"], BtcToken<false>>;
+    getOutputTxId(): string | null;
     /**
      * Returns fee rate of the bitcoin transaction in sats/vB
      */

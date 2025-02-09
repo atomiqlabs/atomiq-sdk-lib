@@ -96,7 +96,16 @@ class LnForGasSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Getters & utils
-    getTxId() {
+    getInputAddress() {
+        return this.pr;
+    }
+    getOutputAddress() {
+        return this.recipient;
+    }
+    getInputTxId() {
+        return this.getPaymentHash().toString("hex");
+    }
+    getOutputTxId() {
         return this.scTxId;
     }
     getRecipient() {

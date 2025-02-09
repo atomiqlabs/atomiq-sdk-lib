@@ -80,6 +80,10 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
     //////////////////////////////
     //// Getters & utils
 
+    getOutputTxId(): string | null {
+        return this.getLpIdentifier();
+    }
+
     /**
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
      */

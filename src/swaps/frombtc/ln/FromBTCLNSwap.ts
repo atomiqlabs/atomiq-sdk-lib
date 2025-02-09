@@ -125,6 +125,10 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     //////////////////////////////
     //// Getters & utils
 
+    getInputTxId(): string | null {
+        return this.getPaymentHash().toString("hex");
+    }
+
     getIdentifierHash(): Buffer {
         const paymentHashBuffer = this.getPaymentHash();
         if(this.randomNonce==null) return paymentHashBuffer;

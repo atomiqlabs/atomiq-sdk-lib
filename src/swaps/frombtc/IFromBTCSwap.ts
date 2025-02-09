@@ -81,6 +81,20 @@ export abstract class IFromBTCSwap<
     //////////////////////////////
     //// Getters & utils
 
+    abstract getInputTxId(): string | null;
+
+    getOutputTxId(): string | null {
+        return this.claimTxId;
+    }
+
+    getInputAddress(): string | null {
+        return this.getAddress();
+    }
+
+    getOutputAddress(): string | null {
+        return this.getInitiator();
+    }
+
     /**
      * Returns the bitcoin address or lightning invoice to be paid for the swap
      */

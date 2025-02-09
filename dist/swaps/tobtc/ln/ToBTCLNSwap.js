@@ -57,6 +57,9 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     }
     //////////////////////////////
     //// Getters & utils
+    getOutputTxId() {
+        return this.getLpIdentifier();
+    }
     /**
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
      */

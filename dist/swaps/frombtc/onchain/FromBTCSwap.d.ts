@@ -33,6 +33,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     constructor(wrapper: FromBTCWrapper<T>, init: FromBTCSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCWrapper<T>, obj: any);
     protected upgradeVersion(): void;
+    getInputTxId(): string | null;
     getAddress(): string;
     /**
      * Returns bitcoin address where the on-chain BTC should be sent to

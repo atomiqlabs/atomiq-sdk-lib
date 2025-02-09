@@ -43,6 +43,10 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
     getSwapPrice(): number;
     getMarketPrice(): number;
     getRealSwapFeePercentagePPM(): BN;
+    getInputTxId(): string | null;
+    abstract getOutputTxId(): string | null;
+    getInputAddress(): string | null;
+    getOutputAddress(): string | null;
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
      */

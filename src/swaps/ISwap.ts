@@ -294,6 +294,14 @@ export abstract class ISwap<
     //////////////////////////////
     //// Getters & utils
 
+    abstract getInputTxId(): string | null;
+
+    abstract getOutputTxId(): string | null;
+
+    abstract getInputAddress(): string | null;
+
+    abstract getOutputAddress(): string | null;
+
     /**
      * Returns the escrow hash - i.e. hash of the escrow data
      */

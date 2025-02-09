@@ -143,6 +143,20 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     //////////////////////////////
     //// Getters & utils
 
+    getInputTxId(): string | null {
+        return this.commitTxId;
+    }
+
+    abstract getOutputTxId(): string | null;
+
+    getInputAddress(): string | null {
+        return this.getInitiator();
+    }
+
+    getOutputAddress(): string | null {
+        return this.getRecipient();
+    }
+
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
      */

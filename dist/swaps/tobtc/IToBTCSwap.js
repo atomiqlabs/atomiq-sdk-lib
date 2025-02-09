@@ -104,6 +104,15 @@ class IToBTCSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Getters & utils
+    getInputTxId() {
+        return this.commitTxId;
+    }
+    getInputAddress() {
+        return this.getInitiator();
+    }
+    getOutputAddress() {
+        return this.getRecipient();
+    }
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
      */

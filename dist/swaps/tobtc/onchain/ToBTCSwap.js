@@ -68,6 +68,9 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
     }
     //////////////////////////////
     //// Getters & utils
+    getOutputTxId() {
+        return this.txId;
+    }
     /**
      * Returns fee rate of the bitcoin transaction in sats/vB
      */

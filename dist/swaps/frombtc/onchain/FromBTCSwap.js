@@ -82,6 +82,9 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
     }
     //////////////////////////////
     //// Getters & utils
+    getInputTxId() {
+        return this.txId;
+    }
     getAddress() {
         return this.address;
     }

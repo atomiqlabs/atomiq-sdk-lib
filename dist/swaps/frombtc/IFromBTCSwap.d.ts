@@ -17,6 +17,10 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
     getSwapPrice(): number;
     getMarketPrice(): number;
     getRealSwapFeePercentagePPM(): BN;
+    abstract getInputTxId(): string | null;
+    getOutputTxId(): string | null;
+    getInputAddress(): string | null;
+    getOutputAddress(): string | null;
     /**
      * Returns the bitcoin address or lightning invoice to be paid for the swap
      */

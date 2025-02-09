@@ -94,6 +94,10 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
     //////////////////////////////
     //// Getters & utils
 
+    getOutputTxId(): string | null {
+        return this.txId;
+    }
+
     /**
      * Returns fee rate of the bitcoin transaction in sats/vB
      */

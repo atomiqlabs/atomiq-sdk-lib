@@ -29,6 +29,7 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
         txId?: string;
     }, check?: boolean): Promise<boolean>;
     getOutput(): TokenAmount<T["ChainId"], BtcToken<true>>;
+    getOutputTxId(): string | null;
     /**
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
      */

@@ -148,7 +148,19 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
     //////////////////////////////
     //// Getters & utils
 
-    getTxId(): string | null {
+    getInputAddress(): string | null {
+        return this.address;
+    }
+
+    getOutputAddress(): string | null {
+        return this.recipient;
+    }
+
+    getInputTxId(): string | null {
+        return this.txId;
+    }
+
+    getOutputTxId(): string | null {
         return this.scTxId;
     }
 

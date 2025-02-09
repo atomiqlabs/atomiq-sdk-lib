@@ -51,6 +51,15 @@ class IFromBTCSwap extends ISwap_1.ISwap {
         const feeWithoutBaseFee = this.swapFeeBtc.sub(this.pricingInfo.satsBaseFee);
         return feeWithoutBaseFee.mul(new BN(1000000)).div(this.getInputWithoutFee().rawAmount);
     }
+    getOutputTxId() {
+        return this.claimTxId;
+    }
+    getInputAddress() {
+        return this.getAddress();
+    }
+    getOutputAddress() {
+        return this.getInitiator();
+    }
     isActionable() {
         return this.isClaimable();
     }

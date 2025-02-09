@@ -209,8 +209,6 @@ class ISwap {
     getPriceDifferencePct() {
         return this.pricingInfo == null ? null : this.pricingInfo.differencePPM == null ? null : this.pricingInfo.differencePPM.toNumber() / 1000000;
     }
-    //////////////////////////////
-    //// Getters & utils
     /**
      * Returns the escrow hash - i.e. hash of the escrow data
      */

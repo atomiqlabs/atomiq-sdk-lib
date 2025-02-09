@@ -40,7 +40,10 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
     refreshPriceData(): Promise<PriceInfoType>;
     getSwapPrice(): number;
     getMarketPrice(): number;
-    getTxId(): string | null;
+    getInputAddress(): string | null;
+    getOutputAddress(): string | null;
+    getInputTxId(): string | null;
+    getOutputTxId(): string | null;
     getRecipient(): string;
     getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;

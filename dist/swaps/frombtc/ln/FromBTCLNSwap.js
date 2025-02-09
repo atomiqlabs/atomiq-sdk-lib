@@ -103,6 +103,9 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     }
     //////////////////////////////
     //// Getters & utils
+    getInputTxId() {
+        return this.getPaymentHash().toString("hex");
+    }
     getIdentifierHash() {
         const paymentHashBuffer = this.getPaymentHash();
         if (this.randomNonce == null)

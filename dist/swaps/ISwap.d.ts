@@ -126,6 +126,10 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      * Returns the real swap fee percentage as PPM (parts per million)
      */
     abstract getRealSwapFeePercentagePPM(): BN;
+    abstract getInputTxId(): string | null;
+    abstract getOutputTxId(): string | null;
+    abstract getInputAddress(): string | null;
+    abstract getOutputAddress(): string | null;
     /**
      * Returns the escrow hash - i.e. hash of the escrow data
      */

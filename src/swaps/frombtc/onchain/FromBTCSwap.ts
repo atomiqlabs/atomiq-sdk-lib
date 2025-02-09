@@ -93,6 +93,10 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
     //////////////////////////////
     //// Getters & utils
 
+    getInputTxId(): string | null {
+        return this.txId;
+    }
+
     getAddress(): string {
         return this.address;
     }

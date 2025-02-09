@@ -99,7 +99,16 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Getters & utils
-    getTxId() {
+    getInputAddress() {
+        return this.address;
+    }
+    getOutputAddress() {
+        return this.recipient;
+    }
+    getInputTxId() {
+        return this.txId;
+    }
+    getOutputTxId() {
         return this.scTxId;
     }
     getRecipient() {

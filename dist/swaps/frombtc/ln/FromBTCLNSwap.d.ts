@@ -43,6 +43,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     constructor(wrapper: FromBTCLNWrapper<T>, init: FromBTCLNSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNWrapper<T>, obj: any);
     protected upgradeVersion(): void;
+    getInputTxId(): string | null;
     getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
     getAddress(): string;
