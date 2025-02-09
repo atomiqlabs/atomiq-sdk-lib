@@ -330,7 +330,7 @@ export abstract class ISwapWrapper<
                 this.swapData.set(newIdentifierHash, value);
                 await this.storage.saveSwapData(value);
                 this.logger.info("init(): Found older swap version without randomNonce, replacing, old hash: "+oldIdentifierHash+
-                    "new hash: "+newIdentifierHash);
+                    " new hash: "+newIdentifierHash);
             }
             if(value.data!=null) this.swapDataByEscrowHash.set(value.data.getEscrowHash(), value);
         }

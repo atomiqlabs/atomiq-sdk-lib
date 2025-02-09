@@ -63,7 +63,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         else {
             this.pr = initOrObject.pr;
             this.secret = initOrObject.secret;
-            this.initialSwapData = base_1.SwapData.deserialize(initOrObject.initialSwapData);
+            this.initialSwapData = initOrObject.initialSwapData == null ? null : base_1.SwapData.deserialize(initOrObject.initialSwapData);
             this.lnurl = initOrObject.lnurl;
             this.lnurlK1 = initOrObject.lnurlK1;
             this.lnurlCallback = initOrObject.lnurlCallback;

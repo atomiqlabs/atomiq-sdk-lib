@@ -80,7 +80,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
             this.pr = initOrObject.pr;
             this.secret = initOrObject.secret;
 
-            this.initialSwapData = SwapData.deserialize<T["Data"]>(initOrObject.initialSwapData);
+            this.initialSwapData = initOrObject.initialSwapData==null ? null : SwapData.deserialize<T["Data"]>(initOrObject.initialSwapData);
 
             this.lnurl = initOrObject.lnurl;
             this.lnurlK1 = initOrObject.lnurlK1;
