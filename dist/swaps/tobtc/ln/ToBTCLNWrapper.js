@@ -180,11 +180,12 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         const amountOut = new BN(parsedPr.millisatoshis).add(new BN(999)).div(new BN(1000));
         (_c = options.maxFee) !== null && _c !== void 0 ? _c : (options.maxFee = this.calculateFeeForAmount(amountOut, options.maxRoutingBaseFee, options.maxRoutingPPM));
         this.checkPaymentHashWasPaid(parsedPr.tagsObject.payment_hash);
+        const claimHash = this.contract.getHashForHtlc(Buffer.from(parsedPr.tagsObject.payment_hash, "hex"));
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         if (preFetches == null)
             preFetches = {
                 pricePreFetchPromise: this.preFetchPrice(amountData, _abortController.signal),
-                feeRatePromise: this.preFetchFeeRate(signer, amountData, parsedPr.tagsObject.payment_hash, _abortController)
+                feeRatePromise: this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController)
             };
         return lps.map(lp => {
             return {

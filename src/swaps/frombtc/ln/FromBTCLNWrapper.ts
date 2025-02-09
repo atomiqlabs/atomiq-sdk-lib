@@ -285,10 +285,11 @@ export class FromBTCLNWrapper<
             throw new UserError("Invalid description hash length");
 
         const {secret, paymentHash} = this.getSecretAndHash();
+        const claimHash = this.contract.getHashForHtlc(paymentHash);
 
         const _abortController = extendAbortController(abortSignal);
         preFetches.pricePrefetchPromise ??= this.preFetchPrice(amountData, _abortController.signal);
-        preFetches.feeRatePromise ??= this.preFetchFeeRate(signer, amountData, paymentHash.toString("hex"), _abortController);
+        preFetches.feeRatePromise ??= this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController);
 
         return lps.map(lp => {
             return {
@@ -338,7 +339,7 @@ export class FromBTCLNWrapper<
                             feeRate: await preFetches.feeRatePromise,
                             initialSwapData: await this.contract.createSwapData(
                                 ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token,
-                                resp.total, this.contract.getHashForHtlc(paymentHash).toString("hex"),
+                                resp.total, claimHash.toString("hex"),
                                 this.getRandomSequence(), new BN(Math.floor(Date.now()/1000)), false, true,
                                 resp.securityDeposit, new BN(0)
                             ),

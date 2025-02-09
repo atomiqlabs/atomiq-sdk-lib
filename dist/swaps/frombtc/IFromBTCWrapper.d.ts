@@ -16,12 +16,12 @@ export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IFr
      *
      * @param signer Address initiating the swap
      * @param amountData
-     * @param hash optional hash of the swap or null
+     * @param claimHash optional claim hash of the swap or null
      * @param abortController
      * @protected
      * @returns Fee rate
      */
-    protected preFetchFeeRate(signer: string, amountData: AmountData, hash: string | null, abortController: AbortController): Promise<any | null>;
+    protected preFetchFeeRate(signer: string, amountData: AmountData, claimHash: string | null, abortController: AbortController): Promise<any | null>;
     /**
      * Pre-fetches intermediary's available SC on-chain liquidity
      * @param amountData

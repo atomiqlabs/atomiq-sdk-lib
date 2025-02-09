@@ -234,9 +234,10 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         if (options.descriptionHash != null && options.descriptionHash.length !== 32)
             throw new UserError_1.UserError("Invalid description hash length");
         const { secret, paymentHash } = this.getSecretAndHash();
+        const claimHash = this.contract.getHashForHtlc(paymentHash);
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         (_a = preFetches.pricePrefetchPromise) !== null && _a !== void 0 ? _a : (preFetches.pricePrefetchPromise = this.preFetchPrice(amountData, _abortController.signal));
-        (_b = preFetches.feeRatePromise) !== null && _b !== void 0 ? _b : (preFetches.feeRatePromise = this.preFetchFeeRate(signer, amountData, paymentHash.toString("hex"), _abortController));
+        (_b = preFetches.feeRatePromise) !== null && _b !== void 0 ? _b : (preFetches.feeRatePromise = this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController));
         return lps.map(lp => {
             return {
                 intermediary: lp,
@@ -275,7 +276,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                             expiry: decodedPr.timeExpireDate * 1000,
                             swapFee: resp.swapFee,
                             feeRate: yield preFetches.feeRatePromise,
-                            initialSwapData: yield this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, this.contract.getHashForHtlc(paymentHash).toString("hex"), this.getRandomSequence(), new BN(Math.floor(Date.now() / 1000)), false, true, resp.securityDeposit, new BN(0)),
+                            initialSwapData: yield this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, claimHash.toString("hex"), this.getRandomSequence(), new BN(Math.floor(Date.now() / 1000)), false, true, resp.securityDeposit, new BN(0)),
                             pr: resp.pr,
                             secret: secret.toString("hex"),
                             exactIn: (_a = amountData.exactIn) !== null && _a !== void 0 ? _a : true

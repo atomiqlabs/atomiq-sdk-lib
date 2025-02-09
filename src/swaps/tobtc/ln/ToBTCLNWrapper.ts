@@ -252,10 +252,12 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
 
         this.checkPaymentHashWasPaid(parsedPr.tagsObject.payment_hash);
 
+        const claimHash = this.contract.getHashForHtlc(Buffer.from(parsedPr.tagsObject.payment_hash, "hex"));
+
         const _abortController = extendAbortController(abortSignal);
         if(preFetches==null) preFetches = {
             pricePreFetchPromise: this.preFetchPrice(amountData, _abortController.signal),
-            feeRatePromise: this.preFetchFeeRate(signer, amountData, parsedPr.tagsObject.payment_hash, _abortController)
+            feeRatePromise: this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController)
         };
 
         return lps.map(lp => {
