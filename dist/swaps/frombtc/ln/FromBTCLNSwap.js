@@ -565,7 +565,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     //////////////////////////////
     //// Storage
     serialize() {
-        return Object.assign(Object.assign({}, super.serialize()), { pr: this.pr, secret: this.secret, lnurl: this.lnurl, lnurlK1: this.lnurlK1, lnurlCallback: this.lnurlCallback, prPosted: this.prPosted });
+        return Object.assign(Object.assign({}, super.serialize()), { pr: this.pr, secret: this.secret, lnurl: this.lnurl, lnurlK1: this.lnurlK1, lnurlCallback: this.lnurlCallback, prPosted: this.prPosted, initialSwapData: this.initialSwapData == null ? null : this.initialSwapData.serialize() });
     }
 }
 exports.FromBTCLNSwap = FromBTCLNSwap;

@@ -650,7 +650,8 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
             lnurl: this.lnurl,
             lnurlK1: this.lnurlK1,
             lnurlCallback: this.lnurlCallback,
-            prPosted: this.prPosted
+            prPosted: this.prPosted,
+            initialSwapData: this.initialSwapData==null ? null : this.initialSwapData.serialize()
         };
     }
 }
