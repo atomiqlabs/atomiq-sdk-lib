@@ -53,7 +53,8 @@ class ISwapWrapper {
                 address: chainData.address,
                 decimals: chainData.decimals,
                 ticker: tokenData.ticker,
-                name: tokenData.name
+                name: tokenData.name,
+                displayDecimals: chainData.displayDecimals
             };
         }
     }

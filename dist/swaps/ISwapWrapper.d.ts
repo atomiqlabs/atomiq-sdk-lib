@@ -24,6 +24,7 @@ export type WrapperCtorTokens<T extends MultiChain = MultiChain> = {
         [chainId in ChainIds<T>]?: {
             address: string;
             decimals: number;
+            displayDecimals?: number;
         };
     };
 }[];

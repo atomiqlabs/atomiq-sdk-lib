@@ -34,7 +34,8 @@ export type WrapperCtorTokens<T extends MultiChain = MultiChain> = {
     name: string,
     chains: {[chainId in ChainIds<T>]?: {
         address: string,
-        decimals: number
+        decimals: number,
+        displayDecimals?: number
     }}
 }[];
 
@@ -104,7 +105,8 @@ export abstract class ISwapWrapper<
                 address: chainData.address,
                 decimals: chainData.decimals,
                 ticker: tokenData.ticker,
-                name: tokenData.name
+                name: tokenData.name,
+                displayDecimals: chainData.displayDecimals
             };
         }
     }
