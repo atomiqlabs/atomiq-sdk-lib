@@ -63,7 +63,7 @@ function fromDecimal(amount, decimalCount) {
     }
 }
 exports.fromDecimal = fromDecimal;
-function toDecimal(amount, decimalCount, cut) {
+function toDecimal(amount, decimalCount, cut, displayDecimals) {
     if (decimalCount <= 0) {
         return amount.toString(10) + "0".repeat(-decimalCount);
     }
@@ -82,11 +82,15 @@ function toDecimal(amount, decimalCount, cut) {
         if (cutTo === 0)
             cutTo = 1;
     }
+    if (displayDecimals === 0)
+        return amountStr.substring(0, splitPoint);
+    if (displayDecimals != null && cutTo > displayDecimals)
+        cutTo = displayDecimals;
     return amountStr.substring(0, splitPoint) + "." + decimalPart.substring(0, cutTo);
 }
 exports.toDecimal = toDecimal;
 function toTokenAmount(amount, token, prices) {
-    const amountStr = toDecimal(amount, token.decimals);
+    let amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
     return {
         rawAmount: amount,
         amount: amountStr,

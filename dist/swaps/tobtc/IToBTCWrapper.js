@@ -83,13 +83,13 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
      *
      * @param signer Address of the swap initiator
      * @param amountData
-     * @param hash optional hash of the swap or null
+     * @param claimHash optional hash of the swap or null
      * @param abortController
      * @protected
      * @returns Fee rate
      */
-    preFetchFeeRate(signer, amountData, hash, abortController) {
-        return (0, Utils_1.tryWithRetries)(() => this.contract.getInitPayInFeeRate(signer, null, amountData.token, hash), null, null, abortController.signal).catch(e => {
+    preFetchFeeRate(signer, amountData, claimHash, abortController) {
+        return (0, Utils_1.tryWithRetries)(() => this.contract.getInitPayInFeeRate(signer, null, amountData.token, claimHash), null, null, abortController.signal).catch(e => {
             this.logger.error("preFetchFeeRate(): Error: ", e);
             abortController.abort(e);
             return null;

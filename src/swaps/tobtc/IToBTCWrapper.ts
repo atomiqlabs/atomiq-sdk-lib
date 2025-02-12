@@ -84,14 +84,14 @@ export abstract class IToBTCWrapper<
      *
      * @param signer Address of the swap initiator
      * @param amountData
-     * @param hash optional hash of the swap or null
+     * @param claimHash optional hash of the swap or null
      * @param abortController
      * @protected
      * @returns Fee rate
      */
-    protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, hash: string | null, abortController: AbortController): Promise<any | null> {
+    protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, claimHash: string | null, abortController: AbortController): Promise<any | null> {
         return tryWithRetries(
-            () => this.contract.getInitPayInFeeRate(signer, null, amountData.token, hash),
+            () => this.contract.getInitPayInFeeRate(signer, null, amountData.token, claimHash),
             null, null, abortController.signal
         ).catch(e => {
             this.logger.error("preFetchFeeRate(): Error: ", e);
