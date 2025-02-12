@@ -135,6 +135,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @throws {Error} If the LP refunded sooner than we were able to claim
      */
     waitTillClaimed(abortSignal?: AbortSignal): Promise<void>;
+    canCommitAndClaimInOneShot(): boolean;
     /**
      * Commits and claims the swap, in a way that the transactions can be signed together by the underlying provider and
      *  then sent sequentially

@@ -479,6 +479,9 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     }
     //////////////////////////////
     //// Commit & claim
+    canCommitAndClaimInOneShot() {
+        return this.wrapper.contract.initAndClaimWithSecret != null;
+    }
     /**
      * Commits and claims the swap, in a way that the transactions can be signed together by the underlying provider and
      *  then sent sequentially
@@ -492,6 +495,8 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
      */
     commitAndClaim(signer, abortSignal, skipChecks) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (!this.canCommitAndClaimInOneShot())
+                throw new Error("Cannot commitAndClaim in single action, please run commit and claim separately!");
             this.checkSigner(signer);
             if (this.state === FromBTCLNSwapState.CLAIM_COMMITED)
                 return [null, yield this.claim(signer)];

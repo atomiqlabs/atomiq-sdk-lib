@@ -553,6 +553,10 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     //////////////////////////////
     //// Commit & claim
 
+    canCommitAndClaimInOneShot(): boolean {
+        return this.wrapper.contract.initAndClaimWithSecret!=null;
+    }
+
     /**
      * Commits and claims the swap, in a way that the transactions can be signed together by the underlying provider and
      *  then sent sequentially
@@ -565,6 +569,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
     async commitAndClaim(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string[]> {
+        if(!this.canCommitAndClaimInOneShot()) throw new Error("Cannot commitAndClaim in single action, please run commit and claim separately!");
         this.checkSigner(signer);
         if(this.state===FromBTCLNSwapState.CLAIM_COMMITED) return [null, await this.claim(signer)];
 
