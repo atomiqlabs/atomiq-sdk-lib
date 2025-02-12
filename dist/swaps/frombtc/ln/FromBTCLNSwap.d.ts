@@ -39,6 +39,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     lnurlK1?: string;
     lnurlCallback?: string;
     prPosted?: boolean;
+    wrapper: FromBTCLNWrapper<T>;
     protected getSwapData(): T["Data"];
     constructor(wrapper: FromBTCLNWrapper<T>, init: FromBTCLNSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNWrapper<T>, obj: any);
@@ -56,6 +57,11 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * Returns timeout time (in UNIX milliseconds) when the LN invoice will expire
      */
     getTimeoutTime(): number;
+    /**
+     * Returns timeout time (in UNIX milliseconds) when the on-chain address will expire and no funds should be sent
+     *  to that address anymore
+     */
+    getHtlcTimeoutTime(): number;
     isFinished(): boolean;
     isClaimable(): boolean;
     isSuccessful(): boolean;

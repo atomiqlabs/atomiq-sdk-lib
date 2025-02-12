@@ -139,6 +139,13 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         const decoded = (0, bolt11_1.decode)(this.pr);
         return (decoded.timeExpireDate * 1000);
     }
+    /**
+     * Returns timeout time (in UNIX milliseconds) when the on-chain address will expire and no funds should be sent
+     *  to that address anymore
+     */
+    getHtlcTimeoutTime() {
+        return this.wrapper.getHtlcTimeout(this.data).toNumber() * 1000;
+    }
     isFinished() {
         return this.state === FromBTCLNSwapState.CLAIM_CLAIMED || this.state === FromBTCLNSwapState.QUOTE_EXPIRED || this.state === FromBTCLNSwapState.FAILED;
     }

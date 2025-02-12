@@ -129,6 +129,14 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         return Promise.resolve(false);
     }
     /**
+     * Returns the swap expiry, leaving enough time for the user to claim the HTLC
+     *
+     * @param data Parsed swap data
+     */
+    getHtlcTimeout(data) {
+        return data.getExpiry().sub(new BN(600));
+    }
+    /**
      * Generates a new 32-byte secret to be used as pre-image for lightning network invoice & HTLC swap\
      *
      * @private

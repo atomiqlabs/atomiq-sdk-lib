@@ -62,6 +62,8 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     lnurlCallback?: string;
     prPosted?: boolean = false;
 
+    wrapper: FromBTCLNWrapper<T>;
+
     protected getSwapData(): T["Data"] {
         return this.data ?? this.initialSwapData;
     }
@@ -163,6 +165,14 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         if(this.pr==null) return null;
         const decoded = bolt11Decode(this.pr);
         return (decoded.timeExpireDate*1000);
+    }
+
+    /**
+     * Returns timeout time (in UNIX milliseconds) when the on-chain address will expire and no funds should be sent
+     *  to that address anymore
+     */
+    getHtlcTimeoutTime(): number {
+        return this.wrapper.getHtlcTimeout(this.data).toNumber()*1000;
     }
 
     isFinished(): boolean {

@@ -9,7 +9,7 @@ import {
     InitializeEvent,
     IStorageManager,
     RefundEvent,
-    SwapCommitStatus
+    SwapCommitStatus, SwapData
 } from "@atomiqlabs/base";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {Buffer} from "buffer";
@@ -153,6 +153,15 @@ export class FromBTCLNWrapper<
             return Promise.resolve(true);
         }
         return Promise.resolve(false);
+    }
+
+    /**
+     * Returns the swap expiry, leaving enough time for the user to claim the HTLC
+     *
+     * @param data Parsed swap data
+     */
+    getHtlcTimeout(data: SwapData): BN {
+        return data.getExpiry().sub(new BN(600));
     }
 
     /**
