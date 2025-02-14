@@ -272,6 +272,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePrefetchPromise = this.preFetchPrice(amountData, _abortController.signal);
         const claimerBountyPrefetchPromise = this.preFetchClaimerBounty(signer, amountData, options, _abortController);
+        const nativeTokenAddress = this.contract.getNativeCurrencyAddress();
         const feeRatePromise = this.preFetchFeeRate(signer, amountData, null, _abortController);
         return lps.map(lp => {
             return {
@@ -282,7 +283,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                     const liquidityPromise = this.preFetchIntermediaryLiquidity(amountData, lp, abortController);
                     try {
                         const { signDataPromise, resp } = yield (0, Utils_1.tryWithRetries)((retryCount) => __awaiter(this, void 0, void 0, function* () {
-                            const { signDataPrefetch, response } = IntermediaryAPI_1.IntermediaryAPI.initFromBTC(this.chainIdentifier, lp.url, {
+                            const { signDataPrefetch, response } = IntermediaryAPI_1.IntermediaryAPI.initFromBTC(this.chainIdentifier, lp.url, nativeTokenAddress, {
                                 claimer: signer,
                                 amount: amountData.amount,
                                 token: amountData.token.toString(),

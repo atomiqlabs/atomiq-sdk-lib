@@ -245,6 +245,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         const claimHash = this.contract.getHashForHtlc(paymentHash);
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         (_a = preFetches.pricePrefetchPromise) !== null && _a !== void 0 ? _a : (preFetches.pricePrefetchPromise = this.preFetchPrice(amountData, _abortController.signal));
+        const nativeTokenAddress = this.contract.getNativeCurrencyAddress();
         (_b = preFetches.feeRatePromise) !== null && _b !== void 0 ? _b : (preFetches.feeRatePromise = this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController));
         return lps.map(lp => {
             return {
@@ -254,7 +255,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                     const abortController = (0, Utils_1.extendAbortController)(_abortController.signal);
                     const liquidityPromise = this.preFetchIntermediaryLiquidity(amountData, lp, abortController);
                     const { lnCapacityPromise, resp } = yield (0, Utils_1.tryWithRetries)((retryCount) => __awaiter(this, void 0, void 0, function* () {
-                        const { lnPublicKey, response } = IntermediaryAPI_1.IntermediaryAPI.initFromBTCLN(this.chainIdentifier, lp.url, {
+                        const { lnPublicKey, response } = IntermediaryAPI_1.IntermediaryAPI.initFromBTCLN(this.chainIdentifier, lp.url, nativeTokenAddress, {
                             paymentHash,
                             amount: amountData.amount,
                             claimer: signer,

@@ -371,6 +371,7 @@ export class FromBTCWrapper<
         const _abortController = extendAbortController(abortSignal);
         const pricePrefetchPromise: Promise<BN> = this.preFetchPrice(amountData, _abortController.signal);
         const claimerBountyPrefetchPromise = this.preFetchClaimerBounty(signer, amountData, options, _abortController);
+        const nativeTokenAddress = this.contract.getNativeCurrencyAddress();
         const feeRatePromise: Promise<any> = this.preFetchFeeRate(signer, amountData, null, _abortController);
 
         return lps.map(lp => {
@@ -382,18 +383,22 @@ export class FromBTCWrapper<
 
                     try {
                         const {signDataPromise, resp} = await tryWithRetries(async(retryCount: number) => {
-                            const {signDataPrefetch, response} = IntermediaryAPI.initFromBTC(this.chainIdentifier, lp.url, {
-                                claimer: signer,
-                                amount: amountData.amount,
-                                token: amountData.token.toString(),
+                            const {signDataPrefetch, response} = IntermediaryAPI.initFromBTC(
+                                this.chainIdentifier, lp.url, nativeTokenAddress,
+                                {
+                                    claimer: signer,
+                                    amount: amountData.amount,
+                                    token: amountData.token.toString(),
 
-                                exactOut: !amountData.exactIn,
-                                sequence,
+                                    exactOut: !amountData.exactIn,
+                                    sequence,
 
-                                claimerBounty: claimerBountyPrefetchPromise,
-                                feeRate: feeRatePromise,
-                                additionalParams
-                            }, this.options.postRequestTimeout, abortController.signal, retryCount>0 ? false : null);
+                                    claimerBounty: claimerBountyPrefetchPromise,
+                                    feeRate: feeRatePromise,
+                                    additionalParams
+                                },
+                                this.options.postRequestTimeout, abortController.signal, retryCount>0 ? false : null
+                            );
 
                             return {
                                 signDataPromise: this.preFetchSignData(signDataPrefetch),

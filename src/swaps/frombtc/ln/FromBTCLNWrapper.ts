@@ -298,6 +298,7 @@ export class FromBTCLNWrapper<
 
         const _abortController = extendAbortController(abortSignal);
         preFetches.pricePrefetchPromise ??= this.preFetchPrice(amountData, _abortController.signal);
+        const nativeTokenAddress = this.contract.getNativeCurrencyAddress();
         preFetches.feeRatePromise ??= this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController);
 
         return lps.map(lp => {
@@ -309,16 +310,20 @@ export class FromBTCLNWrapper<
                     const liquidityPromise: Promise<BN> = this.preFetchIntermediaryLiquidity(amountData, lp, abortController);
 
                     const {lnCapacityPromise, resp} = await tryWithRetries(async(retryCount: number) => {
-                        const {lnPublicKey, response} = IntermediaryAPI.initFromBTCLN(this.chainIdentifier, lp.url, {
-                            paymentHash,
-                            amount: amountData.amount,
-                            claimer: signer,
-                            token: amountData.token.toString(),
-                            descriptionHash: options.descriptionHash,
-                            exactOut: !amountData.exactIn,
-                            feeRate: preFetches.feeRatePromise,
-                            additionalParams
-                        }, this.options.postRequestTimeout, abortController.signal, retryCount>0 ? false : null);
+                        const {lnPublicKey, response} = IntermediaryAPI.initFromBTCLN(
+                            this.chainIdentifier, lp.url, nativeTokenAddress,
+                            {
+                                paymentHash,
+                                amount: amountData.amount,
+                                claimer: signer,
+                                token: amountData.token.toString(),
+                                descriptionHash: options.descriptionHash,
+                                exactOut: !amountData.exactIn,
+                                feeRate: preFetches.feeRatePromise,
+                                additionalParams
+                            },
+                            this.options.postRequestTimeout, abortController.signal, retryCount>0 ? false : null
+                        );
 
                         return {
                             lnCapacityPromise: this.preFetchLnCapacity(lnPublicKey),
