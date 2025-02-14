@@ -211,10 +211,11 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
      * @param data Parsed swap data returned by the intermediary
      * @param sequence Required swap sequence
      * @param claimerBounty Claimer bount data as returned from the preFetchClaimerBounty() pre-fetch promise
+     * @param depositToken
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
-    verifyReturnedData(resp, amountData, lp, options, data, sequence, claimerBounty) {
+    verifyReturnedData(resp, amountData, lp, options, data, sequence, claimerBounty, depositToken) {
         var _a;
         if (amountData.exactIn) {
             if (!resp.amount.eq(amountData.amount))
@@ -234,7 +235,8 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
             !data.getAmount().eq(resp.total) ||
             data.isPayIn() ||
             !data.isToken(amountData.token) ||
-            data.getOfferer() !== lp.getAddress(this.chainIdentifier)) {
+            data.getOfferer() !== lp.getAddress(this.chainIdentifier) ||
+            data.isDepositToken(depositToken)) {
             throw new IntermediaryError_1.IntermediaryError("Invalid data returned");
         }
         //Check that we have enough time to send the TX and for it to confirm
@@ -300,7 +302,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                         }), null, e => e instanceof RequestError_1.RequestError, abortController.signal);
                         const data = new this.swapDataDeserializer(resp.data);
                         data.setClaimer(signer);
-                        this.verifyReturnedData(resp, amountData, lp, options, data, sequence, yield claimerBountyPrefetchPromise);
+                        this.verifyReturnedData(resp, amountData, lp, options, data, sequence, yield claimerBountyPrefetchPromise, nativeTokenAddress);
                         const [pricingInfo, signatureExpiry] = yield Promise.all([
                             //Get intermediary's liquidity
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.FROM_BTC], false, resp.amount, resp.total, amountData.token, resp, pricePrefetchPromise, abortController.signal),

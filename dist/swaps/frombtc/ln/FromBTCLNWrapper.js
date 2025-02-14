@@ -285,7 +285,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                             expiry: decodedPr.timeExpireDate * 1000,
                             swapFee: resp.swapFee,
                             feeRate: yield preFetches.feeRatePromise,
-                            initialSwapData: yield this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, claimHash.toString("hex"), this.getRandomSequence(), new BN(Math.floor(Date.now() / 1000)), false, true, resp.securityDeposit, new BN(0)),
+                            initialSwapData: yield this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, claimHash.toString("hex"), this.getRandomSequence(), new BN(Math.floor(Date.now() / 1000)), false, true, resp.securityDeposit, new BN(0), nativeTokenAddress),
                             pr: resp.pr,
                             secret: secret.toString("hex"),
                             exactIn: (_a = amountData.exactIn) !== null && _a !== void 0 ? _a : true

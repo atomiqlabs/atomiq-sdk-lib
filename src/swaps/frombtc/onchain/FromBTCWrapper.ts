@@ -282,6 +282,7 @@ export class FromBTCWrapper<
      * @param data Parsed swap data returned by the intermediary
      * @param sequence Required swap sequence
      * @param claimerBounty Claimer bount data as returned from the preFetchClaimerBounty() pre-fetch promise
+     * @param depositToken
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
@@ -298,7 +299,8 @@ export class FromBTCWrapper<
             startTimestamp: BN,
             addBlock: number,
             addFee: BN
-        }
+        },
+        depositToken: string
     ): void {
         if(amountData.exactIn) {
             if(!resp.amount.eq(amountData.amount)) throw new IntermediaryError("Invalid amount returned");
@@ -318,7 +320,8 @@ export class FromBTCWrapper<
             !data.getAmount().eq(resp.total) ||
             data.isPayIn() ||
             !data.isToken(amountData.token) ||
-            data.getOfferer()!==lp.getAddress(this.chainIdentifier)
+            data.getOfferer()!==lp.getAddress(this.chainIdentifier) ||
+            data.isDepositToken(depositToken)
         ) {
             throw new IntermediaryError("Invalid data returned");
         }
@@ -409,7 +412,7 @@ export class FromBTCWrapper<
                         const data: T["Data"] = new this.swapDataDeserializer(resp.data);
                         data.setClaimer(signer);
 
-                        this.verifyReturnedData(resp, amountData, lp, options, data, sequence, await claimerBountyPrefetchPromise);
+                        this.verifyReturnedData(resp, amountData, lp, options, data, sequence, await claimerBountyPrefetchPromise, nativeTokenAddress);
                         const [pricingInfo, signatureExpiry] = await Promise.all([
                             //Get intermediary's liquidity
                             this.verifyReturnedPrice(

@@ -355,7 +355,7 @@ export class FromBTCLNWrapper<
                                 ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token,
                                 resp.total, claimHash.toString("hex"),
                                 this.getRandomSequence(), new BN(Math.floor(Date.now()/1000)), false, true,
-                                resp.securityDeposit, new BN(0)
+                                resp.securityDeposit, new BN(0), nativeTokenAddress
                             ),
                             pr: resp.pr,
                             secret: secret.toString("hex"),

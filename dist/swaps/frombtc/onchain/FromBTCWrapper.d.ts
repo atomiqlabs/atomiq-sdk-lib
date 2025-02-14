@@ -83,6 +83,7 @@ export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper
      * @param data Parsed swap data returned by the intermediary
      * @param sequence Required swap sequence
      * @param claimerBounty Claimer bount data as returned from the preFetchClaimerBounty() pre-fetch promise
+     * @param depositToken
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
