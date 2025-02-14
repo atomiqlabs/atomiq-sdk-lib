@@ -236,7 +236,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
             data.isPayIn() ||
             !data.isToken(amountData.token) ||
             data.getOfferer() !== lp.getAddress(this.chainIdentifier) ||
-            data.isDepositToken(depositToken)) {
+            !data.isDepositToken(depositToken)) {
             throw new IntermediaryError_1.IntermediaryError("Invalid data returned");
         }
         //Check that we have enough time to send the TX and for it to confirm

@@ -412,7 +412,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         if (data.getSecurityDeposit().gt(this.getSwapData().getSecurityDeposit())) throw new IntermediaryError("Invalid security deposit!");
         if (data.getAmount().lt(this.getSwapData().getAmount())) throw new IntermediaryError("Invalid amount received!");
         if (data.getClaimHash() !== this.getSwapData().getClaimHash()) throw new IntermediaryError("Invalid payment hash used!");
-        if (data.isDepositToken(this.getSwapData().getDepositToken())) throw new IntermediaryError("Invalid deposit token used!");
+        if (!data.isDepositToken(this.getSwapData().getDepositToken())) throw new IntermediaryError("Invalid deposit token used!");
 
         await Promise.all([
             tryWithRetries(

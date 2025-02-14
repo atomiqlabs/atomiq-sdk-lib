@@ -321,7 +321,7 @@ export class FromBTCWrapper<
             data.isPayIn() ||
             !data.isToken(amountData.token) ||
             data.getOfferer()!==lp.getAddress(this.chainIdentifier) ||
-            data.isDepositToken(depositToken)
+            !data.isDepositToken(depositToken)
         ) {
             throw new IntermediaryError("Invalid data returned");
         }

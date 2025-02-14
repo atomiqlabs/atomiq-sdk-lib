@@ -353,7 +353,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                 throw new IntermediaryError_1.IntermediaryError("Invalid amount received!");
             if (data.getClaimHash() !== this.getSwapData().getClaimHash())
                 throw new IntermediaryError_1.IntermediaryError("Invalid payment hash used!");
-            if (data.isDepositToken(this.getSwapData().getDepositToken()))
+            if (!data.isDepositToken(this.getSwapData().getDepositToken()))
                 throw new IntermediaryError_1.IntermediaryError("Invalid deposit token used!");
             yield Promise.all([
                 (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(data, signature, this.feeRate), null, base_1.SignatureVerificationError),
