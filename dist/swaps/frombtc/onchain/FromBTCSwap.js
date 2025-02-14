@@ -149,7 +149,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
      * Returns claimer bounty, acting as a reward for watchtowers to claim the swap automatically
      */
     getClaimerBounty() {
-        return (0, Tokens_1.toTokenAmount)(this.data.getClaimerBounty(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.data.getClaimerBounty(), this.wrapper.tokens[this.data.getDepositToken()], this.wrapper.prices);
     }
     //////////////////////////////
     //// Bitcoin tx

@@ -175,7 +175,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
      * Returns claimer bounty, acting as a reward for watchtowers to claim the swap automatically
      */
     getClaimerBounty(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getClaimerBounty(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return toTokenAmount(this.data.getClaimerBounty(), this.wrapper.tokens[this.data.getDepositToken()], this.wrapper.prices);
     }
 
     //////////////////////////////
