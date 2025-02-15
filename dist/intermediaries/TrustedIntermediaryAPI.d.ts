@@ -51,6 +51,7 @@ export type AddressStatusResponse = {
 export type TrustedFromBTCInit = {
     address: string;
     amount: BN;
+    token: string;
     refundAddress?: string;
 };
 declare const TrustedFromBTCResponseSchema: {
@@ -86,6 +87,7 @@ export type InvoiceStatusResponse = {
 export type TrustedFromBTCLNInit = {
     address: string;
     amount: BN;
+    token: string;
 };
 declare const TrustedFromBTCLNResponseSchema: {
     readonly pr: FieldTypeEnum.String;

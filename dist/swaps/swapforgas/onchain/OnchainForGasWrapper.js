@@ -49,7 +49,8 @@ class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
             const resp = yield TrustedIntermediaryAPI_1.TrustedIntermediaryAPI.initTrustedFromBTC(this.chainIdentifier, lpUrl, {
                 address: signer,
                 amount,
-                refundAddress
+                refundAddress,
+                token: this.contract.getNativeCurrencyAddress()
             }, this.options.getRequestTimeout);
             if (!resp.total.eq(amount))
                 throw new IntermediaryError_1.IntermediaryError("Invalid total returned");

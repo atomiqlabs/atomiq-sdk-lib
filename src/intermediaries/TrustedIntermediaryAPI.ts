@@ -57,6 +57,7 @@ export type AddressStatusResponse = {
 export type TrustedFromBTCInit = {
     address: string,
     amount: BN,
+    token: string,
     refundAddress?: string
 };
 
@@ -96,7 +97,8 @@ export type InvoiceStatusResponse = {
 
 export type TrustedFromBTCLNInit = {
     address: string,
-    amount: BN
+    amount: BN,
+    token: string
 };
 
 const TrustedFromBTCLNResponseSchema = {

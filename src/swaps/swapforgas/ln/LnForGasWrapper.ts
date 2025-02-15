@@ -25,7 +25,8 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
 
         const resp = await TrustedIntermediaryAPI.initTrustedFromBTCLN(this.chainIdentifier, lpUrl, {
             address: signer,
-            amount
+            amount,
+            token: this.contract.getNativeCurrencyAddress()
         }, this.options.getRequestTimeout);
 
         const decodedPr = bolt11Decode(resp.pr);
