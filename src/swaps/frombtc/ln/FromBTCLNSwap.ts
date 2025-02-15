@@ -449,10 +449,9 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         );
 
         this.commitTxId = result[0];
-        // if(this.state===FromBTCLNSwapState.PR_PAID || this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-        //     await this._saveAndEmit(FromBTCLNSwapState.CLAIM_COMMITED);
-        // }
-        await this.waitTillCommited(abortSignal);
+        if(this.state===FromBTCLNSwapState.PR_PAID || this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
+            await this._saveAndEmit(FromBTCLNSwapState.CLAIM_COMMITED);
+        }
         return result[0];
     }
 
