@@ -380,9 +380,10 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             this.checkSigner(signer);
             const result = yield this.wrapper.contract.sendAndConfirm(signer, yield this.txsCommit(skipChecks), true, abortSignal);
             this.commitTxId = result[0];
-            if (this.state === FromBTCLNSwapState.PR_PAID || this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-                yield this._saveAndEmit(FromBTCLNSwapState.CLAIM_COMMITED);
-            }
+            // if(this.state===FromBTCLNSwapState.PR_PAID || this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
+            //     await this._saveAndEmit(FromBTCLNSwapState.CLAIM_COMMITED);
+            // }
+            yield this.waitTillCommited(abortSignal);
             return result[0];
         });
     }
