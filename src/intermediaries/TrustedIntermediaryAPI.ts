@@ -154,7 +154,8 @@ export class TrustedIntermediaryAPI {
                 baseUrl+"/lnforgas/createInvoice" +
                     "?address="+encodeURIComponent(init.address) +
                     "&amount="+encodeURIComponent(init.amount.toString(10))+
-                    "&chain="+encodeURIComponent(chainIdentifier),
+                    "&chain="+encodeURIComponent(chainIdentifier)+
+                    "&token="+encodeURIComponent(init.token),
                 timeout,
                 abortSignal
             ), null, RequestError, abortSignal
@@ -233,14 +234,13 @@ export class TrustedIntermediaryAPI {
         abortSignal?: AbortSignal
     ): Promise<TrustedFromBTCResponseType> {
         const resp = await tryWithRetries(
-            () => httpPost<{code: number, msg: string, data?: any}>(
-                baseUrl+"/frombtc_trusted/getAddress?chain="+encodeURIComponent(chainIdentifier),
-                {
-                    address: init.address,
-                    amount: init.amount.toString(10),
-                    refundAddress: init.refundAddress,
-                    exactOut: true
-                },
+            () => httpGet<{code: number, msg: string, data?: any}>(
+                baseUrl+"/frombtc_trusted/getAddress?chain="+encodeURIComponent(chainIdentifier)+
+                    "&address="+encodeURIComponent(init.address)+
+                    "&amount="+encodeURIComponent(init.amount.toString(10))+
+                    "&refundAddress="+encodeURIComponent(init.refundAddress)+
+                    "&exactIn=true"+
+                    "&token="+encodeURIComponent(init.token),
                 timeout,
                 abortSignal
             ), null, RequestError, abortSignal
