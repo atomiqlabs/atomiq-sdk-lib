@@ -154,18 +154,56 @@ export type TransactionProof = {
     pos: number;
 };
 export declare class MempoolApi {
-    url: string;
+    backends: {
+        url: string;
+        operational: boolean | null;
+    }[];
     timeout: number;
+    /**
+     * Returns api url that should be operational
+     *
+     * @private
+     */
+    private getOperationalApi;
+    /**
+     * Returns api urls that are maybe operational, in case none is considered operational returns all of the price
+     *  apis such that they can be tested again whether they are operational
+     *
+     * @private
+     */
+    private getMaybeOperationalApis;
     /**
      * Sends a GET or POST request to the mempool api, handling the non-200 responses as errors & throwing
      *
+     * @param url
      * @param path
      * @param responseType
      * @param type
      * @param body
      */
+    private _request;
+    /**
+     * Sends request in parallel to multiple maybe operational api urls
+     *
+     * @param path
+     * @param responseType
+     * @param type
+     * @param body
+     * @private
+     */
+    private requestFromMaybeOperationalUrls;
+    /**
+     * Sends a request to mempool API, first tries to use the operational API (if any) and if that fails it falls back
+     *  to using maybe operational price APIs
+     *
+     * @param path
+     * @param responseType
+     * @param type
+     * @param body
+     * @private
+     */
     private request;
-    constructor(url?: string, timeout?: number);
+    constructor(url?: string | string[], timeout?: number);
     /**
      * Returns information about a specific lightning network node as identified by the public key (in hex encoding)
      *

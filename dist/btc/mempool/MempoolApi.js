@@ -16,20 +16,43 @@ const Utils_1 = require("../../utils/Utils");
 const RequestError_1 = require("../../errors/RequestError");
 class MempoolApi {
     /**
+     * Returns api url that should be operational
+     *
+     * @private
+     */
+    getOperationalApi() {
+        return this.backends.find(e => e.operational === true);
+    }
+    /**
+     * Returns api urls that are maybe operational, in case none is considered operational returns all of the price
+     *  apis such that they can be tested again whether they are operational
+     *
+     * @private
+     */
+    getMaybeOperationalApis() {
+        let operational = this.backends.filter(e => e.operational === true || e.operational === null);
+        if (operational.length === 0) {
+            this.backends.forEach(e => e.operational = null);
+            operational = this.backends;
+        }
+        return operational;
+    }
+    /**
      * Sends a GET or POST request to the mempool api, handling the non-200 responses as errors & throwing
      *
+     * @param url
      * @param path
      * @param responseType
      * @param type
      * @param body
      */
-    request(path, responseType, type = "GET", body) {
+    _request(url, path, responseType, type = "GET", body) {
         return __awaiter(this, void 0, void 0, function* () {
-            const response = yield (0, Utils_1.tryWithRetries)(() => (0, Utils_1.fetchWithTimeout)(this.url + path, {
+            const response = yield (0, Utils_1.fetchWithTimeout)(url + path, {
                 method: type,
                 timeout: this.timeout,
                 body: typeof (body) === "string" ? body : JSON.stringify(body)
-            }));
+            });
             if (response.status !== 200) {
                 let resp;
                 try {
@@ -45,8 +68,81 @@ class MempoolApi {
             return yield response.json();
         });
     }
+    /**
+     * Sends request in parallel to multiple maybe operational api urls
+     *
+     * @param path
+     * @param responseType
+     * @param type
+     * @param body
+     * @private
+     */
+    requestFromMaybeOperationalUrls(path, responseType, type = "GET", body) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                return yield (0, Utils_1.promiseAny)(this.getMaybeOperationalApis().map(obj => (() => __awaiter(this, void 0, void 0, function* () {
+                    try {
+                        const result = yield this._request(obj.url, path, responseType, type, body);
+                        obj.operational = true;
+                        return result;
+                    }
+                    catch (e) {
+                        //Only mark as non operational on 5xx server errors!
+                        if (e instanceof RequestError_1.RequestError && Math.floor(e.httpCode / 100) !== 5) {
+                            obj.operational = true;
+                            throw e;
+                        }
+                        else {
+                            obj.operational = false;
+                            throw e;
+                        }
+                    }
+                }))()));
+            }
+            catch (e) {
+                throw e.find(err => err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5) || e[0];
+            }
+        });
+    }
+    /**
+     * Sends a request to mempool API, first tries to use the operational API (if any) and if that fails it falls back
+     *  to using maybe operational price APIs
+     *
+     * @param path
+     * @param responseType
+     * @param type
+     * @param body
+     * @private
+     */
+    request(path, responseType, type = "GET", body) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return (0, Utils_1.tryWithRetries)(() => {
+                const operationalPriceApi = this.getOperationalApi();
+                if (operationalPriceApi != null) {
+                    return this._request(operationalPriceApi.url, path, responseType, type, body).catch(err => {
+                        //Only retry on 5xx server errors!
+                        if (err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5)
+                            throw err;
+                        operationalPriceApi.operational = false;
+                        return this.requestFromMaybeOperationalUrls(path, responseType, type, body);
+                    });
+                }
+                return this.requestFromMaybeOperationalUrls(path, responseType, type, body);
+            }, null, (err) => err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5);
+        });
+    }
     constructor(url, timeout) {
-        this.url = url || "https://mempool.space/testnet/api/";
+        url = url !== null && url !== void 0 ? url : "https://mempool.space/testnet/api/";
+        if (Array.isArray(url)) {
+            this.backends = url.map(val => {
+                return { url: val, operational: null };
+            });
+        }
+        else {
+            this.backends = [
+                { url: url, operational: null }
+            ];
+        }
         this.timeout = timeout;
     }
     /**

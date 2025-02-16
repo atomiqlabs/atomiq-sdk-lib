@@ -1,6 +1,6 @@
 import * as BN from "bn.js";
 import {Buffer} from "buffer";
-import {fetchWithTimeout, tryWithRetries} from "../../utils/Utils";
+import {fetchWithTimeout, promiseAny, tryWithRetries} from "../../utils/Utils";
 import {RequestError} from "../../errors/RequestError";
 
 export type TxVout = {
@@ -162,28 +162,57 @@ export type TransactionProof = {
 
 export class MempoolApi {
 
-    url: string;
+    backends: {
+        url: string,
+        operational: boolean | null
+    }[];
     timeout: number;
+
+    /**
+     * Returns api url that should be operational
+     *
+     * @private
+     */
+    private getOperationalApi(): {url: string, operational: boolean} {
+        return this.backends.find(e => e.operational===true);
+    }
+
+    /**
+     * Returns api urls that are maybe operational, in case none is considered operational returns all of the price
+     *  apis such that they can be tested again whether they are operational
+     *
+     * @private
+     */
+    private getMaybeOperationalApis(): {url: string, operational: boolean}[] {
+        let operational = this.backends.filter(e => e.operational===true || e.operational===null);
+        if(operational.length===0) {
+            this.backends.forEach(e => e.operational=null);
+            operational = this.backends;
+        }
+        return operational;
+    }
 
     /**
      * Sends a GET or POST request to the mempool api, handling the non-200 responses as errors & throwing
      *
+     * @param url
      * @param path
      * @param responseType
      * @param type
      * @param body
      */
-    private async request<T>(
+    private async _request<T>(
+        url: string,
         path: string,
         responseType: T extends string ? "str" : "obj",
         type: "GET" | "POST" = "GET",
         body?: string | any
     ) : Promise<T> {
-        const response: Response = await tryWithRetries(() => fetchWithTimeout(this.url+path, {
+        const response: Response = await fetchWithTimeout(url+path, {
             method: type,
             timeout: this.timeout,
             body: typeof(body)==="string" ? body : JSON.stringify(body)
-        }));
+        });
 
         if(response.status!==200) {
             let resp: string;
@@ -199,8 +228,86 @@ export class MempoolApi {
         return await response.json();
     }
 
-    constructor(url?: string, timeout?: number) {
-        this.url = url || "https://mempool.space/testnet/api/";
+    /**
+     * Sends request in parallel to multiple maybe operational api urls
+     *
+     * @param path
+     * @param responseType
+     * @param type
+     * @param body
+     * @private
+     */
+    private async requestFromMaybeOperationalUrls<T>(
+        path: string,
+        responseType: T extends string ? "str" : "obj",
+        type: "GET" | "POST" = "GET",
+        body?: string | any
+    ) : Promise<T> {
+        try {
+            return await promiseAny<T>(this.getMaybeOperationalApis().map(
+                obj => (async () => {
+                    try {
+                        const result = await this._request<T>(obj.url, path, responseType, type, body);
+                        obj.operational = true;
+                        return result;
+                    } catch (e) {
+                        //Only mark as non operational on 5xx server errors!
+                        if(e instanceof RequestError && Math.floor(e.httpCode/100)!==5) {
+                            obj.operational = true;
+                            throw e;
+                        } else {
+                            obj.operational = false;
+                            throw e;
+                        }
+                    }
+                })()
+            ))
+        } catch (e) {
+            throw e.find(err => err instanceof RequestError && Math.floor(err.httpCode/100)!==5) || e[0];
+        }
+    }
+
+    /**
+     * Sends a request to mempool API, first tries to use the operational API (if any) and if that fails it falls back
+     *  to using maybe operational price APIs
+     *
+     * @param path
+     * @param responseType
+     * @param type
+     * @param body
+     * @private
+     */
+    private async request<T>(
+        path: string,
+        responseType: T extends string ? "str" : "obj",
+        type: "GET" | "POST" = "GET",
+        body?: string | any
+    ) : Promise<T> {
+        return tryWithRetries<T>(() => {
+            const operationalPriceApi = this.getOperationalApi();
+            if(operationalPriceApi!=null) {
+                return this._request(operationalPriceApi.url, path, responseType, type, body).catch(err => {
+                    //Only retry on 5xx server errors!
+                    if(err instanceof RequestError && Math.floor(err.httpCode/100)!==5) throw err;
+                    operationalPriceApi.operational = false;
+                    return this.requestFromMaybeOperationalUrls(path, responseType, type, body);
+                });
+            }
+            return this.requestFromMaybeOperationalUrls(path, responseType, type, body);
+        }, null, (err: any) => err instanceof RequestError && Math.floor(err.httpCode/100)!==5);
+    }
+
+    constructor(url?: string | string[], timeout?: number) {
+        url = url ?? "https://mempool.space/testnet/api/";
+        if(Array.isArray(url)) {
+            this.backends = url.map(val => {
+                return {url: val, operational: null}
+            });
+        } else {
+            this.backends = [
+                {url: url, operational: null}
+            ];
+        }
         this.timeout = timeout;
     }
 
