@@ -9,6 +9,7 @@ import * as createHash from "create-hash";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {LNURL, LNURLDecodedSuccessAction, LNURLPaySuccessAction, isLNURLPaySuccessAction} from "../../../utils/LNURL";
 import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../Tokens";
+import {getLogger} from "../../../utils/Utils";
 
 export type ToBTCLNSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     confidence: number;
@@ -50,6 +51,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
             this.successAction = initOrObj.successAction;
             this.secret = initOrObj.secret;
         }
+        this.logger = getLogger("ToBTCLN("+this.getIdentifierHashString()+"): ");
         this.tryCalculateSwapFee();
     }
 
@@ -60,9 +62,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
             const secretBuffer = Buffer.from(result.secret, "hex");
             const hash = createHash("sha256").update(secretBuffer).digest();
 
-            const paymentHashBuffer = Buffer.from(this.data.getHash(), "hex");
-
-            if(!hash.equals(paymentHashBuffer)) throw new IntermediaryError("Invalid payment secret returned");
+            if(!hash.equals(this.getPaymentHash())) throw new IntermediaryError("Invalid payment secret returned");
         }
         this.secret = result.secret;
         return Promise.resolve(true);
@@ -81,6 +81,10 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
 
     //////////////////////////////
     //// Getters & utils
+
+    getOutputTxId(): string | null {
+        return this.getLpIdentifier();
+    }
 
     /**
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
@@ -104,10 +108,22 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
         return this.confidence;
     }
 
+    getIdentifierHash(): Buffer {
+        const paymentHashBuffer = this.getPaymentHash();
+        if(this.randomNonce==null) return paymentHashBuffer;
+        return Buffer.concat([paymentHashBuffer, Buffer.from(this.randomNonce, "hex")]);
+    }
+
     getPaymentHash(): Buffer {
         if(this.pr==null) return null;
         const parsed = bolt11Decode(this.pr);
         return Buffer.from(parsed.tagsObject.payment_hash, "hex");
+    }
+
+    protected getLpIdentifier(): string {
+        if(this.pr==null) return null;
+        const parsed = bolt11Decode(this.pr);
+        return parsed.tagsObject.payment_hash;
     }
 
     getRecipient(): string {

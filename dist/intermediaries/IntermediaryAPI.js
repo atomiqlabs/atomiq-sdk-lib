@@ -49,7 +49,7 @@ const ToBTCLNPrepareExactInSchema = {
 };
 /////////////////////////
 ///// From BTC
-const FromBTCResponseSchema = Object.assign({ amount: SchemaVerifier_1.FieldTypeEnum.BN, btcAddress: SchemaVerifier_1.FieldTypeEnum.String, address: SchemaVerifier_1.FieldTypeEnum.String, swapFee: SchemaVerifier_1.FieldTypeEnum.BN, total: SchemaVerifier_1.FieldTypeEnum.BN }, SwapResponseSchema);
+const FromBTCResponseSchema = Object.assign({ amount: SchemaVerifier_1.FieldTypeEnum.BN, btcAddress: SchemaVerifier_1.FieldTypeEnum.String, address: SchemaVerifier_1.FieldTypeEnum.String, swapFee: SchemaVerifier_1.FieldTypeEnum.BN, total: SchemaVerifier_1.FieldTypeEnum.BN, confirmations: SchemaVerifier_1.FieldTypeEnum.NumberOptional }, SwapResponseSchema);
 /////////////////////////
 ///// From BTCLN
 const FromBTCLNResponseSchema = {
@@ -154,6 +154,7 @@ class IntermediaryAPI {
      *
      * @param chainIdentifier
      * @param baseUrl Base URL of the intermediary
+     * @param depositToken
      * @param init Swap initialization parameters
      * @param timeout Timeout in milliseconds for the HTTP request
      * @param abortSignal
@@ -161,8 +162,8 @@ class IntermediaryAPI {
      *
      * @throws {RequestError} If non-200 http response code is returned
      */
-    static initFromBTC(chainIdentifier, baseUrl, init, timeout, abortSignal, streamRequest) {
-        const responseBodyPromise = (0, StreamingFetchPromise_1.streamingFetchPromise)(baseUrl + "/frombtc/getAddress?chain=" + encodeURIComponent(chainIdentifier), Object.assign(Object.assign({}, init.additionalParams), { address: init.claimer, amount: init.amount.toString(10), token: init.token, exactOut: init.exactOut, sequence: init.sequence.toString(10), claimerBounty: init.claimerBounty.then(claimerBounty => {
+    static initFromBTC(chainIdentifier, baseUrl, depositToken, init, timeout, abortSignal, streamRequest) {
+        const responseBodyPromise = (0, StreamingFetchPromise_1.streamingFetchPromise)(baseUrl + "/frombtc/getAddress?chain=" + encodeURIComponent(chainIdentifier) + "&depositToken=" + encodeURIComponent(depositToken), Object.assign(Object.assign({}, init.additionalParams), { address: init.claimer, amount: init.amount.toString(10), token: init.token, exactOut: init.exactOut, sequence: init.sequence.toString(10), claimerBounty: init.claimerBounty.then(claimerBounty => {
                 return {
                     feePerBlock: claimerBounty.feePerBlock.toString(10),
                     safetyFactor: claimerBounty.safetyFactor,
@@ -195,6 +196,7 @@ class IntermediaryAPI {
      *
      * @param chainIdentifier
      * @param baseUrl Base URL of the intermediary
+     * @param depositToken
      * @param init Swap initialization parameters
      * @param timeout Timeout in milliseconds for the HTTP request
      * @param abortSignal
@@ -202,8 +204,8 @@ class IntermediaryAPI {
      *
      * @throws {RequestError} If non-200 http response code is returned
      */
-    static initFromBTCLN(chainIdentifier, baseUrl, init, timeout, abortSignal, streamRequest) {
-        const responseBodyPromise = (0, StreamingFetchPromise_1.streamingFetchPromise)(baseUrl + "/frombtcln/createInvoice?chain=" + encodeURIComponent(chainIdentifier), Object.assign(Object.assign({}, init.additionalParams), { paymentHash: init.paymentHash.toString("hex"), amount: init.amount.toString(), address: init.claimer, token: init.token, descriptionHash: init.descriptionHash == null ? null : init.descriptionHash.toString("hex"), exactOut: init.exactOut, feeRate: init.feeRate }), {
+    static initFromBTCLN(chainIdentifier, baseUrl, depositToken, init, timeout, abortSignal, streamRequest) {
+        const responseBodyPromise = (0, StreamingFetchPromise_1.streamingFetchPromise)(baseUrl + "/frombtcln/createInvoice?chain=" + encodeURIComponent(chainIdentifier) + "&depositToken=" + encodeURIComponent(depositToken), Object.assign(Object.assign({}, init.additionalParams), { paymentHash: init.paymentHash.toString("hex"), amount: init.amount.toString(), address: init.claimer, token: init.token, descriptionHash: init.descriptionHash == null ? null : init.descriptionHash.toString("hex"), exactOut: init.exactOut, feeRate: init.feeRate }), {
             code: SchemaVerifier_1.FieldTypeEnum.Number,
             msg: SchemaVerifier_1.FieldTypeEnum.String,
             data: SchemaVerifier_1.FieldTypeEnum.AnyOptional,

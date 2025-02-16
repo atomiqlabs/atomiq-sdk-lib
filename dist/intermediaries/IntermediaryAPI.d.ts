@@ -149,6 +149,7 @@ declare const FromBTCResponseSchema: {
     readonly address: FieldTypeEnum.String;
     readonly swapFee: FieldTypeEnum.BN;
     readonly total: FieldTypeEnum.BN;
+    readonly confirmations: FieldTypeEnum.NumberOptional;
 };
 export type FromBTCResponseType = RequestSchemaResult<typeof FromBTCResponseSchema>;
 export type FromBTCInit = BaseFromBTCSwapInit & {
@@ -229,6 +230,7 @@ export declare class IntermediaryAPI {
      *
      * @param chainIdentifier
      * @param baseUrl Base URL of the intermediary
+     * @param depositToken
      * @param init Swap initialization parameters
      * @param timeout Timeout in milliseconds for the HTTP request
      * @param abortSignal
@@ -236,7 +238,7 @@ export declare class IntermediaryAPI {
      *
      * @throws {RequestError} If non-200 http response code is returned
      */
-    static initFromBTC(chainIdentifier: string, baseUrl: string, init: FromBTCInit, timeout?: number, abortSignal?: AbortSignal, streamRequest?: boolean): {
+    static initFromBTC(chainIdentifier: string, baseUrl: string, depositToken: string, init: FromBTCInit, timeout?: number, abortSignal?: AbortSignal, streamRequest?: boolean): {
         signDataPrefetch: Promise<any>;
         response: Promise<FromBTCResponseType>;
     };
@@ -245,6 +247,7 @@ export declare class IntermediaryAPI {
      *
      * @param chainIdentifier
      * @param baseUrl Base URL of the intermediary
+     * @param depositToken
      * @param init Swap initialization parameters
      * @param timeout Timeout in milliseconds for the HTTP request
      * @param abortSignal
@@ -252,7 +255,7 @@ export declare class IntermediaryAPI {
      *
      * @throws {RequestError} If non-200 http response code is returned
      */
-    static initFromBTCLN(chainIdentifier: string, baseUrl: string, init: FromBTCLNInit, timeout?: number, abortSignal?: AbortSignal, streamRequest?: boolean): {
+    static initFromBTCLN(chainIdentifier: string, baseUrl: string, depositToken: string, init: FromBTCLNInit, timeout?: number, abortSignal?: AbortSignal, streamRequest?: boolean): {
         lnPublicKey: Promise<string>;
         response: Promise<FromBTCLNResponseType>;
     };

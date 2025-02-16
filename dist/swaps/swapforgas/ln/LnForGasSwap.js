@@ -52,7 +52,7 @@ class LnForGasSwap extends ISwap_1.ISwap {
             this.scTxId = initOrObj.scTxId;
         }
         this.tryCalculateSwapFee();
-        this.logger = (0, Utils_1.getLogger)(this.constructor.name + "(" + this.getPaymentHashString() + "): ");
+        this.logger = (0, Utils_1.getLogger)("LnForGas(" + this.getIdentifierHashString() + "): ");
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
         }
@@ -96,11 +96,23 @@ class LnForGasSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Getters & utils
-    getTxId() {
+    getInputAddress() {
+        return this.pr;
+    }
+    getOutputAddress() {
+        return this.recipient;
+    }
+    getInputTxId() {
+        return this.getPaymentHash().toString("hex");
+    }
+    getOutputTxId() {
         return this.scTxId;
     }
     getRecipient() {
         return this.recipient;
+    }
+    getIdentifierHash() {
+        return this.getPaymentHash();
     }
     getPaymentHash() {
         if (this.pr == null)

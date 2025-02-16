@@ -27,20 +27,19 @@ class IFromBTCSwap extends ISwap_1.ISwap {
             this.swapFeeBtc = this.swapFee.mul(this.getInput().rawAmount).div(this.getOutAmountWithoutFee());
         }
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
+            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getSwapData().getAmount(), this.getSwapData().getToken());
         }
     }
-    /**
-     * Returns the txoHash to be used in init transactions
-     */
-    getTxoHash() { return null; }
+    getSwapData() {
+        return this.data;
+    }
     //////////////////////////////
     //// Pricing
     refreshPriceData() {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.pricingInfo == null)
                 return null;
-            const priceData = yield this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
+            const priceData = yield this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getSwapData().getAmount(), this.getSwapData().getToken());
             this.pricingInfo = priceData;
             return priceData;
         });
@@ -55,19 +54,28 @@ class IFromBTCSwap extends ISwap_1.ISwap {
         const feeWithoutBaseFee = this.swapFeeBtc.sub(this.pricingInfo.satsBaseFee);
         return feeWithoutBaseFee.mul(new BN(1000000)).div(this.getInputWithoutFee().rawAmount);
     }
+    getOutputTxId() {
+        return this.claimTxId;
+    }
+    getInputAddress() {
+        return this.getAddress();
+    }
+    getOutputAddress() {
+        return this.getInitiator();
+    }
     isActionable() {
         return this.isClaimable();
     }
     //////////////////////////////
     //// Amounts & fees
     getOutAmountWithoutFee() {
-        return this.data.getAmount().add(this.swapFee);
+        return this.getSwapData().getAmount().add(this.swapFee);
     }
     getOutputWithoutFee() {
-        return (0, Tokens_1.toTokenAmount)(this.data.getAmount().add(this.swapFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getAmount().add(this.swapFee), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices);
     }
     getOutput() {
-        return (0, Tokens_1.toTokenAmount)(this.data.getAmount(), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices);
     }
     getInputWithoutFee() {
         return (0, Tokens_1.toTokenAmount)(this.getInput().rawAmount.sub(this.swapFeeBtc), this.inputToken, this.wrapper.prices);
@@ -75,21 +83,21 @@ class IFromBTCSwap extends ISwap_1.ISwap {
     getSwapFee() {
         return {
             amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, this.inputToken, this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
+            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices),
             usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
         };
     }
     getSecurityDeposit() {
-        return (0, Tokens_1.toTokenAmount)(this.data.getSecurityDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getSecurityDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
     getTotalDeposit() {
-        return (0, Tokens_1.toTokenAmount)(this.data.getTotalDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getTotalDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
     getInitiator() {
-        return this.data.getClaimer();
+        return this.getSwapData().getClaimer();
     }
     getClaimFee() {
-        return this.wrapper.contract.getClaimFee(this.getInitiator(), this.data);
+        return this.wrapper.contract.getClaimFee(this.getInitiator(), this.getSwapData());
     }
     hasEnoughForTxFees() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -97,7 +105,7 @@ class IFromBTCSwap extends ISwap_1.ISwap {
                 this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.contract.getNativeCurrencyAddress(), false),
                 this.getCommitFee()
             ]);
-            const totalFee = commitFee.add(this.data.getTotalDeposit());
+            const totalFee = commitFee.add(this.getSwapData().getTotalDeposit());
             return {
                 enoughBalance: balance.gte(totalFee),
                 balance: (0, Tokens_1.toTokenAmount)(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
@@ -119,7 +127,7 @@ class IFromBTCSwap extends ISwap_1.ISwap {
                 throw new Error("Must be in CREATED state!");
             this.initiated = true;
             yield this._saveAndEmit();
-            return yield this.wrapper.contract.txsInit(this.data, this.signatureData, this.getTxoHash == null ? null : this.getTxoHash(), skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
+            return yield this.wrapper.contract.txsInit(this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
         });
     }
 }

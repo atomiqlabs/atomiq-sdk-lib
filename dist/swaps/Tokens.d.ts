@@ -6,6 +6,7 @@ export type BtcToken<L = boolean> = {
     ticker: L extends true ? "BTCLN" : "BTC";
     decimals: 8;
     name: L extends true ? "Bitcoin (lightning L2)" : "Bitcoin (on-chain L1)";
+    displayDecimals?: number;
 };
 export declare function isBtcToken(obj: any): obj is BtcToken;
 export declare const BitcoinTokens: {
@@ -18,6 +19,7 @@ export type SCToken<ChainIdentifier extends string = string> = {
     address: string;
     ticker: string;
     decimals: number;
+    displayDecimals?: number;
     name: string;
 };
 export declare function isSCToken(obj: any): obj is SCToken;
@@ -31,5 +33,5 @@ export type TokenAmount<ChainIdentifier extends string = string, T extends Token
     usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) => Promise<number>;
 };
 export declare function fromDecimal(amount: string, decimalCount: number): BN;
-export declare function toDecimal(amount: BN, decimalCount: number, cut?: boolean): string;
+export declare function toDecimal(amount: BN, decimalCount: number, cut?: boolean, displayDecimals?: number): string;
 export declare function toTokenAmount<ChainIdentifier extends string = string, T extends Token<ChainIdentifier> = Token<ChainIdentifier>>(amount: BN, token: T, prices: ISwapPrice): TokenAmount<ChainIdentifier, T>;

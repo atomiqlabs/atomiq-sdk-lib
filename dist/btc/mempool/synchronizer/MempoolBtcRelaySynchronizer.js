@@ -17,7 +17,7 @@ class MempoolBtcRelaySynchronizer {
         this.btcRelay = btcRelay;
         this.bitcoinRpc = bitcoinRpc;
     }
-    syncToLatestTxs(signer) {
+    syncToLatestTxs(signer, feeRate) {
         return __awaiter(this, void 0, void 0, function* () {
             const tipData = yield this.btcRelay.getTipData();
             let cacheData = {
@@ -43,8 +43,8 @@ class MempoolBtcRelaySynchronizer {
                 [resultStoredHeader.getBlockheight()]: resultStoredHeader
             };
             let startForkId = null;
-            let forkFee;
-            let mainFee;
+            let forkFee = feeRate;
+            let mainFee = feeRate;
             const saveHeaders = (headerCache) => __awaiter(this, void 0, void 0, function* () {
                 if (cacheData.forkId === -1) {
                     if (mainFee == null)

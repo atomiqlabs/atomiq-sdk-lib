@@ -19,6 +19,7 @@ const ISwapPrice_1 = require("../prices/abstract/ISwapPrice");
 const Utils_1 = require("../utils/Utils");
 const Tokens_1 = require("./Tokens");
 const SwapDirection_1 = require("./SwapDirection");
+const randomBytes = require("randombytes");
 function isISwapInit(obj) {
     return typeof obj === 'object' &&
         obj != null &&
@@ -51,6 +52,7 @@ class ISwap {
             Object.assign(this, swapInitOrObj);
             this.version = this.currentVersion;
             this.createdAt = Date.now();
+            this.randomNonce = randomBytes(16).toString("hex");
         }
         else {
             this.expiry = swapInitOrObj.expiry;
@@ -80,8 +82,8 @@ class ISwap {
             this.initiated = swapInitOrObj.initiated;
             this.exactIn = swapInitOrObj.exactIn;
             this.createdAt = (_a = swapInitOrObj.createdAt) !== null && _a !== void 0 ? _a : swapInitOrObj.expiry;
+            this.randomNonce = swapInitOrObj.randomNonce;
         }
-        this.logger = (0, Utils_1.getLogger)(this.constructor.name + "(" + this.getPaymentHashString() + "): ");
         if (this.version !== this.currentVersion) {
             this.upgradeVersion();
         }
@@ -207,21 +209,39 @@ class ISwap {
     getPriceDifferencePct() {
         return this.pricingInfo == null ? null : this.pricingInfo.differencePPM == null ? null : this.pricingInfo.differencePPM.toNumber() / 1000000;
     }
-    //////////////////////////////
-    //// Getters & utils
-    getPaymentHashString() {
-        const paymentHash = this.getPaymentHash();
+    /**
+     * Returns the escrow hash - i.e. hash of the escrow data
+     */
+    getEscrowHash() {
+        var _a;
+        return (_a = this.data) === null || _a === void 0 ? void 0 : _a.getEscrowHash();
+    }
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
+    getClaimHash() {
+        var _a;
+        return (_a = this.data) === null || _a === void 0 ? void 0 : _a.getClaimHash();
+    }
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHash() {
+        const claimHashBuffer = buffer_1.Buffer.from(this.getClaimHash(), "hex");
+        if (this.randomNonce == null)
+            return claimHashBuffer;
+        return buffer_1.Buffer.concat([claimHashBuffer, buffer_1.Buffer.from(this.randomNonce, "hex")]);
+    }
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHashString() {
+        const paymentHash = this.getIdentifierHash();
         if (paymentHash == null)
             return null;
         return paymentHash.toString("hex");
-    }
-    /**
-     * Returns payment hash identifier of the swap
-     */
-    getPaymentHash() {
-        if (this.data == null)
-            return null;
-        return buffer_1.Buffer.from(this.data.getHash(), "hex");
     }
     /**
      * Returns quote expiry in UNIX millis
@@ -329,21 +349,16 @@ class ISwap {
             version: this.version,
             initiated: this.initiated,
             exactIn: this.exactIn,
-            createdAt: this.createdAt
+            createdAt: this.createdAt,
+            randomNonce: this.randomNonce
         };
     }
     _save() {
         if (this.isQuoteExpired()) {
-            this.wrapper.swapData.delete(this.getPaymentHashString());
-            if (!this.initiated)
-                return Promise.resolve();
-            return this.wrapper.storage.removeSwapData(this).then(() => { });
+            return this.wrapper.removeSwapData(this);
         }
         else {
-            this.wrapper.swapData.set(this.getPaymentHashString(), this);
-            if (!this.initiated)
-                return Promise.resolve();
-            return this.wrapper.storage.saveSwapData(this);
+            return this.wrapper.saveSwapData(this);
         }
     }
     _saveAndEmit(state) {

@@ -23,6 +23,11 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      */
     protected tryCalculateSwapFee(): void;
     /**
+     * Returns the payment hash identifier to be sent to the LP for getStatus and getRefund
+     * @protected
+     */
+    protected getLpIdentifier(): string;
+    /**
      * Sets the payment result for the swap, optionally also checking it (checking that tx exist or swap secret is valid)
      *
      * @param result Result returned by the LP
@@ -38,6 +43,10 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
     getSwapPrice(): number;
     getMarketPrice(): number;
     getRealSwapFeePercentagePPM(): BN;
+    getInputTxId(): string | null;
+    abstract getOutputTxId(): string | null;
+    getInputAddress(): string | null;
+    getOutputAddress(): string | null;
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
      */

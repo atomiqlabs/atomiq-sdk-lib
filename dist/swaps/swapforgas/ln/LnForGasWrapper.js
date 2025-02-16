@@ -36,7 +36,8 @@ class LnForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
             const lpUrl = typeof (lpOrUrl) === "string" ? lpOrUrl : lpOrUrl.url;
             const resp = yield TrustedIntermediaryAPI_1.TrustedIntermediaryAPI.initTrustedFromBTCLN(this.chainIdentifier, lpUrl, {
                 address: signer,
-                amount
+                amount,
+                token: this.contract.getNativeCurrencyAddress()
             }, this.options.getRequestTimeout);
             const decodedPr = (0, bolt11_1.decode)(resp.pr);
             const amountIn = new BN(decodedPr.millisatoshis).add(new BN(999)).div(new BN(1000));

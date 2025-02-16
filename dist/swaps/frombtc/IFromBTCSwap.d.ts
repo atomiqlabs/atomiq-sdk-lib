@@ -1,5 +1,3 @@
-/// <reference types="node" />
-/// <reference types="node" />
 import { IFromBTCWrapper } from "./IFromBTCWrapper";
 import { Fee, ISwap, ISwapInit } from "../ISwap";
 import * as BN from "bn.js";
@@ -15,14 +13,15 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
      * @protected
      */
     protected tryCalculateSwapFee(): void;
-    /**
-     * Returns the txoHash to be used in init transactions
-     */
-    getTxoHash(): Buffer;
+    protected getSwapData(): T["Data"];
     refreshPriceData(): Promise<PriceInfoType>;
     getSwapPrice(): number;
     getMarketPrice(): number;
     getRealSwapFeePercentagePPM(): BN;
+    abstract getInputTxId(): string | null;
+    getOutputTxId(): string | null;
+    getInputAddress(): string | null;
+    getOutputAddress(): string | null;
     /**
      * Returns the bitcoin address or lightning invoice to be paid for the swap
      */

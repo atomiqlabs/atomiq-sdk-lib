@@ -32,6 +32,7 @@ const Utils_1 = require("../utils/Utils");
 const RequestError_1 = require("../errors/RequestError");
 const SwapperWithChain_1 = require("./SwapperWithChain");
 const OnchainForGasWrapper_1 = require("./swapforgas/onchain/OnchainForGasWrapper");
+const randomBytes = require("randombytes");
 class Swapper extends events_1.EventEmitter {
     constructor(bitcoinRpc, chainsData, pricing, tokens, options) {
         var _a;
@@ -807,9 +808,9 @@ class Swapper extends events_1.EventEmitter {
                 return yield this.getBalance(chainIdentifier, signer, token);
             let [balance, commitFee] = yield Promise.all([
                 this.getBalance(chainIdentifier, signer, token),
-                this.chains[chainIdentifier].swapContract.getCommitFee(
+                swapContract.getCommitFee(
                 //Use large amount, such that the fee for wrapping more tokens is always included!
-                yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token, new BN("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "hex"), null, null, null, null, null, true, false, null, null))
+                yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token, new BN("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "hex"), swapContract.getHashForHtlc(randomBytes(32)).toString("hex"), new BN(randomBytes(8)), new BN(Math.floor(Date.now() / 1000)), true, false, new BN(randomBytes(2)), new BN(randomBytes(2))))
             ]);
             if (feeMultiplier != null) {
                 commitFee = commitFee.mul(new BN(Math.floor(feeMultiplier * 1000000))).div(new BN(1000000));

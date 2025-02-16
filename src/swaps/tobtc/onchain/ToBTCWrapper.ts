@@ -116,7 +116,6 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
      * @param options Options as passed to the swap create function
      * @param data LP's returned parsed swap data
      * @param hash Payment hash of the swap
-     * @param nonce Escrow nonce that should be used for the swap
      * @private
      * @throws {IntermediaryError} if returned data are not correct
      */
@@ -126,8 +125,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
         lp: Intermediary,
         options: ToBTCOptions,
         data: T["Data"],
-        hash: string,
-        nonce: BN
+        hash: string
     ): void {
         if(!resp.totalFee.eq(resp.swapFee.add(resp.networkFee))) throw new IntermediaryError("Invalid totalFee returned");
 
@@ -154,9 +152,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
 
         if(
             !data.getAmount().eq(resp.total) ||
-            data.getHash()!==hash ||
-            !data.getEscrowNonce().eq(nonce) ||
-            data.getConfirmations()!==options.confirmations ||
+            data.getClaimHash()!==hash ||
             data.getType()!==ChainSwapType.CHAIN_NONCED ||
             !data.isPayIn() ||
             !data.isToken(amountData.token) ||
@@ -191,13 +187,13 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
     }[] {
         if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
         options ??= {};
-        options.confirmationTarget = 3;
-        options.confirmations = 2;
+        options.confirmationTarget ??= 3;
+        options.confirmations ??= 2;
 
         const nonce: BN = this.getRandomNonce();
         const outputScript: Buffer = this.btcAddressToOutputScript(address);
         const _hash: string = !amountData.exactIn ?
-            this.contract.getHashForOnchain(outputScript, amountData.amount, nonce).toString("hex") :
+            this.contract.getHashForOnchain(outputScript, amountData.amount, options.confirmations, nonce).toString("hex") :
             null;
 
         const _abortController = extendAbortController(abortSignal);
@@ -233,12 +229,12 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
                         }, null, RequestError, abortController.signal);
 
                         let hash: string = amountData.exactIn ?
-                            this.contract.getHashForOnchain(outputScript, resp.amount, nonce).toString("hex") :
+                            this.contract.getHashForOnchain(outputScript, resp.amount, options.confirmations, nonce).toString("hex") :
                             _hash;
                         const data: T["Data"] = new this.swapDataDeserializer(resp.data);
                         data.setOfferer(signer);
 
-                        this.verifyReturnedData(resp, amountData, lp, options, data, hash, nonce);
+                        this.verifyReturnedData(resp, amountData, lp, options, data, hash);
                         const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                             this.verifyReturnedPrice(
                                 lp.services[SwapType.TO_BTC], true, resp.amount, data.getAmount(),
@@ -262,7 +258,9 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
                             amount: resp.amount,
                             confirmationTarget: options.confirmationTarget,
                             satsPerVByte: resp.satsPervByte.toNumber(),
-                            exactIn: amountData.exactIn ?? false
+                            exactIn: amountData.exactIn ?? false,
+                            requiredConfirmations: options.confirmations,
+                            nonce
                         } as ToBTCSwapInit<T["Data"]>);
                         await quote._save();
                         return quote;

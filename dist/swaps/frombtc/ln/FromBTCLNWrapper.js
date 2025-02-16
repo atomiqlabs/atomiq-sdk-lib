@@ -72,7 +72,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                 }
                 return false;
             }
-            if (swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED) {
+            if (swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED || swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.EXPIRED) {
                 //Check if it's already successfully paid
                 const commitStatus = yield (0, Utils_1.tryWithRetries)(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
                 if (commitStatus === base_1.SwapCommitStatus.PAID) {
@@ -98,20 +98,18 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                     swap._saveAndEmit(FromBTCLNSwap_1.FromBTCLNSwapState.QUOTE_SOFT_EXPIRED);
                 break;
             case FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED:
-                if (this.contract.isExpired(swap.getInitiator(), swap.data))
-                    swap._saveAndEmit(FromBTCLNSwap_1.FromBTCLNSwapState.EXPIRED);
+                this.contract.isExpired(swap.getInitiator(), swap.data).then(expired => {
+                    if (expired)
+                        swap._saveAndEmit(FromBTCLNSwap_1.FromBTCLNSwapState.EXPIRED);
+                });
                 break;
         }
     }
     processEventInitialize(swap, event) {
         return __awaiter(this, void 0, void 0, function* () {
             if (swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.PR_PAID || swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-                const swapData = yield event.swapData();
-                if (swap.data != null && !swap.data.equals(swapData))
-                    return false;
                 if (swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.PR_PAID || swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.QUOTE_SOFT_EXPIRED)
                     swap.state = FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED;
-                swap.data = swapData;
                 return true;
             }
         });
@@ -129,6 +127,14 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
             return Promise.resolve(true);
         }
         return Promise.resolve(false);
+    }
+    /**
+     * Returns the swap expiry, leaving enough time for the user to claim the HTLC
+     *
+     * @param data Parsed swap data
+     */
+    getHtlcTimeout(data) {
+        return data.getExpiry().sub(new BN(600));
     }
     /**
      * Generates a new 32-byte secret to be used as pre-image for lightning network invoice & HTLC swap\
@@ -236,9 +242,11 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         if (options.descriptionHash != null && options.descriptionHash.length !== 32)
             throw new UserError_1.UserError("Invalid description hash length");
         const { secret, paymentHash } = this.getSecretAndHash();
+        const claimHash = this.contract.getHashForHtlc(paymentHash);
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         (_a = preFetches.pricePrefetchPromise) !== null && _a !== void 0 ? _a : (preFetches.pricePrefetchPromise = this.preFetchPrice(amountData, _abortController.signal));
-        (_b = preFetches.feeRatePromise) !== null && _b !== void 0 ? _b : (preFetches.feeRatePromise = this.preFetchFeeRate(signer, amountData, paymentHash.toString("hex"), _abortController));
+        const nativeTokenAddress = this.contract.getNativeCurrencyAddress();
+        (_b = preFetches.feeRatePromise) !== null && _b !== void 0 ? _b : (preFetches.feeRatePromise = this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController));
         return lps.map(lp => {
             return {
                 intermediary: lp,
@@ -247,7 +255,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                     const abortController = (0, Utils_1.extendAbortController)(_abortController.signal);
                     const liquidityPromise = this.preFetchIntermediaryLiquidity(amountData, lp, abortController);
                     const { lnCapacityPromise, resp } = yield (0, Utils_1.tryWithRetries)((retryCount) => __awaiter(this, void 0, void 0, function* () {
-                        const { lnPublicKey, response } = IntermediaryAPI_1.IntermediaryAPI.initFromBTCLN(this.chainIdentifier, lp.url, {
+                        const { lnPublicKey, response } = IntermediaryAPI_1.IntermediaryAPI.initFromBTCLN(this.chainIdentifier, lp.url, nativeTokenAddress, {
                             paymentHash,
                             amount: amountData.amount,
                             claimer: signer,
@@ -277,7 +285,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                             expiry: decodedPr.timeExpireDate * 1000,
                             swapFee: resp.swapFee,
                             feeRate: yield preFetches.feeRatePromise,
-                            data: yield this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, paymentHash.toString("hex"), null, null, null, null, false, true, resp.securityDeposit, new BN(0)),
+                            initialSwapData: yield this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, claimHash.toString("hex"), this.getRandomSequence(), new BN(Math.floor(Date.now() / 1000)), false, true, resp.securityDeposit, new BN(0), nativeTokenAddress),
                             pr: resp.pr,
                             secret: secret.toString("hex"),
                             exactIn: (_a = amountData.exactIn) !== null && _a !== void 0 ? _a : true

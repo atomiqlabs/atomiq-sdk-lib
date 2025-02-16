@@ -84,14 +84,14 @@ export abstract class IToBTCWrapper<
      *
      * @param signer Address of the swap initiator
      * @param amountData
-     * @param hash optional hash of the swap or null
+     * @param claimHash optional hash of the swap or null
      * @param abortController
      * @protected
      * @returns Fee rate
      */
-    protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, hash: string | null, abortController: AbortController): Promise<any | null> {
+    protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, claimHash: string | null, abortController: AbortController): Promise<any | null> {
         return tryWithRetries(
-            () => this.contract.getInitPayInFeeRate(signer, null, amountData.token, hash),
+            () => this.contract.getInitPayInFeeRate(signer, null, amountData.token, claimHash),
             null, null, abortController.signal
         ).catch(e => {
             this.logger.error("preFetchFeeRate(): Error: ", e);
@@ -124,7 +124,9 @@ export abstract class IToBTCWrapper<
                 break;
             case ToBTCSwapState.COMMITED:
             case ToBTCSwapState.SOFT_CLAIMED:
-                if(this.contract.isExpired(swap.getInitiator(), swap.data)) swap._saveAndEmit(ToBTCSwapState.REFUNDABLE);
+                this.contract.isExpired(swap.getInitiator(), swap.data).then(expired => {
+                    if(expired) swap._saveAndEmit(ToBTCSwapState.REFUNDABLE);
+                })
                 break;
         }
     }
@@ -142,7 +144,7 @@ export abstract class IToBTCWrapper<
     protected processEventClaim(swap: S, event: ClaimEvent<T["Data"]>): Promise<boolean> {
         if(swap.state!==ToBTCSwapState.REFUNDED) {
             swap.state = ToBTCSwapState.CLAIMED;
-            swap._setPaymentResult({secret: event.secret, txId: Buffer.from(event.secret, "hex").reverse().toString("hex")});
+            swap._setPaymentResult({secret: event.result, txId: Buffer.from(event.result, "hex").reverse().toString("hex")});
             return Promise.resolve(true);
         }
         return Promise.resolve(false);

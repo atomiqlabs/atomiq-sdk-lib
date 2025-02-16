@@ -98,6 +98,14 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     }
 
     /**
+     * Returns the payment hash identifier to be sent to the LP for getStatus and getRefund
+     * @protected
+     */
+    protected getLpIdentifier(): string {
+        return this.getClaimHash();
+    }
+
+    /**
      * Sets the payment result for the swap, optionally also checking it (checking that tx exist or swap secret is valid)
      *
      * @param result Result returned by the LP
@@ -135,6 +143,20 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     //////////////////////////////
     //// Getters & utils
 
+    getInputTxId(): string | null {
+        return this.commitTxId;
+    }
+
+    abstract getOutputTxId(): string | null;
+
+    getInputAddress(): string | null {
+        return this.getInitiator();
+    }
+
+    getOutputAddress(): string | null {
+        return this.getRecipient();
+    }
+
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
      */
@@ -147,7 +169,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     }
 
     isRefundable(): boolean {
-        return this.state===ToBTCSwapState.REFUNDABLE || (this.state===ToBTCSwapState.COMMITED && this.wrapper.contract.isExpired(this.getInitiator(), this.data));
+        return this.state===ToBTCSwapState.REFUNDABLE;
     }
 
     isQuoteExpired(): boolean {
@@ -306,7 +328,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         this.initiated = true;
         await this._saveAndEmit();
 
-        return await this.wrapper.contract.txsInitPayIn(
+        return await this.wrapper.contract.txsInit(
             this.data, this.signatureData, skipChecks, this.feeRate
         ).catch(e => Promise.reject(e instanceof SignatureVerificationError ? new Error("Request timed out") : e));
     }
@@ -393,7 +415,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
                 await this._saveAndEmit(ToBTCSwapState.REFUNDABLE);
                 return false;
             case RefundAuthorizationResponseCodes.EXPIRED:
-                if(this.wrapper.contract.isExpired(this.getInitiator(), this.data)) throw new Error("Swap expired");
+                if(await this.wrapper.contract.isExpired(this.getInitiator(), this.data)) throw new Error("Swap expired");
                 throw new IntermediaryError("Swap expired");
             case RefundAuthorizationResponseCodes.NOT_FOUND:
                 if((this.state as ToBTCSwapState)===ToBTCSwapState.CLAIMED) return true;
@@ -409,7 +431,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         while(!abortSignal.aborted && (
             resp.code===RefundAuthorizationResponseCodes.PENDING || resp.code===RefundAuthorizationResponseCodes.NOT_FOUND
         )) {
-            resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.data.getHash(), this.data.getSequence());
+            resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             if(resp.code===RefundAuthorizationResponseCodes.PAID) {
                 const validResponse = await this._setPaymentResult(resp.data, true);
                 if(validResponse) {
@@ -439,7 +461,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         if(this.state===ToBTCSwapState.CREATED || this.state==ToBTCSwapState.QUOTE_EXPIRED) return false;
         if(this.isFinished() || this.isRefundable()) return true;
         //Check if that maybe already concluded according to the LP
-        const resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.data.getHash(), this.data.getSequence());
+        const resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
         switch(resp.code) {
             case RefundAuthorizationResponseCodes.PAID:
                 const processed = await this._setPaymentResult(resp.data, true);
@@ -491,10 +513,10 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     async txsRefund(): Promise<T["TX"][]> {
         if(!this.isRefundable()) throw new Error("Must be in REFUNDABLE state or expired!");
 
-        if(this.wrapper.contract.isExpired(this.getInitiator(), this.data)) {
+        if(await this.wrapper.contract.isExpired(this.getInitiator(), this.data)) {
             return await this.wrapper.contract.txsRefund(this.data, true, true);
         } else {
-            const res = await IntermediaryAPI.getRefundAuthorization(this.url, this.data.getHash(), this.data.getSequence());
+            const res = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             if(res.code===RefundAuthorizationResponseCodes.REFUND_DATA) {
                 return await this.wrapper.contract.txsRefundWithAuthorization(
                     this.data,

@@ -59,7 +59,6 @@ export declare class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, 
      * @param options Options as passed to the swap create function
      * @param data LP's returned parsed swap data
      * @param hash Payment hash of the swap
-     * @param nonce Escrow nonce that should be used for the swap
      * @private
      * @throws {IntermediaryError} if returned data are not correct
      */
