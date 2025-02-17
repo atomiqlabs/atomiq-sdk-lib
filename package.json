@@ -1,6 +1,6 @@
 {
   "name": "@atomiqlabs/sdk-lib",
-  "version": "11.0.0-dev.20",
+  "version": "11.0.0-dev.21",
   "description": "Basic SDK functionality library for atomiq",
   "main": "./dist/index.js",
   "types:": "./dist/index.d.ts",
