@@ -75,7 +75,7 @@ export type MultiChainData<T extends MultiChain> = {
 };
 
 export type CtorMultiChainData<T extends MultiChain> = {
-    [chainIdentifier in keyof T]: ChainData<T[chainIdentifier], any>
+    [chainIdentifier in keyof T]: ChainData<T[chainIdentifier]>
 };
 
 export type ChainIds<T extends MultiChain> = keyof T & string;
