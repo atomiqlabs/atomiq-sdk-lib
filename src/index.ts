@@ -9,6 +9,9 @@ export * from "./btc/mempool/MempoolBitcoinBlock";
 export * from "./btc/BitcoinNetwork";
 export * from "./btc/BitcoinRpcWithTxoListener";
 export * from "./btc/LightningNetworkApi";
+export * from "./btc/wallet/IBitcoinWallet";
+export * from "./btc/wallet/MempoolBitcoinWallet";
+export * from "./btc/coinselect2";
 
 export * from "./errors/IntermediaryError";
 export * from "./errors/PaymentAuthError";

@@ -26,7 +26,6 @@ const MempoolBtcRelaySynchronizer_1 = require("../btc/mempool/synchronizer/Mempo
 const LnForGasWrapper_1 = require("./swapforgas/ln/LnForGasWrapper");
 const events_1 = require("events");
 const IndexedDBStorageManager_1 = require("../storage/IndexedDBStorageManager");
-const LocalStorageManager_1 = require("../storage/LocalStorageManager");
 const LNURL_1 = require("../utils/LNURL");
 const Utils_1 = require("../utils/Utils");
 const RequestError_1 = require("../errors/RequestError");
@@ -35,12 +34,13 @@ const OnchainForGasWrapper_1 = require("./swapforgas/onchain/OnchainForGasWrappe
 const randomBytes = require("randombytes");
 class Swapper extends events_1.EventEmitter {
     constructor(bitcoinRpc, chainsData, pricing, tokens, options) {
-        var _a;
-        var _b;
+        var _a, _b;
+        var _c;
         super();
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
         const storagePrefix = (options === null || options === void 0 ? void 0 : options.storagePrefix) || "";
         options.bitcoinNetwork = options.bitcoinNetwork == null ? BitcoinNetwork_1.BitcoinNetwork.TESTNET : options.bitcoinNetwork;
+        (_a = options.storageCtor) !== null && _a !== void 0 ? _a : (options.storageCtor = (name) => new IndexedDBStorageManager_1.IndexedDBStorageManager(name));
         this.bitcoinNetwork = options.bitcoinNetwork === BitcoinNetwork_1.BitcoinNetwork.MAINNET ? bitcoinjs_lib_1.networks.bitcoin :
             options.bitcoinNetwork === BitcoinNetwork_1.BitcoinNetwork.REGTEST ? bitcoinjs_lib_1.networks.regtest :
                 options.bitcoinNetwork === BitcoinNetwork_1.BitcoinNetwork.TESTNET ? bitcoinjs_lib_1.networks.testnet : null;
@@ -51,7 +51,7 @@ class Swapper extends events_1.EventEmitter {
         for (let tokenData of tokens) {
             for (let chainId in tokenData.chains) {
                 const chainData = tokenData.chains[chainId];
-                (_a = (_b = this.tokens)[chainId]) !== null && _a !== void 0 ? _a : (_b[chainId] = {});
+                (_b = (_c = this.tokens)[chainId]) !== null && _b !== void 0 ? _b : (_c[chainId] = {});
                 this.tokens[chainId][chainData.address] = {
                     chain: "SC",
                     chainId,
@@ -66,33 +66,33 @@ class Swapper extends events_1.EventEmitter {
             this.emit("swapState", swap);
         };
         this.chains = (0, Utils_1.objectMap)(chainsData, (chainData, key) => {
-            var _a, _b, _c, _d, _e, _f;
+            var _a;
             const { swapContract, chainEvents, btcRelay } = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer_1.MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
-            const _storagePrefix = storagePrefix + key + "-";
-            const tobtcln = new ToBTCLNWrapper_1.ToBTCLNWrapper(key, ((_a = chainData.storage) === null || _a === void 0 ? void 0 : _a.toBtcLn) || new IndexedDBStorageManager_1.IndexedDBStorageManager(_storagePrefix + "Swaps-ToBTCLN"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, {
+            const _storagePrefix = (_a = chainData.storagePrefix) !== null && _a !== void 0 ? _a : storagePrefix + key + "-";
+            const tobtcln = new ToBTCLNWrapper_1.ToBTCLNWrapper(key, options.storageCtor(_storagePrefix + "Swaps-ToBTCLN"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout,
             });
-            const tobtc = new ToBTCWrapper_1.ToBTCWrapper(key, ((_b = chainData.storage) === null || _b === void 0 ? void 0 : _b.toBtc) || new IndexedDBStorageManager_1.IndexedDBStorageManager(_storagePrefix + "Swaps-ToBTC"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, this.bitcoinRpc, {
-                getRequestTimeout: options.getRequestTimeout,
-                postRequestTimeout: options.postRequestTimeout,
-                bitcoinNetwork: this.bitcoinNetwork
-            });
-            const frombtcln = new FromBTCLNWrapper_1.FromBTCLNWrapper(key, ((_c = chainData.storage) === null || _c === void 0 ? void 0 : _c.fromBtcLn) || new IndexedDBStorageManager_1.IndexedDBStorageManager(_storagePrefix + "Swaps-FromBTCLN"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, {
-                getRequestTimeout: options.getRequestTimeout,
-                postRequestTimeout: options.postRequestTimeout
-            });
-            const frombtc = new FromBTCWrapper_1.FromBTCWrapper(key, ((_d = chainData.storage) === null || _d === void 0 ? void 0 : _d.fromBtc) || new IndexedDBStorageManager_1.IndexedDBStorageManager(_storagePrefix + "Swaps-FromBTC"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, btcRelay, synchronizer, this.bitcoinRpc, {
+            const tobtc = new ToBTCWrapper_1.ToBTCWrapper(key, options.storageCtor(_storagePrefix + "Swaps-ToBTC"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, this.bitcoinRpc, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout,
                 bitcoinNetwork: this.bitcoinNetwork
             });
-            const lnforgas = new LnForGasWrapper_1.LnForGasWrapper(key, ((_e = chainData.storage) === null || _e === void 0 ? void 0 : _e.lnForGas) || new LocalStorageManager_1.LocalStorageManager(_storagePrefix + "LnForGas"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, {
+            const frombtcln = new FromBTCLNWrapper_1.FromBTCLNWrapper(key, options.storageCtor(_storagePrefix + "Swaps-FromBTCLN"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout
             });
-            const onchainforgas = new OnchainForGasWrapper_1.OnchainForGasWrapper(key, ((_f = chainData.storage) === null || _f === void 0 ? void 0 : _f.onchainForGas) || new LocalStorageManager_1.LocalStorageManager(_storagePrefix + "OnchainForGas"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, {
+            const frombtc = new FromBTCWrapper_1.FromBTCWrapper(key, options.storageCtor(_storagePrefix + "Swaps-FromBTC"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, btcRelay, synchronizer, this.bitcoinRpc, {
+                getRequestTimeout: options.getRequestTimeout,
+                postRequestTimeout: options.postRequestTimeout,
+                bitcoinNetwork: this.bitcoinNetwork
+            });
+            const lnforgas = new LnForGasWrapper_1.LnForGasWrapper(key, options.storageCtor(_storagePrefix + "LnForGas"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, {
+                getRequestTimeout: options.getRequestTimeout,
+                postRequestTimeout: options.postRequestTimeout
+            });
+            const onchainforgas = new OnchainForGasWrapper_1.OnchainForGasWrapper(key, options.storageCtor(_storagePrefix + "OnchainForGas"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout
             });

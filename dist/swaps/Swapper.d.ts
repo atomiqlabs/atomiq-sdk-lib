@@ -3,7 +3,7 @@
 /// <reference types="node" />
 import { BitcoinNetwork } from "../btc/BitcoinNetwork";
 import { ISwapPrice } from "../prices/abstract/ISwapPrice";
-import { BtcRelay, ChainType, IStorageManager, RelaySynchronizer } from "@atomiqlabs/base";
+import { BtcRelay, ChainData, ChainType, IStorageManager, RelaySynchronizer } from "@atomiqlabs/base";
 import { ToBTCLNWrapper } from "./tobtc/ln/ToBTCLNWrapper";
 import { ToBTCWrapper } from "./tobtc/onchain/ToBTCWrapper";
 import { FromBTCLNWrapper } from "./frombtc/ln/FromBTCLNWrapper";
@@ -44,6 +44,7 @@ export type SwapperOptions = {
     };
     storagePrefix?: string;
     defaultTrustedIntermediaryUrl?: string;
+    storageCtor?: (name: string) => IStorageManager<any>;
 };
 export type MultiChain = {
     [chainIdentifier in string]: ChainType;
@@ -63,22 +64,8 @@ export type ChainSpecificData<T extends ChainType> = {
 export type MultiChainData<T extends MultiChain> = {
     [chainIdentifier in keyof T]: ChainSpecificData<T[chainIdentifier]>;
 };
-export type CtorChainData<T extends ChainType> = {
-    btcRelay: BtcRelay<any, T["TX"], MempoolBitcoinBlock>;
-    swapContract: T["Contract"];
-    chainEvents: T["Events"];
-    swapDataConstructor: new (data: any) => T["Data"];
-    storage?: {
-        toBtc?: IStorageManager<ToBTCSwap<T>>;
-        fromBtc?: IStorageManager<FromBTCSwap<T>>;
-        toBtcLn?: IStorageManager<ToBTCLNSwap<T>>;
-        fromBtcLn?: IStorageManager<FromBTCLNSwap<T>>;
-        lnForGas?: IStorageManager<LnForGasSwap<T>>;
-        onchainForGas?: IStorageManager<OnchainForGasSwap<T>>;
-    };
-};
 export type CtorMultiChainData<T extends MultiChain> = {
-    [chainIdentifier in keyof T]: CtorChainData<T[chainIdentifier]>;
+    [chainIdentifier in keyof T]: ChainData<T[chainIdentifier], any>;
 };
 export type ChainIds<T extends MultiChain> = keyof T & string;
 export interface SwapperBtcUtils {

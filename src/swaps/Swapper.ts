@@ -1,6 +1,6 @@
 import {BitcoinNetwork} from "../btc/BitcoinNetwork";
 import {ISwapPrice} from "../prices/abstract/ISwapPrice";
-import {BtcRelay, ChainSwapType, ChainType, IStorageManager, RelaySynchronizer} from "@atomiqlabs/base";
+import {BtcRelay, ChainData, ChainSwapType, ChainType, IStorageManager, RelaySynchronizer} from "@atomiqlabs/base";
 import {ToBTCLNWrapper} from "./tobtc/ln/ToBTCLNWrapper";
 import {ToBTCWrapper} from "./tobtc/onchain/ToBTCWrapper";
 import {FromBTCLNWrapper} from "./frombtc/ln/FromBTCLNWrapper";
@@ -49,7 +49,8 @@ export type SwapperOptions = {
     postRequestTimeout?: number,
     defaultAdditionalParameters?: {[key: string]: any},
     storagePrefix?: string
-    defaultTrustedIntermediaryUrl?: string
+    defaultTrustedIntermediaryUrl?: string,
+    storageCtor?: (name: string) => IStorageManager<any>
 };
 
 export type MultiChain = {
@@ -73,23 +74,8 @@ export type MultiChainData<T extends MultiChain> = {
     [chainIdentifier in keyof T]: ChainSpecificData<T[chainIdentifier]>
 };
 
-export type CtorChainData<T extends ChainType> = {
-    btcRelay: BtcRelay<any, T["TX"], MempoolBitcoinBlock>,
-    swapContract: T["Contract"],
-    chainEvents: T["Events"],
-    swapDataConstructor: new (data: any) => T["Data"],
-    storage?: {
-        toBtc?: IStorageManager<ToBTCSwap<T>>,
-        fromBtc?: IStorageManager<FromBTCSwap<T>>,
-        toBtcLn?: IStorageManager<ToBTCLNSwap<T>>,
-        fromBtcLn?: IStorageManager<FromBTCLNSwap<T>>,
-        lnForGas?: IStorageManager<LnForGasSwap<T>>,
-        onchainForGas?: IStorageManager<OnchainForGasSwap<T>>
-    }
-};
-
 export type CtorMultiChainData<T extends MultiChain> = {
-    [chainIdentifier in keyof T]: CtorChainData<T[chainIdentifier]>
+    [chainIdentifier in keyof T]: ChainData<T[chainIdentifier], any>
 };
 
 export type ChainIds<T extends MultiChain> = keyof T & string;
@@ -166,6 +152,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         const storagePrefix = options?.storagePrefix || "";
 
         options.bitcoinNetwork = options.bitcoinNetwork==null ? BitcoinNetwork.TESTNET : options.bitcoinNetwork;
+        options.storageCtor ??= (name: string) => new IndexedDBStorageManager(name);
 
         this.bitcoinNetwork = options.bitcoinNetwork===BitcoinNetwork.MAINNET ? networks.bitcoin :
             options.bitcoinNetwork===BitcoinNetwork.REGTEST ? networks.regtest :
@@ -199,11 +186,11 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             const {swapContract, chainEvents, btcRelay} = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
 
-            const _storagePrefix = storagePrefix+key+"-";
+            const _storagePrefix = chainData.storagePrefix ?? storagePrefix+key+"-";
 
             const tobtcln = new ToBTCLNWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.toBtcLn || new IndexedDBStorageManager(_storagePrefix + "Swaps-ToBTCLN"),
+                options.storageCtor(_storagePrefix + "Swaps-ToBTCLN"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -216,7 +203,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             );
             const tobtc = new ToBTCWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.toBtc || new IndexedDBStorageManager(_storagePrefix + "Swaps-ToBTC"),
+                options.storageCtor(_storagePrefix + "Swaps-ToBTC"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -231,7 +218,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             );
             const frombtcln = new FromBTCLNWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.fromBtcLn || new IndexedDBStorageManager(_storagePrefix + "Swaps-FromBTCLN"),
+                options.storageCtor(_storagePrefix + "Swaps-FromBTCLN"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -245,7 +232,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             );
             const frombtc = new FromBTCWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.fromBtc || new IndexedDBStorageManager(_storagePrefix + "Swaps-FromBTC"),
+                options.storageCtor(_storagePrefix + "Swaps-FromBTC"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -262,7 +249,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             );
             const lnforgas = new LnForGasWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.lnForGas || new LocalStorageManager<LnForGasSwap<T[InputKey]>>(_storagePrefix + "LnForGas"),
+                options.storageCtor(_storagePrefix + "LnForGas"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -275,7 +262,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             );
             const onchainforgas = new OnchainForGasWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.onchainForGas || new LocalStorageManager<OnchainForGasSwap<T[InputKey]>>(_storagePrefix + "OnchainForGas"),
+                options.storageCtor(_storagePrefix + "OnchainForGas"),
                 swapContract,
                 chainEvents,
                 pricing,
