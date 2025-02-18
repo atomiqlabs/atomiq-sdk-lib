@@ -21,7 +21,6 @@ __exportStar(require("./btc/mempool/synchronizer/MempoolBtcRelaySynchronizer"), 
 __exportStar(require("./btc/mempool/MempoolApi"), exports);
 __exportStar(require("./btc/mempool/MempoolBitcoinRpc"), exports);
 __exportStar(require("./btc/mempool/MempoolBitcoinBlock"), exports);
-__exportStar(require("./btc/BitcoinNetwork"), exports);
 __exportStar(require("./btc/BitcoinRpcWithTxoListener"), exports);
 __exportStar(require("./btc/LightningNetworkApi"), exports);
 __exportStar(require("./btc/wallet/IBitcoinWallet"), exports);

@@ -1,9 +1,8 @@
 /// <reference types="node" />
 /// <reference types="node" />
 /// <reference types="node" />
-import { BitcoinNetwork } from "../btc/BitcoinNetwork";
 import { ISwapPrice } from "../prices/abstract/ISwapPrice";
-import { BtcRelay, ChainData, ChainType, IStorageManager, RelaySynchronizer } from "@atomiqlabs/base";
+import { BitcoinNetwork, BtcRelay, ChainData, ChainType, IStorageManager, RelaySynchronizer } from "@atomiqlabs/base";
 import { ToBTCLNWrapper } from "./tobtc/ln/ToBTCLNWrapper";
 import { ToBTCWrapper } from "./tobtc/onchain/ToBTCWrapper";
 import { FromBTCLNWrapper } from "./frombtc/ln/FromBTCLNWrapper";

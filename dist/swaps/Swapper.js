@@ -10,7 +10,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Swapper = void 0;
-const BitcoinNetwork_1 = require("../btc/BitcoinNetwork");
 const base_1 = require("@atomiqlabs/base");
 const ToBTCLNWrapper_1 = require("./tobtc/ln/ToBTCLNWrapper");
 const ToBTCWrapper_1 = require("./tobtc/onchain/ToBTCWrapper");
@@ -39,11 +38,11 @@ class Swapper extends events_1.EventEmitter {
         super();
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
         const storagePrefix = (options === null || options === void 0 ? void 0 : options.storagePrefix) || "";
-        options.bitcoinNetwork = options.bitcoinNetwork == null ? BitcoinNetwork_1.BitcoinNetwork.TESTNET : options.bitcoinNetwork;
+        options.bitcoinNetwork = options.bitcoinNetwork == null ? base_1.BitcoinNetwork.TESTNET : options.bitcoinNetwork;
         (_a = options.storageCtor) !== null && _a !== void 0 ? _a : (options.storageCtor = (name) => new IndexedDBStorageManager_1.IndexedDBStorageManager(name));
-        this.bitcoinNetwork = options.bitcoinNetwork === BitcoinNetwork_1.BitcoinNetwork.MAINNET ? bitcoinjs_lib_1.networks.bitcoin :
-            options.bitcoinNetwork === BitcoinNetwork_1.BitcoinNetwork.REGTEST ? bitcoinjs_lib_1.networks.regtest :
-                options.bitcoinNetwork === BitcoinNetwork_1.BitcoinNetwork.TESTNET ? bitcoinjs_lib_1.networks.testnet : null;
+        this.bitcoinNetwork = options.bitcoinNetwork === base_1.BitcoinNetwork.MAINNET ? bitcoinjs_lib_1.networks.bitcoin :
+            options.bitcoinNetwork === base_1.BitcoinNetwork.REGTEST ? bitcoinjs_lib_1.networks.regtest :
+                options.bitcoinNetwork === base_1.BitcoinNetwork.TESTNET ? bitcoinjs_lib_1.networks.testnet : null;
         this.prices = pricing;
         this.bitcoinRpc = bitcoinRpc;
         this.mempoolApi = bitcoinRpc.api;

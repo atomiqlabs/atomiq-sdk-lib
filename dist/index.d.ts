@@ -2,7 +2,6 @@ export * from "./btc/mempool/synchronizer/MempoolBtcRelaySynchronizer";
 export * from "./btc/mempool/MempoolApi";
 export * from "./btc/mempool/MempoolBitcoinRpc";
 export * from "./btc/mempool/MempoolBitcoinBlock";
-export * from "./btc/BitcoinNetwork";
 export * from "./btc/BitcoinRpcWithTxoListener";
 export * from "./btc/LightningNetworkApi";
 export * from "./btc/wallet/IBitcoinWallet";
