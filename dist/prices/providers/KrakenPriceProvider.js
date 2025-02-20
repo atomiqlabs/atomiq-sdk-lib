@@ -37,10 +37,11 @@ class KrakenPriceProvider extends ExchangePriceProvider_1.ExchangePriceProvider 
                 let invert = pair.startsWith("!");
                 if (invert)
                     pair = pair.substring(1);
-                return parseFloat(response.result[pair].c[0]);
+                const value = parseFloat(response.result[pair].c[0]);
+                return invert ? 1 / value : value;
             });
             const price = prices.reduce((previousValue, currentValue) => previousValue * currentValue, 1);
-            return new BN(Math.floor(price * 100000000000000));
+            return new BN(Math.floor(price * 100000000000000).toString(10));
         });
     }
 }

@@ -23,7 +23,7 @@ class ExchangePriceProvider extends HttpPriceProvider_1.HttpPriceProvider {
                 return this.fetchPair(pair, abortSignal).then(value => invert ? 1 / value : value);
             }));
             const price = prices.reduce((previousValue, currentValue) => previousValue * currentValue, 1);
-            return new BN(Math.floor(price * 100000000000000));
+            return new BN(Math.floor(price * 100000000000000).toString(10));
         });
     }
 }

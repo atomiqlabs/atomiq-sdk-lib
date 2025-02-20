@@ -24,7 +24,7 @@ export abstract class ExchangePriceProvider<T extends MultiChain> extends HttpPr
 
         const price = prices.reduce((previousValue, currentValue) => previousValue * currentValue, 1);
 
-        return new BN(Math.floor(price*100000000000000));
+        return new BN(Math.floor(price*100000000000000).toString(10));
     }
 
 }

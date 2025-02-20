@@ -76,7 +76,7 @@ export abstract class IPriceProvider<T extends MultiChain> {
 
         if(coin.coinId.startsWith("$fixed-")) {
             const amt: number = parseFloat(coin.coinId.substring(7));
-            return Promise.resolve(new BN(Math.floor(amt*1000000)));
+            return Promise.resolve(new BN(Math.floor(amt*1000000).toString(10)));
         }
 
         return this.fetchPrice(coin, abortSignal);
