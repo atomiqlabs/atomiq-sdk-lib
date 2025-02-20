@@ -8,12 +8,14 @@ import {promiseAny, tryWithRetries, getLogger} from "../utils/Utils";
 import {ICachedSwapPrice} from "./abstract/ICachedSwapPrice";
 import {RequestError} from "../errors/RequestError";
 import {ChainIds, MultiChain} from "../swaps/Swapper";
+import {KrakenPriceProvider} from "./providers/KrakenPriceProvider";
 
 export type RedundantSwapPriceAssets<T extends MultiChain> = {
-    binancePair: string,
-    okxPair: string,
-    coinGeckoCoinId: string,
-    coinPaprikaCoinId: string,
+    binancePair?: string,
+    okxPair?: string,
+    coinGeckoCoinId?: string,
+    coinPaprikaCoinId?: string,
+    krakenPair?: string,
     chains: {
         [chainIdentifier in keyof T]?: {
             address: string,
@@ -68,6 +70,12 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
             new CoinPaprikaPriceProvider(assets.map(coinData => {
                 return {
                     coinId: coinData.coinPaprikaCoinId,
+                    chains: coinData.chains
+                };
+            })),
+            new KrakenPriceProvider(assets.map(coinData => {
+                return {
+                    coinId: coinData.krakenPair,
                     chains: coinData.chains
                 };
             }))

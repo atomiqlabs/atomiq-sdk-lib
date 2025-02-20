@@ -3,10 +3,11 @@ import { IPriceProvider } from "./abstract/IPriceProvider";
 import { ICachedSwapPrice } from "./abstract/ICachedSwapPrice";
 import { ChainIds, MultiChain } from "../swaps/Swapper";
 export type RedundantSwapPriceAssets<T extends MultiChain> = {
-    binancePair: string;
-    okxPair: string;
-    coinGeckoCoinId: string;
-    coinPaprikaCoinId: string;
+    binancePair?: string;
+    okxPair?: string;
+    coinGeckoCoinId?: string;
+    coinPaprikaCoinId?: string;
+    krakenPair?: string;
     chains: {
         [chainIdentifier in keyof T]?: {
             address: string;
