@@ -8,6 +8,8 @@ class IPriceProvider {
         var _b;
         this.coinsMap = {};
         for (let coinData of coins) {
+            if (coinData.coinId == null)
+                continue;
             for (let chainId in coinData.chains) {
                 const { address, decimals } = coinData.chains[chainId];
                 (_a = (_b = this.coinsMap)[chainId]) !== null && _a !== void 0 ? _a : (_b[chainId] = {});

@@ -17,6 +17,7 @@ const CoinPaprikaPriceProvider_1 = require("./providers/CoinPaprikaPriceProvider
 const Utils_1 = require("../utils/Utils");
 const ICachedSwapPrice_1 = require("./abstract/ICachedSwapPrice");
 const RequestError_1 = require("../errors/RequestError");
+const KrakenPriceProvider_1 = require("./providers/KrakenPriceProvider");
 const logger = (0, Utils_1.getLogger)("RedundantSwapPrice: ");
 /**
  * Swap price API using multiple price sources, handles errors on the APIs and automatically switches between them, such
@@ -46,6 +47,12 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
             new CoinPaprikaPriceProvider_1.CoinPaprikaPriceProvider(assets.map(coinData => {
                 return {
                     coinId: coinData.coinPaprikaCoinId,
+                    chains: coinData.chains
+                };
+            })),
+            new KrakenPriceProvider_1.KrakenPriceProvider(assets.map(coinData => {
+                return {
+                    coinId: coinData.krakenPair,
                     chains: coinData.chains
                 };
             }))

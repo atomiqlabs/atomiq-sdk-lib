@@ -28,6 +28,7 @@ export abstract class IPriceProvider<T extends MultiChain> {
 
     protected constructor(coins: CtorCoinTypes<T>) {
         for(let coinData of coins) {
+            if(coinData.coinId==null) continue;
             for(let chainId in coinData.chains) {
                 const {address, decimals} = coinData.chains[chainId];
                 this.coinsMap[chainId] ??= {};
