@@ -40,17 +40,15 @@ export abstract class IFromBTCSwap<
                 this.getInput().rawAmount,
                 this.pricingInfo.satsBaseFee,
                 this.pricingInfo.feePPM,
-                this.data.getAmount(),
-                this.data.getToken()
+                this.getSwapData().getAmount(),
+                this.getSwapData().getToken()
             );
         }
     }
 
-    /**
-     * Returns the txoHash to be used in init transactions
-     */
-    getTxoHash(): Buffer {return null;}
-
+    protected getSwapData(): T["Data"] {
+        return this.data;
+    }
 
     //////////////////////////////
     //// Pricing
@@ -62,8 +60,8 @@ export abstract class IFromBTCSwap<
             this.getInput().rawAmount,
             this.pricingInfo.satsBaseFee,
             this.pricingInfo.feePPM,
-            this.data.getAmount(),
-            this.data.getToken()
+            this.getSwapData().getAmount(),
+            this.getSwapData().getToken()
         );
         this.pricingInfo = priceData;
         return priceData;
@@ -85,6 +83,20 @@ export abstract class IFromBTCSwap<
 
     //////////////////////////////
     //// Getters & utils
+
+    abstract getInputTxId(): string | null;
+
+    getOutputTxId(): string | null {
+        return this.claimTxId;
+    }
+
+    getInputAddress(): string | null {
+        return this.getAddress();
+    }
+
+    getOutputAddress(): string | null {
+        return this.getInitiator();
+    }
 
     /**
      * Returns the bitcoin address or lightning invoice to be paid for the swap
@@ -113,15 +125,15 @@ export abstract class IFromBTCSwap<
     //// Amounts & fees
 
     protected getOutAmountWithoutFee(): BN {
-        return this.data.getAmount().add(this.swapFee);
+        return this.getSwapData().getAmount().add(this.swapFee);
     }
 
     getOutputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getAmount().add(this.swapFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return toTokenAmount(this.getSwapData().getAmount().add(this.swapFee), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices);
     }
 
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getAmount(), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return toTokenAmount(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices);
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken> {
@@ -131,26 +143,26 @@ export abstract class IFromBTCSwap<
     getSwapFee(): Fee {
         return {
             amountInSrcToken: toTokenAmount(this.swapFeeBtc, this.inputToken, this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
+            amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
                 this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
         };
     }
 
     getSecurityDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getSecurityDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return toTokenAmount(this.getSwapData().getSecurityDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
 
     getTotalDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getTotalDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return toTokenAmount(this.getSwapData().getTotalDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
 
     getInitiator(): string {
-        return this.data.getClaimer();
+        return this.getSwapData().getClaimer();
     }
 
     getClaimFee(): Promise<BN> {
-        return this.wrapper.contract.getClaimFee(this.getInitiator(), this.data);
+        return this.wrapper.contract.getClaimFee(this.getInitiator(), this.getSwapData());
     }
 
     async hasEnoughForTxFees(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
@@ -158,7 +170,7 @@ export abstract class IFromBTCSwap<
             this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.contract.getNativeCurrencyAddress(), false),
             this.getCommitFee()
         ]);
-        const totalFee = commitFee.add(this.data.getTotalDeposit());
+        const totalFee = commitFee.add(this.getSwapData().getTotalDeposit());
         return {
             enoughBalance: balance.gte(totalFee),
             balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
@@ -196,8 +208,7 @@ export abstract class IFromBTCSwap<
         await this._saveAndEmit();
 
         return await this.wrapper.contract.txsInit(
-            this.data, this.signatureData,
-            this.getTxoHash==null ? null : this.getTxoHash(), skipChecks, this.feeRate
+            this.data, this.signatureData, skipChecks, this.feeRate
         ).catch(e => Promise.reject(e instanceof SignatureVerificationError ? new Error("Request timed out") : e));
     }
 

@@ -22,6 +22,7 @@ const Utils_1 = require("../../../utils/Utils");
 const IntermediaryAPI_1 = require("../../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../../errors/RequestError");
 const LNURL_1 = require("../../../utils/LNURL");
+const IToBTCSwap_1 = require("../IToBTCSwap");
 class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     constructor(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events) {
         var _a, _b, _c;
@@ -32,6 +33,14 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         (_c = options.lightningFeePPM) !== null && _c !== void 0 ? _c : (options.lightningFeePPM = 2000);
         super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
         this.swapDeserializer = ToBTCLNSwap_1.ToBTCLNSwap;
+    }
+    checkPaymentHashWasPaid(paymentHash) {
+        const paymentHashBuffer = Buffer.from(paymentHash, "hex");
+        for (let value of this.swapData.values()) {
+            if ((value.state === IToBTCSwap_1.ToBTCSwapState.CLAIMED || value.state === IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED) &&
+                value.getPaymentHash().equals(paymentHashBuffer))
+                throw new UserError_1.UserError("Lightning invoice was already paid!");
+        }
     }
     /**
      * Calculates maximum lightning network routing fee based on amount
@@ -45,22 +54,6 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     calculateFeeForAmount(amount, overrideBaseFee, overrideFeePPM) {
         return new BN(overrideBaseFee || this.options.lightningBaseFee)
             .add(amount.mul(new BN(overrideFeePPM || this.options.lightningFeePPM)).div(new BN(1000000)));
-    }
-    /**
-     * Pre-fetches & checks status of the specific lightning BOLT11 invoice
-     *
-     * @param parsedPr Parsed bolt11 invoice
-     * @param abortController Aborts in case the invoice is/was already paid
-     * @private
-     */
-    preFetchPayStatus(parsedPr, abortController) {
-        return (0, Utils_1.tryWithRetries)(() => this.contract.getPaymentHashStatus(parsedPr.tagsObject.payment_hash), null, null, abortController.signal).then(payStatus => {
-            if (payStatus !== base_1.SwapCommitStatus.NOT_COMMITED) {
-                throw new UserError_1.UserError("Invoice already being paid for or paid");
-            }
-        }).catch(e => {
-            abortController.abort(e);
-        });
     }
     /**
      * Verifies returned LP data
@@ -81,10 +74,9 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                 throw new IntermediaryError_1.IntermediaryError("Invalid max fee sats returned");
             if (requiredTotal != null && !resp.total.eq(requiredTotal))
                 throw new IntermediaryError_1.IntermediaryError("Invalid data returned - total amount");
+            const claimHash = this.contract.getHashForHtlc(Buffer.from(parsedPr.tagsObject.payment_hash, "hex"));
             if (!data.getAmount().eq(resp.total) ||
-                data.getHash() !== parsedPr.tagsObject.payment_hash ||
-                !data.getEscrowNonce().eq(new BN(0)) ||
-                data.getConfirmations() !== 0 ||
+                !Buffer.from(data.getClaimHash(), "hex").equals(claimHash) ||
                 !data.getExpiry().eq(options.expiryTimestamp) ||
                 data.getType() !== base_1.ChainSwapType.HTLC ||
                 !data.isPayIn() ||
@@ -138,8 +130,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                 const [pricingInfo, signatureExpiry, reputation] = yield Promise.all([
                     this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTCLN], true, amountOut, data.getAmount(), amountData.token, { swapFee: resp.swapFee, networkFee: resp.maxFee, totalFee }, preFetches.pricePreFetchPromise, abortController.signal),
                     this.verifyReturnedSignature(data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal),
-                    preFetches.reputationPromise,
-                    preFetches.payStatusPromise
+                    preFetches.reputationPromise
                 ]);
                 abortController.signal.throwIfAborted();
                 lp.reputation[amountData.token.toString()] = reputation;
@@ -188,12 +179,13 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             throw new UserError_1.UserError("Must be an invoice with amount");
         const amountOut = new BN(parsedPr.millisatoshis).add(new BN(999)).div(new BN(1000));
         (_c = options.maxFee) !== null && _c !== void 0 ? _c : (options.maxFee = this.calculateFeeForAmount(amountOut, options.maxRoutingBaseFee, options.maxRoutingPPM));
+        this.checkPaymentHashWasPaid(parsedPr.tagsObject.payment_hash);
+        const claimHash = this.contract.getHashForHtlc(Buffer.from(parsedPr.tagsObject.payment_hash, "hex"));
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         if (preFetches == null)
             preFetches = {
                 pricePreFetchPromise: this.preFetchPrice(amountData, _abortController.signal),
-                payStatusPromise: this.preFetchPayStatus(parsedPr, _abortController),
-                feeRatePromise: this.preFetchFeeRate(signer, amountData, parsedPr.tagsObject.payment_hash, _abortController)
+                feeRatePromise: this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController)
             };
         return lps.map(lp => {
             return {
@@ -265,7 +257,6 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                 if (prepareResp.amount.gt(max))
                     throw new UserError_1.UserError("Amount more than maximum");
                 const { invoice, parsedInvoice, successAction } = yield LNURL_1.LNURL.useLNURLPay(payRequest, prepareResp.amount, options.comment, this.options.getRequestTimeout, abortController.signal);
-                const payStatusPromise = this.preFetchPayStatus(parsedInvoice, abortController);
                 const resp = yield (0, Utils_1.tryWithRetries)((retryCount) => IntermediaryAPI_1.IntermediaryAPI.initToBTCLNExactIn(lp.url, {
                     pr: invoice,
                     reqId: prepareResp.reqId,
@@ -279,8 +270,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                 const [pricingInfo, signatureExpiry, reputation] = yield Promise.all([
                     this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTCLN], true, prepareResp.amount, data.getAmount(), amountData.token, { swapFee: resp.swapFee, networkFee: resp.maxFee, totalFee }, preFetches.pricePreFetchPromise, abortSignal),
                     this.verifyReturnedSignature(data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal),
-                    reputationPromise,
-                    payStatusPromise
+                    reputationPromise
                 ]);
                 abortController.signal.throwIfAborted();
                 lp.reputation[amountData.token.toString()] = reputation;
@@ -366,11 +356,9 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                     if (amountData.amount.gt(max))
                         throw new UserError_1.UserError("Amount more than maximum");
                     const { invoice, parsedInvoice, successAction } = yield LNURL_1.LNURL.useLNURLPay(payRequest, amountData.amount, options.comment, this.options.getRequestTimeout, _abortController.signal);
-                    const payStatusPromise = this.preFetchPayStatus(parsedInvoice, _abortController);
                     return this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
                         feeRatePromise,
-                        pricePreFetchPromise,
-                        payStatusPromise,
+                        pricePreFetchPromise
                     }).map(data => {
                         return {
                             quote: data.quote.then(quote => {

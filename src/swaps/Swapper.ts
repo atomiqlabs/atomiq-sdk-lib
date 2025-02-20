@@ -1,6 +1,13 @@
-import {BitcoinNetwork} from "../btc/BitcoinNetwork";
 import {ISwapPrice} from "../prices/abstract/ISwapPrice";
-import {BtcRelay, ChainSwapType, ChainType, IStorageManager, RelaySynchronizer} from "@atomiqlabs/base";
+import {
+    BitcoinNetwork,
+    BtcRelay,
+    ChainData,
+    ChainSwapType,
+    ChainType,
+    IStorageManager,
+    RelaySynchronizer
+} from "@atomiqlabs/base";
 import {ToBTCLNWrapper} from "./tobtc/ln/ToBTCLNWrapper";
 import {ToBTCWrapper} from "./tobtc/onchain/ToBTCWrapper";
 import {FromBTCLNWrapper} from "./frombtc/ln/FromBTCLNWrapper";
@@ -37,6 +44,7 @@ import {SwapperWithChain} from "./SwapperWithChain";
 import {BtcToken, SCToken, Token} from "./Tokens";
 import {OnchainForGasSwap} from "./swapforgas/onchain/OnchainForGasSwap";
 import {OnchainForGasWrapper} from "./swapforgas/onchain/OnchainForGasWrapper";
+import * as randomBytes from "randombytes";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -48,7 +56,8 @@ export type SwapperOptions = {
     postRequestTimeout?: number,
     defaultAdditionalParameters?: {[key: string]: any},
     storagePrefix?: string
-    defaultTrustedIntermediaryUrl?: string
+    defaultTrustedIntermediaryUrl?: string,
+    storageCtor?: (name: string) => IStorageManager<any>
 };
 
 export type MultiChain = {
@@ -72,23 +81,8 @@ export type MultiChainData<T extends MultiChain> = {
     [chainIdentifier in keyof T]: ChainSpecificData<T[chainIdentifier]>
 };
 
-export type CtorChainData<T extends ChainType> = {
-    btcRelay: BtcRelay<any, T["TX"], MempoolBitcoinBlock>,
-    swapContract: T["Contract"],
-    chainEvents: T["Events"],
-    swapDataConstructor: new (data: any) => T["Data"],
-    storage?: {
-        toBtc?: IStorageManager<ToBTCSwap<T>>,
-        fromBtc?: IStorageManager<FromBTCSwap<T>>,
-        toBtcLn?: IStorageManager<ToBTCLNSwap<T>>,
-        fromBtcLn?: IStorageManager<FromBTCLNSwap<T>>,
-        lnForGas?: IStorageManager<LnForGasSwap<T>>,
-        onchainForGas?: IStorageManager<OnchainForGasSwap<T>>
-    }
-};
-
 export type CtorMultiChainData<T extends MultiChain> = {
-    [chainIdentifier in keyof T]: CtorChainData<T[chainIdentifier]>
+    [chainIdentifier in keyof T]: ChainData<T[chainIdentifier]>
 };
 
 export type ChainIds<T extends MultiChain> = keyof T & string;
@@ -165,6 +159,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         const storagePrefix = options?.storagePrefix || "";
 
         options.bitcoinNetwork = options.bitcoinNetwork==null ? BitcoinNetwork.TESTNET : options.bitcoinNetwork;
+        options.storageCtor ??= (name: string) => new IndexedDBStorageManager(name);
 
         this.bitcoinNetwork = options.bitcoinNetwork===BitcoinNetwork.MAINNET ? networks.bitcoin :
             options.bitcoinNetwork===BitcoinNetwork.REGTEST ? networks.regtest :
@@ -198,11 +193,11 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             const {swapContract, chainEvents, btcRelay} = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
 
-            const _storagePrefix = storagePrefix+key+"-";
+            const _storagePrefix = chainData.storagePrefix ?? storagePrefix+key+"-";
 
             const tobtcln = new ToBTCLNWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.toBtcLn || new IndexedDBStorageManager(_storagePrefix + "Swaps-ToBTCLN"),
+                options.storageCtor(_storagePrefix + "Swaps-ToBTCLN"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -215,7 +210,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             );
             const tobtc = new ToBTCWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.toBtc || new IndexedDBStorageManager(_storagePrefix + "Swaps-ToBTC"),
+                options.storageCtor(_storagePrefix + "Swaps-ToBTC"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -230,7 +225,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             );
             const frombtcln = new FromBTCLNWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.fromBtcLn || new IndexedDBStorageManager(_storagePrefix + "Swaps-FromBTCLN"),
+                options.storageCtor(_storagePrefix + "Swaps-FromBTCLN"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -244,7 +239,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             );
             const frombtc = new FromBTCWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.fromBtc || new IndexedDBStorageManager(_storagePrefix + "Swaps-FromBTC"),
+                options.storageCtor(_storagePrefix + "Swaps-FromBTC"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -261,7 +256,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             );
             const lnforgas = new LnForGasWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.lnForGas || new LocalStorageManager<LnForGasSwap<T[InputKey]>>(_storagePrefix + "LnForGas"),
+                options.storageCtor(_storagePrefix + "LnForGas"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -274,7 +269,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             );
             const onchainforgas = new OnchainForGasWrapper<T[InputKey]>(
                 key,
-                chainData.storage?.onchainForGas || new LocalStorageManager<OnchainForGasSwap<T[InputKey]>>(_storagePrefix + "OnchainForGas"),
+                options.storageCtor(_storagePrefix + "OnchainForGas"),
                 swapContract,
                 chainEvents,
                 pricing,
@@ -397,13 +392,13 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         return null;
     }
 
-    getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string): SwapBounds;
+    getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SwapBounds;
     getSwapBounds(): MultichainSwapBounds;
 
     /**
      * Returns swap bounds (minimums & maximums) for different swap types & tokens
      */
-    getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier?: ChainIdentifier | string): SwapBounds | MultichainSwapBounds {
+    getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier?: ChainIdentifier): SwapBounds | MultichainSwapBounds {
         if(this.intermediaryDiscovery!=null) {
             if(chainIdentifier==null) {
                 return this.intermediaryDiscovery.getMultichainSwapBounds();
@@ -421,7 +416,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param type      Type of the swap
      * @param token     Token of the swap
      */
-    getMaximum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, type: SwapType, token: string): BN {
+    getMaximum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, type: SwapType, token: string): BN {
         if(this.intermediaryDiscovery!=null) {
             const max = this.intermediaryDiscovery.getSwapMaximum(chainIdentifier, type, token);
             if(max!=null) return new BN(max);
@@ -436,7 +431,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param type      Type of swap
      * @param token     Token of the swap
      */
-    getMinimum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, type: SwapType, token: string): BN {
+    getMinimum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, type: SwapType, token: string): BN {
         if(this.intermediaryDiscovery!=null) {
             const min = this.intermediaryDiscovery.getSwapMinimum(chainIdentifier, type, token);
             if(min!=null) return new BN(min);
@@ -544,7 +539,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param chainIdentifier
      * @param swapType Specific swap type for which to obtain supported tokens
      */
-    getSupportedTokenAddresses<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, swapType: SwapType): Set<string> {
+    getSupportedTokenAddresses<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, swapType: SwapType): Set<string> {
         const set = new Set<string>();
         this.intermediaryDiscovery.intermediaries.forEach(lp => {
             if(lp.services[swapType]==null) return;
@@ -703,7 +698,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      */
     createToBTCSwap<ChainIdentifier extends ChainIds<T>>(
-        chainIdentifier: ChainIdentifier | string,
+        chainIdentifier: ChainIdentifier,
         signer: string,
         tokenAddress: string,
         address: string,
@@ -752,7 +747,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      */
     async createToBTCLNSwap<ChainIdentifier extends ChainIds<T>>(
-        chainIdentifier: ChainIdentifier | string,
+        chainIdentifier: ChainIdentifier,
         signer: string,
         tokenAddress: string,
         paymentRequest: string,
@@ -804,7 +799,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      */
     async createToBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(
-        chainIdentifier: ChainIdentifier | string,
+        chainIdentifier: ChainIdentifier,
         signer: string,
         tokenAddress: string,
         lnurlPay: string | LNURLPay,
@@ -854,7 +849,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      */
     async createFromBTCSwap<ChainIdentifier extends ChainIds<T>>(
-        chainIdentifier: ChainIdentifier | string,
+        chainIdentifier: ChainIdentifier,
         signer: string,
         tokenAddress: string,
         amount: BN,
@@ -893,7 +888,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
      */
     async createFromBTCLNSwap<ChainIdentifier extends ChainIds<T>>(
-        chainIdentifier: ChainIdentifier | string,
+        chainIdentifier: ChainIdentifier,
         signer: string,
         tokenAddress: string,
         amount: BN,
@@ -935,7 +930,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
      */
     async createFromBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(
-        chainIdentifier: ChainIdentifier | string,
+        chainIdentifier: ChainIdentifier,
         signer: string,
         tokenAddress: string,
         lnurl: string | LNURLWithdraw,
@@ -1029,7 +1024,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param trustedIntermediaryOrUrl  URL or Intermediary object of the trusted intermediary to use, otherwise uses default
      * @throws {Error}                  If no trusted intermediary specified
      */
-    createTrustedLNForGasSwap<C extends ChainIds<T>>(chainId: C | string, signer: string, amount: BN, trustedIntermediaryOrUrl?: Intermediary | string): Promise<LnForGasSwap<T[C]>> {
+    createTrustedLNForGasSwap<C extends ChainIds<T>>(chainId: C, signer: string, amount: BN, trustedIntermediaryOrUrl?: Intermediary | string): Promise<LnForGasSwap<T[C]>> {
         if(this.chains[chainId]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainId);
         const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary ?? this.options.defaultTrustedIntermediaryUrl;
         if(useUrl==null) throw new Error("No trusted intermediary specified!");
@@ -1047,7 +1042,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @throws {Error}                  If no trusted intermediary specified
      */
     createTrustedOnchainForGasSwap<C extends ChainIds<T>>(
-        chainId: C | string, signer: string,
+        chainId: C, signer: string,
         amount: BN, refundAddress?: string,
         trustedIntermediaryOrUrl?: Intermediary | string
     ): Promise<OnchainForGasSwap<T[C]>> {
@@ -1065,9 +1060,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
     /**
      * Returns all swaps for the specific chain, and optionally also for a specific signer's address
      */
-    getAllSwaps<C extends ChainIds<T>>(chainId: C | string, signer?: string): Promise<ISwap<T[C]>[]>;
+    getAllSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
 
-    async getAllSwaps<C extends ChainIds<T>>(chainId?: C | string, signer?: string): Promise<ISwap[]> {
+    async getAllSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<ISwap[]> {
         if(chainId==null) {
             const res: ISwap[] = [];
             for(let chainId in this.chains) {
@@ -1099,9 +1094,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
     /**
      * Returns swaps where an action is required (either claim or refund) for the specific chain, and optionally also for a specific signer's address
      */
-    getActionableSwaps<C extends ChainIds<T>>(chainId: C | string, signer?: string): Promise<ISwap<T[C]>[]>;
+    getActionableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
 
-    async getActionableSwaps<C extends ChainIds<T>>(chainId?: C | string, signer?: string): Promise<ISwap[]> {
+    async getActionableSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<ISwap[]> {
         if(chainId==null) {
             const res: ISwap[] = [];
             for(let chainId in this.chains) {
@@ -1133,9 +1128,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
     /**
      * Returns swaps that are refundable for the specific chain, and optionally also for a specific signer's address
      */
-    getRefundableSwaps<C extends ChainIds<T>>(chainId: C | string, signer?: string): Promise<IToBTCSwap<T[C]>[]>;
+    getRefundableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IToBTCSwap<T[C]>[]>;
 
-    async getRefundableSwaps<C extends ChainIds<T>>(chainId?: C | string, signer?: string): Promise<IToBTCSwap[]> {
+    async getRefundableSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<IToBTCSwap[]> {
         if(chainId==null) {
             const res: IToBTCSwap[] = [];
             for(let chainId in this.chains) {
@@ -1163,9 +1158,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
     /**
      * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
      */
-    getClaimableSwaps<C extends ChainIds<T>>(chainId: C | string, signer?: string): Promise<IFromBTCSwap<T[C]>[]>;
+    getClaimableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IFromBTCSwap<T[C]>[]>;
 
-    async getClaimableSwaps<C extends ChainIds<T>>(chainId?: C | string, signer?: string): Promise<IFromBTCSwap[]> {
+    async getClaimableSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<IFromBTCSwap[]> {
         if(chainId==null) {
             const res: IFromBTCSwap[] = [];
             for(let chainId in this.chains) {
@@ -1185,14 +1180,14 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         }
     }
 
-    getBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier | string>): Promise<BN>;
-    getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, token: string): Promise<BN>;
+    getBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>): Promise<BN>;
+    getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string): Promise<BN>;
 
     /**
      * Returns the token balance of the wallet
      */
-    getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifierOrSigner: ChainIdentifier | string, signerOrToken: string | SCToken<ChainIdentifier | string>, token?: string): Promise<BN> {
-        let chainIdentifier: ChainIdentifier | string;
+    getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifierOrSigner: ChainIdentifier, signerOrToken: string | SCToken<ChainIdentifier>, token?: string): Promise<BN> {
+        let chainIdentifier: ChainIdentifier;
         let signer: string;
         if(typeof(signerOrToken)==="string") {
             chainIdentifier = chainIdentifierOrSigner;
@@ -1206,15 +1201,15 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         return this.chains[chainIdentifier].swapContract.getBalance(signer, token, false);
     }
 
-    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier | string>, feeMultiplier?: number): Promise<BN>;
-    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, token: string, feeMultiplier?: number): Promise<BN>;
+    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<BN>;
+    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string, feeMultiplier?: number): Promise<BN>;
 
     /**
      * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
      */
     async getSpendableBalance<ChainIdentifier extends ChainIds<T>>(
-        chainIdentifierOrSigner: ChainIdentifier | string,
-        signerOrToken: string | SCToken<ChainIdentifier | string>,
+        chainIdentifierOrSigner: ChainIdentifier,
+        signerOrToken: string | SCToken<ChainIdentifier>,
         tokenOrFeeMultiplier?: string | number,
         feeMultiplier?: number
     ): Promise<BN> {
@@ -1239,13 +1234,14 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
 
         let [balance, commitFee] = await Promise.all([
             this.getBalance(chainIdentifier, signer, token),
-            this.chains[chainIdentifier].swapContract.getCommitFee(
+            swapContract.getCommitFee(
                 //Use large amount, such that the fee for wrapping more tokens is always included!
                 await swapContract.createSwapData(
                     ChainSwapType.HTLC, signer, null, token,
                     new BN("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "hex"),
-                    null, null, null, null, null,
-                    true, false, null, null
+                    swapContract.getHashForHtlc(randomBytes(32)).toString("hex"),
+                    new BN(randomBytes(8)), new BN(Math.floor(Date.now()/1000)),
+                    true, false, new BN(randomBytes(2)), new BN(randomBytes(2))
                 ),
             )
         ]);
@@ -1260,7 +1256,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
     /**
      * Returns the native token balance of the wallet
      */
-    getNativeBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string): Promise<BN> {
+    getNativeBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string): Promise<BN> {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         return this.chains[chainIdentifier].swapContract.getBalance(signer, this.getNativeTokenAddress(chainIdentifier), false);
     }
@@ -1268,7 +1264,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
     /**
      * Returns the address of the native token's address of the chain
      */
-    getNativeTokenAddress<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string): string {
+    getNativeTokenAddress<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): string {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         return this.chains[chainIdentifier].swapContract.getNativeCurrencyAddress();
     }
@@ -1276,17 +1272,17 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
     /**
      * Returns the address of the native currency of the chain
      */
-    getNativeToken<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string): SCToken<ChainIdentifier> {
+    getNativeToken<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SCToken<ChainIdentifier> {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         return this.tokens[chainIdentifier][this.chains[chainIdentifier].swapContract.getNativeCurrencyAddress()] as SCToken<ChainIdentifier>;
     }
 
-    withChain<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string): SwapperWithChain<T, ChainIdentifier> {
+    withChain<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SwapperWithChain<T, ChainIdentifier> {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         return new SwapperWithChain<T, ChainIdentifier>(this, chainIdentifier as ChainIdentifier);
     }
 
-    randomSigner<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string): T[ChainIdentifier]["Signer"] {
+    randomSigner<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): T[ChainIdentifier]["Signer"] {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         return this.chains[chainIdentifier].swapContract.randomSigner();
     }

@@ -21,6 +21,7 @@ const SwapType_1 = require("../../SwapType");
 const Utils_1 = require("../../../utils/Utils");
 const IntermediaryAPI_1 = require("../../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../../errors/RequestError");
+const randomBytes = require("randombytes");
 class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
     /**
      * @param chainIdentifier
@@ -72,7 +73,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                 }
                 return false;
             }
-            if (swap.state === FromBTCSwap_1.FromBTCSwapState.CLAIM_COMMITED || swap.state === FromBTCSwap_1.FromBTCSwapState.BTC_TX_CONFIRMED) {
+            if (swap.state === FromBTCSwap_1.FromBTCSwapState.CLAIM_COMMITED || swap.state === FromBTCSwap_1.FromBTCSwapState.BTC_TX_CONFIRMED || swap.state === FromBTCSwap_1.FromBTCSwapState.EXPIRED) {
                 const status = yield (0, Utils_1.tryWithRetries)(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
                 switch (status) {
                     case base_1.SwapCommitStatus.PAID:
@@ -84,7 +85,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                         return true;
                     case base_1.SwapCommitStatus.COMMITED:
                         const res = yield swap.getBitcoinPayment();
-                        if (res != null && res.confirmations >= swap.data.getConfirmations()) {
+                        if (res != null && res.confirmations >= swap.requiredConfirmations) {
                             swap.txId = res.txId;
                             swap.vout = res.vout;
                             swap.state = FromBTCSwap_1.FromBTCSwapState.BTC_TX_CONFIRMED;
@@ -108,19 +109,17 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                 //Check if bitcoin payment was received every 2 minutes
                 if (Math.floor(Date.now() / 1000) % 120 === 0)
                     swap.getBitcoinPayment().then(res => {
-                        if (res != null && res.confirmations >= swap.data.getConfirmations()) {
+                        if (res != null && res.confirmations >= swap.requiredConfirmations) {
                             swap.txId = res.txId;
                             swap.vout = res.vout;
                             return swap._saveAndEmit(FromBTCSwap_1.FromBTCSwapState.BTC_TX_CONFIRMED);
                         }
-                    }).catch(e => this.logger.error("tickSwap(" + swap.getPaymentHashString() + "): ", e));
+                    }).catch(e => this.logger.error("tickSwap(" + swap.getIdentifierHashString() + "): ", e));
                 break;
         }
     }
     processEventInitialize(swap, event) {
         if (swap.state === FromBTCSwap_1.FromBTCSwapState.PR_CREATED || swap.state === FromBTCSwap_1.FromBTCSwapState.QUOTE_SOFT_EXPIRED) {
-            if (swap.data != null && !swap.data.getSequence().eq(event.sequence))
-                return Promise.resolve(false);
             swap.state = FromBTCSwap_1.FromBTCSwapState.CLAIM_COMMITED;
             return Promise.resolve(true);
         }
@@ -144,9 +143,10 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
      * Returns the swap expiry, leaving enough time for the user to send a transaction and for it to confirm
      *
      * @param data Parsed swap data
+     * @param requiredConfirmations Confirmations required to claim the tx
      */
-    getOnchainSendTimeout(data) {
-        const tsDelta = (this.options.blocksTillTxConfirms + data.getConfirmations()) * this.options.bitcoinBlocktime * this.options.safetyFactor;
+    getOnchainSendTimeout(data, requiredConfirmations) {
+        const tsDelta = (this.options.blocksTillTxConfirms + requiredConfirmations) * this.options.bitcoinBlocktime * this.options.safetyFactor;
         return data.getExpiry().sub(new BN(tsDelta));
     }
     /**
@@ -162,7 +162,8 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
     preFetchClaimerBounty(signer, amountData, options, abortController) {
         return __awaiter(this, void 0, void 0, function* () {
             const startTimestamp = new BN(Math.floor(Date.now() / 1000));
-            const dummySwapData = yield this.contract.createSwapData(base_1.ChainSwapType.CHAIN, null, signer, amountData.token, null, null, null, null, null, null, false, true, null, null);
+            const dummyAmount = new BN(randomBytes(3));
+            const dummySwapData = yield this.contract.createSwapData(base_1.ChainSwapType.CHAIN, signer, signer, amountData.token, dummyAmount, this.contract.getHashForOnchain(randomBytes(20), dummyAmount, 3).toString("hex"), this.getRandomSequence(), new BN(Math.floor(Date.now() / 1000)), false, true, new BN(randomBytes(2)), new BN(randomBytes(2)));
             try {
                 const [feePerBlock, btcRelayData, currentBtcBlock, claimFeeRate] = yield Promise.all([
                     (0, Utils_1.tryWithRetries)(() => this.btcRelay.getFeePerBlock(), null, null, abortController.signal),
@@ -210,10 +211,12 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
      * @param data Parsed swap data returned by the intermediary
      * @param sequence Required swap sequence
      * @param claimerBounty Claimer bount data as returned from the preFetchClaimerBounty() pre-fetch promise
+     * @param depositToken
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
-    verifyReturnedData(resp, amountData, lp, options, data, sequence, claimerBounty) {
+    verifyReturnedData(resp, amountData, lp, options, data, sequence, claimerBounty, depositToken) {
+        var _a;
         if (amountData.exactIn) {
             if (!resp.amount.eq(amountData.amount))
                 throw new IntermediaryError_1.IntermediaryError("Invalid amount returned");
@@ -222,7 +225,8 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
             if (!resp.total.eq(amountData.amount))
                 throw new IntermediaryError_1.IntermediaryError("Invalid total returned");
         }
-        if (data.getConfirmations() > this.options.maxConfirmations)
+        const requiredConfirmations = (_a = resp.confirmations) !== null && _a !== void 0 ? _a : lp.services[SwapType_1.SwapType.FROM_BTC].data.confirmations;
+        if (requiredConfirmations > this.options.maxConfirmations)
             throw new IntermediaryError_1.IntermediaryError("Requires too many confirmations");
         const totalClaimerBounty = this.getClaimerBounty(data, options, claimerBounty);
         if (!data.getClaimerBounty().eq(totalClaimerBounty) ||
@@ -231,20 +235,24 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
             !data.getAmount().eq(resp.total) ||
             data.isPayIn() ||
             !data.isToken(amountData.token) ||
-            data.getOfferer() !== lp.getAddress(this.chainIdentifier)) {
+            data.getOfferer() !== lp.getAddress(this.chainIdentifier) ||
+            !data.isDepositToken(depositToken)) {
             throw new IntermediaryError_1.IntermediaryError("Invalid data returned");
         }
         //Check that we have enough time to send the TX and for it to confirm
-        const expiry = this.getOnchainSendTimeout(data);
+        const expiry = this.getOnchainSendTimeout(data, requiredConfirmations);
         const currentTimestamp = new BN(Math.floor(Date.now() / 1000));
         if (expiry.sub(currentTimestamp).lt(new BN(this.options.minSendWindow))) {
             throw new IntermediaryError_1.IntermediaryError("Send window too low");
         }
         const lockingScript = bitcoinjs_lib_1.address.toOutputScript(resp.btcAddress, this.options.bitcoinNetwork);
-        const desiredHash = this.contract.getHashForOnchain(lockingScript, resp.amount, new BN(0));
-        const suppliedHash = buffer_1.Buffer.from(data.getHash(), "hex");
-        if (!desiredHash.equals(suppliedHash)) {
-            throw new IntermediaryError_1.IntermediaryError("Invalid payment hash returned!");
+        const desiredExtraData = this.contract.getExtraData(lockingScript, resp.amount, requiredConfirmations);
+        const desiredClaimHash = this.contract.getHashForOnchain(lockingScript, resp.amount, requiredConfirmations);
+        if (!desiredClaimHash.equals(buffer_1.Buffer.from(data.getClaimHash(), "hex"))) {
+            throw new IntermediaryError_1.IntermediaryError("Invalid claim hash returned!");
+        }
+        if (!desiredExtraData.equals(buffer_1.Buffer.from(data.getExtraData(), "hex"))) {
+            throw new IntermediaryError_1.IntermediaryError("Invalid extra data returned!");
         }
     }
     /**
@@ -266,17 +274,18 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePrefetchPromise = this.preFetchPrice(amountData, _abortController.signal);
         const claimerBountyPrefetchPromise = this.preFetchClaimerBounty(signer, amountData, options, _abortController);
+        const nativeTokenAddress = this.contract.getNativeCurrencyAddress();
         const feeRatePromise = this.preFetchFeeRate(signer, amountData, null, _abortController);
         return lps.map(lp => {
             return {
                 intermediary: lp,
                 quote: (() => __awaiter(this, void 0, void 0, function* () {
-                    var _a;
+                    var _a, _b;
                     const abortController = (0, Utils_1.extendAbortController)(_abortController.signal);
                     const liquidityPromise = this.preFetchIntermediaryLiquidity(amountData, lp, abortController);
                     try {
                         const { signDataPromise, resp } = yield (0, Utils_1.tryWithRetries)((retryCount) => __awaiter(this, void 0, void 0, function* () {
-                            const { signDataPrefetch, response } = IntermediaryAPI_1.IntermediaryAPI.initFromBTC(this.chainIdentifier, lp.url, {
+                            const { signDataPrefetch, response } = IntermediaryAPI_1.IntermediaryAPI.initFromBTC(this.chainIdentifier, lp.url, nativeTokenAddress, {
                                 claimer: signer,
                                 amount: amountData.amount,
                                 token: amountData.token.toString(),
@@ -293,7 +302,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                         }), null, e => e instanceof RequestError_1.RequestError, abortController.signal);
                         const data = new this.swapDataDeserializer(resp.data);
                         data.setClaimer(signer);
-                        this.verifyReturnedData(resp, amountData, lp, options, data, sequence, yield claimerBountyPrefetchPromise);
+                        this.verifyReturnedData(resp, amountData, lp, options, data, sequence, yield claimerBountyPrefetchPromise, nativeTokenAddress);
                         const [pricingInfo, signatureExpiry] = yield Promise.all([
                             //Get intermediary's liquidity
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.FROM_BTC], false, resp.amount, resp.total, amountData.token, resp, pricePrefetchPromise, abortController.signal),
@@ -310,7 +319,8 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                             data,
                             address: resp.btcAddress,
                             amount: resp.amount,
-                            exactIn: (_a = amountData.exactIn) !== null && _a !== void 0 ? _a : true
+                            exactIn: (_a = amountData.exactIn) !== null && _a !== void 0 ? _a : true,
+                            requiredConfirmations: (_b = resp.confirmations) !== null && _b !== void 0 ? _b : lp.services[SwapType_1.SwapType.FROM_BTC].data.confirmations
                         });
                         yield quote._save();
                         return quote;

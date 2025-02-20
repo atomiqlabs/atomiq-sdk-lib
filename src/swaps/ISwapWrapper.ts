@@ -16,6 +16,7 @@ import {IntermediaryError} from "../errors/IntermediaryError";
 import {getLogger, mapToArray, tryWithRetries} from "../utils/Utils";
 import {SCToken} from "./Tokens";
 import {ChainIds, MultiChain} from "./Swapper";
+import * as randomBytes from "randombytes";
 
 export type AmountData = {
     amount: BN,
@@ -33,7 +34,8 @@ export type WrapperCtorTokens<T extends MultiChain = MultiChain> = {
     name: string,
     chains: {[chainId in ChainIds<T>]?: {
         address: string,
-        decimals: number
+        decimals: number,
+        displayDecimals?: number
     }}
 }[];
 
@@ -59,6 +61,7 @@ export abstract class ISwapWrapper<
     };
 
     swapData: Map<string, S>;
+    swapDataByEscrowHash: Map<string, S>;
     isInitialized: boolean = false;
     tickInterval: NodeJS.Timeout = null;
 
@@ -102,7 +105,8 @@ export abstract class ISwapWrapper<
                 address: chainData.address,
                 decimals: chainData.decimals,
                 ticker: tokenData.ticker,
-                name: tokenData.name
+                name: tokenData.name,
+                displayDecimals: chainData.displayDecimals
             };
         }
     }
@@ -270,8 +274,7 @@ export abstract class ISwapWrapper<
      */
     private async processEvents(events: SwapEvent<T["Data"]>[]): Promise<boolean> {
         for(let event of events) {
-            const paymentHash = event.paymentHash;
-            const swap: S = this.swapData.get(paymentHash);
+            const swap: S = this.swapDataByEscrowHash.get(event.escrowHash);
             if(swap==null) continue;
 
             let swapChanged: boolean = false;
@@ -297,7 +300,7 @@ export abstract class ISwapWrapper<
                 }
             }
 
-            this.logger.info("processEvents(): "+event.constructor.name+" processed for "+swap.getPaymentHashString()+" swap: ", swap);
+            this.logger.info("processEvents(): "+event.constructor.name+" processed for "+swap.getIdentifierHashString()+" swap: ", swap);
 
             if(swapChanged) {
                 await swap._saveAndEmit();
@@ -314,6 +317,25 @@ export abstract class ISwapWrapper<
         await this.storage.init();
         if(this.isInitialized) return;
         this.swapData = await this.storage.loadSwapData(this, this.swapDeserializer);
+        this.swapDataByEscrowHash = new Map();
+
+        for(let value of this.swapData.values()) {
+            if(value.randomNonce==null) {
+                const oldIdentifierHash = value.getIdentifierHashString();
+                this.swapData.delete(oldIdentifierHash);
+                //Workaround for old Solana swaps - take the first 32 bytes of the claim hash which should stay the same
+                // for both old and new version of the libs
+                await this.storage.storage.removeData(oldIdentifierHash.slice(0, 64));
+                await this.storage.removeSwapData(value);
+                value.randomNonce = randomBytes(16).toString("hex");
+                const newIdentifierHash = value.getIdentifierHashString();
+                this.swapData.set(newIdentifierHash, value);
+                await this.storage.saveSwapData(value);
+                this.logger.info("init(): Found older swap version without randomNonce, replacing, old hash: "+oldIdentifierHash+
+                    " new hash: "+newIdentifierHash);
+            }
+            if(value.data!=null) this.swapDataByEscrowHash.set(value.data.getEscrowHash(), value);
+        }
 
         const hasEventListener = this.processEventRefund!=null || this.processEventClaim!=null || this.processEventInitialize!=null;
 
@@ -338,7 +360,7 @@ export abstract class ISwapWrapper<
                     } else {
                         if(changed) changedSwaps.push(swap);
                     }
-                }).catch(e => this.logger.error("init(): Error when checking swap "+swap.getPaymentHashString()+": ", e))
+                }).catch(e => this.logger.error("init(): Error when checking swap "+swap.getIdentifierHashString()+": ", e))
             )
         );
 
@@ -363,6 +385,20 @@ export abstract class ISwapWrapper<
         this.logger.info("init(): Swap wrapper initialized, num swaps: "+this.swapData.size);
 
         this.isInitialized = true;
+    }
+
+    saveSwapData(swap: S): Promise<void> {
+        this.swapData.set(swap.getIdentifierHashString(), swap);
+        if(swap.data!=null) this.swapDataByEscrowHash.set(swap.data.getEscrowHash(), swap);
+        if(!swap.isInitiated()) return Promise.resolve();
+        return this.storage.saveSwapData(swap);
+    }
+
+    removeSwapData(swap: S): Promise<void> {
+        this.swapData.delete(swap.getIdentifierHashString());
+        if(swap.data!=null) this.swapDataByEscrowHash.delete(swap.data.getEscrowHash());
+        if(!swap.isInitiated) return Promise.resolve();
+        return this.storage.removeSwapData(swap).then(() => {});
     }
 
     /**

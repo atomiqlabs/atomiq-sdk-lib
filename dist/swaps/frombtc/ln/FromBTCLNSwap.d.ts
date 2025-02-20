@@ -22,6 +22,7 @@ export declare enum FromBTCLNSwapState {
 export type FromBTCLNSwapInit<T extends SwapData> = ISwapInit<T> & {
     pr: string;
     secret: string;
+    initialSwapData: T;
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
@@ -33,13 +34,18 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     protected readonly lnurlFailSignal: AbortController;
     protected readonly pr: string;
     protected readonly secret: string;
+    protected initialSwapData: T["Data"];
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
     prPosted?: boolean;
+    wrapper: FromBTCLNWrapper<T>;
+    protected getSwapData(): T["Data"];
     constructor(wrapper: FromBTCLNWrapper<T>, init: FromBTCLNSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNWrapper<T>, obj: any);
     protected upgradeVersion(): void;
+    getInputTxId(): string | null;
+    getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
     getAddress(): string;
     /**
@@ -51,6 +57,11 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * Returns timeout time (in UNIX milliseconds) when the LN invoice will expire
      */
     getTimeoutTime(): number;
+    /**
+     * Returns timeout time (in UNIX milliseconds) when the on-chain address will expire and no funds should be sent
+     *  to that address anymore
+     */
+    getHtlcTimeoutTime(): number;
     isFinished(): boolean;
     isClaimable(): boolean;
     isSuccessful(): boolean;
@@ -130,6 +141,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @throws {Error} If the LP refunded sooner than we were able to claim
      */
     waitTillClaimed(abortSignal?: AbortSignal): Promise<void>;
+    canCommitAndClaimInOneShot(): boolean;
     /**
      * Commits and claims the swap, in a way that the transactions can be signed together by the underlying provider and
      *  then sent sequentially

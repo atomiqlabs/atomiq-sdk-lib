@@ -27,12 +27,12 @@ export declare abstract class IToBTCWrapper<T extends ChainType, S extends IToBT
      *
      * @param signer Address of the swap initiator
      * @param amountData
-     * @param hash optional hash of the swap or null
+     * @param claimHash optional hash of the swap or null
      * @param abortController
      * @protected
      * @returns Fee rate
      */
-    protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, hash: string | null, abortController: AbortController): Promise<any | null>;
+    protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, claimHash: string | null, abortController: AbortController): Promise<any | null>;
     protected checkPastSwap(swap: S): Promise<boolean>;
     protected tickSwap(swap: S): void;
     protected processEventInitialize(swap: S, event: InitializeEvent<T["Data"]>): Promise<boolean>;

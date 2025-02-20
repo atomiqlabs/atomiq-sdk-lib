@@ -6,7 +6,8 @@ export type BtcToken<L = boolean> = {
     lightning: L,
     ticker: L extends true ? "BTCLN" : "BTC",
     decimals: 8,
-    name: L extends true ? "Bitcoin (lightning L2)" : "Bitcoin (on-chain L1)"
+    name: L extends true ? "Bitcoin (lightning L2)" : "Bitcoin (on-chain L1)",
+    displayDecimals?: number
 };
 
 export function isBtcToken(obj: any): obj is BtcToken {
@@ -44,6 +45,7 @@ export type SCToken<ChainIdentifier extends string = string> = {
     address: string,
     ticker: string,
     decimals: number,
+    displayDecimals?: number,
     name: string
 }
 
@@ -96,7 +98,7 @@ export function fromDecimal(amount: string, decimalCount: number) {
 
 }
 
-export function toDecimal(amount: BN, decimalCount: number, cut?: boolean) {
+export function toDecimal(amount: BN, decimalCount: number, cut?: boolean, displayDecimals?: number) {
     if(decimalCount<=0) {
         return amount.toString(10)+"0".repeat(-decimalCount);
     }
@@ -116,6 +118,8 @@ export function toDecimal(amount: BN, decimalCount: number, cut?: boolean) {
         if(cutTo===0) cutTo = 1;
     }
 
+    if(displayDecimals===0) return amountStr.substring(0, splitPoint);
+    if(displayDecimals!=null && cutTo > displayDecimals) cutTo = displayDecimals;
     return amountStr.substring(0, splitPoint)+"."+decimalPart.substring(0, cutTo);
 }
 
@@ -127,7 +131,7 @@ export function toTokenAmount<
     token:  T,
     prices: ISwapPrice
 ): TokenAmount<ChainIdentifier, T> {
-    const amountStr = toDecimal(amount, token.decimals);
+    let amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
     return {
         rawAmount: amount,
         amount: amountStr,

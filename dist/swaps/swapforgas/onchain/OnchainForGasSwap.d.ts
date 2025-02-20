@@ -50,8 +50,12 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
     refreshPriceData(): Promise<PriceInfoType>;
     getSwapPrice(): number;
     getMarketPrice(): number;
-    getTxId(): string | null;
+    getInputAddress(): string | null;
+    getOutputAddress(): string | null;
+    getInputTxId(): string | null;
+    getOutputTxId(): string | null;
     getRecipient(): string;
+    getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
     getAddress(): string;
     /**

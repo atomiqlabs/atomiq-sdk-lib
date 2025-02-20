@@ -3,11 +3,7 @@ import {ToBTCLNSwap} from "./ToBTCLNSwap";
 import {IToBTCWrapper} from "../IToBTCWrapper";
 import * as BN from "bn.js";
 import {UserError} from "../../../errors/UserError";
-import {
-    ChainSwapType, ChainType,
-    IStorageManager,
-    SwapCommitStatus
-} from "@atomiqlabs/base";
+import {ChainSwapType, ChainType, IStorageManager} from "@atomiqlabs/base";
 import {Intermediary, SingleChainReputationType} from "../../../intermediaries/Intermediary";
 import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
@@ -18,14 +14,7 @@ import {extendAbortController, tryWithRetries} from "../../../utils/Utils";
 import {IntermediaryAPI, ToBTCLNResponseType} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
 import {LNURL, LNURLPayParamsWithUrl} from "../../../utils/LNURL";
-import {IToBTCSwapInit} from "../IToBTCSwap";
-
-export type AbortControllerTyped<T> = AbortController & {
-    abort: (reason: T) => void,
-    signal: AbortSignal & {
-        reason: T
-    }
-};
+import {IToBTCSwapInit, ToBTCSwapState} from "../IToBTCSwap";
 
 export type ToBTCLNOptions = {
     expirySeconds?: number,
@@ -63,6 +52,16 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
     }
 
+    private checkPaymentHashWasPaid(paymentHash: string) {
+        const paymentHashBuffer = Buffer.from(paymentHash, "hex");
+        for(let value of this.swapData.values()) {
+            if(
+                (value.state===ToBTCSwapState.CLAIMED || value.state===ToBTCSwapState.SOFT_CLAIMED) &&
+                value.getPaymentHash().equals(paymentHashBuffer)
+            ) throw new UserError("Lightning invoice was already paid!");
+        }
+    }
+
     /**
      * Calculates maximum lightning network routing fee based on amount
      *
@@ -75,26 +74,6 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
     private calculateFeeForAmount(amount: BN, overrideBaseFee?: BN, overrideFeePPM?: BN) : BN {
         return new BN(overrideBaseFee || this.options.lightningBaseFee)
             .add(amount.mul(new BN(overrideFeePPM || this.options.lightningFeePPM)).div(new BN(1000000)));
-    }
-
-    /**
-     * Pre-fetches & checks status of the specific lightning BOLT11 invoice
-     *
-     * @param parsedPr Parsed bolt11 invoice
-     * @param abortController Aborts in case the invoice is/was already paid
-     * @private
-     */
-    private preFetchPayStatus(parsedPr: PaymentRequestObject & {tagsObject: TagsObject}, abortController: AbortController): Promise<void> {
-        return tryWithRetries(
-            () => this.contract.getPaymentHashStatus(parsedPr.tagsObject.payment_hash),
-            null, null, abortController.signal
-        ).then(payStatus => {
-            if(payStatus!==SwapCommitStatus.NOT_COMMITED) {
-                throw new UserError("Invoice already being paid for or paid");
-            }
-        }).catch(e => {
-            abortController.abort(e);
-        });
     }
 
     /**
@@ -124,11 +103,11 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         if(requiredTotal!=null && !resp.total.eq(requiredTotal))
             throw new IntermediaryError("Invalid data returned - total amount");
 
+        const claimHash = this.contract.getHashForHtlc(Buffer.from(parsedPr.tagsObject.payment_hash, "hex"));
+
         if(
             !data.getAmount().eq(resp.total) ||
-            data.getHash()!==parsedPr.tagsObject.payment_hash ||
-            !data.getEscrowNonce().eq(new BN(0)) ||
-            data.getConfirmations()!==0 ||
+            !Buffer.from(data.getClaimHash(), "hex").equals(claimHash) ||
             !data.getExpiry().eq(options.expiryTimestamp) ||
             data.getType()!==ChainSwapType.HTLC ||
             !data.isPayIn() ||
@@ -164,7 +143,6 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         preFetches: {
             feeRatePromise: Promise<any>,
             pricePreFetchPromise: Promise<BN>,
-            payStatusPromise: Promise<void>,
             reputationPromise?: Promise<SingleChainReputationType>
         },
         abort: AbortSignal | AbortController,
@@ -207,8 +185,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 this.verifyReturnedSignature(
                     data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal
                 ),
-                preFetches.reputationPromise,
-                preFetches.payStatusPromise
+                preFetches.reputationPromise
             ]);
             abortController.signal.throwIfAborted();
 
@@ -258,8 +235,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         abortSignal?: AbortSignal,
         preFetches?: {
             feeRatePromise: Promise<any>,
-            pricePreFetchPromise: Promise<BN>,
-            payStatusPromise: Promise<void>
+            pricePreFetchPromise: Promise<BN>
         }
     ): {
         quote: Promise<ToBTCLNSwap<T>>,
@@ -274,11 +250,14 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         const amountOut: BN = new BN(parsedPr.millisatoshis).add(new BN(999)).div(new BN(1000));
         options.maxFee ??= this.calculateFeeForAmount(amountOut, options.maxRoutingBaseFee, options.maxRoutingPPM);
 
+        this.checkPaymentHashWasPaid(parsedPr.tagsObject.payment_hash);
+
+        const claimHash = this.contract.getHashForHtlc(Buffer.from(parsedPr.tagsObject.payment_hash, "hex"));
+
         const _abortController = extendAbortController(abortSignal);
         if(preFetches==null) preFetches = {
             pricePreFetchPromise: this.preFetchPrice(amountData, _abortController.signal),
-            payStatusPromise: this.preFetchPayStatus(parsedPr, _abortController),
-            feeRatePromise: this.preFetchFeeRate(signer, amountData, parsedPr.tagsObject.payment_hash, _abortController)
+            feeRatePromise: this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController)
         };
 
         return lps.map(lp => {
@@ -370,8 +349,6 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 successAction
             } = await LNURL.useLNURLPay(payRequest, prepareResp.amount, options.comment, this.options.getRequestTimeout, abortController.signal);
 
-            const payStatusPromise = this.preFetchPayStatus(parsedInvoice, abortController);
-
             const resp = await tryWithRetries(
                 (retryCount: number) => IntermediaryAPI.initToBTCLNExactIn(lp.url, {
                     pr: invoice,
@@ -397,8 +374,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 this.verifyReturnedSignature(
                     data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal
                 ),
-                reputationPromise,
-                payStatusPromise
+                reputationPromise
             ]);
             abortController.signal.throwIfAborted();
 
@@ -510,12 +486,9 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                     successAction
                 } = await LNURL.useLNURLPay(payRequest, amountData.amount, options.comment, this.options.getRequestTimeout, _abortController.signal);
 
-                const payStatusPromise = this.preFetchPayStatus(parsedInvoice, _abortController);
-
                 return this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
                     feeRatePromise,
-                    pricePreFetchPromise,
-                    payStatusPromise,
+                    pricePreFetchPromise
                 }).map(data => {
                     return {
                         quote: data.quote.then(quote => {

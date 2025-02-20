@@ -8,12 +8,6 @@ import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapW
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { LNURLPayParamsWithUrl } from "../../../utils/LNURL";
-export type AbortControllerTyped<T> = AbortController & {
-    abort: (reason: T) => void;
-    signal: AbortSignal & {
-        reason: T;
-    };
-};
 export type ToBTCLNOptions = {
     expirySeconds?: number;
     maxFee?: BN | Promise<BN>;
@@ -29,6 +23,7 @@ export type ToBTCLNWrapperOptions = ISwapWrapperOptions & {
 export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCLNSwap<T>, ToBTCLNWrapperOptions> {
     protected readonly swapDeserializer: typeof ToBTCLNSwap;
     constructor(chainIdentifier: string, storage: IStorageManager<ToBTCLNSwap<T>>, contract: T["Contract"], chainEvents: T["Events"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options?: ToBTCLNWrapperOptions, events?: EventEmitter);
+    private checkPaymentHashWasPaid;
     /**
      * Calculates maximum lightning network routing fee based on amount
      *
@@ -39,14 +34,6 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
      * @returns Maximum lightning routing fee in sats
      */
     private calculateFeeForAmount;
-    /**
-     * Pre-fetches & checks status of the specific lightning BOLT11 invoice
-     *
-     * @param parsedPr Parsed bolt11 invoice
-     * @param abortController Aborts in case the invoice is/was already paid
-     * @private
-     */
-    private preFetchPayStatus;
     /**
      * Verifies returned LP data
      *
@@ -92,7 +79,6 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
     create(signer: string, bolt11PayRequest: string, amountData: Omit<AmountData, "amount">, lps: Intermediary[], options?: ToBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
         feeRatePromise: Promise<any>;
         pricePreFetchPromise: Promise<BN>;
-        payStatusPromise: Promise<void>;
     }): {
         quote: Promise<ToBTCLNSwap<T>>;
         intermediary: Intermediary;

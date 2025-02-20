@@ -178,6 +178,7 @@ const FromBTCResponseSchema = {
     address: FieldTypeEnum.String,
     swapFee: FieldTypeEnum.BN,
     total: FieldTypeEnum.BN,
+    confirmations: FieldTypeEnum.NumberOptional,
     ...SwapResponseSchema
 } as const;
 
@@ -353,6 +354,7 @@ export class IntermediaryAPI {
      *
      * @param chainIdentifier
      * @param baseUrl Base URL of the intermediary
+     * @param depositToken
      * @param init Swap initialization parameters
      * @param timeout Timeout in milliseconds for the HTTP request
      * @param abortSignal
@@ -363,6 +365,7 @@ export class IntermediaryAPI {
     static initFromBTC(
         chainIdentifier: string,
         baseUrl: string,
+        depositToken: string,
         init: FromBTCInit,
         timeout?: number,
         abortSignal?: AbortSignal,
@@ -371,31 +374,36 @@ export class IntermediaryAPI {
         signDataPrefetch: Promise<any>,
         response: Promise<FromBTCResponseType>
     } {
-        const responseBodyPromise = streamingFetchPromise(baseUrl+"/frombtc/getAddress?chain="+encodeURIComponent(chainIdentifier), {
-            ...init.additionalParams,
-            address: init.claimer,
-            amount: init.amount.toString(10),
-            token: init.token,
+        const responseBodyPromise = streamingFetchPromise(
+            baseUrl+"/frombtc/getAddress?chain="+encodeURIComponent(chainIdentifier)+"&depositToken="+encodeURIComponent(depositToken),
+            {
+                ...init.additionalParams,
+                address: init.claimer,
+                amount: init.amount.toString(10),
+                token: init.token,
 
-            exactOut: init.exactOut,
-            sequence: init.sequence.toString(10),
+                exactOut: init.exactOut,
+                sequence: init.sequence.toString(10),
 
-            claimerBounty: init.claimerBounty.then(claimerBounty => {
-                return {
-                    feePerBlock: claimerBounty.feePerBlock.toString(10),
-                    safetyFactor: claimerBounty.safetyFactor,
-                    startTimestamp: claimerBounty.startTimestamp.toString(10),
-                    addBlock: claimerBounty.addBlock,
-                    addFee: claimerBounty.addFee.toString(10)
-                }
-            }),
-            feeRate: init.feeRate
-        }, {
-            code: FieldTypeEnum.Number,
-            msg: FieldTypeEnum.String,
-            data: FieldTypeEnum.AnyOptional,
-            signDataPrefetch: FieldTypeEnum.AnyOptional
-        }, timeout, abortSignal, streamRequest);
+                claimerBounty: init.claimerBounty.then(claimerBounty => {
+                    return {
+                        feePerBlock: claimerBounty.feePerBlock.toString(10),
+                        safetyFactor: claimerBounty.safetyFactor,
+                        startTimestamp: claimerBounty.startTimestamp.toString(10),
+                        addBlock: claimerBounty.addBlock,
+                        addFee: claimerBounty.addFee.toString(10)
+                    }
+                }),
+                feeRate: init.feeRate
+            },
+            {
+                code: FieldTypeEnum.Number,
+                msg: FieldTypeEnum.String,
+                data: FieldTypeEnum.AnyOptional,
+                signDataPrefetch: FieldTypeEnum.AnyOptional
+            },
+            timeout, abortSignal, streamRequest
+        );
 
         return {
             signDataPrefetch: responseBodyPromise.then(responseBody => responseBody.signDataPrefetch),
@@ -417,6 +425,7 @@ export class IntermediaryAPI {
      *
      * @param chainIdentifier
      * @param baseUrl Base URL of the intermediary
+     * @param depositToken
      * @param init Swap initialization parameters
      * @param timeout Timeout in milliseconds for the HTTP request
      * @param abortSignal
@@ -427,6 +436,7 @@ export class IntermediaryAPI {
     static initFromBTCLN(
         chainIdentifier: string,
         baseUrl: string,
+        depositToken: string,
         init: FromBTCLNInit,
         timeout?: number,
         abortSignal?: AbortSignal,
@@ -435,21 +445,26 @@ export class IntermediaryAPI {
         lnPublicKey: Promise<string>,
         response: Promise<FromBTCLNResponseType>
     } {
-        const responseBodyPromise = streamingFetchPromise(baseUrl+"/frombtcln/createInvoice?chain="+encodeURIComponent(chainIdentifier), {
-            ...init.additionalParams,
-            paymentHash: init.paymentHash.toString("hex"),
-            amount: init.amount.toString(),
-            address: init.claimer,
-            token: init.token,
-            descriptionHash: init.descriptionHash==null ? null : init.descriptionHash.toString("hex"),
-            exactOut: init.exactOut,
-            feeRate: init.feeRate
-        }, {
-            code: FieldTypeEnum.Number,
-            msg: FieldTypeEnum.String,
-            data: FieldTypeEnum.AnyOptional,
-            lnPublicKey: FieldTypeEnum.StringOptional
-        }, timeout, abortSignal, streamRequest);
+        const responseBodyPromise = streamingFetchPromise(
+            baseUrl+"/frombtcln/createInvoice?chain="+encodeURIComponent(chainIdentifier)+"&depositToken="+encodeURIComponent(depositToken),
+            {
+                ...init.additionalParams,
+                paymentHash: init.paymentHash.toString("hex"),
+                amount: init.amount.toString(),
+                address: init.claimer,
+                token: init.token,
+                descriptionHash: init.descriptionHash==null ? null : init.descriptionHash.toString("hex"),
+                exactOut: init.exactOut,
+                feeRate: init.feeRate
+            },
+            {
+                code: FieldTypeEnum.Number,
+                msg: FieldTypeEnum.String,
+                data: FieldTypeEnum.AnyOptional,
+                lnPublicKey: FieldTypeEnum.StringOptional
+            },
+            timeout, abortSignal, streamRequest
+        );
 
         return {
             lnPublicKey: responseBodyPromise.then(responseBody => responseBody.lnPublicKey),

@@ -8,7 +8,7 @@ import {ChainType, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isISwapInit, ISwapInit} from "../../ISwap";
 import {Buffer} from "buffer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
-import {extendAbortController} from "../../../utils/Utils";
+import {extendAbortController, getLogger} from "../../../utils/Utils";
 
 export enum FromBTCSwapState {
     FAILED = -4,
@@ -24,6 +24,7 @@ export enum FromBTCSwapState {
 export type FromBTCSwapInit<T extends SwapData> = ISwapInit<T> & {
     address: string;
     amount: BN;
+    requiredConfirmations: number;
 };
 
 export function isFromBTCSwapInit<T extends SwapData>(obj: any): obj is FromBTCSwapInit<T> {
@@ -40,6 +41,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
 
     readonly address: string;
     readonly amount: BN;
+    readonly requiredConfirmations: number;
 
     txId?: string;
     vout?: number;
@@ -56,8 +58,10 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
             this.amount = new BN(initOrObject.amount);
             this.txId = initOrObject.txId;
             this.vout = initOrObject.vout;
+            this.requiredConfirmations = initOrObject.requiredConfirmations ?? this.data.getConfirmationsHint();
         }
         this.tryCalculateSwapFee();
+        this.logger = getLogger("FromBTC("+this.getIdentifierHashString()+"): ");
     }
 
     protected upgradeVersion() {
@@ -90,13 +94,8 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
     //////////////////////////////
     //// Getters & utils
 
-    getTxoHash(): Buffer {
-        const parsedOutputScript = address.toOutputScript(this.address, this.wrapper.options.bitcoinNetwork);
-
-        return createHash("sha256").update(Buffer.concat([
-            Buffer.from(this.amount.toArray("le", 8)),
-            parsedOutputScript
-        ])).digest();
+    getInputTxId(): string | null {
+        return this.txId;
     }
 
     getAddress(): string {
@@ -121,7 +120,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
      *  to that address anymore
      */
     getTimeoutTime(): number {
-        return this.wrapper.getOnchainSendTimeout(this.data).toNumber()*1000;
+        return this.wrapper.getOnchainSendTimeout(this.data, this.requiredConfirmations).toNumber()*1000;
     }
 
     isFinished(): boolean {
@@ -141,7 +140,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
     }
 
     isFailed(): boolean {
-        return this.state===FromBTCSwapState.FAILED;
+        return this.state===FromBTCSwapState.FAILED || (this.state===FromBTCSwapState.EXPIRED && this.txId!=null);
     }
 
     isQuoteExpired(): boolean {
@@ -154,7 +153,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
 
     canCommit(): boolean {
         if(this.state!==FromBTCSwapState.PR_CREATED) return false;
-        const expiry = this.wrapper.getOnchainSendTimeout(this.data);
+        const expiry = this.wrapper.getOnchainSendTimeout(this.data, this.requiredConfirmations);
         const currentTimestamp = new BN(Math.floor(Date.now()/1000));
 
         return expiry.sub(currentTimestamp).gte(new BN(this.wrapper.options.minSendWindow));
@@ -176,7 +175,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
      * Returns claimer bounty, acting as a reward for watchtowers to claim the swap automatically
      */
     getClaimerBounty(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getClaimerBounty(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return toTokenAmount(this.data.getClaimerBounty(), this.wrapper.tokens[this.data.getDepositToken()], this.wrapper.prices);
     }
 
     //////////////////////////////
@@ -199,10 +198,10 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
 
         const result = await this.wrapper.btcRpc.waitForAddressTxo(
             this.address,
-            this.getTxoHash(),
-            this.data.getConfirmations(),
+            Buffer.from(this.data.getTxoHashHint(), "hex"),
+            this.requiredConfirmations,
             (confirmations: number, txId: string, vout: number, txEtaMs: number) => {
-                if(updateCallback!=null) updateCallback(txId, confirmations, this.data.getConfirmations(), txEtaMs);
+                if(updateCallback!=null) updateCallback(txId, confirmations, this.requiredConfirmations, txEtaMs);
             },
             abortSignal,
             checkIntervalSeconds
@@ -231,14 +230,14 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         confirmations: number,
         targetConfirmations: number
     } | null> {
-        const result = await this.wrapper.btcRpc.checkAddressTxos(this.address, this.getTxoHash());
+        const result = await this.wrapper.btcRpc.checkAddressTxos(this.address, Buffer.from(this.data.getTxoHashHint(), "hex"));
         if(result==null) return null;
 
         return {
             txId: result.tx.txid,
             vout: result.vout,
             confirmations: result.tx.confirmations,
-            targetConfirmations: this.data.getConfirmations()
+            targetConfirmations: this.requiredConfirmations
         }
     }
 
@@ -309,12 +308,13 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
 
         const tx = await this.wrapper.btcRpc.getTransaction(this.txId);
 
-        return await this.wrapper.contract.txsClaimWithTxData(signer ?? this.getInitiator(), this.data, tx.blockheight, {
+        return await this.wrapper.contract.txsClaimWithTxData(signer ?? this.getInitiator(), this.data, {
             blockhash: tx.blockhash,
-            confirmations: this.data.getConfirmations(),
+            confirmations: tx.confirmations,
             txid: tx.txid,
-            hex: tx.hex
-        }, this.vout, null, this.wrapper.synchronizer, true);
+            hex: tx.hex,
+            height: tx.blockheight
+        }, this.requiredConfirmations, this.vout, null, this.wrapper.synchronizer, true);
     }
 
     /**
@@ -398,6 +398,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
             ...super.serialize(),
             address: this.address,
             amount: this.amount.toString(10),
+            requiredConfirmations: this.requiredConfirmations,
             txId: this.txId,
             vout: this.vout
         };

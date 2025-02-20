@@ -54,6 +54,11 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     refundTxId?: string;
     claimTxId?: string;
     /**
+     * Random nonce to differentiate the swap from others with the same identifier hash (i.e. when quoting the same swap
+     *  from multiple LPs)
+     */
+    randomNonce: string;
+    /**
      * Event emitter emitting "swapState" event when swap's state changes
      */
     events: EventEmitter;
@@ -121,11 +126,28 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      * Returns the real swap fee percentage as PPM (parts per million)
      */
     abstract getRealSwapFeePercentagePPM(): BN;
-    getPaymentHashString(): string;
+    abstract getInputTxId(): string | null;
+    abstract getOutputTxId(): string | null;
+    abstract getInputAddress(): string | null;
+    abstract getOutputAddress(): string | null;
     /**
-     * Returns payment hash identifier of the swap
+     * Returns the escrow hash - i.e. hash of the escrow data
      */
-    getPaymentHash(): Buffer;
+    getEscrowHash(): string | null;
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
+    getClaimHash(): string;
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHash(): Buffer;
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHashString(): string;
     /**
      * Returns quote expiry in UNIX millis
      */

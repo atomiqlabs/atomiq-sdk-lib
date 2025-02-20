@@ -16,6 +16,7 @@ const SwapWrapperStorage_1 = require("./SwapWrapperStorage");
 const BN = require("bn.js");
 const IntermediaryError_1 = require("../errors/IntermediaryError");
 const Utils_1 = require("../utils/Utils");
+const randomBytes = require("randombytes");
 class ISwapWrapper {
     /**
      * @param chainIdentifier
@@ -52,7 +53,8 @@ class ISwapWrapper {
                 address: chainData.address,
                 decimals: chainData.decimals,
                 ticker: tokenData.ticker,
-                name: tokenData.name
+                name: tokenData.name,
+                displayDecimals: chainData.displayDecimals
             };
         }
     }
@@ -146,8 +148,7 @@ class ISwapWrapper {
         var _a, _b, _c;
         return __awaiter(this, void 0, void 0, function* () {
             for (let event of events) {
-                const paymentHash = event.paymentHash;
-                const swap = this.swapData.get(paymentHash);
+                const swap = this.swapDataByEscrowHash.get(event.escrowHash);
                 if (swap == null)
                     continue;
                 let swapChanged = false;
@@ -172,7 +173,7 @@ class ISwapWrapper {
                         swapChanged || (swapChanged = true);
                     }
                 }
-                this.logger.info("processEvents(): " + event.constructor.name + " processed for " + swap.getPaymentHashString() + " swap: ", swap);
+                this.logger.info("processEvents(): " + event.constructor.name + " processed for " + swap.getIdentifierHashString() + " swap: ", swap);
                 if (swapChanged) {
                     yield swap._saveAndEmit();
                 }
@@ -189,6 +190,25 @@ class ISwapWrapper {
             if (this.isInitialized)
                 return;
             this.swapData = yield this.storage.loadSwapData(this, this.swapDeserializer);
+            this.swapDataByEscrowHash = new Map();
+            for (let value of this.swapData.values()) {
+                if (value.randomNonce == null) {
+                    const oldIdentifierHash = value.getIdentifierHashString();
+                    this.swapData.delete(oldIdentifierHash);
+                    //Workaround for old Solana swaps - take the first 32 bytes of the claim hash which should stay the same
+                    // for both old and new version of the libs
+                    yield this.storage.storage.removeData(oldIdentifierHash.slice(0, 64));
+                    yield this.storage.removeSwapData(value);
+                    value.randomNonce = randomBytes(16).toString("hex");
+                    const newIdentifierHash = value.getIdentifierHashString();
+                    this.swapData.set(newIdentifierHash, value);
+                    yield this.storage.saveSwapData(value);
+                    this.logger.info("init(): Found older swap version without randomNonce, replacing, old hash: " + oldIdentifierHash +
+                        " new hash: " + newIdentifierHash);
+                }
+                if (value.data != null)
+                    this.swapDataByEscrowHash.set(value.data.getEscrowHash(), value);
+            }
             const hasEventListener = this.processEventRefund != null || this.processEventClaim != null || this.processEventInitialize != null;
             //Save events received in the meantime into the event queue and process them only after we've checked and
             // processed all the past swaps
@@ -210,7 +230,7 @@ class ISwapWrapper {
                     if (changed)
                         changedSwaps.push(swap);
                 }
-            }).catch(e => this.logger.error("init(): Error when checking swap " + swap.getPaymentHashString() + ": ", e))));
+            }).catch(e => this.logger.error("init(): Error when checking swap " + swap.getIdentifierHashString() + ": ", e))));
             yield this.storage.removeSwapDataArr(removeSwaps);
             yield this.storage.saveSwapDataArr(changedSwaps);
             if (hasEventListener) {
@@ -228,6 +248,22 @@ class ISwapWrapper {
             this.logger.info("init(): Swap wrapper initialized, num swaps: " + this.swapData.size);
             this.isInitialized = true;
         });
+    }
+    saveSwapData(swap) {
+        this.swapData.set(swap.getIdentifierHashString(), swap);
+        if (swap.data != null)
+            this.swapDataByEscrowHash.set(swap.data.getEscrowHash(), swap);
+        if (!swap.isInitiated())
+            return Promise.resolve();
+        return this.storage.saveSwapData(swap);
+    }
+    removeSwapData(swap) {
+        this.swapData.delete(swap.getIdentifierHashString());
+        if (swap.data != null)
+            this.swapDataByEscrowHash.delete(swap.data.getEscrowHash());
+        if (!swap.isInitiated)
+            return Promise.resolve();
+        return this.storage.removeSwapData(swap).then(() => { });
     }
     /**
      * Un-subscribes from event listeners on Solana

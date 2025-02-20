@@ -80,7 +80,8 @@ class TrustedIntermediaryAPI {
             const resp = yield (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(baseUrl + "/lnforgas/createInvoice" +
                 "?address=" + encodeURIComponent(init.address) +
                 "&amount=" + encodeURIComponent(init.amount.toString(10)) +
-                "&chain=" + encodeURIComponent(chainIdentifier), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+                "&chain=" + encodeURIComponent(chainIdentifier) +
+                "&token=" + encodeURIComponent(init.token), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
             if (resp.code !== 10000)
                 throw RequestError_1.RequestError.parse(JSON.stringify(resp), 400);
             return (0, SchemaVerifier_1.verifySchema)(resp.data, TrustedFromBTCLNResponseSchema);
@@ -132,12 +133,12 @@ class TrustedIntermediaryAPI {
      */
     static initTrustedFromBTC(chainIdentifier, baseUrl, init, timeout, abortSignal) {
         return __awaiter(this, void 0, void 0, function* () {
-            const resp = yield (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpPost)(baseUrl + "/frombtc_trusted/getAddress?chain=" + encodeURIComponent(chainIdentifier), {
-                address: init.address,
-                amount: init.amount.toString(10),
-                refundAddress: init.refundAddress,
-                exactOut: true
-            }, timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+            const resp = yield (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(baseUrl + "/frombtc_trusted/getAddress?chain=" + encodeURIComponent(chainIdentifier) +
+                "&address=" + encodeURIComponent(init.address) +
+                "&amount=" + encodeURIComponent(init.amount.toString(10)) +
+                "&refundAddress=" + encodeURIComponent(init.refundAddress) +
+                "&exactIn=true" +
+                "&token=" + encodeURIComponent(init.token), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
             if (resp.code !== 10000)
                 throw RequestError_1.RequestError.parse(JSON.stringify(resp), 400);
             return (0, SchemaVerifier_1.verifySchema)(resp.data, TrustedFromBTCResponseSchema);

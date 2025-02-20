@@ -9,7 +9,7 @@ import {
     InitializeEvent,
     IStorageManager,
     RefundEvent,
-    SwapCommitStatus
+    SwapCommitStatus, SwapData
 } from "@atomiqlabs/base";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {Buffer} from "buffer";
@@ -99,7 +99,7 @@ export class FromBTCLNWrapper<
             return false;
         }
 
-        if(swap.state===FromBTCLNSwapState.CLAIM_COMMITED) {
+        if(swap.state===FromBTCLNSwapState.CLAIM_COMMITED || swap.state===FromBTCLNSwapState.EXPIRED) {
             //Check if it's already successfully paid
             const commitStatus = await tryWithRetries(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
             if(commitStatus===SwapCommitStatus.PAID) {
@@ -125,17 +125,16 @@ export class FromBTCLNWrapper<
                 if(swap.expiry<Date.now()) swap._saveAndEmit(FromBTCLNSwapState.QUOTE_SOFT_EXPIRED);
                 break;
             case FromBTCLNSwapState.CLAIM_COMMITED:
-                if(this.contract.isExpired(swap.getInitiator(), swap.data)) swap._saveAndEmit(FromBTCLNSwapState.EXPIRED);
+                this.contract.isExpired(swap.getInitiator(), swap.data).then(expired => {
+                    if(expired) swap._saveAndEmit(FromBTCLNSwapState.EXPIRED)
+                });
                 break;
         }
     }
 
     protected async processEventInitialize(swap: FromBTCLNSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean> {
         if(swap.state===FromBTCLNSwapState.PR_PAID || swap.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-            const swapData = await event.swapData();
-            if(swap.data!=null && !swap.data.equals(swapData)) return false;
             if(swap.state===FromBTCLNSwapState.PR_PAID || swap.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) swap.state = FromBTCLNSwapState.CLAIM_COMMITED;
-            swap.data = swapData;
             return true;
         }
     }
@@ -154,6 +153,15 @@ export class FromBTCLNWrapper<
             return Promise.resolve(true);
         }
         return Promise.resolve(false);
+    }
+
+    /**
+     * Returns the swap expiry, leaving enough time for the user to claim the HTLC
+     *
+     * @param data Parsed swap data
+     */
+    getHtlcTimeout(data: SwapData): BN {
+        return data.getExpiry().sub(new BN(600));
     }
 
     /**
@@ -286,10 +294,12 @@ export class FromBTCLNWrapper<
             throw new UserError("Invalid description hash length");
 
         const {secret, paymentHash} = this.getSecretAndHash();
+        const claimHash = this.contract.getHashForHtlc(paymentHash);
 
         const _abortController = extendAbortController(abortSignal);
         preFetches.pricePrefetchPromise ??= this.preFetchPrice(amountData, _abortController.signal);
-        preFetches.feeRatePromise ??= this.preFetchFeeRate(signer, amountData, paymentHash.toString("hex"), _abortController);
+        const nativeTokenAddress = this.contract.getNativeCurrencyAddress();
+        preFetches.feeRatePromise ??= this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController);
 
         return lps.map(lp => {
             return {
@@ -300,16 +310,20 @@ export class FromBTCLNWrapper<
                     const liquidityPromise: Promise<BN> = this.preFetchIntermediaryLiquidity(amountData, lp, abortController);
 
                     const {lnCapacityPromise, resp} = await tryWithRetries(async(retryCount: number) => {
-                        const {lnPublicKey, response} = IntermediaryAPI.initFromBTCLN(this.chainIdentifier, lp.url, {
-                            paymentHash,
-                            amount: amountData.amount,
-                            claimer: signer,
-                            token: amountData.token.toString(),
-                            descriptionHash: options.descriptionHash,
-                            exactOut: !amountData.exactIn,
-                            feeRate: preFetches.feeRatePromise,
-                            additionalParams
-                        }, this.options.postRequestTimeout, abortController.signal, retryCount>0 ? false : null);
+                        const {lnPublicKey, response} = IntermediaryAPI.initFromBTCLN(
+                            this.chainIdentifier, lp.url, nativeTokenAddress,
+                            {
+                                paymentHash,
+                                amount: amountData.amount,
+                                claimer: signer,
+                                token: amountData.token.toString(),
+                                descriptionHash: options.descriptionHash,
+                                exactOut: !amountData.exactIn,
+                                feeRate: preFetches.feeRatePromise,
+                                additionalParams
+                            },
+                            this.options.postRequestTimeout, abortController.signal, retryCount>0 ? false : null
+                        );
 
                         return {
                             lnCapacityPromise: this.preFetchLnCapacity(lnPublicKey),
@@ -337,10 +351,11 @@ export class FromBTCLNWrapper<
                             expiry: decodedPr.timeExpireDate*1000,
                             swapFee: resp.swapFee,
                             feeRate: await preFetches.feeRatePromise,
-                            data: await this.contract.createSwapData(
+                            initialSwapData: await this.contract.createSwapData(
                                 ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token,
-                                resp.total, paymentHash.toString("hex"), null, null, null, null, false, true,
-                                resp.securityDeposit, new BN(0)
+                                resp.total, claimHash.toString("hex"),
+                                this.getRandomSequence(), new BN(Math.floor(Date.now()/1000)), false, true,
+                                resp.securityDeposit, new BN(0), nativeTokenAddress
                             ),
                             pr: resp.pr,
                             secret: secret.toString("hex"),

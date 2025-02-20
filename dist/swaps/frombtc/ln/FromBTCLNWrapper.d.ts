@@ -4,7 +4,7 @@
 import { FromBTCLNSwap } from "./FromBTCLNSwap";
 import { IFromBTCWrapper } from "../IFromBTCWrapper";
 import * as BN from "bn.js";
-import { ChainType, ClaimEvent, InitializeEvent, IStorageManager, RefundEvent } from "@atomiqlabs/base";
+import { ChainType, ClaimEvent, InitializeEvent, IStorageManager, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { Buffer } from "buffer";
 import { LightningNetworkApi } from "../../../btc/LightningNetworkApi";
@@ -36,6 +36,12 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
     protected processEventInitialize(swap: FromBTCLNSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean>;
     protected processEventClaim(swap: FromBTCLNSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean>;
     protected processEventRefund(swap: FromBTCLNSwap<T>, event: RefundEvent<T["Data"]>): Promise<boolean>;
+    /**
+     * Returns the swap expiry, leaving enough time for the user to claim the HTLC
+     *
+     * @param data Parsed swap data
+     */
+    getHtlcTimeout(data: SwapData): BN;
     /**
      * Generates a new 32-byte secret to be used as pre-image for lightning network invoice & HTLC swap\
      *

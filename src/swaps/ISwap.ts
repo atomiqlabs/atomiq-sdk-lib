@@ -8,6 +8,7 @@ import {isPriceInfoType, PriceInfoType} from "../prices/abstract/ISwapPrice";
 import {getLogger, LoggerType, timeoutPromise, tryWithRetries} from "../utils/Utils";
 import {SCToken, Token, TokenAmount, toTokenAmount} from "./Tokens";
 import {SwapDirection} from "./SwapDirection";
+import * as randomBytes from "randombytes";
 
 export type ISwapInit<T extends SwapData> = {
     pricingInfo: PriceInfoType,
@@ -86,6 +87,12 @@ export abstract class ISwap<
     claimTxId?: string;
 
     /**
+     * Random nonce to differentiate the swap from others with the same identifier hash (i.e. when quoting the same swap
+     *  from multiple LPs)
+     */
+    randomNonce: string;
+
+    /**
      * Event emitter emitting "swapState" event when swap's state changes
      */
     events: EventEmitter = new EventEmitter();
@@ -102,6 +109,7 @@ export abstract class ISwap<
             Object.assign(this, swapInitOrObj);
             this.version = this.currentVersion;
             this.createdAt = Date.now();
+            this.randomNonce = randomBytes(16).toString("hex");
         } else {
             this.expiry = swapInitOrObj.expiry;
             this.url = swapInitOrObj.url;
@@ -135,8 +143,9 @@ export abstract class ISwap<
             this.initiated = swapInitOrObj.initiated;
             this.exactIn = swapInitOrObj.exactIn;
             this.createdAt = swapInitOrObj.createdAt ?? swapInitOrObj.expiry;
+
+            this.randomNonce = swapInitOrObj.randomNonce;
         }
-        this.logger = getLogger(this.constructor.name+"("+this.getPaymentHashString()+"): ");
         if(this.version!==this.currentVersion) {
             this.upgradeVersion();
         }
@@ -286,18 +295,46 @@ export abstract class ISwap<
     //////////////////////////////
     //// Getters & utils
 
-    getPaymentHashString(): string {
-        const paymentHash = this.getPaymentHash();
-        if(paymentHash==null) return null;
-        return paymentHash.toString("hex");
+    abstract getInputTxId(): string | null;
+
+    abstract getOutputTxId(): string | null;
+
+    abstract getInputAddress(): string | null;
+
+    abstract getOutputAddress(): string | null;
+
+    /**
+     * Returns the escrow hash - i.e. hash of the escrow data
+     */
+    getEscrowHash(): string | null {
+        return this.data?.getEscrowHash();
     }
 
     /**
-     * Returns payment hash identifier of the swap
+     * Returns the claim data hash - i.e. hash passed to the claim handler
      */
-    getPaymentHash(): Buffer {
-        if(this.data==null) return null;
-        return Buffer.from(this.data.getHash(), "hex");
+    getClaimHash(): string {
+        return this.data?.getClaimHash();
+    }
+
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHash(): Buffer {
+        const claimHashBuffer = Buffer.from(this.getClaimHash(), "hex");
+        if(this.randomNonce==null) return claimHashBuffer;
+        return Buffer.concat([claimHashBuffer, Buffer.from(this.randomNonce, "hex")]);
+    }
+
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHashString(): string {
+        const paymentHash = this.getIdentifierHash();
+        if(paymentHash==null) return null;
+        return paymentHash.toString("hex");
     }
 
     /**
@@ -484,19 +521,16 @@ export abstract class ISwap<
             version: this.version,
             initiated: this.initiated,
             exactIn: this.exactIn,
-            createdAt: this.createdAt
+            createdAt: this.createdAt,
+            randomNonce: this.randomNonce
         }
     }
 
     _save(): Promise<void> {
         if(this.isQuoteExpired()) {
-            this.wrapper.swapData.delete(this.getPaymentHashString());
-            if(!this.initiated) return Promise.resolve();
-            return this.wrapper.storage.removeSwapData(this).then(() => {});
+            return this.wrapper.removeSwapData(this);
         } else {
-            this.wrapper.swapData.set(this.getPaymentHashString(), this);
-            if(!this.initiated) return Promise.resolve();
-            return this.wrapper.storage.saveSwapData(this);
+            return this.wrapper.saveSwapData(this);
         }
     }
 
