@@ -37,7 +37,7 @@ function isLnForGasSwapInit(obj) {
 exports.isLnForGasSwapInit = isLnForGasSwapInit;
 class LnForGasSwap extends ISwap_1.ISwap {
     constructor(wrapper, initOrObj) {
-        var _a;
+        var _a, _b, _c;
         if (isLnForGasSwapInit(initOrObj))
             initOrObj.url += "/lnforgas";
         super(wrapper, initOrObj);
@@ -57,7 +57,7 @@ class LnForGasSwap extends ISwap_1.ISwap {
         this.tryCalculateSwapFee();
         this.logger = (0, Utils_1.getLogger)("LnForGas(" + this.getIdentifierHashString() + "): ");
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.outputAmount, (_a = this.token) !== null && _a !== void 0 ? _a : this.wrapper.getNativeToken().address);
+            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, (_a = this.pricingInfo.satsBaseFee) !== null && _a !== void 0 ? _a : new BN(10), (_b = this.pricingInfo.feePPM) !== null && _b !== void 0 ? _b : new BN(10000), this.outputAmount, (_c = this.token) !== null && _c !== void 0 ? _c : this.wrapper.getNativeToken().address);
         }
     }
     upgradeVersion() {
@@ -83,11 +83,11 @@ class LnForGasSwap extends ISwap_1.ISwap {
     //////////////////////////////
     //// Pricing
     refreshPriceData() {
-        var _a;
+        var _a, _b, _c;
         return __awaiter(this, void 0, void 0, function* () {
             if (this.pricingInfo == null)
                 return null;
-            const priceData = yield this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.outputAmount, (_a = this.token) !== null && _a !== void 0 ? _a : this.wrapper.getNativeToken().address);
+            const priceData = yield this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.getInput().rawAmount, (_a = this.pricingInfo.satsBaseFee) !== null && _a !== void 0 ? _a : new BN(10), (_b = this.pricingInfo.feePPM) !== null && _b !== void 0 ? _b : new BN(10000), this.outputAmount, (_c = this.token) !== null && _c !== void 0 ? _c : this.wrapper.getNativeToken().address);
             this.pricingInfo = priceData;
             return priceData;
         });

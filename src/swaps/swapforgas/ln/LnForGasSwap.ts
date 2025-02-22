@@ -75,8 +75,8 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
                 this.chainIdentifier,
                 this.getInput().rawAmount,
-                this.pricingInfo.satsBaseFee,
-                this.pricingInfo.feePPM,
+                this.pricingInfo.satsBaseFee ?? new BN(10),
+                this.pricingInfo.feePPM ?? new BN(10000),
                 this.outputAmount,
                 this.token ?? this.wrapper.getNativeToken().address
             );
@@ -113,8 +113,8 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         const priceData = await this.wrapper.prices.isValidAmountReceive(
             this.chainIdentifier,
             this.getInput().rawAmount,
-            this.pricingInfo.satsBaseFee,
-            this.pricingInfo.feePPM,
+            this.pricingInfo.satsBaseFee ?? new BN(10),
+            this.pricingInfo.feePPM ?? new BN(10000),
             this.outputAmount,
             this.token ?? this.wrapper.getNativeToken().address
         );
