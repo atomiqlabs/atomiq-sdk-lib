@@ -29,6 +29,7 @@ export type OnchainForGasSwapInit<T extends SwapData> = ISwapInit<T> & {
     inputAmount: BN;
     outputAmount: BN;
     recipient: string;
+    token: string;
     refundAddress?: string;
 };
 
@@ -39,6 +40,7 @@ export function isOnchainForGasSwapInit<T extends SwapData>(obj: any): obj is On
         BN.isBN(obj.inputAmount) &&
         BN.isBN(obj.outputAmount) &&
         typeof(obj.recipient)==="string" &&
+        typeof(obj.token)==="string" &&
         (obj.refundAddress==null || typeof(obj.refundAddress)==="string") &&
         isISwapInit<T>(obj);
 }
@@ -51,6 +53,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
     private readonly sequence: BN;
     private readonly address: string;
     private readonly recipient: string;
+    private readonly token: string;
     private inputAmount: BN;
     private outputAmount: BN;
     private refundAddress: string;
@@ -81,6 +84,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             this.inputAmount = initOrObj.inputAmount==null ? null : new BN(initOrObj.inputAmount);
             this.outputAmount = initOrObj.outputAmount==null ? null : new BN(initOrObj.outputAmount);
             this.recipient = initOrObj.recipient;
+            this.token = initOrObj.token;
             this.refundAddress = initOrObj.refundAddress;
             this.scTxId = initOrObj.scTxId;
             this.txId = initOrObj.txId;
@@ -92,11 +96,11 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
                 this.chainIdentifier,
-                this.getInput().rawAmount,
+                this.inputAmount,
                 this.pricingInfo.satsBaseFee,
                 this.pricingInfo.feePPM,
-                this.data.getAmount(),
-                this.data.getToken()
+                this.outputAmount,
+                this.token ?? this.wrapper.getNativeToken().address
             );
         }
     }
@@ -126,11 +130,11 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         if(this.pricingInfo==null) return null;
         const priceData = await this.wrapper.prices.isValidAmountReceive(
             this.chainIdentifier,
-            this.getInput().rawAmount,
+            this.inputAmount,
             this.pricingInfo.satsBaseFee,
             this.pricingInfo.feePPM,
-            this.data.getAmount(),
-            this.data.getToken()
+            this.outputAmount,
+            this.token ?? this.wrapper.getNativeToken().address
         );
         this.pricingInfo = priceData;
         return priceData;
@@ -430,6 +434,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             inputAmount: this.inputAmount==null ? null : this.inputAmount.toString(10),
             outputAmount: this.outputAmount==null ? null : this.outputAmount.toString(10),
             recipient: this.recipient,
+            token: this.token,
             refundAddress: this.refundAddress,
             scTxId: this.scTxId,
             txId: this.txId,

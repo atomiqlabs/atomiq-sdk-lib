@@ -26,12 +26,14 @@ export type LnForGasSwapInit<T extends SwapData> = ISwapInit<T> & {
     pr: string;
     outputAmount: BN;
     recipient: string;
+    token: string;
 };
 
 export function isLnForGasSwapInit<T extends SwapData>(obj: any): obj is LnForGasSwapInit<T> {
     return typeof(obj.pr)==="string" &&
         BN.isBN(obj.outputAmount) &&
         typeof(obj.recipient)==="string" &&
+        typeof(obj.token)==="string" &&
         isISwapInit<T>(obj);
 }
 
@@ -44,6 +46,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     private readonly pr: string;
     private readonly outputAmount: BN;
     private readonly recipient: string;
+    private readonly token: string;
 
     //State: FINISHED
     scTxId: string;
@@ -62,6 +65,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
             this.pr = initOrObj.pr;
             this.outputAmount = initOrObj.outputAmount==null ? null : new BN(initOrObj.outputAmount);
             this.recipient = initOrObj.recipient;
+            this.token = initOrObj.token;
             this.scTxId = initOrObj.scTxId;
         }
         this.tryCalculateSwapFee();
@@ -73,8 +77,8 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
                 this.getInput().rawAmount,
                 this.pricingInfo.satsBaseFee,
                 this.pricingInfo.feePPM,
-                this.data.getAmount(),
-                this.data.getToken()
+                this.outputAmount,
+                this.token ?? this.wrapper.getNativeToken().address
             );
         }
     }
@@ -111,8 +115,8 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
             this.getInput().rawAmount,
             this.pricingInfo.satsBaseFee,
             this.pricingInfo.feePPM,
-            this.data.getAmount(),
-            this.data.getToken()
+            this.outputAmount,
+            this.token ?? this.wrapper.getNativeToken().address
         );
         this.pricingInfo = priceData;
         return priceData;
@@ -336,6 +340,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
             pr: this.pr,
             outputAmount: this.outputAmount==null ? null : this.outputAmount.toString(10),
             recipient: this.recipient,
+            token: this.token,
             scTxId: this.scTxId
         };
     }

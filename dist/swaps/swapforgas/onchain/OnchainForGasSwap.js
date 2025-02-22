@@ -34,12 +34,14 @@ function isOnchainForGasSwapInit(obj) {
         BN.isBN(obj.inputAmount) &&
         BN.isBN(obj.outputAmount) &&
         typeof (obj.recipient) === "string" &&
+        typeof (obj.token) === "string" &&
         (obj.refundAddress == null || typeof (obj.refundAddress) === "string") &&
         (0, ISwap_1.isISwapInit)(obj);
 }
 exports.isOnchainForGasSwapInit = isOnchainForGasSwapInit;
 class OnchainForGasSwap extends ISwap_1.ISwap {
     constructor(wrapper, initOrObj) {
+        var _a;
         if (isOnchainForGasSwapInit(initOrObj))
             initOrObj.url += "/frombtc_trusted";
         super(wrapper, initOrObj);
@@ -54,6 +56,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
             this.inputAmount = initOrObj.inputAmount == null ? null : new BN(initOrObj.inputAmount);
             this.outputAmount = initOrObj.outputAmount == null ? null : new BN(initOrObj.outputAmount);
             this.recipient = initOrObj.recipient;
+            this.token = initOrObj.token;
             this.refundAddress = initOrObj.refundAddress;
             this.scTxId = initOrObj.scTxId;
             this.txId = initOrObj.txId;
@@ -62,7 +65,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
         this.logger = (0, Utils_1.getLogger)("OnchainForGas(" + this.getIdentifierHashString() + "): ");
         this.tryCalculateSwapFee();
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
+            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.inputAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.outputAmount, (_a = this.token) !== null && _a !== void 0 ? _a : this.wrapper.getNativeToken().address);
         }
     }
     upgradeVersion() {
@@ -83,10 +86,11 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
     //////////////////////////////
     //// Pricing
     refreshPriceData() {
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
             if (this.pricingInfo == null)
                 return null;
-            const priceData = yield this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
+            const priceData = yield this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.inputAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.outputAmount, (_a = this.token) !== null && _a !== void 0 ? _a : this.wrapper.getNativeToken().address);
             this.pricingInfo = priceData;
             return priceData;
         });
@@ -346,7 +350,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
     //////////////////////////////
     //// Storage
     serialize() {
-        return Object.assign(Object.assign({}, super.serialize()), { paymentHash: this.paymentHash, sequence: this.sequence == null ? null : this.sequence.toString(10), address: this.address, inputAmount: this.inputAmount == null ? null : this.inputAmount.toString(10), outputAmount: this.outputAmount == null ? null : this.outputAmount.toString(10), recipient: this.recipient, refundAddress: this.refundAddress, scTxId: this.scTxId, txId: this.txId, refundTxId: this.refundTxId });
+        return Object.assign(Object.assign({}, super.serialize()), { paymentHash: this.paymentHash, sequence: this.sequence == null ? null : this.sequence.toString(10), address: this.address, inputAmount: this.inputAmount == null ? null : this.inputAmount.toString(10), outputAmount: this.outputAmount == null ? null : this.outputAmount.toString(10), recipient: this.recipient, token: this.token, refundAddress: this.refundAddress, scTxId: this.scTxId, txId: this.txId, refundTxId: this.refundTxId });
     }
     getInitiator() {
         return this.recipient;

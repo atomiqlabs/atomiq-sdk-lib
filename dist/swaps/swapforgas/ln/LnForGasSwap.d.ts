@@ -19,6 +19,7 @@ export type LnForGasSwapInit<T extends SwapData> = ISwapInit<T> & {
     pr: string;
     outputAmount: BN;
     recipient: string;
+    token: string;
 };
 export declare function isLnForGasSwapInit<T extends SwapData>(obj: any): obj is LnForGasSwapInit<T>;
 export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> {
@@ -28,6 +29,7 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
     private readonly pr;
     private readonly outputAmount;
     private readonly recipient;
+    private readonly token;
     scTxId: string;
     constructor(wrapper: LnForGasWrapper<T>, init: LnForGasSwapInit<T["Data"]>);
     constructor(wrapper: LnForGasWrapper<T>, obj: any);

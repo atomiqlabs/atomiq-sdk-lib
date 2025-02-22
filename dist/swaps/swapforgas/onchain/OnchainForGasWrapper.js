@@ -46,11 +46,12 @@ class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
             if (!this.isInitialized)
                 throw new Error("Not initialized, call init() first!");
             const lpUrl = typeof (lpOrUrl) === "string" ? lpOrUrl : lpOrUrl.url;
+            const token = this.contract.getNativeCurrencyAddress();
             const resp = yield TrustedIntermediaryAPI_1.TrustedIntermediaryAPI.initTrustedFromBTC(this.chainIdentifier, lpUrl, {
                 address: signer,
                 amount,
                 refundAddress,
-                token: this.contract.getNativeCurrencyAddress()
+                token
             }, this.options.getRequestTimeout);
             if (!resp.total.eq(amount))
                 throw new IntermediaryError_1.IntermediaryError("Invalid total returned");
@@ -71,7 +72,8 @@ class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
                 swapFee: resp.swapFee,
                 swapFeeBtc: resp.swapFeeSats,
                 feeRate: "",
-                exactIn: false
+                exactIn: false,
+                token
             });
             yield quote._save();
             return quote;

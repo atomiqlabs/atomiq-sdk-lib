@@ -23,6 +23,7 @@ export type OnchainForGasSwapInit<T extends SwapData> = ISwapInit<T> & {
     inputAmount: BN;
     outputAmount: BN;
     recipient: string;
+    token: string;
     refundAddress?: string;
 };
 export declare function isOnchainForGasSwapInit<T extends SwapData>(obj: any): obj is OnchainForGasSwapInit<T>;
@@ -32,6 +33,7 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
     private readonly sequence;
     private readonly address;
     private readonly recipient;
+    private readonly token;
     private inputAmount;
     private outputAmount;
     private refundAddress;
