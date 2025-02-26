@@ -184,7 +184,7 @@ class ISwapWrapper {
     /**
      * Initializes the swap wrapper, needs to be called before any other action can be taken
      */
-    init() {
+    init(noTimers = false) {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.storage.init();
             if (this.isInitialized)
@@ -240,11 +240,12 @@ class ISwapWrapper {
                 this.chainEvents.unregisterListener(initListener);
                 this.chainEvents.registerListener(this.boundProcessEvents);
             }
-            this.tickInterval = setInterval(() => {
-                this.swapData.forEach(value => {
-                    this.tickSwap(value);
-                });
-            }, 1000);
+            if (!noTimers)
+                this.tickInterval = setInterval(() => {
+                    this.swapData.forEach(value => {
+                        this.tickSwap(value);
+                    });
+                }, 1000);
             this.logger.info("init(): Swap wrapper initialized, num swaps: " + this.swapData.size);
             this.isInitialized = true;
         });

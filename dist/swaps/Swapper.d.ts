@@ -174,8 +174,11 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
     getMinimum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, type: SwapType, token: string): BN;
     /**
      * Initializes the swap storage and loads existing swaps, needs to be called before any other action
+     *
+     * @param noTimers      Whether to run without setting up the watchdog timers
+     * @param noEvents      Whether to leave out event handler
      */
-    init(): Promise<void>;
+    init(noTimers?: boolean, noEvents?: boolean): Promise<void>;
     /**
      * Stops listening for onchain events and closes this Swapper instance
      */

@@ -161,7 +161,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
     /**
      * Initializes the swap wrapper, needs to be called before any other action can be taken
      */
-    init(): Promise<void>;
+    init(noTimers?: boolean): Promise<void>;
     saveSwapData(swap: S): Promise<void>;
     removeSwapData(swap: S): Promise<void>;
     /**

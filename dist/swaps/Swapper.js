@@ -244,28 +244,32 @@ class Swapper extends events_1.EventEmitter {
     }
     /**
      * Initializes the swap storage and loads existing swaps, needs to be called before any other action
+     *
+     * @param noTimers      Whether to run without setting up the watchdog timers
+     * @param noEvents      Whether to leave out event handler
      */
-    init() {
+    init(noTimers = false, noEvents = false) {
         return __awaiter(this, void 0, void 0, function* () {
             this.logger.info("init(): Intializing swapper: ", this);
             for (let chainIdentifier in this.chains) {
                 const { swapContract, chainEvents, tobtcln, tobtc, frombtcln, frombtc, lnforgas, onchainforgas } = this.chains[chainIdentifier];
                 yield swapContract.start();
                 this.logger.info("init(): Intialized swap contract: " + chainIdentifier);
-                yield chainEvents.init();
+                if (!noEvents)
+                    yield chainEvents.init();
                 this.logger.info("init(): Intialized events: " + chainIdentifier);
                 this.logger.info("init(): Initializing To BTCLN: " + chainIdentifier);
-                yield tobtcln.init();
+                yield tobtcln.init(noTimers);
                 this.logger.info("init(): Initializing To BTC: " + chainIdentifier);
-                yield tobtc.init();
+                yield tobtc.init(noTimers);
                 this.logger.info("init(): Initializing From BTCLN: " + chainIdentifier);
-                yield frombtcln.init();
+                yield frombtcln.init(noTimers);
                 this.logger.info("init(): Initializing From BTC: " + chainIdentifier);
-                yield frombtc.init();
+                yield frombtc.init(noTimers);
                 this.logger.info("init(): Initializing From BTCLN to gas: " + chainIdentifier);
-                yield lnforgas.init();
+                yield lnforgas.init(noTimers);
                 this.logger.info("init(): Initializing From BTC to gas: " + chainIdentifier);
-                yield onchainforgas.init();
+                yield onchainforgas.init(noTimers);
             }
             this.logger.info("init(): Initializing intermediary discovery");
             yield this.intermediaryDiscovery.init();

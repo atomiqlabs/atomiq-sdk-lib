@@ -441,8 +441,11 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
 
     /**
      * Initializes the swap storage and loads existing swaps, needs to be called before any other action
+     *
+     * @param noTimers      Whether to run without setting up the watchdog timers
+     * @param noEvents      Whether to leave out event handler
      */
-    async init() {
+    async init(noTimers: boolean = false, noEvents: boolean = false): Promise<void> {
         this.logger.info("init(): Intializing swapper: ", this);
 
         for(let chainIdentifier in this.chains) {
@@ -459,22 +462,22 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             await swapContract.start();
             this.logger.info("init(): Intialized swap contract: "+chainIdentifier);
 
-            await chainEvents.init();
+            if(!noEvents) await chainEvents.init();
             this.logger.info("init(): Intialized events: "+chainIdentifier);
 
             this.logger.info("init(): Initializing To BTCLN: "+chainIdentifier);
-            await tobtcln.init();
+            await tobtcln.init(noTimers);
             this.logger.info("init(): Initializing To BTC: "+chainIdentifier);
-            await tobtc.init();
+            await tobtc.init(noTimers);
             this.logger.info("init(): Initializing From BTCLN: "+chainIdentifier);
-            await frombtcln.init();
+            await frombtcln.init(noTimers);
             this.logger.info("init(): Initializing From BTC: "+chainIdentifier);
-            await frombtc.init();
+            await frombtc.init(noTimers);
 
             this.logger.info("init(): Initializing From BTCLN to gas: "+chainIdentifier);
-            await lnforgas.init();
+            await lnforgas.init(noTimers);
             this.logger.info("init(): Initializing From BTC to gas: "+chainIdentifier);
-            await onchainforgas.init();
+            await onchainforgas.init(noTimers);
         }
 
         this.logger.info("init(): Initializing intermediary discovery");

@@ -313,7 +313,7 @@ export abstract class ISwapWrapper<
     /**
      * Initializes the swap wrapper, needs to be called before any other action can be taken
      */
-    public async init(): Promise<void> {
+    public async init(noTimers: boolean = false): Promise<void> {
         await this.storage.init();
         if(this.isInitialized) return;
         this.swapData = await this.storage.loadSwapData(this, this.swapDeserializer);
@@ -376,7 +376,7 @@ export abstract class ISwapWrapper<
             this.chainEvents.registerListener(this.boundProcessEvents);
         }
 
-        this.tickInterval = setInterval(() => {
+        if(!noTimers) this.tickInterval = setInterval(() => {
             this.swapData.forEach(value => {
                 this.tickSwap(value);
             })
