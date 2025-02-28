@@ -1,10 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToBTCLNSwap = exports.isToBTCLNSwapInit = void 0;
-const bolt11_1 = require("bolt11");
+const bolt11_1 = require("@atomiqlabs/bolt11");
 const IToBTCSwap_1 = require("../IToBTCSwap");
 const SwapType_1 = require("../../SwapType");
-const BN = require("bn.js");
 const buffer_1 = require("buffer");
 const createHash = require("create-hash");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
@@ -54,7 +53,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     //// Amounts & fees
     getOutput() {
         const parsedPR = (0, bolt11_1.decode)(this.pr);
-        const amount = new BN(parsedPR.millisatoshis).add(new BN(999)).div(new BN(1000));
+        const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
         return (0, Tokens_1.toTokenAmount)(amount, this.outputToken, this.wrapper.prices);
     }
     //////////////////////////////
@@ -100,8 +99,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
         return parsed.tagsObject.payment_hash;
     }
     getRecipient() {
-        var _a;
-        return (_a = this.lnurl) !== null && _a !== void 0 ? _a : this.pr;
+        return this.lnurl ?? this.pr;
     }
     //////////////////////////////
     //// LNURL-pay
@@ -132,7 +130,14 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     //////////////////////////////
     //// Storage
     serialize() {
-        return Object.assign(Object.assign({}, super.serialize()), { pr: this.pr, confidence: this.confidence, secret: this.secret, lnurl: this.lnurl, successAction: this.successAction });
+        return {
+            ...super.serialize(),
+            pr: this.pr,
+            confidence: this.confidence,
+            secret: this.secret,
+            lnurl: this.lnurl,
+            successAction: this.successAction
+        };
     }
 }
 exports.ToBTCLNSwap = ToBTCLNSwap;

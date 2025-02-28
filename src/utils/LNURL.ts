@@ -1,11 +1,11 @@
 import {RequestError} from "../errors/RequestError";
-import * as BN from "bn.js";
-import {decode as bolt11Decode, PaymentRequestObject, TagsObject} from "bolt11";
+import {decode as bolt11Decode, PaymentRequestObject, TagsObject} from "@atomiqlabs/bolt11";
 import * as createHash from "create-hash";
 import {UserError} from "../errors/UserError";
 import {httpGet, tryWithRetries} from "./Utils";
 import {bech32} from "bech32";
 import {ModeOfOperation} from "aes-js";
+import {Buffer} from "buffer";
 
 export type LNURLWithdrawParams = {
     tag: "withdrawRequest";
@@ -57,8 +57,8 @@ export type LNURLPayParamsWithUrl = LNURLPayParams & {url: string};
 
 export type LNURLPay = {
     type: "pay",
-    min: BN,
-    max: BN,
+    min: bigint,
+    max: bigint,
     commentMaxLength: number,
     shortDescription: string,
     longDescription?: string,
@@ -71,8 +71,8 @@ export function isLNURLPay(value: any): value is LNURLPay {
         typeof value === "object" &&
         value != null &&
         value.type === "pay" &&
-        BN.isBN(value.min) &&
-        BN.isBN(value.max) &&
+        typeof(value.min) === "bigint" &&
+        typeof(value.max) === "bigint" &&
         typeof value.commentMaxLength === "number" &&
         typeof value.shortDescription === "string" &&
         (value.longDescription === undefined || typeof value.longDescription === "string") &&
@@ -83,8 +83,8 @@ export function isLNURLPay(value: any): value is LNURLPay {
 
 export type LNURLWithdraw= {
     type: "withdraw",
-    min: BN,
-    max: BN,
+    min: bigint,
+    max: bigint,
     params: LNURLWithdrawParamsWithUrl
 }
 
@@ -93,8 +93,8 @@ export function isLNURLWithdraw(value: any): value is LNURLWithdraw {
         typeof value === "object" &&
         value != null &&
         value.type === "withdraw" &&
-        BN.isBN(value.min) &&
-        BN.isBN(value.max) &&
+        typeof(value.min) === "bigint" &&
+        typeof(value.max) === "bigint" &&
         isLNURLWithdrawParams(value.params)
     );
 }
@@ -309,8 +309,8 @@ export class LNURL {
             });
             return {
                 type: "pay",
-                min: new BN(payRequest.minSendable).div(new BN(1000)),
-                max: new BN(payRequest.maxSendable).div(new BN(1000)),
+                min: BigInt(payRequest.minSendable) / 1000n,
+                max: BigInt(payRequest.maxSendable) / 1000n,
                 commentMaxLength: payRequest.commentAllowed || 0,
                 shortDescription,
                 longDescription,
@@ -322,8 +322,8 @@ export class LNURL {
             const payRequest: LNURLWithdrawParamsWithUrl = res;
             return {
                 type: "withdraw",
-                min: new BN(payRequest.minWithdrawable).div(new BN(1000)),
-                max: new BN(payRequest.maxWithdrawable).div(new BN(1000)),
+                min: BigInt(payRequest.minWithdrawable) / 1000n,
+                max: BigInt(payRequest.maxWithdrawable) / 1000n,
                 params: payRequest
             }
         }
@@ -342,7 +342,7 @@ export class LNURL {
      */
     static async useLNURLPay(
         payRequest: LNURLPayParamsWithUrl,
-        amount: BN,
+        amount: bigint,
         comment?: string,
         timeout?: number,
         abortSignal?: AbortSignal
@@ -351,7 +351,7 @@ export class LNURL {
         parsedInvoice: PaymentRequestObject & { tagsObject: TagsObject; },
         successAction?: LNURLPaySuccessAction
     }> {
-        const params = ["amount="+amount.mul(new BN(1000)).toString(10)];
+        const params = ["amount="+(amount * 1000n).toString(10)];
         if(comment!=null) {
             params.push("comment="+encodeURIComponent(comment));
         }
@@ -372,8 +372,8 @@ export class LNURL {
         if(parsedPR.tagsObject.purpose_commit_hash!==descHash)
             throw new RequestError("Invalid invoice received (description hash)!", 200);
 
-        const invoiceMSats = new BN(parsedPR.millisatoshis);
-        if(!invoiceMSats.eq(amount.mul(new BN(1000))))
+        const invoiceMSats = BigInt(parsedPR.millisatoshis);
+        if(invoiceMSats !== (amount * 1000n))
             throw new RequestError("Invalid invoice received (amount)!", 200);
 
         return {
@@ -422,13 +422,13 @@ export class LNURL {
         withdrawRequest: LNURLWithdrawParamsWithUrl,
         lnpr: string
     ): Promise<void> {
-        const min = new BN(withdrawRequest.minWithdrawable).div(new BN(1000));
-        const max = new BN(withdrawRequest.maxWithdrawable).div(new BN(1000));
+        const min = BigInt(withdrawRequest.minWithdrawable) / 1000n;
+        const max = BigInt(withdrawRequest.maxWithdrawable) / 1000n;
 
         const parsedPR = bolt11Decode(lnpr);
-        const amount = new BN(parsedPR.millisatoshis).add(new BN(999)).div(new BN(1000));
-        if(amount.lt(min)) throw new UserError("Invoice amount less than minimum LNURL-withdraw limit");
-        if(amount.gt(max)) throw new UserError("Invoice amount more than maximum LNURL-withdraw limit");
+        const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
+        if(amount < min) throw new UserError("Invoice amount less than minimum LNURL-withdraw limit");
+        if(amount > max) throw new UserError("Invoice amount more than maximum LNURL-withdraw limit");
 
         return await LNURL.postInvoiceToLNURLWithdraw(withdrawRequest, lnpr);
     }

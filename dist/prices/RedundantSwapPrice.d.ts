@@ -1,4 +1,3 @@
-import BN = require("bn.js");
 import { IPriceProvider } from "./abstract/IPriceProvider";
 import { ICachedSwapPrice } from "./abstract/ICachedSwapPrice";
 import { ChainIds, MultiChain } from "../swaps/Swapper";
@@ -33,13 +32,13 @@ type CoinDecimals<T extends MultiChain> = {
  *  that there always is a functional API
  */
 export declare class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T> {
-    static createFromTokenMap<T extends MultiChain>(maxAllowedFeeDiffPPM: BN, assets: RedundantSwapPriceAssets<T>, cacheTimeout?: number): RedundantSwapPrice<T>;
+    static createFromTokenMap<T extends MultiChain>(maxAllowedFeeDiffPPM: bigint, assets: RedundantSwapPriceAssets<T>, cacheTimeout?: number): RedundantSwapPrice<T>;
     coinsDecimals: CoinDecimals<T>;
     priceApis: {
         priceApi: IPriceProvider<T>;
         operational: boolean;
     }[];
-    constructor(maxAllowedFeeDiffPPM: BN, coinsDecimals: CtorCoinDecimals<T>, priceApis: IPriceProvider<T>[], cacheTimeout?: number);
+    constructor(maxAllowedFeeDiffPPM: bigint, coinsDecimals: CtorCoinDecimals<T>, priceApis: IPriceProvider<T>[], cacheTimeout?: number);
     /**
      * Returns price api that should be operational
      *
@@ -71,7 +70,7 @@ export declare class RedundantSwapPrice<T extends MultiChain> extends ICachedSwa
      * @param abortSignal
      * @private
      */
-    protected fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<BN>;
+    protected fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<bigint>;
     protected getDecimals<C extends ChainIds<T>>(chainIdentifier: C, token: string): number | null;
     /**
      * Fetches BTC price in USD in parallel from multiple maybe operational price APIs

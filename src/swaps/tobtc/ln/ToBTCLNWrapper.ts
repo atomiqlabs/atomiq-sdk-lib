@@ -1,7 +1,6 @@
-import {decode as bolt11Decode, PaymentRequestObject, TagsObject} from "bolt11";
+import {decode as bolt11Decode, PaymentRequestObject, TagsObject} from "@atomiqlabs/bolt11";
 import {ToBTCLNSwap} from "./ToBTCLNSwap";
 import {IToBTCWrapper} from "../IToBTCWrapper";
-import * as BN from "bn.js";
 import {UserError} from "../../../errors/UserError";
 import {ChainSwapType, ChainType, IStorageManager} from "@atomiqlabs/base";
 import {Intermediary, SingleChainReputationType} from "../../../intermediaries/Intermediary";
@@ -18,10 +17,10 @@ import {IToBTCSwapInit, ToBTCSwapState} from "../IToBTCSwap";
 
 export type ToBTCLNOptions = {
     expirySeconds?: number,
-    maxFee?: BN | Promise<BN>,
-    expiryTimestamp?: BN,
-    maxRoutingPPM?: BN,
-    maxRoutingBaseFee?: BN
+    maxFee?: bigint | Promise<bigint>,
+    expiryTimestamp?: bigint,
+    maxRoutingPPM?: bigint,
+    maxRoutingBaseFee?: bigint
 }
 
 export type ToBTCLNWrapperOptions = ISwapWrapperOptions & {
@@ -71,9 +70,9 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
      * @private
      * @returns Maximum lightning routing fee in sats
      */
-    private calculateFeeForAmount(amount: BN, overrideBaseFee?: BN, overrideFeePPM?: BN) : BN {
-        return new BN(overrideBaseFee || this.options.lightningBaseFee)
-            .add(amount.mul(new BN(overrideFeePPM || this.options.lightningFeePPM)).div(new BN(1000000)));
+    private calculateFeeForAmount(amount: bigint, overrideBaseFee?: bigint, overrideFeePPM?: bigint) : bigint {
+        return BigInt(overrideBaseFee ?? this.options.lightningBaseFee)
+            + (amount * BigInt(overrideFeePPM ?? this.options.lightningFeePPM) / 1000000n);
     }
 
     /**
@@ -96,19 +95,19 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         lp: Intermediary,
         options: ToBTCLNOptions,
         data: T["Data"],
-        requiredTotal?: BN
+        requiredTotal?: bigint
     ): Promise<void> {
-        if(resp.routingFeeSats.gt(await options.maxFee)) throw new IntermediaryError("Invalid max fee sats returned");
+        if(resp.routingFeeSats > await options.maxFee) throw new IntermediaryError("Invalid max fee sats returned");
 
-        if(requiredTotal!=null && !resp.total.eq(requiredTotal))
+        if(requiredTotal!=null && resp.total !== requiredTotal)
             throw new IntermediaryError("Invalid data returned - total amount");
 
         const claimHash = this.contract.getHashForHtlc(Buffer.from(parsedPr.tagsObject.payment_hash, "hex"));
 
         if(
-            !data.getAmount().eq(resp.total) ||
+            data.getAmount() !== resp.total ||
             !Buffer.from(data.getClaimHash(), "hex").equals(claimHash) ||
-            !data.getExpiry().eq(options.expiryTimestamp) ||
+            data.getExpiry() !== options.expiryTimestamp ||
             data.getType()!==ChainSwapType.HTLC ||
             !data.isPayIn() ||
             !data.isToken(token) ||
@@ -142,7 +141,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         options: ToBTCLNOptions,
         preFetches: {
             feeRatePromise: Promise<any>,
-            pricePreFetchPromise: Promise<BN>,
+            pricePreFetchPromise: Promise<bigint>,
             reputationPromise?: Promise<SingleChainReputationType>
         },
         abort: AbortSignal | AbortController,
@@ -169,8 +168,8 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 };
             }, null, e => e instanceof RequestError, abortController.signal);
 
-            const amountOut: BN = new BN(parsedPr.millisatoshis).add(new BN(999)).div(new BN(1000));
-            const totalFee: BN = resp.swapFee.add(resp.maxFee);
+            const amountOut: bigint = (BigInt(parsedPr.millisatoshis) + 999n) / 1000n;
+            const totalFee: bigint = resp.swapFee + resp.maxFee;
             const data: T["Data"] = new this.swapDataDeserializer(resp.data);
             data.setOfferer(signer);
 
@@ -235,7 +234,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         abortSignal?: AbortSignal,
         preFetches?: {
             feeRatePromise: Promise<any>,
-            pricePreFetchPromise: Promise<BN>
+            pricePreFetchPromise: Promise<bigint>
         }
     ): {
         quote: Promise<ToBTCLNSwap<T>>,
@@ -243,11 +242,11 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
     }[] {
         options ??= {};
         options.expirySeconds ??= this.options.paymentTimeoutSeconds;
-        options.expiryTimestamp ??= new BN(Math.floor(Date.now()/1000)+options.expirySeconds);
+        options.expiryTimestamp ??= BigInt(Math.floor(Date.now()/1000)+options.expirySeconds);
 
         const parsedPr = bolt11Decode(bolt11PayRequest);
         if(parsedPr.millisatoshis==null) throw new UserError("Must be an invoice with amount");
-        const amountOut: BN = new BN(parsedPr.millisatoshis).add(new BN(999)).div(new BN(1000));
+        const amountOut: bigint = (BigInt(parsedPr.millisatoshis) + 999n) / 1000n;
         options.maxFee ??= this.calculateFeeForAmount(amountOut, options.maxRoutingBaseFee, options.maxRoutingPPM);
 
         this.checkPaymentHashWasPaid(parsedPr.tagsObject.payment_hash);
@@ -308,7 +307,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         options: ToBTCLNOptions & {comment?: string},
         preFetches: {
             feeRatePromise: Promise<any>,
-            pricePreFetchPromise: Promise<BN>
+            pricePreFetchPromise: Promise<bigint>
         },
         abortSignal: AbortSignal,
         additionalParams: Record<string, any>,
@@ -334,14 +333,14 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 };
             }, null, e => e instanceof RequestError, abortController.signal);
 
-            if(prepareResp.amount.isZero() || prepareResp.amount.isNeg())
+            if(prepareResp.amount <= 0n)
                 throw new IntermediaryError("Invalid amount returned (zero or negative)");
 
-            const min = new BN(payRequest.minSendable).div(new BN(1000));
-            const max = new BN(payRequest.maxSendable).div(new BN(1000));
+            const min = BigInt(payRequest.minSendable) / 1000n;
+            const max = BigInt(payRequest.maxSendable) / 1000n;
 
-            if(prepareResp.amount.lt(min)) throw new UserError("Amount less than minimum");
-            if(prepareResp.amount.gt(max)) throw new UserError("Amount more than maximum");
+            if(prepareResp.amount < min) throw new UserError("Amount less than minimum");
+            if(prepareResp.amount > max) throw new UserError("Amount more than maximum");
 
             const {
                 invoice,
@@ -359,7 +358,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 null, RequestError, abortController.signal
             );
 
-            const totalFee: BN = resp.swapFee.add(resp.maxFee);
+            const totalFee: bigint = resp.swapFee + resp.maxFee;
             const data: T["Data"] = new this.swapDataDeserializer(resp.data);
             data.setOfferer(signer);
 
@@ -430,14 +429,14 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
         options ??= {};
         options.expirySeconds ??= this.options.paymentTimeoutSeconds;
-        options.expiryTimestamp ??= new BN(Math.floor(Date.now()/1000)+options.expirySeconds);
+        options.expiryTimestamp ??= BigInt(Math.floor(Date.now()/1000)+options.expirySeconds);
 
         const _abortController = extendAbortController(abortSignal);
-        const pricePreFetchPromise: Promise<BN> = this.preFetchPrice(amountData, _abortController.signal);
+        const pricePreFetchPromise: Promise<bigint> = this.preFetchPrice(amountData, _abortController.signal);
         const feeRatePromise: Promise<any> = this.preFetchFeeRate(signer, amountData, null, _abortController);
 
-        options.maxRoutingPPM ??= new BN(this.options.lightningFeePPM);
-        options.maxRoutingBaseFee ??= new BN(this.options.lightningBaseFee);
+        options.maxRoutingPPM ??= BigInt(this.options.lightningFeePPM);
+        options.maxRoutingBaseFee ??= BigInt(this.options.lightningBaseFee);
         if(amountData.exactIn) {
             options.maxFee ??= pricePreFetchPromise
                 .then(
@@ -460,7 +459,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
 
             if(amountData.exactIn) {
                 const {invoice: dummyInvoice} = await LNURL.useLNURLPay(
-                    payRequest, new BN(payRequest.minSendable).div(new BN(1000)), null,
+                    payRequest, BigInt(payRequest.minSendable) / 1000n, null,
                     this.options.getRequestTimeout, _abortController.signal
                 );
 
@@ -474,11 +473,11 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                     }
                 })
             } else {
-                const min = new BN(payRequest.minSendable).div(new BN(1000));
-                const max = new BN(payRequest.maxSendable).div(new BN(1000));
+                const min = BigInt(payRequest.minSendable) / 1000n;
+                const max = BigInt(payRequest.maxSendable) / 1000n;
 
-                if(amountData.amount.lt(min)) throw new UserError("Amount less than minimum");
-                if(amountData.amount.gt(max)) throw new UserError("Amount more than maximum");
+                if(amountData.amount < min) throw new UserError("Amount less than minimum");
+                if(amountData.amount > max) throw new UserError("Amount more than maximum");
 
                 const {
                     invoice,

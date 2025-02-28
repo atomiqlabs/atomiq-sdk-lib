@@ -1,6 +1,5 @@
 import { IFromBTCSwap } from "./IFromBTCSwap";
 import { AmountData, ISwapWrapper, ISwapWrapperOptions } from "../ISwapWrapper";
-import * as BN from "bn.js";
 import { Intermediary } from "../../intermediaries/Intermediary";
 import { ChainType } from "@atomiqlabs/base";
 export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IFromBTCSwap<T, any>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends ISwapWrapper<T, S, O> {
@@ -10,7 +9,7 @@ export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IFr
      * @protected
      * @returns Random 64-bit sequence number
      */
-    protected getRandomSequence(): BN;
+    protected getRandomSequence(): bigint;
     /**
      * Pre-fetches feeRate for a given swap
      *
@@ -30,7 +29,7 @@ export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IFr
      * @protected
      * @returns Intermediary's liquidity balance
      */
-    protected preFetchIntermediaryLiquidity(amountData: AmountData, lp: Intermediary, abortController: AbortController): Promise<BN | null>;
+    protected preFetchIntermediaryLiquidity(amountData: AmountData, lp: Intermediary, abortController: AbortController): Promise<bigint | null>;
     /**
      * Verifies whether the intermediary has enough available liquidity such that we can initiate the swap
      *
@@ -39,7 +38,7 @@ export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IFr
      * @protected
      * @throws {IntermediaryError} if intermediary's liquidity is lower than what's required for the swap
      */
-    protected verifyIntermediaryLiquidity(amount: BN, liquidityPromise: Promise<BN>): Promise<void>;
+    protected verifyIntermediaryLiquidity(amount: bigint, liquidityPromise: Promise<bigint>): Promise<void>;
     protected isOurSwap(signer: string, swap: S): boolean;
     /**
      * Returns all swaps that are claimable, and optionally only those initiated with signer's address

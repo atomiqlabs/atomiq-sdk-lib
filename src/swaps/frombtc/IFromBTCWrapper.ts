@@ -1,11 +1,10 @@
 import {IFromBTCSwap} from "./IFromBTCSwap";
 import {AmountData, ISwapWrapper, ISwapWrapperOptions} from "../ISwapWrapper";
-import * as BN from "bn.js";
 import * as randomBytes from "randombytes";
 import {Intermediary} from "../../intermediaries/Intermediary";
 import {IntermediaryError} from "../../errors/IntermediaryError";
 import {tryWithRetries} from "../../utils/Utils";
-import {ChainType} from "@atomiqlabs/base";
+import {BigIntBufferUtils, ChainType} from "@atomiqlabs/base";
 
 export abstract class IFromBTCWrapper<
     T extends ChainType,
@@ -19,8 +18,8 @@ export abstract class IFromBTCWrapper<
      * @protected
      * @returns Random 64-bit sequence number
      */
-    protected getRandomSequence(): BN {
-        return new BN(randomBytes(8));
+    protected getRandomSequence(): bigint {
+        return BigIntBufferUtils.fromBuffer(randomBytes(8));
     }
 
     /**
@@ -57,7 +56,7 @@ export abstract class IFromBTCWrapper<
      * @protected
      * @returns Intermediary's liquidity balance
      */
-    protected preFetchIntermediaryLiquidity(amountData: AmountData, lp: Intermediary, abortController: AbortController): Promise<BN | null> {
+    protected preFetchIntermediaryLiquidity(amountData: AmountData, lp: Intermediary, abortController: AbortController): Promise<bigint | null> {
         return lp.getLiquidity(this.chainIdentifier, this.contract, amountData.token.toString(), abortController.signal).catch(e => {
             this.logger.error("preFetchIntermediaryLiquidity(): Error: ", e);
             abortController.abort(e);
@@ -74,11 +73,11 @@ export abstract class IFromBTCWrapper<
      * @throws {IntermediaryError} if intermediary's liquidity is lower than what's required for the swap
      */
     protected async verifyIntermediaryLiquidity(
-        amount: BN,
-        liquidityPromise: Promise<BN>
+        amount: bigint,
+        liquidityPromise: Promise<bigint>
     ): Promise<void> {
         const liquidity = await liquidityPromise;
-        if(liquidity.lt(amount)) throw new IntermediaryError("Intermediary doesn't have enough liquidity");
+        if(liquidity < amount) throw new IntermediaryError("Intermediary doesn't have enough liquidity");
     }
 
     protected isOurSwap(signer: string, swap: S): boolean {

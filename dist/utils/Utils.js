@@ -1,16 +1,9 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
+exports.toOutputScript = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
 const RequestError_1 = require("../errors/RequestError");
+const buffer_1 = require("buffer");
+const btc_signer_1 = require("@scure/btc-signer");
 function isConstructor(fn) {
     return (typeof fn === 'function' &&
         fn.prototype != null &&
@@ -125,31 +118,29 @@ exports.extendAbortController = extendAbortController;
  * @param abortSignal
  * @returns Result of the action executing callback
  */
-function tryWithRetries(func, retryPolicy, errorAllowed, abortSignal) {
-    return __awaiter(this, void 0, void 0, function* () {
-        retryPolicy = retryPolicy || {};
-        retryPolicy.maxRetries = retryPolicy.maxRetries || 5;
-        retryPolicy.delay = retryPolicy.delay || 500;
-        retryPolicy.exponential = retryPolicy.exponential == null ? true : retryPolicy.exponential;
-        let err = null;
-        for (let i = 0; i < retryPolicy.maxRetries; i++) {
-            try {
-                return yield func(i);
-            }
-            catch (e) {
-                if (errorAllowed != null && checkError(e, errorAllowed))
-                    throw e;
-                err = e;
-                logger.warn("tryWithRetries(): Error on try number: " + i, e);
-            }
-            if (abortSignal != null && abortSignal.aborted)
-                throw (abortSignal.reason || new Error("Aborted"));
-            if (i !== retryPolicy.maxRetries - 1) {
-                yield timeoutPromise(retryPolicy.exponential ? retryPolicy.delay * Math.pow(2, i) : retryPolicy.delay, abortSignal);
-            }
+async function tryWithRetries(func, retryPolicy, errorAllowed, abortSignal) {
+    retryPolicy = retryPolicy || {};
+    retryPolicy.maxRetries = retryPolicy.maxRetries || 5;
+    retryPolicy.delay = retryPolicy.delay || 500;
+    retryPolicy.exponential = retryPolicy.exponential == null ? true : retryPolicy.exponential;
+    let err = null;
+    for (let i = 0; i < retryPolicy.maxRetries; i++) {
+        try {
+            return await func(i);
         }
-        throw err;
-    });
+        catch (e) {
+            if (errorAllowed != null && checkError(e, errorAllowed))
+                throw e;
+            err = e;
+            logger.warn("tryWithRetries(): Error on try number: " + i, e);
+        }
+        if (abortSignal != null && abortSignal.aborted)
+            throw (abortSignal.reason || new Error("Aborted"));
+        if (i !== retryPolicy.maxRetries - 1) {
+            await timeoutPromise(retryPolicy.exponential ? retryPolicy.delay * Math.pow(2, i) : retryPolicy.delay, abortSignal);
+        }
+    }
+    throw err;
 }
 exports.tryWithRetries = tryWithRetries;
 /**
@@ -181,32 +172,30 @@ exports.fetchWithTimeout = fetchWithTimeout;
  * @param allowNon200 Whether to allow non-200 status code HTTP responses
  * @throws {RequestError} if non 200 response code was returned or body cannot be parsed
  */
-function httpGet(url, timeout, abortSignal, allowNon200 = false) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const init = {
-            method: "GET",
-            timeout,
-            signal: abortSignal
-        };
-        const response = yield fetchWithTimeout(url, init);
-        if (response.status !== 200) {
-            let resp;
-            try {
-                resp = yield response.text();
-            }
-            catch (e) {
-                throw new RequestError_1.RequestError(response.statusText, response.status);
-            }
-            if (allowNon200) {
-                try {
-                    return JSON.parse(resp);
-                }
-                catch (e) { }
-            }
-            throw RequestError_1.RequestError.parse(resp, response.status);
+async function httpGet(url, timeout, abortSignal, allowNon200 = false) {
+    const init = {
+        method: "GET",
+        timeout,
+        signal: abortSignal
+    };
+    const response = await fetchWithTimeout(url, init);
+    if (response.status !== 200) {
+        let resp;
+        try {
+            resp = await response.text();
         }
-        return yield response.json();
-    });
+        catch (e) {
+            throw new RequestError_1.RequestError(response.statusText, response.status);
+        }
+        if (allowNon200) {
+            try {
+                return JSON.parse(resp);
+            }
+            catch (e) { }
+        }
+        throw RequestError_1.RequestError.parse(resp, response.status);
+    }
+    return await response.json();
 }
 exports.httpGet = httpGet;
 /**
@@ -217,28 +206,26 @@ exports.httpGet = httpGet;
  * @param abortSignal
  * @throws {RequestError} if non 200 response code was returned
  */
-function httpPost(url, body, timeout, abortSignal) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const init = {
-            method: "POST",
-            timeout,
-            body: JSON.stringify(body),
-            headers: { 'Content-Type': 'application/json' },
-            signal: abortSignal
-        };
-        const response = timeout == null ? yield fetch(url, init) : yield fetchWithTimeout(url, init);
-        if (response.status !== 200) {
-            let resp;
-            try {
-                resp = yield response.text();
-            }
-            catch (e) {
-                throw new RequestError_1.RequestError(response.statusText, response.status);
-            }
-            throw RequestError_1.RequestError.parse(resp, response.status);
+async function httpPost(url, body, timeout, abortSignal) {
+    const init = {
+        method: "POST",
+        timeout,
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        signal: abortSignal
+    };
+    const response = timeout == null ? await fetch(url, init) : await fetchWithTimeout(url, init);
+    if (response.status !== 200) {
+        let resp;
+        try {
+            resp = await response.text();
         }
-        return yield response.json();
-    });
+        catch (e) {
+            throw new RequestError_1.RequestError(response.statusText, response.status);
+        }
+        throw RequestError_1.RequestError.parse(resp, response.status);
+    }
+    return await response.json();
 }
 exports.httpPost = httpPost;
 /**
@@ -286,3 +273,34 @@ function timeoutSignal(timeout, abortReason, abortSignal) {
     return abortController.signal;
 }
 exports.timeoutSignal = timeoutSignal;
+function bigIntMin(a, b) {
+    return a > b ? b : a;
+}
+exports.bigIntMin = bigIntMin;
+function bigIntMax(a, b) {
+    return b > a ? b : a;
+}
+exports.bigIntMax = bigIntMax;
+function bigIntCompare(a, b) {
+    return a > b ? 1 : a === b ? 0 : -1;
+}
+exports.bigIntCompare = bigIntCompare;
+function toOutputScript(network, address) {
+    const outputScript = (0, btc_signer_1.Address)(network).decode(address);
+    switch (outputScript.type) {
+        case "pkh":
+        case "sh":
+        case "wpkh":
+        case "wsh":
+            return buffer_1.Buffer.from(btc_signer_1.OutScript.encode({
+                type: outputScript.type,
+                hash: outputScript.hash
+            }));
+        case "tr":
+            return buffer_1.Buffer.from(btc_signer_1.OutScript.encode({
+                type: "tr",
+                pubkey: outputScript.pubkey
+            }));
+    }
+}
+exports.toOutputScript = toOutputScript;

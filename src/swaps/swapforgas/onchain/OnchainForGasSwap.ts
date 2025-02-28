@@ -1,5 +1,4 @@
 import {SwapType} from "../../SwapType";
-import * as BN from "bn.js";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
@@ -24,10 +23,10 @@ export enum OnchainForGasSwapState {
 
 export type OnchainForGasSwapInit<T extends SwapData> = ISwapInit<T> & {
     paymentHash: string;
-    sequence: BN;
+    sequence: bigint;
     address: string;
-    inputAmount: BN;
-    outputAmount: BN;
+    inputAmount: bigint;
+    outputAmount: bigint;
     recipient: string;
     token: string;
     refundAddress?: string;
@@ -35,10 +34,10 @@ export type OnchainForGasSwapInit<T extends SwapData> = ISwapInit<T> & {
 
 export function isOnchainForGasSwapInit<T extends SwapData>(obj: any): obj is OnchainForGasSwapInit<T> {
     return typeof(obj.paymentHash)==="string" &&
-        BN.isBN(obj.sequence) &&
+        typeof(obj.sequence)==="bigint" &&
         typeof(obj.address)==="string" &&
-        BN.isBN(obj.inputAmount) &&
-        BN.isBN(obj.outputAmount) &&
+        typeof(obj.inputAmount)==="bigint" &&
+        typeof(obj.outputAmount)==="bigint" &&
         typeof(obj.recipient)==="string" &&
         typeof(obj.token)==="string" &&
         (obj.refundAddress==null || typeof(obj.refundAddress)==="string") &&
@@ -50,12 +49,12 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
 
     //State: PR_CREATED
     private readonly paymentHash: string;
-    private readonly sequence: BN;
+    private readonly sequence: bigint;
     private readonly address: string;
     private readonly recipient: string;
     private readonly token: string;
-    private inputAmount: BN;
-    private outputAmount: BN;
+    private inputAmount: bigint;
+    private outputAmount: bigint;
     private refundAddress: string;
 
     //State: FINISHED
@@ -79,10 +78,10 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             this.state = OnchainForGasSwapState.PR_CREATED;
         } else {
             this.paymentHash = initOrObj.paymentHash;
-            this.sequence = initOrObj.sequence==null ? null : new BN(initOrObj.sequence);
+            this.sequence = initOrObj.sequence==null ? null : BigInt(initOrObj.sequence);
             this.address = initOrObj.address;
-            this.inputAmount = initOrObj.inputAmount==null ? null : new BN(initOrObj.inputAmount);
-            this.outputAmount = initOrObj.outputAmount==null ? null : new BN(initOrObj.outputAmount);
+            this.inputAmount = initOrObj.inputAmount==null ? null : BigInt(initOrObj.inputAmount);
+            this.outputAmount = initOrObj.outputAmount==null ? null : BigInt(initOrObj.outputAmount);
             this.recipient = initOrObj.recipient;
             this.token = initOrObj.token;
             this.refundAddress = initOrObj.refundAddress;
@@ -118,7 +117,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
      */
     protected tryCalculateSwapFee() {
         if(this.swapFeeBtc==null) {
-            this.swapFeeBtc = this.swapFee.mul(this.getInput().rawAmount).div(this.getOutAmountWithoutFee());
+            this.swapFeeBtc = this.swapFee * this.getInput().rawAmount / this.getOutAmountWithoutFee();
         }
     }
 
@@ -141,11 +140,11 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
     }
 
     getSwapPrice(): number {
-        return this.pricingInfo.swapPriceUSatPerToken.toNumber()/100000000000000;
+        return Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
     }
 
     getMarketPrice(): number {
-        return this.pricingInfo.realPriceUSatPerToken.toNumber()/100000000000000;
+        return Number(this.pricingInfo.realPriceUSatPerToken) / 100000000000000;
     }
 
 
@@ -192,7 +191,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
     }
 
     getQrData(): string {
-        return "bitcoin:"+this.address+"?amount="+encodeURIComponent((this.inputAmount.toNumber()/100000000).toString(10));
+        return "bitcoin:"+this.address+"?amount="+encodeURIComponent((Number(this.inputAmount)/100000000).toString(10));
     }
 
     getTimeoutTime(): number {
@@ -230,8 +229,8 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
     //////////////////////////////
     //// Amounts & fees
 
-    protected getOutAmountWithoutFee(): BN {
-        return this.outputAmount.add(this.swapFee);
+    protected getOutAmountWithoutFee(): bigint {
+        return this.outputAmount + this.swapFee;
     }
 
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
@@ -239,7 +238,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>> {
-        return toTokenAmount(this.inputAmount.sub(this.swapFeeBtc), BitcoinTokens.BTC, this.wrapper.prices);
+        return toTokenAmount(this.inputAmount - this.swapFeeBtc, BitcoinTokens.BTC, this.wrapper.prices);
     }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>> {
@@ -255,9 +254,9 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         };
     }
 
-    getRealSwapFeePercentagePPM(): BN {
-        const feeWithoutBaseFee = this.swapFeeBtc.sub(this.pricingInfo.satsBaseFee);
-        return feeWithoutBaseFee.mul(new BN(1000000)).div(this.getInputWithoutFee().rawAmount);
+    getRealSwapFeePercentagePPM(): bigint {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
     }
 
 
@@ -286,15 +285,15 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             case AddressStatusResponseCodes.AWAIT_CONFIRMATION:
             case AddressStatusResponseCodes.PENDING:
             case AddressStatusResponseCodes.TX_SENT:
-                const inputAmount = new BN(response.data.adjustedAmount, 10);
-                const outputAmount = new BN(response.data.adjustedTotal, 10);
-                const adjustedFee = response.data.adjustedFee==null ? null : new BN(response.data.adjustedFee, 10);
-                const adjustedFeeSats = response.data.adjustedFeeSats==null ? null : new BN(response.data.adjustedFeeSats, 10);
+                const inputAmount = BigInt(response.data.adjustedAmount);
+                const outputAmount = BigInt(response.data.adjustedTotal);
+                const adjustedFee = response.data.adjustedFee==null ? null : BigInt(response.data.adjustedFee);
+                const adjustedFeeSats = response.data.adjustedFeeSats==null ? null : BigInt(response.data.adjustedFeeSats);
                 const txId = response.data.txId;
                 if(
                     this.txId!=txId ||
-                    !this.inputAmount.eq(inputAmount) ||
-                    !this.outputAmount.eq(outputAmount)
+                    this.inputAmount !== inputAmount ||
+                    this.outputAmount !== outputAmount
                 ) {
                     this.txId = txId;
                     this.inputAmount = inputAmount;
@@ -448,9 +447,9 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
 
     hasEnoughForTxFees(): Promise<{ enoughBalance: boolean; balance: TokenAmount; required: TokenAmount }> {
         return Promise.resolve({
-            balance: toTokenAmount(new BN(0), this.wrapper.getNativeToken(), this.wrapper.prices),
+            balance: toTokenAmount(0n, this.wrapper.getNativeToken(), this.wrapper.prices),
             enoughBalance: true,
-            required: toTokenAmount(new BN(0), this.wrapper.getNativeToken(), this.wrapper.prices)
+            required: toTokenAmount(0n, this.wrapper.getNativeToken(), this.wrapper.prices)
         });
     }
 

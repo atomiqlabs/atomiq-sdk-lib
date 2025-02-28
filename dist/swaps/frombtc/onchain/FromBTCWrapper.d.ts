@@ -1,16 +1,15 @@
 /// <reference types="node" />
 import { IFromBTCWrapper } from "../IFromBTCWrapper";
 import { FromBTCSwap } from "./FromBTCSwap";
-import * as BN from "bn.js";
 import { ChainType, ClaimEvent, InitializeEvent, IStorageManager, RefundEvent, RelaySynchronizer, SwapData, BtcRelay } from "@atomiqlabs/base";
 import { EventEmitter } from "events";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { BitcoinRpcWithTxoListener } from "../../../btc/BitcoinRpcWithTxoListener";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
-import { networks } from "bitcoinjs-lib";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
+import { BTC_NETWORK } from "@scure/btc-signer/utils";
 export type FromBTCOptions = {
-    feeSafetyFactor?: BN;
+    feeSafetyFactor?: bigint;
     blockSafetyFactor?: number;
 };
 export type FromBTCWrapperOptions = ISwapWrapperOptions & {
@@ -18,7 +17,7 @@ export type FromBTCWrapperOptions = ISwapWrapperOptions & {
     blocksTillTxConfirms?: number;
     maxConfirmations?: number;
     minSendWindow?: number;
-    bitcoinNetwork?: networks.Network;
+    bitcoinNetwork?: BTC_NETWORK;
     bitcoinBlocktime?: number;
 };
 export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper<T, FromBTCSwap<T>, FromBTCWrapperOptions> {
@@ -52,7 +51,7 @@ export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper
      * @param data Parsed swap data
      * @param requiredConfirmations Confirmations required to claim the tx
      */
-    getOnchainSendTimeout(data: SwapData, requiredConfirmations: number): BN;
+    getOnchainSendTimeout(data: SwapData, requiredConfirmations: number): bigint;
     /**
      * Pre-fetches claimer (watchtower) bounty data for the swap. Doesn't throw, instead returns null and aborts the
      *  provided abortController

@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RedundantSwapPrice = void 0;
 const BinancePriceProvider_1 = require("./providers/BinancePriceProvider");
@@ -61,13 +52,12 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
     }
     constructor(maxAllowedFeeDiffPPM, coinsDecimals, priceApis, cacheTimeout) {
         var _a;
-        var _b;
         super(maxAllowedFeeDiffPPM, cacheTimeout);
         this.coinsDecimals = {};
         for (let coinData of coinsDecimals) {
             for (let chainId in coinData.chains) {
                 const { address, decimals } = coinData.chains[chainId];
-                (_a = (_b = this.coinsDecimals)[chainId]) !== null && _a !== void 0 ? _a : (_b[chainId] = {});
+                (_a = this.coinsDecimals)[chainId] ?? (_a[chainId] = {});
                 this.coinsDecimals[chainId][address.toString()] = decimals;
             }
         }
@@ -108,30 +98,28 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
      * @param abortSignal
      * @private
      */
-    fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                return yield (0, Utils_1.promiseAny)(this.getMaybeOperationalPriceApis().map(obj => (() => __awaiter(this, void 0, void 0, function* () {
-                    try {
-                        const price = yield obj.priceApi.getPrice(chainIdentifier, token, abortSignal);
-                        logger.debug("fetchPrice(): Price from " + obj.priceApi.constructor.name + ": ", price.toString(10));
-                        obj.operational = true;
-                        return price;
-                    }
-                    catch (e) {
-                        if (abortSignal != null)
-                            abortSignal.throwIfAborted();
-                        obj.operational = false;
-                        throw e;
-                    }
-                }))()));
-            }
-            catch (e) {
-                if (abortSignal != null)
-                    abortSignal.throwIfAborted();
-                throw e.find(err => !(err instanceof RequestError_1.RequestError)) || e[0];
-            }
-        });
+    async fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal) {
+        try {
+            return await (0, Utils_1.promiseAny)(this.getMaybeOperationalPriceApis().map(obj => (async () => {
+                try {
+                    const price = await obj.priceApi.getPrice(chainIdentifier, token, abortSignal);
+                    logger.debug("fetchPrice(): Price from " + obj.priceApi.constructor.name + ": ", price.toString(10));
+                    obj.operational = true;
+                    return price;
+                }
+                catch (e) {
+                    if (abortSignal != null)
+                        abortSignal.throwIfAborted();
+                    obj.operational = false;
+                    throw e;
+                }
+            })()));
+        }
+        catch (e) {
+            if (abortSignal != null)
+                abortSignal.throwIfAborted();
+            throw e.find(err => !(err instanceof RequestError_1.RequestError)) || e[0];
+        }
     }
     /**
      * Fetches the prices, first tries to use the operational price API (if any) and if that fails it falls back
@@ -167,30 +155,28 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
      * @param abortSignal
      * @private
      */
-    fetchUsdPriceFromMaybeOperationalPriceApis(abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                return yield (0, Utils_1.promiseAny)(this.getMaybeOperationalPriceApis().map(obj => (() => __awaiter(this, void 0, void 0, function* () {
-                    try {
-                        const price = yield obj.priceApi.getUsdPrice(abortSignal);
-                        logger.debug("fetchPrice(): USD price from " + obj.priceApi.constructor.name + ": ", price.toString(10));
-                        obj.operational = true;
-                        return price;
-                    }
-                    catch (e) {
-                        if (abortSignal != null)
-                            abortSignal.throwIfAborted();
-                        obj.operational = false;
-                        throw e;
-                    }
-                }))()));
-            }
-            catch (e) {
-                if (abortSignal != null)
-                    abortSignal.throwIfAborted();
-                throw e.find(err => !(err instanceof RequestError_1.RequestError)) || e[0];
-            }
-        });
+    async fetchUsdPriceFromMaybeOperationalPriceApis(abortSignal) {
+        try {
+            return await (0, Utils_1.promiseAny)(this.getMaybeOperationalPriceApis().map(obj => (async () => {
+                try {
+                    const price = await obj.priceApi.getUsdPrice(abortSignal);
+                    logger.debug("fetchPrice(): USD price from " + obj.priceApi.constructor.name + ": ", price.toString(10));
+                    obj.operational = true;
+                    return price;
+                }
+                catch (e) {
+                    if (abortSignal != null)
+                        abortSignal.throwIfAborted();
+                    obj.operational = false;
+                    throw e;
+                }
+            })()));
+        }
+        catch (e) {
+            if (abortSignal != null)
+                abortSignal.throwIfAborted();
+            throw e.find(err => !(err instanceof RequestError_1.RequestError)) || e[0];
+        }
     }
     fetchUsdPrice(abortSignal) {
         return (0, Utils_1.tryWithRetries)(() => {

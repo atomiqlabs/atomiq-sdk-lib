@@ -1,4 +1,3 @@
-import * as BN from 'bn.js';
 import {ISwapPrice} from "../prices/abstract/ISwapPrice";
 
 export type BtcToken<L = boolean> = {
@@ -69,7 +68,7 @@ export type TokenAmount<
     ChainIdentifier extends string = string,
     T extends Token<ChainIdentifier> = Token<ChainIdentifier>
 > = {
-    rawAmount: BN,
+    rawAmount: bigint,
     amount: string,
     _amount: number,
     token: T,
@@ -77,28 +76,27 @@ export type TokenAmount<
 };
 
 export function fromDecimal(amount: string, decimalCount: number) {
-
     if(amount.includes(".")) {
         const [before, after] = amount.split(".");
         if(decimalCount<0) {
-            return new BN(before.substring(0, before.length+decimalCount));
+            return BigInt(before.substring(0, before.length+decimalCount));
         }
         if(after.length>decimalCount) {
             //Cut the last digits
-            return new BN((before==="0" ? "" : before)+after.substring(0, decimalCount));
+            return BigInt((before==="0" ? "" : before)+after.substring(0, decimalCount));
         }
-        return new BN((before==="0" ? "" : before)+after.padEnd(decimalCount, "0"));
+        return BigInt((before==="0" ? "" : before)+after.padEnd(decimalCount, "0"));
     } else {
         if(decimalCount<0) {
-            return new BN(amount.substring(0, amount.length+decimalCount));
+            return BigInt(amount.substring(0, amount.length+decimalCount));
         } else {
-            return new BN(amount+"0".repeat(decimalCount));
+            return BigInt(amount+"0".repeat(decimalCount));
         }
     }
 
 }
 
-export function toDecimal(amount: BN, decimalCount: number, cut?: boolean, displayDecimals?: number) {
+export function toDecimal(amount: bigint, decimalCount: number, cut?: boolean, displayDecimals?: number) {
     if(decimalCount<=0) {
         return amount.toString(10)+"0".repeat(-decimalCount);
     }
@@ -127,7 +125,7 @@ export function toTokenAmount<
     ChainIdentifier extends string = string,
     T extends Token<ChainIdentifier> = Token<ChainIdentifier>
 >(
-    amount: BN,
+    amount: bigint,
     token:  T,
     prices: ISwapPrice
 ): TokenAmount<ChainIdentifier, T> {

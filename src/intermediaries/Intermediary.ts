@@ -1,6 +1,5 @@
 import {SwapType} from "../swaps/SwapType";
 import {SwapHandlerInfoType} from "./IntermediaryDiscovery";
-import * as BN from "bn.js";
 import {ChainSwapType, SwapContract} from "@atomiqlabs/base";
 import {LNNodeLiquidity} from "../btc/LightningNetworkApi";
 import {tryWithRetries} from "../utils/Utils";
@@ -12,18 +11,18 @@ export type ServicesType = {
 export type SingleChainReputationType = {
     [token: string]: {
         [key in ChainSwapType]: {
-            successVolume: BN,
-            successCount: BN,
-            failVolume: BN,
-            failCount: BN,
-            coopCloseVolume: BN,
-            coopCloseCount: BN,
+            successVolume: bigint,
+            successCount: bigint,
+            failVolume: bigint,
+            failCount: bigint,
+            coopCloseVolume: bigint,
+            coopCloseCount: bigint,
         }
     }
 };
 
 export type SCLiquidity = {
-    [token: string]: BN
+    [token: string]: bigint
 };
 
 export class Intermediary {
@@ -126,7 +125,7 @@ export class Intermediary {
         swapContract: SwapContract<any>,
         token: string,
         abortSignal?: AbortSignal
-    ): Promise<BN> {
+    ): Promise<bigint> {
         const result = await tryWithRetries(() =>
             swapContract.getBalance(this.getAddress(chainIdentifier), token, true),
             null, null, abortSignal
@@ -138,7 +137,6 @@ export class Intermediary {
 
         return result;
     }
-
 
     supportsChain(chainIdentifier: string): boolean {
         if(this.addresses[chainIdentifier]==null) return false;

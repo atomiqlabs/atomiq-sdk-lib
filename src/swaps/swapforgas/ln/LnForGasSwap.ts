@@ -1,6 +1,5 @@
-import {decode as bolt11Decode} from "bolt11";
+import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {SwapType} from "../../SwapType";
-import * as BN from "bn.js";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {LnForGasWrapper} from "./LnForGasWrapper";
 import {Buffer} from "buffer";
@@ -24,14 +23,14 @@ export enum LnForGasSwapState {
 
 export type LnForGasSwapInit<T extends SwapData> = ISwapInit<T> & {
     pr: string;
-    outputAmount: BN;
+    outputAmount: bigint;
     recipient: string;
     token: string;
 };
 
 export function isLnForGasSwapInit<T extends SwapData>(obj: any): obj is LnForGasSwapInit<T> {
     return typeof(obj.pr)==="string" &&
-        BN.isBN(obj.outputAmount) &&
+        typeof(obj.outputAmount) === "bigint" &&
         typeof(obj.recipient)==="string" &&
         typeof(obj.token)==="string" &&
         isISwapInit<T>(obj);
@@ -44,7 +43,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
 
     //State: PR_CREATED
     private readonly pr: string;
-    private readonly outputAmount: BN;
+    private readonly outputAmount: bigint;
     private readonly recipient: string;
     private readonly token: string;
 
@@ -63,7 +62,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
             this.state = LnForGasSwapState.PR_CREATED;
         } else {
             this.pr = initOrObj.pr;
-            this.outputAmount = initOrObj.outputAmount==null ? null : new BN(initOrObj.outputAmount);
+            this.outputAmount = initOrObj.outputAmount==null ? null : BigInt(initOrObj.outputAmount);
             this.recipient = initOrObj.recipient;
             this.token = initOrObj.token;
             this.scTxId = initOrObj.scTxId;
@@ -75,8 +74,8 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
                 this.chainIdentifier,
                 this.getInput().rawAmount,
-                this.pricingInfo.satsBaseFee ?? new BN(10),
-                this.pricingInfo.feePPM ?? new BN(10000),
+                this.pricingInfo.satsBaseFee ?? 10n,
+                this.pricingInfo.feePPM ?? 10000n,
                 this.outputAmount,
                 this.token ?? this.wrapper.getNativeToken().address
             );
@@ -100,7 +99,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
      */
     protected tryCalculateSwapFee() {
         if(this.swapFeeBtc==null) {
-            this.swapFeeBtc = this.swapFee.mul(this.getInput().rawAmount).div(this.getOutAmountWithoutFee());
+            this.swapFeeBtc = this.swapFee * this.getInput().rawAmount / this.getOutAmountWithoutFee();
         }
     }
 
@@ -113,8 +112,8 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         const priceData = await this.wrapper.prices.isValidAmountReceive(
             this.chainIdentifier,
             this.getInput().rawAmount,
-            this.pricingInfo.satsBaseFee ?? new BN(10),
-            this.pricingInfo.feePPM ?? new BN(10000),
+            this.pricingInfo.satsBaseFee ?? 10n,
+            this.pricingInfo.feePPM ?? 10000n,
             this.outputAmount,
             this.token ?? this.wrapper.getNativeToken().address
         );
@@ -123,11 +122,11 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     }
 
     getSwapPrice(): number {
-        return this.pricingInfo.swapPriceUSatPerToken.toNumber()/100000000000000;
+        return Number(this.pricingInfo.swapPriceUSatPerToken)/100000000000000;
     }
 
     getMarketPrice(): number {
-        return this.pricingInfo.realPriceUSatPerToken.toNumber()/100000000000000;
+        return Number(this.pricingInfo.realPriceUSatPerToken)/100000000000000;
     }
 
 
@@ -215,8 +214,8 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     //////////////////////////////
     //// Amounts & fees
 
-    protected getOutAmountWithoutFee(): BN {
-        return this.outputAmount.add(this.swapFee);
+    protected getOutAmountWithoutFee(): bigint {
+        return this.outputAmount + this.swapFee;
     }
 
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
@@ -225,13 +224,13 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<true>> {
         const parsed = bolt11Decode(this.pr);
-        const amount = new BN(parsed.millisatoshis).add(new BN(999)).div(new BN(1000));
-        return toTokenAmount(amount.sub(this.swapFeeBtc), BitcoinTokens.BTCLN, this.wrapper.prices);
+        const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
+        return toTokenAmount(amount - this.swapFeeBtc, BitcoinTokens.BTCLN, this.wrapper.prices);
     }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>> {
         const parsed = bolt11Decode(this.pr);
-        const amount = new BN(parsed.millisatoshis).add(new BN(999)).div(new BN(1000));
+        const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
         return toTokenAmount(amount, BitcoinTokens.BTCLN, this.wrapper.prices);
     }
 
@@ -244,9 +243,9 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         };
     }
 
-    getRealSwapFeePercentagePPM(): BN {
-        const feeWithoutBaseFee = this.swapFeeBtc.sub(this.pricingInfo.satsBaseFee);
-        return feeWithoutBaseFee.mul(new BN(1000000)).div(this.getInputWithoutFee().rawAmount);
+    getRealSwapFeePercentagePPM(): bigint {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
     }
 
 
@@ -351,9 +350,9 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
 
     hasEnoughForTxFees(): Promise<{ enoughBalance: boolean; balance: TokenAmount; required: TokenAmount }> {
         return Promise.resolve({
-            balance: toTokenAmount(new BN(0), this.wrapper.getNativeToken(), this.wrapper.prices),
+            balance: toTokenAmount(0n, this.wrapper.getNativeToken(), this.wrapper.prices),
             enoughBalance: true,
-            required: toTokenAmount(new BN(0), this.wrapper.getNativeToken(), this.wrapper.prices)
+            required: toTokenAmount(0n, this.wrapper.getNativeToken(), this.wrapper.prices)
         });
     }
 

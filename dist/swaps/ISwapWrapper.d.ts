@@ -5,11 +5,10 @@ import { EventEmitter } from "events";
 import { ISwap } from "./ISwap";
 import { SwapWrapperStorage } from "./SwapWrapperStorage";
 import { ISwapPrice, PriceInfoType } from "../prices/abstract/ISwapPrice";
-import * as BN from "bn.js";
 import { SCToken } from "./Tokens";
 import { ChainIds, MultiChain } from "./Swapper";
 export type AmountData = {
-    amount: BN;
+    amount: bigint;
     token: string;
     exactIn?: boolean;
 };
@@ -66,7 +65,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * @protected
      * @returns Price of the token in uSats (micro sats)
      */
-    protected preFetchPrice(amountData: Omit<AmountData, "amount">, abortSignal?: AbortSignal): Promise<BN | null>;
+    protected preFetchPrice(amountData: Omit<AmountData, "amount">, abortSignal?: AbortSignal): Promise<bigint | null>;
     /**
      * Pre-fetches signature verification data from the server's pre-sent promise, doesn't throw, instead returns null
      *
@@ -106,11 +105,11 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
     protected verifyReturnedPrice(lpServiceData: {
         swapBaseFee: number;
         swapFeePPM: number;
-    }, send: boolean, amountSats: BN, amountToken: BN, token: string, feeData: {
-        swapFee: BN;
-        networkFee?: BN;
-        totalFee?: BN;
-    }, pricePrefetchPromise?: Promise<BN>, abortSignal?: AbortSignal): Promise<PriceInfoType>;
+    }, send: boolean, amountSats: bigint, amountToken: bigint, token: string, feeData: {
+        swapFee: bigint;
+        networkFee?: bigint;
+        totalFee?: bigint;
+    }, pricePrefetchPromise?: Promise<bigint>, abortSignal?: AbortSignal): Promise<PriceInfoType>;
     /**
      * Checks if the provided swap is belonging to the provided signer's address
      *

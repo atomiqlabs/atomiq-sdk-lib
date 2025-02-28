@@ -1,7 +1,6 @@
 
 import {IFromBTCWrapper} from "./IFromBTCWrapper";
 import {Fee, ISwap, ISwapInit} from "../ISwap";
-import * as BN from "bn.js";
 import {
     ChainType,
     SignatureVerificationError,
@@ -31,7 +30,7 @@ export abstract class IFromBTCSwap<
      */
     protected tryCalculateSwapFee() {
         if(this.swapFeeBtc==null) {
-            this.swapFeeBtc = this.swapFee.mul(this.getInput().rawAmount).div(this.getOutAmountWithoutFee());
+            this.swapFeeBtc = this.swapFee * this.getInput().rawAmount / this.getOutAmountWithoutFee();
         }
 
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
@@ -68,16 +67,16 @@ export abstract class IFromBTCSwap<
     }
 
     getSwapPrice(): number {
-        return this.pricingInfo.swapPriceUSatPerToken.toNumber()/100000000000000;
+        return Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
     }
 
     getMarketPrice(): number {
-        return this.pricingInfo.realPriceUSatPerToken.toNumber()/100000000000000;
+        return Number(this.pricingInfo.realPriceUSatPerToken) / 100000000000000;
     }
 
-    getRealSwapFeePercentagePPM(): BN {
-        const feeWithoutBaseFee = this.swapFeeBtc.sub(this.pricingInfo.satsBaseFee);
-        return feeWithoutBaseFee.mul(new BN(1000000)).div(this.getInputWithoutFee().rawAmount);
+    getRealSwapFeePercentagePPM(): bigint {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
     }
 
 
@@ -124,12 +123,12 @@ export abstract class IFromBTCSwap<
     //////////////////////////////
     //// Amounts & fees
 
-    protected getOutAmountWithoutFee(): BN {
-        return this.getSwapData().getAmount().add(this.swapFee);
+    protected getOutAmountWithoutFee(): bigint {
+        return this.getSwapData().getAmount() + this.swapFee;
     }
 
     getOutputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.getSwapData().getAmount().add(this.swapFee), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices);
+        return toTokenAmount(this.getSwapData().getAmount() + this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices);
     }
 
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
@@ -137,7 +136,7 @@ export abstract class IFromBTCSwap<
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken> {
-        return toTokenAmount(this.getInput().rawAmount.sub(this.swapFeeBtc), this.inputToken, this.wrapper.prices);
+        return toTokenAmount(this.getInput().rawAmount - this.swapFeeBtc, this.inputToken, this.wrapper.prices);
     }
 
     getSwapFee(): Fee {
@@ -161,7 +160,7 @@ export abstract class IFromBTCSwap<
         return this.getSwapData().getClaimer();
     }
 
-    getClaimFee(): Promise<BN> {
+    getClaimFee(): Promise<bigint> {
         return this.wrapper.contract.getClaimFee(this.getInitiator(), this.getSwapData());
     }
 
@@ -170,9 +169,9 @@ export abstract class IFromBTCSwap<
             this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.contract.getNativeCurrencyAddress(), false),
             this.getCommitFee()
         ]);
-        const totalFee = commitFee.add(this.getSwapData().getTotalDeposit());
+        const totalFee = commitFee + this.getSwapData().getTotalDeposit();
         return {
-            enoughBalance: balance.gte(totalFee),
+            enoughBalance: balance >= totalFee,
             balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
             required: toTokenAmount(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices)
         };

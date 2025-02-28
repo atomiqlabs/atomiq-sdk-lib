@@ -11,7 +11,6 @@ import {EventEmitter} from "events";
 import {ISwap} from "./ISwap";
 import {SwapWrapperStorage} from "./SwapWrapperStorage";
 import {ISwapPrice, PriceInfoType} from "../prices/abstract/ISwapPrice";
-import * as BN from "bn.js";
 import {IntermediaryError} from "../errors/IntermediaryError";
 import {getLogger, mapToArray, tryWithRetries} from "../utils/Utils";
 import {SCToken} from "./Tokens";
@@ -19,7 +18,7 @@ import {ChainIds, MultiChain} from "./Swapper";
 import * as randomBytes from "randombytes";
 
 export type AmountData = {
-    amount: BN,
+    amount: bigint,
     token: string,
     exactIn?: boolean
 }
@@ -119,7 +118,7 @@ export abstract class ISwapWrapper<
      * @protected
      * @returns Price of the token in uSats (micro sats)
      */
-    protected preFetchPrice(amountData: Omit<AmountData, "amount">, abortSignal?: AbortSignal): Promise<BN | null> {
+    protected preFetchPrice(amountData: Omit<AmountData, "amount">, abortSignal?: AbortSignal): Promise<bigint | null> {
         return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
             this.logger.error("preFetchPrice(): Error: ", e);
             return null;
@@ -196,20 +195,20 @@ export abstract class ISwapWrapper<
     protected async verifyReturnedPrice(
         lpServiceData: {swapBaseFee: number, swapFeePPM: number},
         send: boolean,
-        amountSats: BN,
-        amountToken: BN,
+        amountSats: bigint,
+        amountToken: bigint,
         token: string,
         feeData: {
-            swapFee: BN,
-            networkFee?: BN,
-            totalFee?: BN
+            swapFee: bigint,
+            networkFee?: bigint,
+            totalFee?: bigint
         },
-        pricePrefetchPromise: Promise<BN> = Promise.resolve(null),
+        pricePrefetchPromise: Promise<bigint> = Promise.resolve(null),
         abortSignal?: AbortSignal
     ): Promise<PriceInfoType> {
-        const swapBaseFee = new BN(lpServiceData.swapBaseFee);
-        const swapFeePPM = new BN(lpServiceData.swapFeePPM);
-        if(send) amountToken = amountToken.sub(feeData.networkFee);
+        const swapBaseFee = BigInt(lpServiceData.swapBaseFee);
+        const swapFeePPM = BigInt(lpServiceData.swapFeePPM);
+        if(send) amountToken = amountToken - feeData.networkFee;
 
         const isValidAmount = await (
             send ?

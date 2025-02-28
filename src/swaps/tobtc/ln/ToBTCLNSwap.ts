@@ -1,8 +1,7 @@
-import {decode as bolt11Decode} from "bolt11";
+import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {ToBTCLNWrapper} from "./ToBTCLNWrapper";
 import {isIToBTCSwapInit, IToBTCSwap, IToBTCSwapInit} from "../IToBTCSwap";
 import {SwapType} from "../../SwapType";
-import * as BN from "bn.js";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import * as createHash from "create-hash";
@@ -74,7 +73,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
 
     getOutput(): TokenAmount<T["ChainId"], BtcToken<true>> {
         const parsedPR = bolt11Decode(this.pr);
-        const amount = new BN(parsedPR.millisatoshis).add(new BN(999)).div(new BN(1000));
+        const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
         return toTokenAmount(amount, this.outputToken, this.wrapper.prices);
     }
 

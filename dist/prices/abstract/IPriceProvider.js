@@ -1,18 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IPriceProvider = void 0;
-const BN = require("bn.js");
 class IPriceProvider {
     constructor(coins) {
         var _a;
-        var _b;
         this.coinsMap = {};
         for (let coinData of coins) {
             if (coinData.coinId == null)
                 continue;
             for (let chainId in coinData.chains) {
                 const { address, decimals } = coinData.chains[chainId];
-                (_a = (_b = this.coinsMap)[chainId]) !== null && _a !== void 0 ? _a : (_b[chainId] = {});
+                (_a = this.coinsMap)[chainId] ?? (_a[chainId] = {});
                 this.coinsMap[chainId][address.toString()] = {
                     coinId: coinData.coinId,
                     decimals
@@ -38,7 +36,7 @@ class IPriceProvider {
             throw new Error("Token not found");
         if (coin.coinId.startsWith("$fixed-")) {
             const amt = parseFloat(coin.coinId.substring(7));
-            return Promise.resolve(new BN(Math.floor(amt * 1000000).toString(10)));
+            return Promise.resolve(BigInt(Math.floor(amt * 1000000).toString(10)));
         }
         return this.fetchPrice(coin, abortSignal);
     }

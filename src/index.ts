@@ -1,7 +1,3 @@
-import {initEccLib} from "bitcoinjs-lib";
-import * as tinySecpk256Interface from "@bitcoinerlab/secp256k1";
-initEccLib(tinySecpk256Interface);
-
 export * from "./btc/mempool/synchronizer/MempoolBtcRelaySynchronizer";
 export * from "./btc/mempool/MempoolApi";
 export * from "./btc/mempool/MempoolBitcoinRpc";

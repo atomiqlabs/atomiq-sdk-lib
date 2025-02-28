@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {IPriceProvider} from "./abstract/IPriceProvider";
 import {ICachedSwapPrice} from "./abstract/ICachedSwapPrice";
 import {ChainIds, MultiChain} from "../swaps/Swapper";
@@ -10,7 +9,7 @@ export class SingleSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T> {
 
     priceProvider: IPriceProvider<T>;
 
-    constructor(maxAllowedFeeDiffPPM: BN, priceProvider: IPriceProvider<T>, cacheTimeout?: number) {
+    constructor(maxAllowedFeeDiffPPM: bigint, priceProvider: IPriceProvider<T>, cacheTimeout?: number) {
         super(maxAllowedFeeDiffPPM, cacheTimeout);
         this.priceProvider = priceProvider;
     }
@@ -24,7 +23,7 @@ export class SingleSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T> {
      * @protected
      * @returns token price in uSats (micro sats)
      */
-    protected fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<BN> {
+    protected fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<bigint> {
         return this.priceProvider.getPrice(chainIdentifier, token, abortSignal);
     }
 

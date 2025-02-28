@@ -1,4 +1,3 @@
-import BN = require("bn.js");
 import {IPriceProvider} from "./abstract/IPriceProvider";
 import {BinancePriceProvider} from "./providers/BinancePriceProvider";
 import {OKXPriceProvider} from "./providers/OKXPriceProvider";
@@ -47,7 +46,7 @@ const logger = getLogger("RedundantSwapPrice: ");
  */
 export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T> {
 
-    static createFromTokenMap<T extends MultiChain>(maxAllowedFeeDiffPPM: BN, assets: RedundantSwapPriceAssets<T>, cacheTimeout?: number): RedundantSwapPrice<T> {
+    static createFromTokenMap<T extends MultiChain>(maxAllowedFeeDiffPPM: bigint, assets: RedundantSwapPriceAssets<T>, cacheTimeout?: number): RedundantSwapPrice<T> {
         const priceApis = [
             new BinancePriceProvider(assets.map(coinData => {
                 return {
@@ -90,7 +89,7 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
         operational: boolean
     }[];
 
-    constructor(maxAllowedFeeDiffPPM: BN, coinsDecimals: CtorCoinDecimals<T>, priceApis: IPriceProvider<T>[], cacheTimeout?: number) {
+    constructor(maxAllowedFeeDiffPPM: bigint, coinsDecimals: CtorCoinDecimals<T>, priceApis: IPriceProvider<T>[], cacheTimeout?: number) {
         super(maxAllowedFeeDiffPPM, cacheTimeout);
         for(let coinData of coinsDecimals) {
             for(let chainId in coinData.chains) {
@@ -141,7 +140,7 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
      */
     private async fetchPriceFromMaybeOperationalPriceApis<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal) {
         try {
-            return await promiseAny<BN>(this.getMaybeOperationalPriceApis().map(
+            return await promiseAny<bigint>(this.getMaybeOperationalPriceApis().map(
                 obj => (async () => {
                     try {
                         const price = await obj.priceApi.getPrice(chainIdentifier, token, abortSignal);
@@ -170,7 +169,7 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
      * @param abortSignal
      * @private
      */
-    protected fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<BN> {
+    protected fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<bigint> {
         return tryWithRetries(() => {
             const operationalPriceApi = this.getOperationalPriceApi();
             if(operationalPriceApi!=null) {

@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Intermediary = void 0;
 const SwapType_1 = require("../swaps/SwapType");
@@ -52,28 +43,25 @@ class Intermediary {
      * @param tokens
      * @param abortSignal
      */
-    getReputation(chainIdentifier, swapContract, tokens, abortSignal) {
-        var _a, _b;
-        var _c;
-        return __awaiter(this, void 0, void 0, function* () {
-            const checkReputationTokens = tokens == null ?
-                this.getSupportedTokens(chainIdentifier, [SwapType_1.SwapType.TO_BTC, SwapType_1.SwapType.TO_BTCLN]) :
-                new Set(tokens);
-            const promises = [];
-            const reputation = {};
-            for (let token of checkReputationTokens) {
-                promises.push((0, Utils_1.tryWithRetries)(() => swapContract.getIntermediaryReputation(this.getAddress(chainIdentifier), token), null, null, abortSignal).then(result => {
-                    reputation[token] = result;
-                }));
-            }
-            yield Promise.all(promises);
-            (_a = this.reputation) !== null && _a !== void 0 ? _a : (this.reputation = {});
-            (_b = (_c = this.reputation)[chainIdentifier]) !== null && _b !== void 0 ? _b : (_c[chainIdentifier] = {});
-            for (let key in reputation) {
-                this.reputation[chainIdentifier][key] = reputation[key];
-            }
-            return reputation;
-        });
+    async getReputation(chainIdentifier, swapContract, tokens, abortSignal) {
+        var _a;
+        const checkReputationTokens = tokens == null ?
+            this.getSupportedTokens(chainIdentifier, [SwapType_1.SwapType.TO_BTC, SwapType_1.SwapType.TO_BTCLN]) :
+            new Set(tokens);
+        const promises = [];
+        const reputation = {};
+        for (let token of checkReputationTokens) {
+            promises.push((0, Utils_1.tryWithRetries)(() => swapContract.getIntermediaryReputation(this.getAddress(chainIdentifier), token), null, null, abortSignal).then(result => {
+                reputation[token] = result;
+            }));
+        }
+        await Promise.all(promises);
+        this.reputation ?? (this.reputation = {});
+        (_a = this.reputation)[chainIdentifier] ?? (_a[chainIdentifier] = {});
+        for (let key in reputation) {
+            this.reputation[chainIdentifier][key] = reputation[key];
+        }
+        return reputation;
     }
     /**
      * Fetches, returns and saves the liquidity of the intermediaryfor a specific token
@@ -83,16 +71,13 @@ class Intermediary {
      * @param token
      * @param abortSignal
      */
-    getLiquidity(chainIdentifier, swapContract, token, abortSignal) {
-        var _a, _b;
-        var _c;
-        return __awaiter(this, void 0, void 0, function* () {
-            const result = yield (0, Utils_1.tryWithRetries)(() => swapContract.getBalance(this.getAddress(chainIdentifier), token, true), null, null, abortSignal);
-            (_a = this.liquidity) !== null && _a !== void 0 ? _a : (this.liquidity = {});
-            (_b = (_c = this.liquidity)[chainIdentifier]) !== null && _b !== void 0 ? _b : (_c[chainIdentifier] = {});
-            this.liquidity[chainIdentifier][token] = result;
-            return result;
-        });
+    async getLiquidity(chainIdentifier, swapContract, token, abortSignal) {
+        var _a;
+        const result = await (0, Utils_1.tryWithRetries)(() => swapContract.getBalance(this.getAddress(chainIdentifier), token, true), null, null, abortSignal);
+        this.liquidity ?? (this.liquidity = {});
+        (_a = this.liquidity)[chainIdentifier] ?? (_a[chainIdentifier] = {});
+        this.liquidity[chainIdentifier][token] = result;
+        return result;
     }
     supportsChain(chainIdentifier) {
         if (this.addresses[chainIdentifier] == null)

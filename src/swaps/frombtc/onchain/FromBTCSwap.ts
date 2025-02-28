@@ -1,9 +1,6 @@
 import {IFromBTCSwap} from "../IFromBTCSwap";
 import {SwapType} from "../../SwapType";
-import {address} from "bitcoinjs-lib";
-import * as createHash from "create-hash";
 import {FromBTCWrapper} from "./FromBTCWrapper";
-import * as BN from "bn.js";
 import {ChainType, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isISwapInit, ISwapInit} from "../../ISwap";
 import {Buffer} from "buffer";
@@ -23,13 +20,13 @@ export enum FromBTCSwapState {
 
 export type FromBTCSwapInit<T extends SwapData> = ISwapInit<T> & {
     address: string;
-    amount: BN;
+    amount: bigint;
     requiredConfirmations: number;
 };
 
 export function isFromBTCSwapInit<T extends SwapData>(obj: any): obj is FromBTCSwapInit<T> {
-    return typeof(obj.address)==="string" &&
-        BN.isBN(obj.amount) &&
+    return typeof(obj.address) === "string" &&
+        typeof(obj.amount) === "bigint" &&
         isISwapInit<T>(obj);
 }
 
@@ -40,7 +37,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
     readonly wrapper: FromBTCWrapper<T>;
 
     readonly address: string;
-    readonly amount: BN;
+    readonly amount: bigint;
     readonly requiredConfirmations: number;
 
     txId?: string;
@@ -55,7 +52,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
             this.state = FromBTCSwapState.PR_CREATED;
         } else {
             this.address = initOrObject.address;
-            this.amount = new BN(initOrObject.amount);
+            this.amount = BigInt(initOrObject.amount);
             this.txId = initOrObject.txId;
             this.vout = initOrObject.vout;
             this.requiredConfirmations = initOrObject.requiredConfirmations ?? this.data.getConfirmationsHint();
@@ -112,7 +109,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
 
     getQrData(): string {
         if(this.state===FromBTCSwapState.PR_CREATED) return null;
-        return "bitcoin:"+this.address+"?amount="+encodeURIComponent((this.amount.toNumber()/100000000).toString(10));
+        return "bitcoin:"+this.address+"?amount="+encodeURIComponent((Number(this.amount) / 100000000).toString(10));
     }
 
     /**
@@ -120,7 +117,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
      *  to that address anymore
      */
     getTimeoutTime(): number {
-        return this.wrapper.getOnchainSendTimeout(this.data, this.requiredConfirmations).toNumber()*1000;
+        return Number(this.wrapper.getOnchainSendTimeout(this.data, this.requiredConfirmations)) * 1000;
     }
 
     isFinished(): boolean {
@@ -154,9 +151,9 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
     canCommit(): boolean {
         if(this.state!==FromBTCSwapState.PR_CREATED) return false;
         const expiry = this.wrapper.getOnchainSendTimeout(this.data, this.requiredConfirmations);
-        const currentTimestamp = new BN(Math.floor(Date.now()/1000));
+        const currentTimestamp = BigInt(Math.floor(Date.now()/1000));
 
-        return expiry.sub(currentTimestamp).gte(new BN(this.wrapper.options.minSendWindow));
+        return (expiry - currentTimestamp) >= this.wrapper.options.minSendWindow;
     }
 
     canClaim(): boolean {
@@ -168,7 +165,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
     //// Amounts & fees
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>> {
-        return toTokenAmount(new BN(this.amount), this.inputToken, this.wrapper.prices);
+        return toTokenAmount(this.amount, this.inputToken, this.wrapper.prices);
     }
 
     /**

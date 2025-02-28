@@ -1,12 +1,11 @@
 import {LNURLPay, LNURLWithdraw} from "../utils/LNURL";
-import * as BN from "bn.js";
 import {IntermediaryDiscovery, SwapBounds} from "../intermediaries/IntermediaryDiscovery";
 import {SwapType} from "./SwapType";
 import {LnForGasSwap} from "./swapforgas/ln/LnForGasSwap";
 import {ISwap} from "./ISwap";
 import {IToBTCSwap} from "./tobtc/IToBTCSwap";
 import {IFromBTCSwap} from "./frombtc/IFromBTCSwap";
-import {ChainIds, MultiChain, Swapper, SwapperBtcUtils, SwapperOptions} from "./Swapper";
+import {ChainIds, MultiChain, Swapper, SwapperBtcUtils} from "./Swapper";
 import {FromBTCLNSwap} from "./frombtc/ln/FromBTCLNSwap";
 import {Buffer} from "buffer";
 import {FromBTCSwap} from "./frombtc/onchain/FromBTCSwap";
@@ -16,8 +15,8 @@ import {SwapperWithSigner} from "./SwapperWithSigner";
 import {SwapPriceWithChain} from "../prices/SwapPriceWithChain";
 import {MempoolApi} from "../btc/mempool/MempoolApi";
 import {MempoolBitcoinRpc} from "../btc/mempool/MempoolBitcoinRpc";
-import {Network} from "bitcoinjs-lib";
 import {BtcToken, SCToken, Token} from "./Tokens";
+import {BTC_NETWORK} from "@scure/btc-signer/utils";
 
 export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends ChainIds<T>> implements SwapperBtcUtils {
 
@@ -35,7 +34,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
     get bitcoinRpc(): MempoolBitcoinRpc {
         return this.swapper.bitcoinRpc;
     }
-    get bitcoinNetwork(): Network {
+    get bitcoinNetwork(): BTC_NETWORK {
         return this.swapper.bitcoinNetwork;
     }
 
@@ -87,7 +86,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
      *
      * @param lnpr
      */
-    getLightningInvoiceValue(lnpr: string): BN {
+    getLightningInvoiceValue(lnpr: string): bigint {
         return this.swapper.getLightningInvoiceValue(lnpr);
     }
 
@@ -104,7 +103,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
      * @param type      Type of the swap
      * @param token     Token of the swap
      */
-    getMaximum(type: SwapType, token: string): BN {
+    getMaximum(type: SwapType, token: string): bigint {
         return this.swapper.getMaximum(this.chainIdentifier, type, token);
     }
 
@@ -114,7 +113,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
      * @param type      Type of swap
      * @param token     Token of the swap
      */
-    getMinimum(type: SwapType, token: string): BN {
+    getMinimum(type: SwapType, token: string): bigint {
         return this.swapper.getMinimum(this.chainIdentifier, type, token);
     }
 
@@ -145,7 +144,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
         signer: string,
         tokenAddress: string,
         address: string,
-        amount: BN,
+        amount: bigint,
         confirmationTarget?: number,
         confirmations?: number,
         exactIn?: boolean,
@@ -159,8 +158,8 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
         tokenAddress: string,
         paymentRequest: string,
         expirySeconds?: number,
-        maxRoutingBaseFee?: BN,
-        maxRoutingPPM?: BN,
+        maxRoutingBaseFee?: bigint,
+        maxRoutingPPM?: bigint,
         additionalParams?: Record<string, any>
     ): Promise<ToBTCLNSwap<T[ChainIdentifier]>> {
         return this.swapper.createToBTCLNSwap(this.chainIdentifier, signer, tokenAddress, paymentRequest, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, additionalParams);
@@ -170,11 +169,11 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
         signer: string,
         tokenAddress: string,
         lnurlPay: string | LNURLPay,
-        amount: BN,
+        amount: bigint,
         comment: string,
         expirySeconds?: number,
-        maxRoutingBaseFee?: BN,
-        maxRoutingPPM?: BN,
+        maxRoutingBaseFee?: bigint,
+        maxRoutingPPM?: bigint,
         exactIn?: boolean,
         additionalParams?: Record<string, any>
     ): Promise<ToBTCLNSwap<T[ChainIdentifier]>> {
@@ -184,7 +183,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
     createFromBTCSwap(
         signer: string,
         tokenAddress: string,
-        amount: BN,
+        amount: bigint,
         exactOut?: boolean,
         additionalParams?: Record<string, any>
     ): Promise<FromBTCSwap<T[ChainIdentifier]>> {
@@ -194,7 +193,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
     createFromBTCLNSwap(
         signer: string,
         tokenAddress: string,
-        amount: BN,
+        amount: bigint,
         exactOut?: boolean,
         descriptionHash?: Buffer,
         additionalParams?: Record<string, any>
@@ -206,22 +205,22 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
         signer: string,
         tokenAddress: string,
         lnurl: string | LNURLWithdraw,
-        amount: BN,
+        amount: bigint,
         exactOut?: boolean,
         additionalParams?: Record<string, any>
     ): Promise<FromBTCLNSwap<T[ChainIdentifier]>> {
         return this.swapper.createFromBTCLNSwapViaLNURL(this.chainIdentifier, signer, tokenAddress, lnurl, amount, exactOut, additionalParams);
     }
 
-    createTrustedLNForGasSwap(signer: string, amount: BN, trustedIntermediaryUrl?: string): Promise<LnForGasSwap<T[ChainIdentifier]>> {
+    createTrustedLNForGasSwap(signer: string, amount: bigint, trustedIntermediaryUrl?: string): Promise<LnForGasSwap<T[ChainIdentifier]>> {
         return this.swapper.createTrustedLNForGasSwap(this.chainIdentifier, signer, amount, trustedIntermediaryUrl);
     }
 
-    create(signer: string, srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>, amount: BN, exactIn: boolean, lnurlWithdraw?: string): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
-    create(signer: string, srcToken: BtcToken<false>, dstToken: SCToken<ChainIdentifier>, amount: BN, exactIn: boolean): Promise<FromBTCSwap<T[ChainIdentifier]>>;
-    create(signer: string, srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<false>, amount: BN, exactIn: boolean, address: string): Promise<ToBTCSwap<T[ChainIdentifier]>>;
-    create(signer: string, srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: BN, exactIn: boolean, lnurlPay: string): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
-    create(signer: string, srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: BN, exactIn: false, lightningInvoice: string): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    create(signer: string, srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean, lnurlWithdraw?: string): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
+    create(signer: string, srcToken: BtcToken<false>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean): Promise<FromBTCSwap<T[ChainIdentifier]>>;
+    create(signer: string, srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<false>, amount: bigint, exactIn: boolean, address: string): Promise<ToBTCSwap<T[ChainIdentifier]>>;
+    create(signer: string, srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: bigint, exactIn: boolean, lnurlPay: string): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    create(signer: string, srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: bigint, exactIn: false, lightningInvoice: string): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates a swap from srcToken to dstToken, of a specific token amount, either specifying input amount (exactIn=true)
      *  or output amount (exactIn=false), NOTE: For regular -> BTC-LN (lightning) swaps the passed amount is ignored and
@@ -235,7 +234,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
      * @param addressLnurlLightningInvoice Bitcoin on-chain address, lightning invoice, LNURL-pay to pay or
      *  LNURL-withdrawal to withdraw money from
      */
-    create(signer: string, srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>, amount: BN, exactIn: boolean, addressLnurlLightningInvoice?: string): Promise<ISwap<T[ChainIdentifier]>> {
+    create(signer: string, srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>, amount: bigint, exactIn: boolean, addressLnurlLightningInvoice?: string): Promise<ISwap<T[ChainIdentifier]>> {
         return this.swapper.create(signer, srcToken as any, dstToken as any, amount, exactIn, addressLnurlLightningInvoice);
     }
 
@@ -270,7 +269,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
     /**
      * Returns the token balance of the wallet
      */
-    getBalance(signer: string, token: string | SCToken<ChainIdentifier>): Promise<BN> {
+    getBalance(signer: string, token: string | SCToken<ChainIdentifier>): Promise<bigint> {
         let tokenAddress: string;
         if(typeof(token) === 'string') {
             tokenAddress = token;
@@ -284,7 +283,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
     /**
      * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
      */
-    getSpendableBalance(signer: string, token: string | SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<BN> {
+    getSpendableBalance(signer: string, token: string | SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<bigint> {
         let tokenAddress: string;
         if(typeof(token) === 'string') {
             tokenAddress = token;
@@ -298,7 +297,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
     /**
      * Returns the native token balance of the wallet
      */
-    getNativeBalance(signer: string): Promise<BN> {
+    getNativeBalance(signer: string): Promise<bigint> {
         return this.swapper.getNativeBalance(this.chainIdentifier, signer);
     }
 

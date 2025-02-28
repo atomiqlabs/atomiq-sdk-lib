@@ -1,6 +1,5 @@
 /// <reference types="node" />
 /// <reference types="node" />
-import * as BN from "bn.js";
 import { FieldTypeEnum, RequestSchemaResult } from "../utils/paramcoders/SchemaVerifier";
 export type InfoHandlerResponse = {
     address: string;
@@ -70,7 +69,7 @@ export type SwapInit = {
 };
 export type BaseFromBTCSwapInit = SwapInit & {
     claimer: string;
-    amount: BN;
+    amount: bigint;
     exactOut: boolean;
     feeRate: Promise<string>;
 };
@@ -82,23 +81,23 @@ declare const ToBTCResponseSchema: {
     readonly prefix: FieldTypeEnum.String;
     readonly timeout: FieldTypeEnum.String;
     readonly signature: FieldTypeEnum.String;
-    readonly amount: FieldTypeEnum.BN;
+    readonly amount: FieldTypeEnum.BigInt;
     readonly address: FieldTypeEnum.String;
-    readonly satsPervByte: FieldTypeEnum.BN;
-    readonly networkFee: FieldTypeEnum.BN;
-    readonly swapFee: FieldTypeEnum.BN;
-    readonly totalFee: FieldTypeEnum.BN;
-    readonly total: FieldTypeEnum.BN;
-    readonly minRequiredExpiry: FieldTypeEnum.BN;
+    readonly satsPervByte: FieldTypeEnum.BigInt;
+    readonly networkFee: FieldTypeEnum.BigInt;
+    readonly swapFee: FieldTypeEnum.BigInt;
+    readonly totalFee: FieldTypeEnum.BigInt;
+    readonly total: FieldTypeEnum.BigInt;
+    readonly minRequiredExpiry: FieldTypeEnum.BigInt;
 };
 export type ToBTCResponseType = RequestSchemaResult<typeof ToBTCResponseSchema>;
 export type ToBTCInit = BaseToBTCSwapInit & {
     btcAddress: string;
     exactIn: boolean;
-    amount: BN;
+    amount: bigint;
     confirmationTarget: number;
     confirmations: number;
-    nonce: BN;
+    nonce: bigint;
     feeRate: Promise<string>;
 };
 declare const ToBTCLNResponseSchema: {
@@ -106,30 +105,30 @@ declare const ToBTCLNResponseSchema: {
     readonly prefix: FieldTypeEnum.String;
     readonly timeout: FieldTypeEnum.String;
     readonly signature: FieldTypeEnum.String;
-    readonly maxFee: FieldTypeEnum.BN;
-    readonly swapFee: FieldTypeEnum.BN;
-    readonly total: FieldTypeEnum.BN;
+    readonly maxFee: FieldTypeEnum.BigInt;
+    readonly swapFee: FieldTypeEnum.BigInt;
+    readonly total: FieldTypeEnum.BigInt;
     readonly confidence: FieldTypeEnum.Number;
     readonly address: FieldTypeEnum.String;
-    readonly routingFeeSats: FieldTypeEnum.BN;
+    readonly routingFeeSats: FieldTypeEnum.BigInt;
 };
 export type ToBTCLNResponseType = RequestSchemaResult<typeof ToBTCLNResponseSchema>;
 export type ToBTCLNInit = BaseToBTCSwapInit & {
     pr: string;
-    maxFee: BN;
-    expiryTimestamp: BN;
+    maxFee: bigint;
+    expiryTimestamp: bigint;
     feeRate: Promise<any>;
 };
 declare const ToBTCLNPrepareExactInSchema: {
-    readonly amount: FieldTypeEnum.BN;
+    readonly amount: FieldTypeEnum.BigInt;
     readonly reqId: FieldTypeEnum.String;
 };
 export type ToBTCLNPrepareExactInResponseType = RequestSchemaResult<typeof ToBTCLNPrepareExactInSchema>;
 export type ToBTCLNPrepareExactIn = BaseToBTCSwapInit & {
     pr: string;
-    amount: BN;
-    maxFee: BN;
-    expiryTimestamp: BN;
+    amount: bigint;
+    maxFee: bigint;
+    expiryTimestamp: bigint;
 };
 export type ToBTCLNInitExactIn = {
     pr: string;
@@ -144,22 +143,22 @@ declare const FromBTCResponseSchema: {
     readonly prefix: FieldTypeEnum.String;
     readonly timeout: FieldTypeEnum.String;
     readonly signature: FieldTypeEnum.String;
-    readonly amount: FieldTypeEnum.BN;
+    readonly amount: FieldTypeEnum.BigInt;
     readonly btcAddress: FieldTypeEnum.String;
     readonly address: FieldTypeEnum.String;
-    readonly swapFee: FieldTypeEnum.BN;
-    readonly total: FieldTypeEnum.BN;
+    readonly swapFee: FieldTypeEnum.BigInt;
+    readonly total: FieldTypeEnum.BigInt;
     readonly confirmations: FieldTypeEnum.NumberOptional;
 };
 export type FromBTCResponseType = RequestSchemaResult<typeof FromBTCResponseSchema>;
 export type FromBTCInit = BaseFromBTCSwapInit & {
-    sequence: BN;
+    sequence: bigint;
     claimerBounty: Promise<{
-        feePerBlock: BN;
+        feePerBlock: bigint;
         safetyFactor: number;
-        startTimestamp: BN;
+        startTimestamp: bigint;
         addBlock: number;
-        addFee: BN;
+        addFee: bigint;
     }>;
 };
 declare const FromBTCLNResponseSchema: {
@@ -197,7 +196,7 @@ export declare class IntermediaryAPI {
      *
      * @throws {RequestError} If non-200 http response code is returned
      */
-    static getRefundAuthorization(url: string, paymentHash: string, sequence: BN, timeout?: number, abortSignal?: AbortSignal): Promise<RefundAuthorizationResponse>;
+    static getRefundAuthorization(url: string, paymentHash: string, sequence: bigint, timeout?: number, abortSignal?: AbortSignal): Promise<RefundAuthorizationResponse>;
     /**
      * Returns the information about the payment of the From BTCLN swaps
      *

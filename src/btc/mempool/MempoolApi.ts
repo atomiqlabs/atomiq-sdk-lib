@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {Buffer} from "buffer";
 import {fetchWithTimeout, promiseAny, tryWithRetries} from "../../utils/Utils";
 import {RequestError} from "../../errors/RequestError";
@@ -351,19 +350,19 @@ export class MempoolApi {
      * @param address
      */
     async getAddressBalances(address: string): Promise<{
-        confirmedBalance: BN,
-        unconfirmedBalance: BN
+        confirmedBalance: bigint,
+        unconfirmedBalance: bigint
     }> {
         const jsonBody = await this.request<AddressInfo>("address/"+address, "obj");
 
-        const confirmedInput = new BN(jsonBody.chain_stats.funded_txo_sum);
-        const confirmedOutput = new BN(jsonBody.chain_stats.spent_txo_sum);
-        const unconfirmedInput = new BN(jsonBody.mempool_stats.funded_txo_sum);
-        const unconfirmedOutput = new BN(jsonBody.mempool_stats.spent_txo_sum);
+        const confirmedInput = BigInt(jsonBody.chain_stats.funded_txo_sum);
+        const confirmedOutput = BigInt(jsonBody.chain_stats.spent_txo_sum);
+        const unconfirmedInput = BigInt(jsonBody.mempool_stats.funded_txo_sum);
+        const unconfirmedOutput = BigInt(jsonBody.mempool_stats.spent_txo_sum);
 
         return {
-            confirmedBalance: confirmedInput.sub(confirmedOutput),
-            unconfirmedBalance: unconfirmedInput.sub(unconfirmedOutput)
+            confirmedBalance: confirmedInput - confirmedOutput,
+            unconfirmedBalance: unconfirmedInput - unconfirmedOutput
         }
     }
 
@@ -390,10 +389,10 @@ export class MempoolApi {
             block_hash: string,
             block_time: number
         },
-        value: BN
+        value: bigint
     }[]> {
         let jsonBody: any = await this.request<any>("address/"+address+"/utxo", "obj");
-        jsonBody.forEach(e => e.value = new BN(e.value));
+        jsonBody.forEach(e => e.value = BigInt(e.value));
 
         return jsonBody;
     }

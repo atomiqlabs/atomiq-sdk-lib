@@ -1,5 +1,4 @@
-import * as BN from "bn.js";
-import { PaymentRequestObject, TagsObject } from "bolt11";
+import { PaymentRequestObject, TagsObject } from "@atomiqlabs/bolt11";
 export type LNURLWithdrawParams = {
     tag: "withdrawRequest";
     k1: string;
@@ -48,8 +47,8 @@ export type LNURLPayParamsWithUrl = LNURLPayParams & {
 };
 export type LNURLPay = {
     type: "pay";
-    min: BN;
-    max: BN;
+    min: bigint;
+    max: bigint;
     commentMaxLength: number;
     shortDescription: string;
     longDescription?: string;
@@ -59,8 +58,8 @@ export type LNURLPay = {
 export declare function isLNURLPay(value: any): value is LNURLPay;
 export type LNURLWithdraw = {
     type: "withdraw";
-    min: BN;
-    max: BN;
+    min: bigint;
+    max: bigint;
     params: LNURLWithdrawParamsWithUrl;
 };
 export declare function isLNURLWithdraw(value: any): value is LNURLWithdraw;
@@ -133,7 +132,7 @@ export declare class LNURL {
      * @param abortSignal
      * @throws {RequestError} If the response is non-200, status: ERROR, or invalid format
      */
-    static useLNURLPay(payRequest: LNURLPayParamsWithUrl, amount: BN, comment?: string, timeout?: number, abortSignal?: AbortSignal): Promise<{
+    static useLNURLPay(payRequest: LNURLPayParamsWithUrl, amount: bigint, comment?: string, timeout?: number, abortSignal?: AbortSignal): Promise<{
         invoice: string;
         parsedInvoice: PaymentRequestObject & {
             tagsObject: TagsObject;

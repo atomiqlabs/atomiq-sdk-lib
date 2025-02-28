@@ -94,8 +94,7 @@ class SwapperWithChain {
     getSupportedTokens(swapType) {
         const arr = [];
         this.getSupportedTokenAddresses(swapType).forEach(tokenAddress => {
-            var _a, _b;
-            const token = (_b = (_a = this.swapper.tokens) === null || _a === void 0 ? void 0 : _a[this.chainIdentifier]) === null || _b === void 0 ? void 0 : _b[tokenAddress];
+            const token = this.swapper.tokens?.[this.chainIdentifier]?.[tokenAddress];
             if (token != null)
                 arr.push(token);
         });

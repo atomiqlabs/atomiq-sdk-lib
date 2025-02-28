@@ -6,7 +6,7 @@ import { Intermediary } from "../../../intermediaries/Intermediary";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
-import { Network } from "bitcoinjs-lib";
+import { BTC_NETWORK } from "@scure/btc-signer/utils";
 export type ToBTCOptions = {
     confirmationTarget?: number;
     confirmations?: number;
@@ -14,7 +14,7 @@ export type ToBTCOptions = {
 export type ToBTCWrapperOptions = ISwapWrapperOptions & {
     safetyFactor?: number;
     maxConfirmations?: number;
-    bitcoinNetwork?: Network;
+    bitcoinNetwork?: BTC_NETWORK;
     bitcoinBlocktime?: number;
     maxExpectedOnchainSendSafetyFactor?: number;
     maxExpectedOnchainSendGracePeriodBlocks?: number;

@@ -1,4 +1,7 @@
 import {RequestError} from "../errors/RequestError";
+import {BTC_NETWORK} from "@scure/btc-signer/utils";
+import {Buffer} from "buffer";
+import {Address, OutScript} from "@scure/btc-signer";
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
@@ -292,4 +295,35 @@ export function timeoutSignal(timeout: number, abortReason?: any, abortSignal?: 
         });
     }
     return abortController.signal;
+}
+
+export function bigIntMin(a: bigint, b: bigint): bigint {
+    return a > b ? b : a;
+}
+
+export function bigIntMax(a: bigint, b: bigint): bigint {
+    return b > a ? b : a;
+}
+
+export function bigIntCompare(a: bigint, b: bigint): -1 | 0 | 1 {
+    return a > b ? 1 : a===b ? 0 : -1;
+}
+
+export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
+    const outputScript = Address(network).decode(address);
+    switch(outputScript.type) {
+        case "pkh":
+        case "sh":
+        case "wpkh":
+        case "wsh":
+            return Buffer.from(OutScript.encode({
+                type: outputScript.type,
+                hash: outputScript.hash
+            }));
+        case "tr":
+            return Buffer.from(OutScript.encode({
+                type: "tr",
+                pubkey: outputScript.pubkey
+            }));
+    }
 }

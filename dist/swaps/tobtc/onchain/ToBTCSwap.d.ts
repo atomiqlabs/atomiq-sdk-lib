@@ -1,16 +1,15 @@
 import { ToBTCWrapper } from "./ToBTCWrapper";
 import { IToBTCSwap, IToBTCSwapInit } from "../IToBTCSwap";
 import { SwapType } from "../../SwapType";
-import * as BN from "bn.js";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { BtcToken, TokenAmount } from "../../Tokens";
 export type ToBTCSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     address: string;
-    amount: BN;
+    amount: bigint;
     confirmationTarget: number;
     satsPerVByte: number;
     requiredConfirmations: number;
-    nonce: BN;
+    nonce: bigint;
 };
 export declare function isToBTCSwapInit<T extends SwapData>(obj: any): obj is ToBTCSwapInit<T>;
 export declare class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {

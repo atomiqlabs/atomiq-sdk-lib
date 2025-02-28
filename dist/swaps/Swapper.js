@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Swapper = void 0;
 const base_1 = require("@atomiqlabs/base");
@@ -16,9 +7,7 @@ const ToBTCWrapper_1 = require("./tobtc/onchain/ToBTCWrapper");
 const FromBTCLNWrapper_1 = require("./frombtc/ln/FromBTCLNWrapper");
 const FromBTCWrapper_1 = require("./frombtc/onchain/FromBTCWrapper");
 const IntermediaryDiscovery_1 = require("../intermediaries/IntermediaryDiscovery");
-const bitcoinjs_lib_1 = require("bitcoinjs-lib");
-const bolt11_1 = require("bolt11");
-const BN = require("bn.js");
+const bolt11_1 = require("@atomiqlabs/bolt11");
 const IntermediaryError_1 = require("../errors/IntermediaryError");
 const SwapType_1 = require("./SwapType");
 const MempoolBtcRelaySynchronizer_1 = require("../btc/mempool/synchronizer/MempoolBtcRelaySynchronizer");
@@ -31,18 +20,18 @@ const RequestError_1 = require("../errors/RequestError");
 const SwapperWithChain_1 = require("./SwapperWithChain");
 const OnchainForGasWrapper_1 = require("./swapforgas/onchain/OnchainForGasWrapper");
 const randomBytes = require("randombytes");
+const utils_1 = require("@scure/btc-signer/utils");
+const btc_signer_1 = require("@scure/btc-signer");
 class Swapper extends events_1.EventEmitter {
     constructor(bitcoinRpc, chainsData, pricing, tokens, options) {
-        var _a, _b;
-        var _c;
+        var _a;
         super();
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
-        const storagePrefix = (options === null || options === void 0 ? void 0 : options.storagePrefix) || "";
+        const storagePrefix = options?.storagePrefix || "";
         options.bitcoinNetwork = options.bitcoinNetwork == null ? base_1.BitcoinNetwork.TESTNET : options.bitcoinNetwork;
-        (_a = options.storageCtor) !== null && _a !== void 0 ? _a : (options.storageCtor = (name) => new IndexedDBStorageManager_1.IndexedDBStorageManager(name));
-        this.bitcoinNetwork = options.bitcoinNetwork === base_1.BitcoinNetwork.MAINNET ? bitcoinjs_lib_1.networks.bitcoin :
-            options.bitcoinNetwork === base_1.BitcoinNetwork.REGTEST ? bitcoinjs_lib_1.networks.regtest :
-                options.bitcoinNetwork === base_1.BitcoinNetwork.TESTNET ? bitcoinjs_lib_1.networks.testnet : null;
+        options.storageCtor ?? (options.storageCtor = (name) => new IndexedDBStorageManager_1.IndexedDBStorageManager(name));
+        this.bitcoinNetwork = options.bitcoinNetwork === base_1.BitcoinNetwork.MAINNET ? utils_1.NETWORK :
+            options.bitcoinNetwork === base_1.BitcoinNetwork.TESTNET ? utils_1.TEST_NETWORK : null;
         this.prices = pricing;
         this.bitcoinRpc = bitcoinRpc;
         this.mempoolApi = bitcoinRpc.api;
@@ -50,7 +39,7 @@ class Swapper extends events_1.EventEmitter {
         for (let tokenData of tokens) {
             for (let chainId in tokenData.chains) {
                 const chainData = tokenData.chains[chainId];
-                (_b = (_c = this.tokens)[chainId]) !== null && _b !== void 0 ? _b : (_c[chainId] = {});
+                (_a = this.tokens)[chainId] ?? (_a[chainId] = {});
                 this.tokens[chainId][chainData.address] = {
                     chain: "SC",
                     chainId,
@@ -65,10 +54,9 @@ class Swapper extends events_1.EventEmitter {
             this.emit("swapState", swap);
         };
         this.chains = (0, Utils_1.objectMap)(chainsData, (chainData, key) => {
-            var _a;
             const { swapContract, chainEvents, btcRelay } = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer_1.MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
-            const _storagePrefix = (_a = chainData.storagePrefix) !== null && _a !== void 0 ? _a : storagePrefix + key + "-";
+            const _storagePrefix = chainData.storagePrefix ?? storagePrefix + key + "-";
             const tobtcln = new ToBTCLNWrapper_1.ToBTCLNWrapper(key, options.storageCtor(_storagePrefix + "Swaps-ToBTCLN"), swapContract, chainEvents, pricing, tokens, chainData.swapDataConstructor, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout,
@@ -149,7 +137,7 @@ class Swapper extends events_1.EventEmitter {
      */
     isValidBitcoinAddress(addr) {
         try {
-            bitcoinjs_lib_1.address.toOutputScript(addr, this.bitcoinNetwork);
+            (0, btc_signer_1.Address)(this.bitcoinNetwork).decode(addr);
             return true;
         }
         catch (e) {
@@ -195,7 +183,7 @@ class Swapper extends events_1.EventEmitter {
     getLightningInvoiceValue(lnpr) {
         const parsed = (0, bolt11_1.decode)(lnpr);
         if (parsed.millisatoshis != null)
-            return new BN(parsed.millisatoshis).add(new BN(999)).div(new BN(1000));
+            return (BigInt(parsed.millisatoshis) + 999n) / 1000n;
         return null;
     }
     /**
@@ -223,9 +211,9 @@ class Swapper extends events_1.EventEmitter {
         if (this.intermediaryDiscovery != null) {
             const max = this.intermediaryDiscovery.getSwapMaximum(chainIdentifier, type, token);
             if (max != null)
-                return new BN(max);
+                return BigInt(max);
         }
-        return new BN(0);
+        return 0n;
     }
     /**
      * Returns minimum possible swap amount
@@ -238,9 +226,9 @@ class Swapper extends events_1.EventEmitter {
         if (this.intermediaryDiscovery != null) {
             const min = this.intermediaryDiscovery.getSwapMinimum(chainIdentifier, type, token);
             if (min != null)
-                return new BN(min);
+                return BigInt(min);
         }
-        return new BN(0);
+        return 0n;
     }
     /**
      * Initializes the swap storage and loads existing swaps, needs to be called before any other action
@@ -248,57 +236,53 @@ class Swapper extends events_1.EventEmitter {
      * @param noTimers      Whether to run without setting up the watchdog timers
      * @param noEvents      Whether to leave out event handler
      */
-    init(noTimers = false, noEvents = false) {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.logger.info("init(): Intializing swapper: ", this);
-            for (let chainIdentifier in this.chains) {
-                const { swapContract, chainEvents, tobtcln, tobtc, frombtcln, frombtc, lnforgas, onchainforgas } = this.chains[chainIdentifier];
-                yield swapContract.start();
-                this.logger.info("init(): Intialized swap contract: " + chainIdentifier);
-                if (!noEvents)
-                    yield chainEvents.init();
-                this.logger.info("init(): Intialized events: " + chainIdentifier);
-                this.logger.info("init(): Initializing To BTCLN: " + chainIdentifier);
-                yield tobtcln.init(noTimers);
-                this.logger.info("init(): Initializing To BTC: " + chainIdentifier);
-                yield tobtc.init(noTimers);
-                this.logger.info("init(): Initializing From BTCLN: " + chainIdentifier);
-                yield frombtcln.init(noTimers);
-                this.logger.info("init(): Initializing From BTC: " + chainIdentifier);
-                yield frombtc.init(noTimers);
-                this.logger.info("init(): Initializing From BTCLN to gas: " + chainIdentifier);
-                yield lnforgas.init(noTimers);
-                this.logger.info("init(): Initializing From BTC to gas: " + chainIdentifier);
-                yield onchainforgas.init(noTimers);
-            }
-            this.logger.info("init(): Initializing intermediary discovery");
-            yield this.intermediaryDiscovery.init();
-            if (this.options.defaultTrustedIntermediaryUrl != null) {
-                this.defaultTrustedIntermediary = yield this.intermediaryDiscovery.getIntermediary(this.options.defaultTrustedIntermediaryUrl);
-            }
-        });
+    async init(noTimers = false, noEvents = false) {
+        this.logger.info("init(): Intializing swapper: ", this);
+        for (let chainIdentifier in this.chains) {
+            const { swapContract, chainEvents, tobtcln, tobtc, frombtcln, frombtc, lnforgas, onchainforgas } = this.chains[chainIdentifier];
+            await swapContract.start();
+            this.logger.info("init(): Intialized swap contract: " + chainIdentifier);
+            if (!noEvents)
+                await chainEvents.init();
+            this.logger.info("init(): Intialized events: " + chainIdentifier);
+            this.logger.info("init(): Initializing To BTCLN: " + chainIdentifier);
+            await tobtcln.init(noTimers);
+            this.logger.info("init(): Initializing To BTC: " + chainIdentifier);
+            await tobtc.init(noTimers);
+            this.logger.info("init(): Initializing From BTCLN: " + chainIdentifier);
+            await frombtcln.init(noTimers);
+            this.logger.info("init(): Initializing From BTC: " + chainIdentifier);
+            await frombtc.init(noTimers);
+            this.logger.info("init(): Initializing From BTCLN to gas: " + chainIdentifier);
+            await lnforgas.init(noTimers);
+            this.logger.info("init(): Initializing From BTC to gas: " + chainIdentifier);
+            await onchainforgas.init(noTimers);
+        }
+        this.logger.info("init(): Initializing intermediary discovery");
+        await this.intermediaryDiscovery.init();
+        if (this.options.defaultTrustedIntermediaryUrl != null) {
+            this.defaultTrustedIntermediary = await this.intermediaryDiscovery.getIntermediary(this.options.defaultTrustedIntermediaryUrl);
+        }
     }
     /**
      * Stops listening for onchain events and closes this Swapper instance
      */
-    stop() {
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let chainIdentifier in this.chains) {
-                const { tobtcln, tobtc, frombtcln, frombtc, lnforgas, onchainforgas } = this.chains[chainIdentifier];
-                tobtcln.events.off("swapState", this.swapStateListener);
-                tobtc.events.off("swapState", this.swapStateListener);
-                frombtcln.events.off("swapState", this.swapStateListener);
-                frombtc.events.off("swapState", this.swapStateListener);
-                lnforgas.events.off("swapState", this.swapStateListener);
-                onchainforgas.events.off("swapState", this.swapStateListener);
-                yield tobtcln.stop();
-                yield tobtc.stop();
-                yield frombtcln.stop();
-                yield frombtc.stop();
-                yield lnforgas.stop();
-                yield onchainforgas.stop();
-            }
-        });
+    async stop() {
+        for (let chainIdentifier in this.chains) {
+            const { tobtcln, tobtc, frombtcln, frombtc, lnforgas, onchainforgas } = this.chains[chainIdentifier];
+            tobtcln.events.off("swapState", this.swapStateListener);
+            tobtc.events.off("swapState", this.swapStateListener);
+            frombtcln.events.off("swapState", this.swapStateListener);
+            frombtc.events.off("swapState", this.swapStateListener);
+            lnforgas.events.off("swapState", this.swapStateListener);
+            onchainforgas.events.off("swapState", this.swapStateListener);
+            await tobtcln.stop();
+            await tobtc.stop();
+            await frombtcln.stop();
+            await frombtc.stop();
+            await lnforgas.stop();
+            await onchainforgas.stop();
+        }
     }
     /**
      * Returns a set of supported tokens by all the intermediaries offering a specific swap service
@@ -308,14 +292,13 @@ class Swapper extends events_1.EventEmitter {
     getSupportedTokens(swapType) {
         const tokens = [];
         this.intermediaryDiscovery.intermediaries.forEach(lp => {
-            var _a, _b;
             if (lp.services[swapType] == null)
                 return;
             if (lp.services[swapType].chainTokens == null)
                 return;
             for (let chainId in lp.services[swapType].chainTokens) {
                 for (let tokenAddress of lp.services[swapType].chainTokens[chainId]) {
-                    const token = (_b = (_a = this.tokens) === null || _a === void 0 ? void 0 : _a[chainId]) === null || _b === void 0 ? void 0 : _b[tokenAddress];
+                    const token = this.tokens?.[chainId]?.[tokenAddress];
                     if (token != null)
                         tokens.push(token);
                 }
@@ -352,12 +335,21 @@ class Swapper extends events_1.EventEmitter {
      * @throws {Error} when no intermediary was found
      * @throws {Error} if the chain with the provided identifier cannot be found
      */
-    createSwap(chainIdentifier, create, amountData, swapType, maxWaitTimeMS = 2000) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.chains[chainIdentifier] == null)
-                throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
-            let candidates;
-            const inBtc = swapType === SwapType_1.SwapType.TO_BTCLN || swapType === SwapType_1.SwapType.TO_BTC ? !amountData.exactIn : amountData.exactIn;
+    async createSwap(chainIdentifier, create, amountData, swapType, maxWaitTimeMS = 2000) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        let candidates;
+        const inBtc = swapType === SwapType_1.SwapType.TO_BTCLN || swapType === SwapType_1.SwapType.TO_BTC ? !amountData.exactIn : amountData.exactIn;
+        if (!inBtc) {
+            //Get candidates not based on the amount
+            candidates = this.intermediaryDiscovery.getSwapCandidates(chainIdentifier, swapType, amountData.token);
+        }
+        else {
+            candidates = this.intermediaryDiscovery.getSwapCandidates(chainIdentifier, swapType, amountData.token, amountData.amount);
+        }
+        if (candidates.length === 0) {
+            this.logger.warn("createSwap(): No valid intermediary found, reloading intermediary database...");
+            await this.intermediaryDiscovery.reloadIntermediaries();
             if (!inBtc) {
                 //Get candidates not based on the amount
                 candidates = this.intermediaryDiscovery.getSwapCandidates(chainIdentifier, swapType, amountData.token);
@@ -365,95 +357,84 @@ class Swapper extends events_1.EventEmitter {
             else {
                 candidates = this.intermediaryDiscovery.getSwapCandidates(chainIdentifier, swapType, amountData.token, amountData.amount);
             }
-            if (candidates.length === 0) {
-                this.logger.warn("createSwap(): No valid intermediary found, reloading intermediary database...");
-                yield this.intermediaryDiscovery.reloadIntermediaries();
-                if (!inBtc) {
-                    //Get candidates not based on the amount
-                    candidates = this.intermediaryDiscovery.getSwapCandidates(chainIdentifier, swapType, amountData.token);
-                }
-                else {
-                    candidates = this.intermediaryDiscovery.getSwapCandidates(chainIdentifier, swapType, amountData.token, amountData.amount);
-                }
-                if (candidates.length === 0)
-                    throw new Error("No intermediary found!");
-            }
-            const abortController = new AbortController();
-            this.logger.debug("createSwap() Swap candidates: ", candidates.map(lp => lp.url).join());
-            const quotePromises = yield create(candidates, abortController.signal, this.chains[chainIdentifier]);
-            const quotes = yield new Promise((resolve, reject) => {
-                let min;
-                let max;
-                let error;
-                let numResolved = 0;
-                let quotes = [];
-                let timeout;
-                quotePromises.forEach(data => {
-                    data.quote.then(quote => {
-                        if (numResolved === 0) {
-                            timeout = setTimeout(() => {
-                                abortController.abort(new Error("Timed out waiting for quote!"));
-                                resolve(quotes);
-                            }, maxWaitTimeMS);
+            if (candidates.length === 0)
+                throw new Error("No intermediary found!");
+        }
+        const abortController = new AbortController();
+        this.logger.debug("createSwap() Swap candidates: ", candidates.map(lp => lp.url).join());
+        const quotePromises = await create(candidates, abortController.signal, this.chains[chainIdentifier]);
+        const quotes = await new Promise((resolve, reject) => {
+            let min;
+            let max;
+            let error;
+            let numResolved = 0;
+            let quotes = [];
+            let timeout;
+            quotePromises.forEach(data => {
+                data.quote.then(quote => {
+                    if (numResolved === 0) {
+                        timeout = setTimeout(() => {
+                            abortController.abort(new Error("Timed out waiting for quote!"));
+                            resolve(quotes);
+                        }, maxWaitTimeMS);
+                    }
+                    numResolved++;
+                    quotes.push({
+                        quote,
+                        intermediary: data.intermediary
+                    });
+                    if (numResolved === quotePromises.length) {
+                        clearTimeout(timeout);
+                        resolve(quotes);
+                        return;
+                    }
+                }).catch(e => {
+                    numResolved++;
+                    if (e instanceof IntermediaryError_1.IntermediaryError) {
+                        //Blacklist that node
+                        this.intermediaryDiscovery.removeIntermediary(data.intermediary);
+                    }
+                    if (e instanceof RequestError_1.OutOfBoundsError) {
+                        if (min == null || max == null) {
+                            min = e.min;
+                            max = e.max;
                         }
-                        numResolved++;
-                        quotes.push({
-                            quote,
-                            intermediary: data.intermediary
-                        });
-                        if (numResolved === quotePromises.length) {
+                        else {
+                            min = (0, Utils_1.bigIntMin)(min, e.min);
+                            max = (0, Utils_1.bigIntMax)(max, e.max);
+                        }
+                    }
+                    this.logger.error("createSwap(): Intermediary " + data.intermediary.url + " error: ", e);
+                    error = e;
+                    if (numResolved === quotePromises.length) {
+                        if (timeout != null)
                             clearTimeout(timeout);
+                        if (quotes.length > 0) {
                             resolve(quotes);
                             return;
                         }
-                    }).catch(e => {
-                        numResolved++;
-                        if (e instanceof IntermediaryError_1.IntermediaryError) {
-                            //Blacklist that node
-                            this.intermediaryDiscovery.removeIntermediary(data.intermediary);
+                        if (min != null && max != null) {
+                            reject(new RequestError_1.OutOfBoundsError("Out of bounds", 400, min, max));
+                            return;
                         }
-                        if (e instanceof RequestError_1.OutOfBoundsError) {
-                            if (min == null || max == null) {
-                                min = e.min;
-                                max = e.max;
-                            }
-                            else {
-                                min = BN.min(min, e.min);
-                                max = BN.max(max, e.max);
-                            }
-                        }
-                        this.logger.error("createSwap(): Intermediary " + data.intermediary.url + " error: ", e);
-                        error = e;
-                        if (numResolved === quotePromises.length) {
-                            if (timeout != null)
-                                clearTimeout(timeout);
-                            if (quotes.length > 0) {
-                                resolve(quotes);
-                                return;
-                            }
-                            if (min != null && max != null) {
-                                reject(new RequestError_1.OutOfBoundsError("Out of bounds", 400, min, max));
-                                return;
-                            }
-                            reject(error);
-                        }
-                    });
+                        reject(error);
+                    }
                 });
             });
-            //TODO: Intermediary's reputation is not taken into account!
-            quotes.sort((a, b) => {
-                if (amountData.exactIn) {
-                    //Compare outputs
-                    return b.quote.getOutput().rawAmount.cmp(a.quote.getOutput().rawAmount);
-                }
-                else {
-                    //Compare inputs
-                    return a.quote.getInput().rawAmount.cmp(b.quote.getInput().rawAmount);
-                }
-            });
-            this.logger.debug("createSwap(): Sorted quotes, best price to worst: ", quotes);
-            return quotes[0].quote;
         });
+        //TODO: Intermediary's reputation is not taken into account!
+        quotes.sort((a, b) => {
+            if (amountData.exactIn) {
+                //Compare outputs
+                return (0, Utils_1.bigIntCompare)(b.quote.getOutput().rawAmount, a.quote.getOutput().rawAmount);
+            }
+            else {
+                //Compare inputs
+                return (0, Utils_1.bigIntCompare)(a.quote.getOutput().rawAmount, b.quote.getOutput().rawAmount);
+            }
+        });
+        this.logger.debug("createSwap(): Sorted quotes, best price to worst: ", quotes);
+        return quotes[0].quote;
     }
     /**
      * Creates To BTC swap
@@ -495,21 +476,19 @@ class Swapper extends events_1.EventEmitter {
      * @param maxRoutingPPM         Maximum routing fee to use - proportional fee in PPM (higher routing fee means higher probability of payment success)
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      */
-    createToBTCLNSwap(chainIdentifier, signer, tokenAddress, paymentRequest, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, additionalParams = this.options.defaultAdditionalParameters) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const parsedPR = (0, bolt11_1.decode)(paymentRequest);
-            const amountData = {
-                amount: new BN(parsedPR.millisatoshis).add(new BN(999)).div(new BN(1000)),
-                token: tokenAddress,
-                exactIn: false
-            };
-            expirySeconds !== null && expirySeconds !== void 0 ? expirySeconds : (expirySeconds = 5 * 24 * 3600);
-            return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.tobtcln.create(signer, paymentRequest, amountData, candidates, {
-                expirySeconds,
-                maxRoutingPPM,
-                maxRoutingBaseFee
-            }, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.TO_BTCLN);
-        });
+    async createToBTCLNSwap(chainIdentifier, signer, tokenAddress, paymentRequest, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, additionalParams = this.options.defaultAdditionalParameters) {
+        const parsedPR = (0, bolt11_1.decode)(paymentRequest);
+        const amountData = {
+            amount: (BigInt(parsedPR.millisatoshis) + 999n) / 1000n,
+            token: tokenAddress,
+            exactIn: false
+        };
+        expirySeconds ?? (expirySeconds = 5 * 24 * 3600);
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.tobtcln.create(signer, paymentRequest, amountData, candidates, {
+            expirySeconds,
+            maxRoutingPPM,
+            maxRoutingBaseFee
+        }, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.TO_BTCLN);
     }
     /**
      * Creates To BTCLN swap via LNURL-pay
@@ -526,21 +505,19 @@ class Swapper extends events_1.EventEmitter {
      * @param exactIn               Whether to do an exact in swap instead of exact out
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      */
-    createToBTCLNSwapViaLNURL(chainIdentifier, signer, tokenAddress, lnurlPay, amount, comment, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, exactIn, additionalParams = this.options.defaultAdditionalParameters) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const amountData = {
-                amount,
-                token: tokenAddress,
-                exactIn
-            };
-            expirySeconds !== null && expirySeconds !== void 0 ? expirySeconds : (expirySeconds = 5 * 24 * 3600);
-            return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.tobtcln.createViaLNURL(signer, typeof (lnurlPay) === "string" ? lnurlPay : lnurlPay.params, amountData, candidates, {
-                expirySeconds,
-                comment,
-                maxRoutingBaseFee,
-                maxRoutingPPM
-            }, additionalParams, abortSignal), amountData, SwapType_1.SwapType.TO_BTCLN);
-        });
+    async createToBTCLNSwapViaLNURL(chainIdentifier, signer, tokenAddress, lnurlPay, amount, comment, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, exactIn, additionalParams = this.options.defaultAdditionalParameters) {
+        const amountData = {
+            amount,
+            token: tokenAddress,
+            exactIn
+        };
+        expirySeconds ?? (expirySeconds = 5 * 24 * 3600);
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.tobtcln.createViaLNURL(signer, typeof (lnurlPay) === "string" ? lnurlPay : lnurlPay.params, amountData, candidates, {
+            expirySeconds,
+            comment,
+            maxRoutingBaseFee,
+            maxRoutingPPM
+        }, additionalParams, abortSignal), amountData, SwapType_1.SwapType.TO_BTCLN);
     }
     /**
      * Creates From BTC swap
@@ -552,15 +529,13 @@ class Swapper extends events_1.EventEmitter {
      * @param exactOut              Whether to use a exact out instead of exact in
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      */
-    createFromBTCSwap(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const amountData = {
-                amount,
-                token: tokenAddress,
-                exactIn: !exactOut
-            };
-            return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.frombtc.create(signer, amountData, candidates, null, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.FROM_BTC);
-        });
+    async createFromBTCSwap(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters) {
+        const amountData = {
+            amount,
+            token: tokenAddress,
+            exactIn: !exactOut
+        };
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.frombtc.create(signer, amountData, candidates, null, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.FROM_BTC);
     }
     /**
      * Creates From BTCLN swap
@@ -573,17 +548,15 @@ class Swapper extends events_1.EventEmitter {
      * @param descriptionHash   Description hash for ln invoice
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
      */
-    createFromBTCLNSwap(chainIdentifier, signer, tokenAddress, amount, exactOut, descriptionHash, additionalParams = this.options.defaultAdditionalParameters) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const amountData = {
-                amount,
-                token: tokenAddress,
-                exactIn: !exactOut
-            };
-            return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.frombtcln.create(signer, amountData, candidates, {
-                descriptionHash
-            }, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.FROM_BTCLN);
-        });
+    async createFromBTCLNSwap(chainIdentifier, signer, tokenAddress, amount, exactOut, descriptionHash, additionalParams = this.options.defaultAdditionalParameters) {
+        const amountData = {
+            amount,
+            token: tokenAddress,
+            exactIn: !exactOut
+        };
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.frombtcln.create(signer, amountData, candidates, {
+            descriptionHash
+        }, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.FROM_BTCLN);
     }
     /**
      * Creates From BTCLN swap, withdrawing from LNURL-withdraw
@@ -596,15 +569,13 @@ class Swapper extends events_1.EventEmitter {
      * @param exactOut          Whether to use exact out instead of exact in
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
      */
-    createFromBTCLNSwapViaLNURL(chainIdentifier, signer, tokenAddress, lnurl, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const amountData = {
-                amount,
-                token: tokenAddress,
-                exactIn: !exactOut
-            };
-            return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.frombtcln.createViaLNURL(signer, typeof (lnurl) === "string" ? lnurl : lnurl.params, amountData, candidates, additionalParams, abortSignal), amountData, SwapType_1.SwapType.FROM_BTCLN);
-        });
+    async createFromBTCLNSwapViaLNURL(chainIdentifier, signer, tokenAddress, lnurl, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters) {
+        const amountData = {
+            amount,
+            token: tokenAddress,
+            exactIn: !exactOut
+        };
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.frombtcln.createViaLNURL(signer, typeof (lnurl) === "string" ? lnurl : lnurl.params, amountData, candidates, additionalParams, abortSignal), amountData, SwapType_1.SwapType.FROM_BTCLN);
     }
     /**
      * Creates a swap from srcToken to dstToken, of a specific token amount, either specifying input amount (exactIn=true)
@@ -675,10 +646,9 @@ class Swapper extends events_1.EventEmitter {
      * @throws {Error}                  If no trusted intermediary specified
      */
     createTrustedLNForGasSwap(chainId, signer, amount, trustedIntermediaryOrUrl) {
-        var _a;
         if (this.chains[chainId] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainId);
-        const useUrl = (_a = trustedIntermediaryOrUrl !== null && trustedIntermediaryOrUrl !== void 0 ? trustedIntermediaryOrUrl : this.defaultTrustedIntermediary) !== null && _a !== void 0 ? _a : this.options.defaultTrustedIntermediaryUrl;
+        const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary ?? this.options.defaultTrustedIntermediaryUrl;
         if (useUrl == null)
             throw new Error("No trusted intermediary specified!");
         return this.chains[chainId].lnforgas.create(signer, amount, useUrl);
@@ -694,77 +664,68 @@ class Swapper extends events_1.EventEmitter {
      * @throws {Error}                  If no trusted intermediary specified
      */
     createTrustedOnchainForGasSwap(chainId, signer, amount, refundAddress, trustedIntermediaryOrUrl) {
-        var _a;
         if (this.chains[chainId] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainId);
-        const useUrl = (_a = trustedIntermediaryOrUrl !== null && trustedIntermediaryOrUrl !== void 0 ? trustedIntermediaryOrUrl : this.defaultTrustedIntermediary) !== null && _a !== void 0 ? _a : this.options.defaultTrustedIntermediaryUrl;
+        const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary ?? this.options.defaultTrustedIntermediaryUrl;
         if (useUrl == null)
             throw new Error("No trusted intermediary specified!");
         return this.chains[chainId].onchainforgas.create(signer, amount, useUrl, refundAddress);
     }
-    getAllSwaps(chainId, signer) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (chainId == null) {
-                const res = [];
-                for (let chainId in this.chains) {
-                    const chainData = this.chains[chainId];
-                    [].concat(yield chainData.tobtcln.getAllSwaps(), yield chainData.tobtc.getAllSwaps(), yield chainData.frombtcln.getAllSwaps(), yield chainData.frombtc.getAllSwaps()).forEach(val => res.push(val));
-                }
-                return res;
-            }
-            else {
+    async getAllSwaps(chainId, signer) {
+        if (chainId == null) {
+            const res = [];
+            for (let chainId in this.chains) {
                 const chainData = this.chains[chainId];
-                return [].concat(yield chainData.tobtcln.getAllSwaps(signer), yield chainData.tobtc.getAllSwaps(signer), yield chainData.frombtcln.getAllSwaps(signer), yield chainData.frombtc.getAllSwaps(signer));
+                [].concat(await chainData.tobtcln.getAllSwaps(), await chainData.tobtc.getAllSwaps(), await chainData.frombtcln.getAllSwaps(), await chainData.frombtc.getAllSwaps()).forEach(val => res.push(val));
             }
-        });
+            return res;
+        }
+        else {
+            const chainData = this.chains[chainId];
+            return [].concat(await chainData.tobtcln.getAllSwaps(signer), await chainData.tobtc.getAllSwaps(signer), await chainData.frombtcln.getAllSwaps(signer), await chainData.frombtc.getAllSwaps(signer));
+        }
     }
-    getActionableSwaps(chainId, signer) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (chainId == null) {
-                const res = [];
-                for (let chainId in this.chains) {
-                    const chainData = this.chains[chainId];
-                    [].concat(yield chainData.tobtcln.getActionableSwaps(), yield chainData.tobtc.getActionableSwaps(), yield chainData.frombtcln.getActionableSwaps(), yield chainData.frombtc.getActionableSwaps()).forEach(val => res.push(val));
-                }
-                return res;
-            }
-            else {
+    async getActionableSwaps(chainId, signer) {
+        if (chainId == null) {
+            const res = [];
+            for (let chainId in this.chains) {
                 const chainData = this.chains[chainId];
-                return [].concat(yield chainData.tobtcln.getActionableSwaps(signer), yield chainData.tobtc.getActionableSwaps(signer), yield chainData.frombtcln.getActionableSwaps(signer), yield chainData.frombtc.getActionableSwaps(signer));
+                [].concat(await chainData.tobtcln.getActionableSwaps(), await chainData.tobtc.getActionableSwaps(), await chainData.frombtcln.getActionableSwaps(), await chainData.frombtc.getActionableSwaps()).forEach(val => res.push(val));
             }
-        });
+            return res;
+        }
+        else {
+            const chainData = this.chains[chainId];
+            return [].concat(await chainData.tobtcln.getActionableSwaps(signer), await chainData.tobtc.getActionableSwaps(signer), await chainData.frombtcln.getActionableSwaps(signer), await chainData.frombtc.getActionableSwaps(signer));
+        }
     }
-    getRefundableSwaps(chainId, signer) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (chainId == null) {
-                const res = [];
-                for (let chainId in this.chains) {
-                    const chainData = this.chains[chainId];
-                    [].concat(yield chainData.tobtcln.getRefundableSwaps(), yield chainData.tobtc.getRefundableSwaps()).forEach(val => res.push(val));
-                }
-                return res;
-            }
-            else {
+    async getRefundableSwaps(chainId, signer) {
+        if (chainId == null) {
+            const res = [];
+            for (let chainId in this.chains) {
                 const chainData = this.chains[chainId];
-                return [].concat(yield chainData.tobtcln.getRefundableSwaps(signer), yield chainData.tobtc.getRefundableSwaps(signer));
+                [].concat(await chainData.tobtcln.getRefundableSwaps(), await chainData.tobtc.getRefundableSwaps()).forEach(val => res.push(val));
             }
-        });
+            return res;
+        }
+        else {
+            const chainData = this.chains[chainId];
+            return [].concat(await chainData.tobtcln.getRefundableSwaps(signer), await chainData.tobtc.getRefundableSwaps(signer));
+        }
     }
-    getClaimableSwaps(chainId, signer) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (chainId == null) {
-                const res = [];
-                for (let chainId in this.chains) {
-                    const chainData = this.chains[chainId];
-                    [].concat(yield chainData.frombtcln.getClaimableSwaps(), yield chainData.frombtc.getClaimableSwaps()).forEach(val => res.push(val));
-                }
-                return res;
-            }
-            else {
+    async getClaimableSwaps(chainId, signer) {
+        if (chainId == null) {
+            const res = [];
+            for (let chainId in this.chains) {
                 const chainData = this.chains[chainId];
-                return [].concat(yield chainData.frombtcln.getClaimableSwaps(signer), yield chainData.frombtc.getClaimableSwaps(signer));
+                [].concat(await chainData.frombtcln.getClaimableSwaps(), await chainData.frombtc.getClaimableSwaps()).forEach(val => res.push(val));
             }
-        });
+            return res;
+        }
+        else {
+            const chainData = this.chains[chainId];
+            return [].concat(await chainData.frombtcln.getClaimableSwaps(signer), await chainData.frombtc.getClaimableSwaps(signer));
+        }
     }
     /**
      * Returns the token balance of the wallet
@@ -788,38 +749,36 @@ class Swapper extends events_1.EventEmitter {
     /**
      * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
      */
-    getSpendableBalance(chainIdentifierOrSigner, signerOrToken, tokenOrFeeMultiplier, feeMultiplier) {
-        return __awaiter(this, void 0, void 0, function* () {
-            let chainIdentifier;
-            let signer;
-            let token;
-            if (typeof (signerOrToken) === "string") {
-                chainIdentifier = chainIdentifierOrSigner;
-                signer = signerOrToken;
-                token = tokenOrFeeMultiplier;
-            }
-            else {
-                chainIdentifier = signerOrToken.chainId;
-                token = signerOrToken.address;
-                signer = chainIdentifierOrSigner;
-                feeMultiplier = tokenOrFeeMultiplier;
-            }
-            if (this.chains[chainIdentifier] == null)
-                throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
-            const swapContract = this.chains[chainIdentifier].swapContract;
-            if (swapContract.getNativeCurrencyAddress() !== token)
-                return yield this.getBalance(chainIdentifier, signer, token);
-            let [balance, commitFee] = yield Promise.all([
-                this.getBalance(chainIdentifier, signer, token),
-                swapContract.getCommitFee(
-                //Use large amount, such that the fee for wrapping more tokens is always included!
-                yield swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token, new BN("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "hex"), swapContract.getHashForHtlc(randomBytes(32)).toString("hex"), new BN(randomBytes(8)), new BN(Math.floor(Date.now() / 1000)), true, false, new BN(randomBytes(2)), new BN(randomBytes(2))))
-            ]);
-            if (feeMultiplier != null) {
-                commitFee = commitFee.mul(new BN(Math.floor(feeMultiplier * 1000000))).div(new BN(1000000));
-            }
-            return BN.max(balance.sub(commitFee), new BN(0));
-        });
+    async getSpendableBalance(chainIdentifierOrSigner, signerOrToken, tokenOrFeeMultiplier, feeMultiplier) {
+        let chainIdentifier;
+        let signer;
+        let token;
+        if (typeof (signerOrToken) === "string") {
+            chainIdentifier = chainIdentifierOrSigner;
+            signer = signerOrToken;
+            token = tokenOrFeeMultiplier;
+        }
+        else {
+            chainIdentifier = signerOrToken.chainId;
+            token = signerOrToken.address;
+            signer = chainIdentifierOrSigner;
+            feeMultiplier = tokenOrFeeMultiplier;
+        }
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        const swapContract = this.chains[chainIdentifier].swapContract;
+        if (swapContract.getNativeCurrencyAddress() !== token)
+            return await this.getBalance(chainIdentifier, signer, token);
+        let [balance, commitFee] = await Promise.all([
+            this.getBalance(chainIdentifier, signer, token),
+            swapContract.getCommitFee(
+            //Use large amount, such that the fee for wrapping more tokens is always included!
+            await swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn, swapContract.getHashForHtlc(randomBytes(32)).toString("hex"), base_1.BigIntBufferUtils.fromBuffer(randomBytes(8)), BigInt(Math.floor(Date.now() / 1000)), true, false, base_1.BigIntBufferUtils.fromBuffer(randomBytes(2)), base_1.BigIntBufferUtils.fromBuffer(randomBytes(2))))
+        ]);
+        if (feeMultiplier != null) {
+            commitFee = commitFee * (BigInt(Math.floor(feeMultiplier * 1000000))) / 1000000n;
+        }
+        return (0, Utils_1.bigIntMax)(balance - commitFee, 0n);
     }
     /**
      * Returns the native token balance of the wallet

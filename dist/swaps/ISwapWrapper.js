@@ -1,19 +1,9 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ISwapWrapper = void 0;
 const base_1 = require("@atomiqlabs/base");
 const events_1 = require("events");
 const SwapWrapperStorage_1 = require("./SwapWrapperStorage");
-const BN = require("bn.js");
 const IntermediaryError_1 = require("../errors/IntermediaryError");
 const Utils_1 = require("../utils/Utils");
 const randomBytes = require("randombytes");
@@ -103,12 +93,10 @@ class ISwapWrapper {
      * @returns Swap initialization signature expiry
      * @throws {SignatureVerificationError} when swap init signature is invalid
      */
-    verifyReturnedSignature(data, signature, feeRatePromise, preFetchSignatureVerificationData, abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [feeRate, preFetchedSignatureData] = yield Promise.all([feeRatePromise, preFetchSignatureVerificationData]);
-            yield (0, Utils_1.tryWithRetries)(() => this.contract.isValidInitAuthorization(data, signature, feeRate, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
-            return yield (0, Utils_1.tryWithRetries)(() => this.contract.getInitAuthorizationExpiry(data, signature, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
-        });
+    async verifyReturnedSignature(data, signature, feeRatePromise, preFetchSignatureVerificationData, abortSignal) {
+        const [feeRate, preFetchedSignatureData] = await Promise.all([feeRatePromise, preFetchSignatureVerificationData]);
+        await (0, Utils_1.tryWithRetries)(() => this.contract.isValidInitAuthorization(data, signature, feeRate, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
+        return await (0, Utils_1.tryWithRetries)(() => this.contract.getInitAuthorizationExpiry(data, signature, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
     }
     /**
      * Verifies returned  price for swaps
@@ -125,130 +113,123 @@ class ISwapWrapper {
      * @returns Price info object
      * @throws {IntermediaryError} if the calculated fee is too high
      */
-    verifyReturnedPrice(lpServiceData, send, amountSats, amountToken, token, feeData, pricePrefetchPromise = Promise.resolve(null), abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const swapBaseFee = new BN(lpServiceData.swapBaseFee);
-            const swapFeePPM = new BN(lpServiceData.swapFeePPM);
-            if (send)
-                amountToken = amountToken.sub(feeData.networkFee);
-            const isValidAmount = yield (send ?
-                this.prices.isValidAmountSend(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, yield pricePrefetchPromise) :
-                this.prices.isValidAmountReceive(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, yield pricePrefetchPromise));
-            if (!isValidAmount.isValid)
-                throw new IntermediaryError_1.IntermediaryError("Fee too high");
-            return isValidAmount;
-        });
+    async verifyReturnedPrice(lpServiceData, send, amountSats, amountToken, token, feeData, pricePrefetchPromise = Promise.resolve(null), abortSignal) {
+        const swapBaseFee = BigInt(lpServiceData.swapBaseFee);
+        const swapFeePPM = BigInt(lpServiceData.swapFeePPM);
+        if (send)
+            amountToken = amountToken - feeData.networkFee;
+        const isValidAmount = await (send ?
+            this.prices.isValidAmountSend(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, await pricePrefetchPromise) :
+            this.prices.isValidAmountReceive(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, await pricePrefetchPromise));
+        if (!isValidAmount.isValid)
+            throw new IntermediaryError_1.IntermediaryError("Fee too high");
+        return isValidAmount;
     }
     /**
      * Processes batch of SC on-chain events
      * @param events
      * @private
      */
-    processEvents(events) {
-        var _a, _b, _c;
-        return __awaiter(this, void 0, void 0, function* () {
-            for (let event of events) {
-                const swap = this.swapDataByEscrowHash.get(event.escrowHash);
-                if (swap == null)
-                    continue;
-                let swapChanged = false;
-                if (event instanceof base_1.InitializeEvent) {
-                    swapChanged = yield this.processEventInitialize(swap, event);
-                    if (((_a = event.meta) === null || _a === void 0 ? void 0 : _a.txId) != null && swap.commitTxId !== event.meta.txId) {
-                        swap.commitTxId = event.meta.txId;
-                        swapChanged || (swapChanged = true);
-                    }
-                }
-                if (event instanceof base_1.ClaimEvent) {
-                    swapChanged = yield this.processEventClaim(swap, event);
-                    if (((_b = event.meta) === null || _b === void 0 ? void 0 : _b.txId) != null && swap.claimTxId !== event.meta.txId) {
-                        swap.claimTxId = event.meta.txId;
-                        swapChanged || (swapChanged = true);
-                    }
-                }
-                if (event instanceof base_1.RefundEvent) {
-                    swapChanged = yield this.processEventRefund(swap, event);
-                    if (((_c = event.meta) === null || _c === void 0 ? void 0 : _c.txId) != null && swap.refundTxId !== event.meta.txId) {
-                        swap.refundTxId = event.meta.txId;
-                        swapChanged || (swapChanged = true);
-                    }
-                }
-                this.logger.info("processEvents(): " + event.constructor.name + " processed for " + swap.getIdentifierHashString() + " swap: ", swap);
-                if (swapChanged) {
-                    yield swap._saveAndEmit();
+    async processEvents(events) {
+        for (let event of events) {
+            const swap = this.swapDataByEscrowHash.get(event.escrowHash);
+            if (swap == null)
+                continue;
+            let swapChanged = false;
+            if (event instanceof base_1.InitializeEvent) {
+                swapChanged = await this.processEventInitialize(swap, event);
+                if (event.meta?.txId != null && swap.commitTxId !== event.meta.txId) {
+                    swap.commitTxId = event.meta.txId;
+                    swapChanged || (swapChanged = true);
                 }
             }
-            return true;
-        });
+            if (event instanceof base_1.ClaimEvent) {
+                swapChanged = await this.processEventClaim(swap, event);
+                if (event.meta?.txId != null && swap.claimTxId !== event.meta.txId) {
+                    swap.claimTxId = event.meta.txId;
+                    swapChanged || (swapChanged = true);
+                }
+            }
+            if (event instanceof base_1.RefundEvent) {
+                swapChanged = await this.processEventRefund(swap, event);
+                if (event.meta?.txId != null && swap.refundTxId !== event.meta.txId) {
+                    swap.refundTxId = event.meta.txId;
+                    swapChanged || (swapChanged = true);
+                }
+            }
+            this.logger.info("processEvents(): " + event.constructor.name + " processed for " + swap.getIdentifierHashString() + " swap: ", swap);
+            if (swapChanged) {
+                await swap._saveAndEmit();
+            }
+        }
+        return true;
     }
     /**
      * Initializes the swap wrapper, needs to be called before any other action can be taken
      */
-    init(noTimers = false) {
-        return __awaiter(this, void 0, void 0, function* () {
-            yield this.storage.init();
-            if (this.isInitialized)
-                return;
-            this.swapData = yield this.storage.loadSwapData(this, this.swapDeserializer);
-            this.swapDataByEscrowHash = new Map();
-            for (let value of this.swapData.values()) {
-                if (value.randomNonce == null) {
-                    const oldIdentifierHash = value.getIdentifierHashString();
-                    this.swapData.delete(oldIdentifierHash);
-                    //Workaround for old Solana swaps - take the first 32 bytes of the claim hash which should stay the same
-                    // for both old and new version of the libs
-                    yield this.storage.storage.removeData(oldIdentifierHash.slice(0, 64));
-                    yield this.storage.removeSwapData(value);
-                    value.randomNonce = randomBytes(16).toString("hex");
-                    const newIdentifierHash = value.getIdentifierHashString();
-                    this.swapData.set(newIdentifierHash, value);
-                    yield this.storage.saveSwapData(value);
-                    this.logger.info("init(): Found older swap version without randomNonce, replacing, old hash: " + oldIdentifierHash +
-                        " new hash: " + newIdentifierHash);
-                }
-                if (value.data != null)
-                    this.swapDataByEscrowHash.set(value.data.getEscrowHash(), value);
+    async init(noTimers = false) {
+        await this.storage.init();
+        if (this.isInitialized)
+            return;
+        this.swapData = await this.storage.loadSwapData(this, this.swapDeserializer);
+        this.swapDataByEscrowHash = new Map();
+        for (let value of this.swapData.values()) {
+            if (value.randomNonce == null) {
+                const oldIdentifierHash = value.getIdentifierHashString();
+                this.swapData.delete(oldIdentifierHash);
+                //Workaround for old Solana swaps - take the first 32 bytes of the claim hash which should stay the same
+                // for both old and new version of the libs
+                await this.storage.storage.removeData(oldIdentifierHash.slice(0, 64));
+                await this.storage.removeSwapData(value);
+                value.randomNonce = randomBytes(16).toString("hex");
+                const newIdentifierHash = value.getIdentifierHashString();
+                this.swapData.set(newIdentifierHash, value);
+                await this.storage.saveSwapData(value);
+                this.logger.info("init(): Found older swap version without randomNonce, replacing, old hash: " + oldIdentifierHash +
+                    " new hash: " + newIdentifierHash);
             }
-            const hasEventListener = this.processEventRefund != null || this.processEventClaim != null || this.processEventInitialize != null;
-            //Save events received in the meantime into the event queue and process them only after we've checked and
-            // processed all the past swaps
-            let eventQueue = [];
-            const initListener = (events) => {
-                eventQueue.push(...events);
-                return Promise.resolve(true);
-            };
-            if (hasEventListener)
-                this.chainEvents.registerListener(initListener);
-            //Check past swaps
-            const changedSwaps = [];
-            const removeSwaps = [];
-            yield Promise.all((0, Utils_1.mapToArray)(this.swapData, (key, swap) => this.checkPastSwap(swap).then(changed => {
-                if (swap.isQuoteExpired()) {
-                    removeSwaps.push(swap);
-                }
-                else {
-                    if (changed)
-                        changedSwaps.push(swap);
-                }
-            }).catch(e => this.logger.error("init(): Error when checking swap " + swap.getIdentifierHashString() + ": ", e))));
-            yield this.storage.removeSwapDataArr(removeSwaps);
-            yield this.storage.saveSwapDataArr(changedSwaps);
-            if (hasEventListener) {
-                //Process accumulated event queue
-                yield this.processEvents(eventQueue);
-                //Register the correct event handler
-                this.chainEvents.unregisterListener(initListener);
-                this.chainEvents.registerListener(this.boundProcessEvents);
+            if (value.data != null)
+                this.swapDataByEscrowHash.set(value.data.getEscrowHash(), value);
+        }
+        const hasEventListener = this.processEventRefund != null || this.processEventClaim != null || this.processEventInitialize != null;
+        //Save events received in the meantime into the event queue and process them only after we've checked and
+        // processed all the past swaps
+        let eventQueue = [];
+        const initListener = (events) => {
+            eventQueue.push(...events);
+            return Promise.resolve(true);
+        };
+        if (hasEventListener)
+            this.chainEvents.registerListener(initListener);
+        //Check past swaps
+        const changedSwaps = [];
+        const removeSwaps = [];
+        await Promise.all((0, Utils_1.mapToArray)(this.swapData, (key, swap) => this.checkPastSwap(swap).then(changed => {
+            if (swap.isQuoteExpired()) {
+                removeSwaps.push(swap);
             }
-            if (!noTimers)
-                this.tickInterval = setInterval(() => {
-                    this.swapData.forEach(value => {
-                        this.tickSwap(value);
-                    });
-                }, 1000);
-            this.logger.info("init(): Swap wrapper initialized, num swaps: " + this.swapData.size);
-            this.isInitialized = true;
-        });
+            else {
+                if (changed)
+                    changedSwaps.push(swap);
+            }
+        }).catch(e => this.logger.error("init(): Error when checking swap " + swap.getIdentifierHashString() + ": ", e))));
+        await this.storage.removeSwapDataArr(removeSwaps);
+        await this.storage.saveSwapDataArr(changedSwaps);
+        if (hasEventListener) {
+            //Process accumulated event queue
+            await this.processEvents(eventQueue);
+            //Register the correct event handler
+            this.chainEvents.unregisterListener(initListener);
+            this.chainEvents.registerListener(this.boundProcessEvents);
+        }
+        if (!noTimers)
+            this.tickInterval = setInterval(() => {
+                this.swapData.forEach(value => {
+                    this.tickSwap(value);
+                });
+            }, 1000);
+        this.logger.info("init(): Swap wrapper initialized, num swaps: " + this.swapData.size);
+        this.isInitialized = true;
     }
     saveSwapData(swap) {
         this.swapData.set(swap.getIdentifierHashString(), swap);
@@ -269,15 +250,13 @@ class ISwapWrapper {
     /**
      * Un-subscribes from event listeners on Solana
      */
-    stop() {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.swapData = null;
-            this.isInitialized = false;
-            this.chainEvents.unregisterListener(this.boundProcessEvents);
-            this.logger.info("stop(): Swap wrapper stopped");
-            if (this.tickInterval != null)
-                clearInterval(this.tickInterval);
-        });
+    async stop() {
+        this.swapData = null;
+        this.isInitialized = false;
+        this.chainEvents.unregisterListener(this.boundProcessEvents);
+        this.logger.info("stop(): Swap wrapper stopped");
+        if (this.tickInterval != null)
+            clearInterval(this.tickInterval);
     }
     /**
      * Returns all swaps, optionally only those which were intiated by as specific signer's address

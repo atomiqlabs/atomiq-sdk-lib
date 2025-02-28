@@ -2,7 +2,6 @@ import {CtorCoinTypes} from "../abstract/IPriceProvider";
 import {ExchangePriceProvider} from "./abstract/ExchangePriceProvider";
 import {httpGet} from "../../utils/Utils";
 import {MultiChain} from "../../swaps/Swapper";
-import {BinanceResponse} from "./BinancePriceProvider";
 
 export type OKXResponse = {
     code: string;

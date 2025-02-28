@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.toTokenAmount = exports.toDecimal = exports.fromDecimal = exports.isToken = exports.isSCToken = exports.BitcoinTokens = exports.isBtcToken = void 0;
-const BN = require("bn.js");
 function isBtcToken(obj) {
     return typeof (obj) === "object" &&
         obj.chain === "BTC" &&
@@ -45,20 +44,20 @@ function fromDecimal(amount, decimalCount) {
     if (amount.includes(".")) {
         const [before, after] = amount.split(".");
         if (decimalCount < 0) {
-            return new BN(before.substring(0, before.length + decimalCount));
+            return BigInt(before.substring(0, before.length + decimalCount));
         }
         if (after.length > decimalCount) {
             //Cut the last digits
-            return new BN((before === "0" ? "" : before) + after.substring(0, decimalCount));
+            return BigInt((before === "0" ? "" : before) + after.substring(0, decimalCount));
         }
-        return new BN((before === "0" ? "" : before) + after.padEnd(decimalCount, "0"));
+        return BigInt((before === "0" ? "" : before) + after.padEnd(decimalCount, "0"));
     }
     else {
         if (decimalCount < 0) {
-            return new BN(amount.substring(0, amount.length + decimalCount));
+            return BigInt(amount.substring(0, amount.length + decimalCount));
         }
         else {
-            return new BN(amount + "0".repeat(decimalCount));
+            return BigInt(amount + "0".repeat(decimalCount));
         }
     }
 }

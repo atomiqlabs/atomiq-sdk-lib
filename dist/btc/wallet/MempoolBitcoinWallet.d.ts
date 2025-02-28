@@ -1,10 +1,11 @@
 /// <reference types="node" />
 /// <reference types="node" />
-import * as BN from "bn.js";
 import { CoinselectAddressTypes } from "../coinselect2";
-import { networks, Psbt } from "bitcoinjs-lib";
+import { BTC_NETWORK } from "@scure/btc-signer/utils";
+import { Transaction } from "@scure/btc-signer";
 import { IBitcoinWallet } from "./IBitcoinWallet";
 import { MempoolApi } from "../mempool/MempoolApi";
+import { Buffer } from "buffer";
 export type BitcoinWalletUtxo = {
     vout: number;
     txId: string;
@@ -20,14 +21,14 @@ export type BitcoinWalletUtxo = {
 };
 export declare abstract class MempoolBitcoinWallet implements IBitcoinWallet {
     mempoolApi: MempoolApi;
-    network: networks.Network;
+    network: BTC_NETWORK;
     feeMultiplier: number;
-    constructor(mempoolApi: MempoolApi, network: networks.Network, feeMultiplier?: number);
+    constructor(mempoolApi: MempoolApi, network: BTC_NETWORK, feeMultiplier?: number);
     protected _getFeeRate(): Promise<number>;
     protected _sendTransaction(rawHex: string): Promise<string>;
     protected _getBalance(address: string): Promise<{
-        confirmedBalance: BN;
-        unconfirmedBalance: BN;
+        confirmedBalance: bigint;
+        unconfirmedBalance: bigint;
     }>;
     protected _getUtxoPool(sendingAddress: string, sendingAddressType: CoinselectAddressTypes): Promise<BitcoinWalletUtxo[]>;
     protected _getPsbt(sendingAccounts: {
@@ -35,7 +36,7 @@ export declare abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         address: string;
         addressType: CoinselectAddressTypes;
     }[], recipient: string, amount: number, feeRate?: number): Promise<{
-        psbt: Psbt;
+        psbt: Transaction;
         fee: number;
         inputAddressIndexes: {
             [address: string]: number[];
@@ -45,19 +46,19 @@ export declare abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         address: string;
         addressType: CoinselectAddressTypes;
     }[]): Promise<{
-        balance: BN;
+        balance: bigint;
         feeRate: number;
         totalFee: number;
     }>;
-    abstract sendTransaction(address: string, amount: BN, feeRate?: number): Promise<string>;
-    abstract getTransactionFee(address: string, amount: BN, feeRate?: number): Promise<number>;
+    abstract sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string>;
+    abstract getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number>;
     abstract getReceiveAddress(): string;
     abstract getBalance(): Promise<{
-        confirmedBalance: BN;
-        unconfirmedBalance: BN;
+        confirmedBalance: bigint;
+        unconfirmedBalance: bigint;
     }>;
     abstract getSpendableBalance(): Promise<{
-        balance: BN;
+        balance: bigint;
         feeRate: number;
         totalFee: number;
     }>;

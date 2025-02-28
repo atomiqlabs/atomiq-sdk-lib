@@ -1,18 +1,8 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IntermediaryDiscovery = exports.SwapHandlerType = void 0;
 const Intermediary_1 = require("./Intermediary");
 const SwapType_1 = require("../swaps/SwapType");
-const BN = require("bn.js");
 const events_1 = require("events");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../utils/Utils");
@@ -61,12 +51,12 @@ function getIntermediaryComparator(swapType, tokenAddress, swapAmount) {
     }
     return (a, b) => {
         if (swapAmount == null) {
-            return new BN(a.services[swapType].swapFeePPM).sub(new BN(b.services[swapType].swapFeePPM)).toNumber();
+            return a.services[swapType].swapFeePPM - b.services[swapType].swapFeePPM;
         }
         else {
-            const feeA = new BN(a.services[swapType].swapBaseFee).add(swapAmount.mul(new BN(a.services[swapType].swapFeePPM)).div(new BN(1000000)));
-            const feeB = new BN(b.services[swapType].swapBaseFee).add(swapAmount.mul(new BN(b.services[swapType].swapFeePPM)).div(new BN(1000000)));
-            return feeA.sub(feeB).toNumber();
+            const feeA = BigInt(a.services[swapType].swapBaseFee) + (swapAmount * BigInt(a.services[swapType].swapFeePPM) / 1000000n);
+            const feeB = BigInt(b.services[swapType].swapBaseFee) + (swapAmount * BigInt(b.services[swapType].swapFeePPM) / 1000000n);
+            return feeA - feeB > 0n ? 1 : feeA === feeB ? 0 : -1;
         }
     };
 }
@@ -87,15 +77,13 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
      *
      * @param abortSignal
      */
-    getIntermediaryUrls(abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.overrideNodeUrls != null && this.overrideNodeUrls.length > 0) {
-                return this.overrideNodeUrls;
-            }
-            const response = yield (0, Utils_1.httpGet)(this.registryUrl, this.httpRequestTimeout, abortSignal);
-            const content = response.content.replace(new RegExp("\\n", "g"), "");
-            return JSON.parse(buffer_1.Buffer.from(content, "base64").toString());
-        });
+    async getIntermediaryUrls(abortSignal) {
+        if (this.overrideNodeUrls != null && this.overrideNodeUrls.length > 0) {
+            return this.overrideNodeUrls;
+        }
+        const response = await (0, Utils_1.httpGet)(this.registryUrl, this.httpRequestTimeout, abortSignal);
+        const content = response.content.replace(new RegExp("\\n", "g"), "");
+        return JSON.parse(buffer_1.Buffer.from(content, "base64").toString());
     }
     /**
      * Returns data as reported by a specific node (as identified by its URL)
@@ -103,54 +91,50 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
      * @param url
      * @param abortSignal
      */
-    getNodeInfo(url, abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const response = yield IntermediaryAPI_1.IntermediaryAPI.getIntermediaryInfo(url);
-            //Handle legacy responses
-            if (response.chains == null)
-                response.chains = {
-                    [DEFAULT_CHAIN]: { address: response.address, signature: response.signature }
-                };
-            const addresses = {};
-            for (let chain in response.chains) {
-                if (this.swapContracts[chain] != null) {
-                    const { signature, address } = response.chains[chain];
-                    yield this.swapContracts[chain].isValidDataSignature(buffer_1.Buffer.from(response.envelope), signature, address);
-                    addresses[chain] = address;
-                }
-            }
-            if (abortSignal != null)
-                abortSignal.throwIfAborted();
-            //Handle legacy responses
-            const info = JSON.parse(response.envelope);
-            for (let swapType in info.services) {
-                const serviceData = info.services[swapType];
-                if (serviceData.chainTokens == null)
-                    serviceData.chainTokens = {
-                        [DEFAULT_CHAIN]: serviceData.tokens
-                    };
-            }
-            return {
-                addresses,
-                info
+    async getNodeInfo(url, abortSignal) {
+        const response = await IntermediaryAPI_1.IntermediaryAPI.getIntermediaryInfo(url);
+        //Handle legacy responses
+        if (response.chains == null)
+            response.chains = {
+                [DEFAULT_CHAIN]: { address: response.address, signature: response.signature }
             };
-        });
+        const addresses = {};
+        for (let chain in response.chains) {
+            if (this.swapContracts[chain] != null) {
+                const { signature, address } = response.chains[chain];
+                await this.swapContracts[chain].isValidDataSignature(buffer_1.Buffer.from(response.envelope), signature, address);
+                addresses[chain] = address;
+            }
+        }
+        if (abortSignal != null)
+            abortSignal.throwIfAborted();
+        //Handle legacy responses
+        const info = JSON.parse(response.envelope);
+        for (let swapType in info.services) {
+            const serviceData = info.services[swapType];
+            if (serviceData.chainTokens == null)
+                serviceData.chainTokens = {
+                    [DEFAULT_CHAIN]: serviceData.tokens
+                };
+        }
+        return {
+            addresses,
+            info
+        };
     }
-    loadIntermediary(url, abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const nodeInfo = yield this.getNodeInfo(url, abortSignal);
-                const services = {};
-                for (let key in nodeInfo.info.services) {
-                    services[swapHandlerTypeToSwapType(key)] = nodeInfo.info.services[key];
-                }
-                return new Intermediary_1.Intermediary(url, nodeInfo.addresses, services);
+    async loadIntermediary(url, abortSignal) {
+        try {
+            const nodeInfo = await this.getNodeInfo(url, abortSignal);
+            const services = {};
+            for (let key in nodeInfo.info.services) {
+                services[swapHandlerTypeToSwapType(key)] = nodeInfo.info.services[key];
             }
-            catch (e) {
-                logger.error("fetchIntermediaries(): Error contacting intermediary " + url + ": ", e);
-                return null;
-            }
-        });
+            return new Intermediary_1.Intermediary(url, nodeInfo.addresses, services);
+        }
+        catch (e) {
+            logger.error("fetchIntermediaries(): Error contacting intermediary " + url + ": ", e);
+            return null;
+        }
     }
     /**
      * Fetches data about all intermediaries in the network, pinging every one of them and ensuring they are online
@@ -159,16 +143,14 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
      * @private
      * @throws {Error} When no online intermediary was found
      */
-    fetchIntermediaries(abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const urls = yield this.getIntermediaryUrls(abortSignal);
-            logger.debug("fetchIntermediaries(): Pinging intermediaries: ", urls.join());
-            const promises = urls.map(url => this.loadIntermediary(url, abortSignal));
-            const activeNodes = (yield Promise.all(promises)).filter(intermediary => intermediary != null);
-            if (activeNodes.length === 0)
-                throw new Error("No online intermediary found!");
-            return activeNodes;
-        });
+    async fetchIntermediaries(abortSignal) {
+        const urls = await this.getIntermediaryUrls(abortSignal);
+        logger.debug("fetchIntermediaries(): Pinging intermediaries: ", urls.join());
+        const promises = urls.map(url => this.loadIntermediary(url, abortSignal));
+        const activeNodes = (await Promise.all(promises)).filter(intermediary => intermediary != null);
+        if (activeNodes.length === 0)
+            throw new Error("No online intermediary found!");
+        return activeNodes;
     }
     /**
      * Returns the intermediary at the provided URL, either from the already fetched list of LPs or fetches the data on-demand
@@ -185,13 +167,11 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
      * Reloads the saves a list of intermediaries
      * @param abortSignal
      */
-    reloadIntermediaries(abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const fetchedIntermediaries = yield (0, Utils_1.tryWithRetries)(() => this.fetchIntermediaries(abortSignal), null, null, abortSignal);
-            this.intermediaries = fetchedIntermediaries;
-            this.emit("added", fetchedIntermediaries);
-            logger.info("reloadIntermediaries(): Using active intermediaries: ", fetchedIntermediaries.map(lp => lp.url).join());
-        });
+    async reloadIntermediaries(abortSignal) {
+        const fetchedIntermediaries = await (0, Utils_1.tryWithRetries)(() => this.fetchIntermediaries(abortSignal), null, null, abortSignal);
+        this.intermediaries = fetchedIntermediaries;
+        this.emit("added", fetchedIntermediaries);
+        logger.info("reloadIntermediaries(): Using active intermediaries: ", fetchedIntermediaries.map(lp => lp.url).join());
     }
     /**
      * Initializes the discovery by fetching/reloading intermediaries
@@ -205,25 +185,24 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
     getMultichainSwapBounds() {
         const bounds = {};
         this.intermediaries.forEach(intermediary => {
-            var _a, _b;
             for (let swapType in intermediary.services) {
                 const swapService = intermediary.services[swapType];
-                (_a = bounds[swapType]) !== null && _a !== void 0 ? _a : (bounds[swapType] = {});
+                bounds[swapType] ?? (bounds[swapType] = {});
                 const multichainBounds = bounds[swapType];
                 for (let chainId in swapService.chainTokens) {
-                    (_b = multichainBounds[chainId]) !== null && _b !== void 0 ? _b : (multichainBounds[chainId] = {});
+                    multichainBounds[chainId] ?? (multichainBounds[chainId] = {});
                     const tokenBounds = multichainBounds[chainId];
                     for (let token of swapService.chainTokens[chainId]) {
                         const tokenMinMax = tokenBounds[token];
                         if (tokenMinMax == null) {
                             tokenBounds[token] = {
-                                min: new BN(swapService.min),
-                                max: new BN(swapService.max)
+                                min: BigInt(swapService.min),
+                                max: BigInt(swapService.max)
                             };
                         }
                         else {
-                            tokenMinMax.min = BN.min(tokenMinMax.min, new BN(swapService.min));
-                            tokenMinMax.max = BN.min(tokenMinMax.max, new BN(swapService.max));
+                            tokenMinMax.min = (0, Utils_1.bigIntMax)(tokenMinMax.min, BigInt(swapService.min));
+                            tokenMinMax.max = (0, Utils_1.bigIntMin)(tokenMinMax.max, BigInt(swapService.max));
                         }
                     }
                 }
@@ -247,13 +226,13 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
                         const tokenMinMax = tokenBounds[token];
                         if (tokenMinMax == null) {
                             tokenBounds[token] = {
-                                min: new BN(swapService.min),
-                                max: new BN(swapService.max)
+                                min: BigInt(swapService.min),
+                                max: BigInt(swapService.max)
                             };
                         }
                         else {
-                            tokenMinMax.min = BN.min(tokenMinMax.min, new BN(swapService.min));
-                            tokenMinMax.max = BN.min(tokenMinMax.max, new BN(swapService.max));
+                            tokenMinMax.min = (0, Utils_1.bigIntMax)(tokenMinMax.min, BigInt(swapService.min));
+                            tokenMinMax.max = (0, Utils_1.bigIntMin)(tokenMinMax.max, BigInt(swapService.max));
                         }
                     }
                 }
@@ -315,9 +294,9 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
             const swapService = e.services[swapType];
             if (swapService == null)
                 return false;
-            if (amount != null && amount.lt(new BN(swapService.min)))
+            if (amount != null && amount < BigInt(swapService.min))
                 return false;
-            if (amount != null && amount.gt(new BN(swapService.max)))
+            if (amount != null && amount > BigInt(swapService.max))
                 return false;
             if (swapService.chainTokens == null)
                 return false;

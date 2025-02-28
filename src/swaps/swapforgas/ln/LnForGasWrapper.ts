@@ -1,8 +1,7 @@
-import * as BN from "bn.js";
 import {LnForGasSwap, LnForGasSwapInit, LnForGasSwapState} from "./LnForGasSwap";
 import {ISwapWrapper} from "../../ISwapWrapper";
 import {TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediaryAPI";
-import {decode as bolt11Decode} from "bolt11";
+import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {ChainType} from "@atomiqlabs/base";
 import {Intermediary} from "../../../intermediaries/Intermediary";
@@ -18,7 +17,7 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
      * @param amount            Amount you wish to receive in base units (satoshis)
      * @param lpOrUrl           Intermediary/Counterparty swap service Intermediary object or raw url
      */
-    async create(signer: string, amount: BN, lpOrUrl: Intermediary | string): Promise<LnForGasSwap<T>> {
+    async create(signer: string, amount: bigint, lpOrUrl: Intermediary | string): Promise<LnForGasSwap<T>> {
         if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
 
         const lpUrl = typeof(lpOrUrl)==="string" ? lpOrUrl : lpOrUrl.url;
@@ -32,9 +31,9 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
         }, this.options.getRequestTimeout);
 
         const decodedPr = bolt11Decode(resp.pr);
-        const amountIn = new BN(decodedPr.millisatoshis).add(new BN(999)).div(new BN(1000));
+        const amountIn = (BigInt(decodedPr.millisatoshis) + 999n) / 1000n;
 
-        if(!resp.total.eq(amount)) throw new IntermediaryError("Invalid total returned");
+        if(resp.total!==amount) throw new IntermediaryError("Invalid total returned");
 
         const pricingInfo = await this.verifyReturnedPrice(
             typeof(lpOrUrl)==="string" ?

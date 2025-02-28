@@ -1,18 +1,17 @@
 import { IToBTCWrapper } from "./IToBTCWrapper";
 import { Fee, ISwap, ISwapInit } from "../ISwap";
-import * as BN from "bn.js";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { PriceInfoType } from "../../prices/abstract/ISwapPrice";
 import { RefundAuthorizationResponse } from "../../intermediaries/IntermediaryAPI";
 import { BtcToken, SCToken, TokenAmount } from "../Tokens";
 export type IToBTCSwapInit<T extends SwapData> = ISwapInit<T> & {
-    networkFee: BN;
-    networkFeeBtc?: BN;
+    networkFee: bigint;
+    networkFeeBtc?: bigint;
 };
 export declare function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T>;
 export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<T, ToBTCSwapState> {
-    protected readonly networkFee: BN;
-    protected networkFeeBtc?: BN;
+    protected readonly networkFee: bigint;
+    protected networkFeeBtc?: bigint;
     protected readonly abstract outputToken: BtcToken;
     protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, serializedObject: any);
     protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, init: IToBTCSwapInit<T["Data"]>);
@@ -42,7 +41,7 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
     refreshPriceData(): Promise<PriceInfoType>;
     getSwapPrice(): number;
     getMarketPrice(): number;
-    getRealSwapFeePercentagePPM(): BN;
+    getRealSwapFeePercentagePPM(): bigint;
     getInputTxId(): string | null;
     abstract getOutputTxId(): string | null;
     getInputAddress(): string | null;
@@ -78,7 +77,7 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
     /**
      * Get the estimated smart chain transaction fee of the refund transaction
      */
-    getRefundFee(): Promise<BN>;
+    getRefundFee(): Promise<bigint>;
     /**
      * Checks if the intiator/sender has enough balance to go through with the swap
      */

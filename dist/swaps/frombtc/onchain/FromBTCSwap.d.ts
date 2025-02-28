@@ -1,7 +1,6 @@
 import { IFromBTCSwap } from "../IFromBTCSwap";
 import { SwapType } from "../../SwapType";
 import { FromBTCWrapper } from "./FromBTCWrapper";
-import * as BN from "bn.js";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { ISwapInit } from "../../ISwap";
 import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
@@ -17,7 +16,7 @@ export declare enum FromBTCSwapState {
 }
 export type FromBTCSwapInit<T extends SwapData> = ISwapInit<T> & {
     address: string;
-    amount: BN;
+    amount: bigint;
     requiredConfirmations: number;
 };
 export declare function isFromBTCSwapInit<T extends SwapData>(obj: any): obj is FromBTCSwapInit<T>;
@@ -26,7 +25,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     protected readonly TYPE = SwapType.FROM_BTC;
     readonly wrapper: FromBTCWrapper<T>;
     readonly address: string;
-    readonly amount: BN;
+    readonly amount: bigint;
     readonly requiredConfirmations: number;
     txId?: string;
     vout?: number;

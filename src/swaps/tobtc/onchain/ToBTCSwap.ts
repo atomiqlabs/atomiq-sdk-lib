@@ -1,7 +1,6 @@
 import {ToBTCWrapper} from "./ToBTCWrapper";
 import {isIToBTCSwapInit, IToBTCSwap, IToBTCSwapInit} from "../IToBTCSwap";
 import {SwapType} from "../../SwapType";
-import * as BN from "bn.js";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
@@ -11,16 +10,16 @@ import {getLogger} from "../../../utils/Utils";
 
 export type ToBTCSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     address: string;
-    amount: BN;
+    amount: bigint;
     confirmationTarget: number;
     satsPerVByte: number;
     requiredConfirmations: number;
-    nonce: BN;
+    nonce: bigint;
 };
 
 export function isToBTCSwapInit<T extends SwapData>(obj: any): obj is ToBTCSwapInit<T> {
     return typeof (obj.address) === "string" &&
-        BN.isBN(obj.amount) &&
+        typeof(obj.amount) === "bigint" &&
         typeof (obj.confirmationTarget) === "number" &&
         typeof (obj.satsPerVByte) === "number" &&
         isIToBTCSwapInit<T>(obj);
@@ -33,12 +32,12 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
     protected readonly wrapper: ToBTCWrapper<T>;
 
     private readonly address: string;
-    private readonly amount: BN;
+    private readonly amount: bigint;
     private readonly confirmationTarget: number;
     private readonly satsPerVByte: number;
 
     private readonly requiredConfirmations: number;
-    private readonly nonce: BN;
+    private readonly nonce: bigint;
 
     private txId?: string;
 
@@ -52,13 +51,13 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
         super(wrapper, initOrObject);
         if(!isToBTCSwapInit(initOrObject)) {
             this.address = initOrObject.address;
-            this.amount = new BN(initOrObject.amount);
+            this.amount = BigInt(initOrObject.amount);
             this.confirmationTarget = initOrObject.confirmationTarget;
             this.satsPerVByte = initOrObject.satsPerVByte;
             this.txId = initOrObject.txId;
 
             this.requiredConfirmations = initOrObject.requiredConfirmations ?? this.data.getConfirmationsHint();
-            this.nonce = (initOrObject.nonce==null ? null : new BN(initOrObject.nonce)) ?? this.data.getNonceHint();
+            this.nonce = (initOrObject.nonce==null ? null : BigInt(initOrObject.nonce)) ?? this.data.getNonceHint();
         }
         this.logger = getLogger("ToBTC("+this.getIdentifierHashString()+"): ");
         this.tryCalculateSwapFee();
@@ -73,7 +72,7 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
 
             const foundVout = btcTx.outs.find(vout => this.data.getClaimHash()===this.wrapper.contract.getHashForOnchain(
                 Buffer.from(vout.scriptPubKey.hex, "hex"),
-                new BN(vout.value),
+                BigInt(vout.value),
                 this.requiredConfirmations,
                 this.nonce
             ).toString("hex"));

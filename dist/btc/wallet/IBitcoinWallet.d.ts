@@ -1,14 +1,13 @@
-import * as BN from "bn.js";
 export interface IBitcoinWallet {
-    sendTransaction(address: string, amount: BN, feeRate?: number): Promise<string>;
-    getTransactionFee(address: string, amount: BN, feeRate?: number): Promise<number>;
+    sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string>;
+    getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number>;
     getReceiveAddress(): string;
     getBalance(): Promise<{
-        confirmedBalance: BN;
-        unconfirmedBalance: BN;
+        confirmedBalance: bigint;
+        unconfirmedBalance: bigint;
     }>;
     getSpendableBalance(): Promise<{
-        balance: BN;
+        balance: bigint;
         feeRate: number;
         totalFee: number;
     }>;

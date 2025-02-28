@@ -1,10 +1,9 @@
-import * as BN from "bn.js";
 
-export function parseBN(str: string | number): BN | null {
+export function parseBigInt(str: string | number): bigint | null {
     if(str==null) return null;
     if(typeof(str)!=="string" && typeof(str)!=="number") return null;
     try {
-        return new BN(str);
+        return BigInt(str);
     } catch (e) {
         return null;
     }
@@ -14,32 +13,32 @@ export enum FieldTypeEnum {
     String=0,
     Boolean=1,
     Number=2,
-    BN=3,
+    BigInt=3,
     Any=4,
 
     StringOptional=100,
     BooleanOptional=101,
     NumberOptional=102,
-    BNOptional=103,
+    BigIntOptional=103,
     AnyOptional=104,
 }
 
-export type FieldType<T extends FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | BN | any))> =
+export type FieldType<T extends FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any))> =
     T extends FieldTypeEnum.String ? string :
     T extends FieldTypeEnum.Boolean ? boolean :
     T extends FieldTypeEnum.Number ? number :
-    T extends FieldTypeEnum.BN ? BN :
+    T extends FieldTypeEnum.BigInt ? bigint :
     T extends FieldTypeEnum.Any ? any :
     T extends FieldTypeEnum.StringOptional ? string :
     T extends FieldTypeEnum.BooleanOptional ? boolean :
     T extends FieldTypeEnum.NumberOptional ? number :
-    T extends FieldTypeEnum.BNOptional ? BN :
+    T extends FieldTypeEnum.BigIntOptional ? bigint :
     T extends FieldTypeEnum.AnyOptional ? any :
     T extends RequestSchema ? RequestSchemaResult<T> :
     T extends ((val: any) => string) ? string :
     T extends ((val: any) => boolean) ? boolean :
     T extends ((val: any) => number) ? number :
-    T extends ((val: any) => BN) ? BN :
+    T extends ((val: any) => bigint) ? bigint :
     T extends ((val: any) => any) ? any :
         never;
 
@@ -62,15 +61,15 @@ function isAllOptional(schema: RequestSchema) {
     return true;
 }
 
-export function isOptionalField(type: FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | BN | any))) {
+export function isOptionalField(type: FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any))) {
     if(typeof(type)==="function") return type(undefined)!=null;
     if(typeof(type)==="object") return isAllOptional(type);
     return type>=100;
 }
 
-export function verifyField<T extends FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | BN | any))>(fieldType: T, val: any): FieldType<T> {
+export function verifyField<T extends FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any))>(fieldType: T, val: any): FieldType<T> {
 
-    const type: FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | BN | any)) = fieldType;
+    const type: FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any)) = fieldType;
     if(typeof(type)==="function") {
         const result = type(val);
         if(result==null) return;
@@ -90,8 +89,8 @@ export function verifyField<T extends FieldTypeEnum | RequestSchema | ((val: any
         if(typeof(val)!=="number") return;
         if(isNaN(val as number)) return;
         return val as any;
-    } else if(type===FieldTypeEnum.BN || type===FieldTypeEnum.BNOptional) {
-        const result = parseBN(val);
+    } else if(type===FieldTypeEnum.BigInt || type===FieldTypeEnum.BigIntOptional) {
+        const result = parseBigInt(val);
         if(result==null) return;
         return result as any;
     } else if(type===FieldTypeEnum.String || type===FieldTypeEnum.StringOptional) {
@@ -134,8 +133,8 @@ export function verifySchema<T extends RequestSchema>(req: any, schema: T): Requ
             if(typeof(val)!=="number") return null;
             if(isNaN(val as number)) return null;
             resultSchema[fieldName] = val;
-        } else if(type===FieldTypeEnum.BN || type===FieldTypeEnum.BNOptional) {
-            const result = parseBN(val);
+        } else if(type===FieldTypeEnum.BigInt || type===FieldTypeEnum.BigIntOptional) {
+            const result = parseBigInt(val);
             if(result==null) return null;
             resultSchema[fieldName] = result;
         } else if(type===FieldTypeEnum.String || type===FieldTypeEnum.StringOptional) {

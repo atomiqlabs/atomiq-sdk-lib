@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IndexedDBStorageManager = void 0;
 const Utils_1 = require("../utils/Utils");
@@ -42,91 +33,77 @@ class IndexedDBStorageManager {
      *
      * @private
      */
-    tryMigrate() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const txt = window.localStorage.getItem(this.storageKey);
-            if (txt == null)
-                return false;
-            let data;
-            try {
-                data = JSON.parse(txt);
-            }
-            catch (e) {
-                this.logger.error("tryMigrate(): Tried to migrate the database, but cannot parse old local storage!");
-                return false;
-            }
-            yield this.executeTransactionArr(store => Object.keys(data).map(id => {
-                return store.put({ id, data: data[id] });
-            }), false);
-            window.localStorage.removeItem(this.storageKey);
-            this.logger.info("tryMigrate(): Database successfully migrated from localStorage to indexedDB!");
-            return true;
-        });
+    async tryMigrate() {
+        const txt = window.localStorage.getItem(this.storageKey);
+        if (txt == null)
+            return false;
+        let data;
+        try {
+            data = JSON.parse(txt);
+        }
+        catch (e) {
+            this.logger.error("tryMigrate(): Tried to migrate the database, but cannot parse old local storage!");
+            return false;
+        }
+        await this.executeTransactionArr(store => Object.keys(data).map(id => {
+            return store.put({ id, data: data[id] });
+        }), false);
+        window.localStorage.removeItem(this.storageKey);
+        this.logger.info("tryMigrate(): Database successfully migrated from localStorage to indexedDB!");
+        return true;
     }
-    init() {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.db == null) {
-                this.db = yield new Promise((resolve, reject) => {
-                    const request = window.indexedDB.open(this.storageKey, 1);
-                    request.onupgradeneeded = (event) => {
-                        const db = event.target.result;
-                        db.createObjectStore("swaps", { keyPath: "id" });
-                    };
-                    request.onerror = (e) => reject(e);
-                    request.onsuccess = (e) => resolve(e.target.result);
-                });
-            }
-        });
-    }
-    loadData(type) {
-        return __awaiter(this, void 0, void 0, function* () {
-            yield this.tryMigrate();
-            const result = yield this.executeTransaction(store => store.getAll(), true);
-            const returnObj = [];
-            result.forEach(data => {
-                const deserialized = new type(data.data);
-                this.data[data.id] = deserialized;
-                returnObj.push(deserialized);
+    async init() {
+        if (this.db == null) {
+            this.db = await new Promise((resolve, reject) => {
+                const request = window.indexedDB.open(this.storageKey, 1);
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    db.createObjectStore("swaps", { keyPath: "id" });
+                };
+                request.onerror = (e) => reject(e);
+                request.onsuccess = (e) => resolve(e.target.result);
             });
-            return returnObj;
+        }
+    }
+    async loadData(type) {
+        await this.tryMigrate();
+        const result = await this.executeTransaction(store => store.getAll(), true);
+        const returnObj = [];
+        result.forEach(data => {
+            const deserialized = new type(data.data);
+            this.data[data.id] = deserialized;
+            returnObj.push(deserialized);
+        });
+        return returnObj;
+    }
+    async removeData(hash) {
+        await this.executeTransaction(store => store.delete(hash), false)
+            .catch(() => null);
+        if (this.data[hash] != null)
+            delete this.data[hash];
+    }
+    async removeDataArr(arr) {
+        await this.executeTransactionArr(store => arr.map(id => {
+            return store.delete(id);
+        }), false);
+        arr.forEach(id => {
+            if (this.data[id] != null)
+                delete this.data[id];
         });
     }
-    removeData(hash) {
-        return __awaiter(this, void 0, void 0, function* () {
-            yield this.executeTransaction(store => store.delete(hash), false)
-                .catch(() => null);
-            if (this.data[hash] != null)
-                delete this.data[hash];
-        });
+    async saveData(hash, object) {
+        await this.executeTransaction(store => store.put({
+            id: hash,
+            data: object.serialize()
+        }), false);
+        this.data[hash] = object;
     }
-    removeDataArr(arr) {
-        return __awaiter(this, void 0, void 0, function* () {
-            yield this.executeTransactionArr(store => arr.map(id => {
-                return store.delete(id);
-            }), false);
-            arr.forEach(id => {
-                if (this.data[id] != null)
-                    delete this.data[id];
-            });
-        });
-    }
-    saveData(hash, object) {
-        return __awaiter(this, void 0, void 0, function* () {
-            yield this.executeTransaction(store => store.put({
-                id: hash,
-                data: object.serialize()
-            }), false);
-            this.data[hash] = object;
-        });
-    }
-    saveDataArr(arr) {
-        return __awaiter(this, void 0, void 0, function* () {
-            yield this.executeTransactionArr(store => arr.map(data => {
-                return store.put({ id: data.id, data: data.object.serialize() });
-            }), false);
-            arr.forEach(data => {
-                this.data[data.id] = data.object;
-            });
+    async saveDataArr(arr) {
+        await this.executeTransactionArr(store => arr.map(data => {
+            return store.put({ id: data.id, data: data.object.serialize() });
+        }), false);
+        arr.forEach(data => {
+            this.data[data.id] = data.object;
         });
     }
 }

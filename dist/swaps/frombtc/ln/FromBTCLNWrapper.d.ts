@@ -3,7 +3,6 @@
 /// <reference types="node" />
 import { FromBTCLNSwap } from "./FromBTCLNSwap";
 import { IFromBTCWrapper } from "../IFromBTCWrapper";
-import * as BN from "bn.js";
 import { ChainType, ClaimEvent, InitializeEvent, IStorageManager, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { Buffer } from "buffer";
@@ -41,7 +40,7 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
      *
      * @param data Parsed swap data
      */
-    getHtlcTimeout(data: SwapData): BN;
+    getHtlcTimeout(data: SwapData): bigint;
     /**
      * Generates a new 32-byte secret to be used as pre-image for lightning network invoice & HTLC swap\
      *
@@ -97,7 +96,7 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
      * @param preFetches
      */
     create(signer: string, amountData: AmountData, lps: Intermediary[], options: FromBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
-        pricePrefetchPromise?: Promise<BN>;
+        pricePrefetchPromise?: Promise<bigint>;
         feeRatePromise?: Promise<any>;
     }): {
         quote: Promise<FromBTCLNSwap<T>>;

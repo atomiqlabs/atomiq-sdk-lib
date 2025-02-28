@@ -1,7 +1,6 @@
 import {FromBTCLNSwap, FromBTCLNSwapInit, FromBTCLNSwapState} from "./FromBTCLNSwap";
 import {IFromBTCWrapper} from "../IFromBTCWrapper";
-import * as BN from "bn.js";
-import {decode as bolt11Decode, PaymentRequestObject, TagsObject} from "bolt11";
+import {decode as bolt11Decode, PaymentRequestObject, TagsObject} from "@atomiqlabs/bolt11";
 import {
     ChainSwapType,
     ChainType,
@@ -160,8 +159,8 @@ export class FromBTCLNWrapper<
      *
      * @param data Parsed swap data
      */
-    getHtlcTimeout(data: SwapData): BN {
-        return data.getExpiry().sub(new BN(600));
+    getHtlcTimeout(data: SwapData): bigint {
+        return data.getExpiry() - 600n;
     }
 
     /**
@@ -212,7 +211,7 @@ export class FromBTCLNWrapper<
         lp: Intermediary,
         options: FromBTCLNOptions,
         decodedPr: PaymentRequestObject & {tagsObject: TagsObject},
-        amountIn: BN
+        amountIn: bigint
     ): void {
         if(lp.getAddress(this.chainIdentifier)!==resp.intermediaryKey) throw new IntermediaryError("Invalid intermediary address/pubkey");
 
@@ -222,7 +221,7 @@ export class FromBTCLNWrapper<
         if(!amountData.exactIn) {
             if(!resp.total.eq(amountData.amount)) throw new IntermediaryError("Invalid amount returned");
         } else {
-            if(!amountIn.eq(amountData.amount)) throw new IntermediaryError("Invalid payment request returned, amount mismatch");
+            if(amountIn !== amountData.amount) throw new IntermediaryError("Invalid payment request returned, amount mismatch");
         }
     }
 
@@ -242,7 +241,7 @@ export class FromBTCLNWrapper<
     private async verifyLnNodeCapacity(
         lp: Intermediary,
         decodedPr: PaymentRequestObject & {tagsObject: TagsObject},
-        amountIn: BN,
+        amountIn: bigint,
         lnCapacityPrefetchPromise: Promise<LNNodeLiquidity | null>,
         abortSignal?: AbortSignal
     ): Promise<void> {
@@ -255,9 +254,9 @@ export class FromBTCLNWrapper<
         lp.lnData = result
 
         if(decodedPr.payeeNodeKey!==result.publicKey) throw new IntermediaryError("Invalid pr returned - payee pubkey");
-        if(result.capacity.lt(amountIn))
+        if(result.capacity < amountIn)
             throw new IntermediaryError("LP's lightning node doesn't have enough inbound capacity for the swap!");
-        if(result.capacity.div(new BN(2)).lt(amountIn))
+        if((result.capacity / 2n) < amountIn)
             throw new Error("LP's lightning node probably doesn't have enough inbound capacity for the swap!");
     }
 
@@ -280,7 +279,7 @@ export class FromBTCLNWrapper<
         additionalParams?: Record<string, any>,
         abortSignal?: AbortSignal,
         preFetches?: {
-            pricePrefetchPromise?: Promise<BN>,
+            pricePrefetchPromise?: Promise<bigint>,
             feeRatePromise?: Promise<any>
         }
     ): {
@@ -307,7 +306,7 @@ export class FromBTCLNWrapper<
                 quote: (async () => {
                     const abortController = extendAbortController(_abortController.signal);
 
-                    const liquidityPromise: Promise<BN> = this.preFetchIntermediaryLiquidity(amountData, lp, abortController);
+                    const liquidityPromise: Promise<bigint> = this.preFetchIntermediaryLiquidity(amountData, lp, abortController);
 
                     const {lnCapacityPromise, resp} = await tryWithRetries(async(retryCount: number) => {
                         const {lnPublicKey, response} = IntermediaryAPI.initFromBTCLN(
@@ -332,7 +331,7 @@ export class FromBTCLNWrapper<
                     }, null, RequestError, abortController.signal);
 
                     const decodedPr = bolt11Decode(resp.pr);
-                    const amountIn = new BN(decodedPr.millisatoshis).add(new BN(999)).div(new BN(1000));
+                    const amountIn = (BigInt(decodedPr.millisatoshis) + 999n) / 1000n;
 
                     try {
                         this.verifyReturnedData(resp, amountData, lp, options, decodedPr, amountIn);
@@ -354,8 +353,8 @@ export class FromBTCLNWrapper<
                             initialSwapData: await this.contract.createSwapData(
                                 ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token,
                                 resp.total, claimHash.toString("hex"),
-                                this.getRandomSequence(), new BN(Math.floor(Date.now()/1000)), false, true,
-                                resp.securityDeposit, new BN(0), nativeTokenAddress
+                                this.getRandomSequence(), BigInt(Math.floor(Date.now()/1000)), false, true,
+                                resp.securityDeposit, 0n, nativeTokenAddress
                             ),
                             pr: resp.pr,
                             secret: secret.toString("hex"),
@@ -419,7 +418,7 @@ export class FromBTCLNWrapper<
         };
 
         try {
-            const exactOutAmountPromise: Promise<BN> = !amountData.exactIn ? preFetches.pricePrefetchPromise.then(price =>
+            const exactOutAmountPromise: Promise<bigint> = !amountData.exactIn ? preFetches.pricePrefetchPromise.then(price =>
                 this.prices.getToBtcSwapAmount(this.chainIdentifier, amountData.amount, amountData.token, abortController.signal, price)
             ).catch(e => {
                 abortController.abort(e);
@@ -428,18 +427,18 @@ export class FromBTCLNWrapper<
 
             const withdrawRequest = await this.getLNURLWithdraw(lnurl, abortController.signal);
 
-            const min = new BN(withdrawRequest.minWithdrawable).div(new BN(1000));
-            const max = new BN(withdrawRequest.maxWithdrawable).div(new BN(1000));
+            const min = BigInt(withdrawRequest.minWithdrawable) / 1000n;
+            const max = BigInt(withdrawRequest.maxWithdrawable) / 1000n;
 
             if(amountData.exactIn) {
-                if(amountData.amount.lt(min)) throw new UserError("Amount less than LNURL-withdraw minimum");
-                if(amountData.amount.gt(max)) throw new UserError("Amount more than LNURL-withdraw maximum");
+                if(amountData.amount < min) throw new UserError("Amount less than LNURL-withdraw minimum");
+                if(amountData.amount > max) throw new UserError("Amount more than LNURL-withdraw maximum");
             } else {
                 const amount = await exactOutAmountPromise;
                 abortController.signal.throwIfAborted();
 
-                if(amount.muln(95).divn(100).lt(min)) throw new UserError("Amount less than LNURL-withdraw minimum");
-                if(amount.muln(105).divn(100).gt(max)) throw new UserError("Amount more than LNURL-withdraw maximum");
+                if((amount * 95n / 100n) < min) throw new UserError("Amount less than LNURL-withdraw minimum");
+                if((amount * 105n / 100n) > max) throw new UserError("Amount more than LNURL-withdraw maximum");
             }
 
             return this.create(signer, amountData, lps, null, additionalParams, abortSignal, preFetches).map(data => {
@@ -450,8 +449,8 @@ export class FromBTCLNWrapper<
                         quote.lnurlCallback = withdrawRequest.callback;
 
                         const amountIn = quote.getInput().rawAmount;
-                        if(amountIn.lt(min)) throw new UserError("Amount less than LNURL-withdraw minimum");
-                        if(amountIn.gt(max)) throw new UserError("Amount more than LNURL-withdraw maximum");
+                        if(amountIn < min) throw new UserError("Amount less than LNURL-withdraw minimum");
+                        if(amountIn > max) throw new UserError("Amount more than LNURL-withdraw maximum");
 
                         return quote;
                     }),

@@ -1,16 +1,6 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MempoolApi = void 0;
-const BN = require("bn.js");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../../utils/Utils");
 const RequestError_1 = require("../../errors/RequestError");
@@ -46,27 +36,25 @@ class MempoolApi {
      * @param type
      * @param body
      */
-    _request(url, path, responseType, type = "GET", body) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const response = yield (0, Utils_1.fetchWithTimeout)(url + path, {
-                method: type,
-                timeout: this.timeout,
-                body: typeof (body) === "string" ? body : JSON.stringify(body)
-            });
-            if (response.status !== 200) {
-                let resp;
-                try {
-                    resp = yield response.text();
-                }
-                catch (e) {
-                    throw new RequestError_1.RequestError(response.statusText, response.status);
-                }
-                throw RequestError_1.RequestError.parse(resp, response.status);
-            }
-            if (responseType === "str")
-                return yield response.text();
-            return yield response.json();
+    async _request(url, path, responseType, type = "GET", body) {
+        const response = await (0, Utils_1.fetchWithTimeout)(url + path, {
+            method: type,
+            timeout: this.timeout,
+            body: typeof (body) === "string" ? body : JSON.stringify(body)
         });
+        if (response.status !== 200) {
+            let resp;
+            try {
+                resp = await response.text();
+            }
+            catch (e) {
+                throw new RequestError_1.RequestError(response.statusText, response.status);
+            }
+            throw RequestError_1.RequestError.parse(resp, response.status);
+        }
+        if (responseType === "str")
+            return await response.text();
+        return await response.json();
     }
     /**
      * Sends request in parallel to multiple maybe operational api urls
@@ -77,32 +65,30 @@ class MempoolApi {
      * @param body
      * @private
      */
-    requestFromMaybeOperationalUrls(path, responseType, type = "GET", body) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                return yield (0, Utils_1.promiseAny)(this.getMaybeOperationalApis().map(obj => (() => __awaiter(this, void 0, void 0, function* () {
-                    try {
-                        const result = yield this._request(obj.url, path, responseType, type, body);
+    async requestFromMaybeOperationalUrls(path, responseType, type = "GET", body) {
+        try {
+            return await (0, Utils_1.promiseAny)(this.getMaybeOperationalApis().map(obj => (async () => {
+                try {
+                    const result = await this._request(obj.url, path, responseType, type, body);
+                    obj.operational = true;
+                    return result;
+                }
+                catch (e) {
+                    //Only mark as non operational on 5xx server errors!
+                    if (e instanceof RequestError_1.RequestError && Math.floor(e.httpCode / 100) !== 5) {
                         obj.operational = true;
-                        return result;
+                        throw e;
                     }
-                    catch (e) {
-                        //Only mark as non operational on 5xx server errors!
-                        if (e instanceof RequestError_1.RequestError && Math.floor(e.httpCode / 100) !== 5) {
-                            obj.operational = true;
-                            throw e;
-                        }
-                        else {
-                            obj.operational = false;
-                            throw e;
-                        }
+                    else {
+                        obj.operational = false;
+                        throw e;
                     }
-                }))()));
-            }
-            catch (e) {
-                throw e.find(err => err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5) || e[0];
-            }
-        });
+                }
+            })()));
+        }
+        catch (e) {
+            throw e.find(err => err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5) || e[0];
+        }
     }
     /**
      * Sends a request to mempool API, first tries to use the operational API (if any) and if that fails it falls back
@@ -114,25 +100,23 @@ class MempoolApi {
      * @param body
      * @private
      */
-    request(path, responseType, type = "GET", body) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return (0, Utils_1.tryWithRetries)(() => {
-                const operationalPriceApi = this.getOperationalApi();
-                if (operationalPriceApi != null) {
-                    return this._request(operationalPriceApi.url, path, responseType, type, body).catch(err => {
-                        //Only retry on 5xx server errors!
-                        if (err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5)
-                            throw err;
-                        operationalPriceApi.operational = false;
-                        return this.requestFromMaybeOperationalUrls(path, responseType, type, body);
-                    });
-                }
-                return this.requestFromMaybeOperationalUrls(path, responseType, type, body);
-            }, null, (err) => err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5);
-        });
+    async request(path, responseType, type = "GET", body) {
+        return (0, Utils_1.tryWithRetries)(() => {
+            const operationalPriceApi = this.getOperationalApi();
+            if (operationalPriceApi != null) {
+                return this._request(operationalPriceApi.url, path, responseType, type, body).catch(err => {
+                    //Only retry on 5xx server errors!
+                    if (err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5)
+                        throw err;
+                    operationalPriceApi.operational = false;
+                    return this.requestFromMaybeOperationalUrls(path, responseType, type, body);
+                });
+            }
+            return this.requestFromMaybeOperationalUrls(path, responseType, type, body);
+        }, null, (err) => err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5);
     }
     constructor(url, timeout) {
-        url = url !== null && url !== void 0 ? url : "https://mempool.space/testnet/api/";
+        url = url ?? "https://mempool.space/testnet/api/";
         if (Array.isArray(url)) {
             this.backends = url.map(val => {
                 return { url: val, operational: null };
@@ -174,29 +158,25 @@ class MempoolApi {
      *
      * @param txId
      */
-    getRawTransaction(txId) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const rawTransaction = yield this.request("tx/" + txId + "/hex", "str");
-            return buffer_1.Buffer.from(rawTransaction, "hex");
-        });
+    async getRawTransaction(txId) {
+        const rawTransaction = await this.request("tx/" + txId + "/hex", "str");
+        return buffer_1.Buffer.from(rawTransaction, "hex");
     }
     /**
      * Returns confirmed & unconfirmed balance of the specific bitcoin address
      *
      * @param address
      */
-    getAddressBalances(address) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const jsonBody = yield this.request("address/" + address, "obj");
-            const confirmedInput = new BN(jsonBody.chain_stats.funded_txo_sum);
-            const confirmedOutput = new BN(jsonBody.chain_stats.spent_txo_sum);
-            const unconfirmedInput = new BN(jsonBody.mempool_stats.funded_txo_sum);
-            const unconfirmedOutput = new BN(jsonBody.mempool_stats.spent_txo_sum);
-            return {
-                confirmedBalance: confirmedInput.sub(confirmedOutput),
-                unconfirmedBalance: unconfirmedInput.sub(unconfirmedOutput)
-            };
-        });
+    async getAddressBalances(address) {
+        const jsonBody = await this.request("address/" + address, "obj");
+        const confirmedInput = BigInt(jsonBody.chain_stats.funded_txo_sum);
+        const confirmedOutput = BigInt(jsonBody.chain_stats.spent_txo_sum);
+        const unconfirmedInput = BigInt(jsonBody.mempool_stats.funded_txo_sum);
+        const unconfirmedOutput = BigInt(jsonBody.mempool_stats.spent_txo_sum);
+        return {
+            confirmedBalance: confirmedInput - confirmedOutput,
+            unconfirmedBalance: unconfirmedInput - unconfirmedOutput
+        };
     }
     /**
      * Returns CPFP (children pays for parent) data for a given transaction
@@ -211,12 +191,10 @@ class MempoolApi {
      *
      * @param address
      */
-    getAddressUTXOs(address) {
-        return __awaiter(this, void 0, void 0, function* () {
-            let jsonBody = yield this.request("address/" + address + "/utxo", "obj");
-            jsonBody.forEach(e => e.value = new BN(e.value));
-            return jsonBody;
-        });
+    async getAddressUTXOs(address) {
+        let jsonBody = await this.request("address/" + address + "/utxo", "obj");
+        jsonBody.forEach(e => e.value = BigInt(e.value));
+        return jsonBody;
     }
     /**
      * Returns current on-chain bitcoin fees
@@ -241,11 +219,9 @@ class MempoolApi {
     /**
      * Returns the blockheight of the current bitcoin blockchain's tip
      */
-    getTipBlockHeight() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const response = yield this.request("blocks/tip/height", "str");
-            return parseInt(response);
-        });
+    async getTipBlockHeight() {
+        const response = await this.request("blocks/tip/height", "str");
+        return parseInt(response);
     }
     /**
      * Returns the bitcoin blockheader as identified by its blockhash

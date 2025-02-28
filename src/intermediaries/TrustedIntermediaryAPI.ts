@@ -1,6 +1,5 @@
-import {httpGet, httpPost, tryWithRetries} from "../utils/Utils";
+import {httpGet, tryWithRetries} from "../utils/Utils";
 import {RequestError} from "../errors/RequestError";
-import BN from "bn.js";
 import {FieldTypeEnum, RequestSchemaResult, verifySchema} from "../utils/paramcoders/SchemaVerifier";
 
 
@@ -56,19 +55,19 @@ export type AddressStatusResponse = {
 
 export type TrustedFromBTCInit = {
     address: string,
-    amount: BN,
+    amount: bigint,
     token: string,
     refundAddress?: string
 };
 
 const TrustedFromBTCResponseSchema = {
     paymentHash: FieldTypeEnum.String,
-    sequence: FieldTypeEnum.BN,
+    sequence: FieldTypeEnum.BigInt,
     btcAddress: FieldTypeEnum.String,
-    amountSats: FieldTypeEnum.BN,
-    swapFeeSats: FieldTypeEnum.BN,
-    swapFee: FieldTypeEnum.BN,
-    total: FieldTypeEnum.BN,
+    amountSats: FieldTypeEnum.BigInt,
+    swapFeeSats: FieldTypeEnum.BigInt,
+    swapFee: FieldTypeEnum.BigInt,
+    total: FieldTypeEnum.BigInt,
     intermediaryKey: FieldTypeEnum.String,
     recommendedFee: FieldTypeEnum.Number,
     expiresAt: FieldTypeEnum.Number
@@ -97,14 +96,14 @@ export type InvoiceStatusResponse = {
 
 export type TrustedFromBTCLNInit = {
     address: string,
-    amount: BN,
+    amount: bigint,
     token: string
 };
 
 const TrustedFromBTCLNResponseSchema = {
     pr: FieldTypeEnum.String,
-    swapFee: FieldTypeEnum.BN,
-    total: FieldTypeEnum.BN
+    swapFee: FieldTypeEnum.BigInt,
+    total: FieldTypeEnum.BigInt
 } as const;
 
 export type TrustedFromBTCLNResponseType = RequestSchemaResult<typeof TrustedFromBTCLNResponseSchema>;
@@ -178,7 +177,7 @@ export class TrustedIntermediaryAPI {
     static async getAddressStatus(
         url: string,
         paymentHash: string,
-        sequence: BN,
+        sequence: bigint,
         timeout?: number,
         abortSignal?: AbortSignal
     ): Promise<AddressStatusResponse> {
@@ -202,7 +201,7 @@ export class TrustedIntermediaryAPI {
     static async setRefundAddress(
         url: string,
         paymentHash: string,
-        sequence: BN,
+        sequence: bigint,
         refundAddress: string,
         timeout?: number,
         abortSignal?: AbortSignal

@@ -1,8 +1,7 @@
-import {decode as bolt11Decode} from "bolt11";
+import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {FromBTCLNWrapper} from "./FromBTCLNWrapper";
 import {IFromBTCSwap} from "../IFromBTCSwap";
 import {SwapType} from "../../SwapType";
-import * as BN from "bn.js";
 import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isISwapInit, ISwapInit} from "../../ISwap";
 import {Buffer} from "buffer";
@@ -172,7 +171,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      *  to that address anymore
      */
     getHtlcTimeoutTime(): number {
-        return this.wrapper.getHtlcTimeout(this.data).toNumber()*1000;
+        return Number(this.wrapper.getHtlcTimeout(this.data))*1000;
     }
 
     isFinished(): boolean {
@@ -223,14 +222,14 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>> {
         const parsed = bolt11Decode(this.pr);
-        const amount = new BN(parsed.millisatoshis).add(new BN(999)).div(new BN(1000));
+        const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
         return toTokenAmount(amount, this.inputToken, this.wrapper.prices);
     }
 
     /**
      * Estimated transaction fee for commit & claim txs combined
      */
-    async getCommitAndClaimFee(): Promise<BN> {
+    async getCommitAndClaimFee(): Promise<bigint> {
         const swapContract: T["Contract"] = this.wrapper.contract;
         const feeRate = this.feeRate ?? await swapContract.getInitFeeRate(
             this.getSwapData().getOfferer(),
@@ -248,7 +247,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                 swapContract.getRawClaimFee(this.getInitiator(), this.getSwapData(), feeRate) :
                 swapContract.getClaimFee(this.getInitiator(), this.getSwapData(), feeRate)
         );
-        return commitFee.add(claimFee);
+        return commitFee + claimFee;
     }
 
     async getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>> {
@@ -267,9 +266,9 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         ]);
         const commitFee = await this.wrapper.contract.getCommitFee(this.getSwapData(), feeRate);
         const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.getSwapData(), feeRate);
-        const totalFee = commitFee.add(claimFee).add(this.getSwapData().getTotalDeposit());
+        const totalFee = commitFee + claimFee + this.getSwapData().getTotalDeposit();
         return {
-            enoughBalance: balance.gte(totalFee),
+            enoughBalance: balance >= totalFee,
             balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
             required: toTokenAmount(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices)
         };
@@ -409,8 +408,8 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
 
         if (data.getOfferer() !== this.getSwapData().getOfferer()) throw new IntermediaryError("Invalid offerer used");
         if (!data.isToken(this.getSwapData().getToken())) throw new IntermediaryError("Invalid token used");
-        if (data.getSecurityDeposit().gt(this.getSwapData().getSecurityDeposit())) throw new IntermediaryError("Invalid security deposit!");
-        if (data.getAmount().lt(this.getSwapData().getAmount())) throw new IntermediaryError("Invalid amount received!");
+        if (data.getSecurityDeposit() > this.getSwapData().getSecurityDeposit()) throw new IntermediaryError("Invalid security deposit!");
+        if (data.getAmount() < this.getSwapData().getAmount()) throw new IntermediaryError("Invalid amount received!");
         if (data.getClaimHash() !== this.getSwapData().getClaimHash()) throw new IntermediaryError("Invalid payment hash used!");
         if (!data.isDepositToken(this.getSwapData().getDepositToken())) throw new IntermediaryError("Invalid deposit token used!");
 

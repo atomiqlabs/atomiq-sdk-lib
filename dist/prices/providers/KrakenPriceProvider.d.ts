@@ -1,7 +1,6 @@
 import { CoinType, CtorCoinTypes } from "../abstract/IPriceProvider";
 import { ExchangePriceProvider } from "./abstract/ExchangePriceProvider";
 import { MultiChain } from "../../swaps/Swapper";
-import * as BN from "bn.js";
 export type KrakenResponse = {
     error: string[];
     result: {
@@ -22,5 +21,5 @@ export declare class KrakenPriceProvider<T extends MultiChain> extends ExchangeP
     constructor(coinsMap: CtorCoinTypes<T>, url?: string, httpRequestTimeout?: number);
     protected fetchPair(pair: string, abortSignal?: AbortSignal): Promise<number>;
     protected fetchUsdPrice(abortSignal?: AbortSignal): Promise<number>;
-    protected fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<BN>;
+    protected fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<bigint>;
 }

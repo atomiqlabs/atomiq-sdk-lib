@@ -1,6 +1,5 @@
 import {IToBTCWrapper} from "./IToBTCWrapper";
 import {Fee, isISwapInit, ISwap, ISwapInit} from "../ISwap";
-import * as BN from "bn.js";
 import {
     ChainType,
     SignatureVerificationError,
@@ -18,19 +17,19 @@ import {extendAbortController, timeoutPromise, tryWithRetries} from "../../utils
 import {BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../Tokens";
 
 export type IToBTCSwapInit<T extends SwapData> = ISwapInit<T> & {
-    networkFee: BN,
-    networkFeeBtc?: BN
+    networkFee: bigint,
+    networkFeeBtc?: bigint
 };
 
 export function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T> {
-    return BN.isBN(obj.networkFee) &&
-        (obj.networkFeeBtc==null || BN.isBN(obj.networkFeeBtc)) &&
+    return typeof(obj.networkFee) === "bigint" &&
+        (obj.networkFeeBtc==null || typeof(obj.networkFeeBtc) === "bigint") &&
         isISwapInit<T>(obj);
 }
 
 export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<T, ToBTCSwapState> {
-    protected readonly networkFee: BN;
-    protected networkFeeBtc?: BN;
+    protected readonly networkFee: bigint;
+    protected networkFeeBtc?: bigint;
     protected readonly abstract outputToken: BtcToken;
 
     protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, serializedObject: any);
@@ -43,8 +42,8 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         if(isIToBTCSwapInit<T["Data"]>(initOrObject)) {
             this.state = ToBTCSwapState.CREATED;
         } else {
-            this.networkFee = initOrObject.networkFee==null ? null : new BN(initOrObject.networkFee);
-            this.networkFeeBtc = initOrObject.networkFeeBtc==null ? null : new BN(initOrObject.networkFeeBtc);
+            this.networkFee = initOrObject.networkFee==null ? null : BigInt(initOrObject.networkFee);
+            this.networkFeeBtc = initOrObject.networkFeeBtc==null ? null : BigInt(initOrObject.networkFeeBtc);
         }
     }
 
@@ -80,10 +79,10 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
      */
     protected tryCalculateSwapFee() {
         if(this.swapFeeBtc==null) {
-            this.swapFeeBtc = this.swapFee.mul(this.getOutput().rawAmount).div(this.getInputWithoutFee().rawAmount);
+            this.swapFeeBtc = this.swapFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
         }
         if(this.networkFeeBtc==null) {
-            this.networkFeeBtc = this.networkFee.mul(this.getOutput().rawAmount).div(this.getInputWithoutFee().rawAmount);
+            this.networkFeeBtc = this.networkFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
         }
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoSend(
@@ -127,16 +126,16 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     }
 
     getSwapPrice(): number {
-        return 100000000000000/this.pricingInfo.swapPriceUSatPerToken.toNumber();
+        return 100000000000000/Number(this.pricingInfo.swapPriceUSatPerToken);
     }
 
     getMarketPrice(): number {
-        return 100000000000000/this.pricingInfo.realPriceUSatPerToken.toNumber();
+        return 100000000000000/Number(this.pricingInfo.realPriceUSatPerToken);
     }
 
-    getRealSwapFeePercentagePPM(): BN {
-        const feeWithoutBaseFee = this.swapFeeBtc.sub(this.pricingInfo.satsBaseFee);
-        return feeWithoutBaseFee.mul(new BN(1000000)).div(this.getOutput().rawAmount);
+    getRealSwapFeePercentagePPM(): bigint {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        return feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
     }
 
 
@@ -210,10 +209,10 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
 
     getFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken> {
         return {
-            amountInSrcToken: toTokenAmount(this.swapFee.add(this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFeeBtc.add(this.networkFeeBtc), this.outputToken, this.wrapper.prices),
+            amountInSrcToken: toTokenAmount(this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
+            amountInDstToken: toTokenAmount(this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc.add(this.networkFeeBtc), abortSignal, preFetchedUsdPrice)
+                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
         }
     }
 
@@ -240,7 +239,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getAmount().sub(this.swapFee.add(this.networkFee)), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return toTokenAmount(this.data.getAmount() - (this.swapFee + this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
     }
 
     getInput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
@@ -250,7 +249,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     /**
      * Get the estimated smart chain transaction fee of the refund transaction
      */
-    getRefundFee(): Promise<BN> {
+    getRefundFee(): Promise<bigint> {
         return this.wrapper.contract.getRefundFee(this.data);
     }
 
@@ -260,12 +259,12 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     async hasEnoughBalance(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
         const [balance, commitFee] = await Promise.all([
             this.wrapper.contract.getBalance(this.getInitiator(), this.data.getToken(), false),
-            this.data.getToken()===this.wrapper.contract.getNativeCurrencyAddress() ? this.getCommitFee() : Promise.resolve<BN>(null)
+            this.data.getToken()===this.wrapper.contract.getNativeCurrencyAddress() ? this.getCommitFee() : Promise.resolve<bigint>(null)
         ]);
         let required = this.data.getAmount();
-        if(commitFee!=null) required = required.add(commitFee);
+        if(commitFee!=null) required = required + commitFee;
         return {
-            enoughBalance: balance.gte(required),
+            enoughBalance: balance >= required,
             balance: toTokenAmount(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
             required: toTokenAmount(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices)
         };
@@ -280,7 +279,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
             this.getCommitFee()
         ]);
         return {
-            enoughBalance: balance.gte(commitFee),
+            enoughBalance: balance >= commitFee,
             balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
             required: toTokenAmount(commitFee, this.wrapper.getNativeToken(), this.wrapper.prices)
         };

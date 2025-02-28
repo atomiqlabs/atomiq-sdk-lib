@@ -1,12 +1,11 @@
-import * as BN from "bn.js";
 import {coinSelect, maxSendable, CoinselectAddressTypes} from "../coinselect2";
-import {networks, address, Psbt, payments} from "bitcoinjs-lib";
+import {BTC_NETWORK} from "@scure/btc-signer/utils"
+import {p2wpkh, Address, OutScript, Transaction, p2tr} from "@scure/btc-signer";
 import * as randomBytes from "randombytes";
-import {
-    toXOnly,
-} from 'bitcoinjs-lib/src/psbt/bip371';
 import {IBitcoinWallet} from "./IBitcoinWallet";
 import {MempoolApi} from "../mempool/MempoolApi";
+import {Buffer} from "buffer";
+import {toOutputScript} from "../../utils/Utils";
 
 export type BitcoinWalletUtxo = {
     vout: number,
@@ -25,10 +24,10 @@ export type BitcoinWalletUtxo = {
 export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
 
     mempoolApi: MempoolApi;
-    network: networks.Network;
+    network: BTC_NETWORK;
     feeMultiplier: number;
 
-    constructor(mempoolApi: MempoolApi, network: networks.Network, feeMultiplier: number = 1.25) {
+    constructor(mempoolApi: MempoolApi, network: BTC_NETWORK, feeMultiplier: number = 1.25) {
         this.mempoolApi = mempoolApi;
         this.network = network;
         this.feeMultiplier = feeMultiplier;
@@ -45,7 +44,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         return this.mempoolApi.sendTransaction(rawHex);
     }
 
-    protected _getBalance(address: string): Promise<{ confirmedBalance: BN; unconfirmedBalance: BN }> {
+    protected _getBalance(address: string): Promise<{ confirmedBalance: bigint; unconfirmedBalance: bigint }> {
         return this.mempoolApi.getAddressBalances(address);
     }
 
@@ -53,17 +52,16 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         sendingAddress: string,
         sendingAddressType: CoinselectAddressTypes
     ): Promise<BitcoinWalletUtxo[]> {
-
         const utxos = await this.mempoolApi.getAddressUTXOs(sendingAddress);
 
         let totalSpendable = 0;
 
-        const outputScript = address.toOutputScript(sendingAddress, this.network);
+        const outputScript = toOutputScript(this.network, sendingAddress);
 
         const utxoPool: BitcoinWalletUtxo[] = [];
 
         for(let utxo of utxos) {
-            const value = utxo.value.toNumber();
+            const value = Number(utxo.value);
             totalSpendable += value;
             utxoPool.push({
                 vout: utxo.vout,
@@ -97,7 +95,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         recipient: string,
         amount: number,
         feeRate?: number
-    ): Promise<{psbt: Psbt, fee: number, inputAddressIndexes: {[address: string]: number[]}}> {
+    ): Promise<{psbt: Transaction, fee: number, inputAddressIndexes: {[address: string]: number[]}}> {
         if(feeRate==null) feeRate = await this._getFeeRate();
 
         const utxoPool: BitcoinWalletUtxo[] = (await Promise.all(sendingAccounts.map(acc => this._getUtxoPool(acc.address, acc.addressType)))).flat();
@@ -111,7 +109,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
             {
                 address: recipient,
                 value: amount,
-                script: address.toOutputScript(recipient, this.network)
+                script: toOutputScript(this.network, recipient)
             }
         ];
         console.log("Coinselect targets: ", targets);
@@ -127,9 +125,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
             };
         }
 
-        const psbt = new Psbt({
-            network: this.network
-        });
+        const psbt = new Transaction({PSBTVersion: 2});
 
         const inputAddressIndexes: {[address: string]: number[]} = {};
         coinselectResult.inputs.forEach((input, index) => {
@@ -139,58 +135,63 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
 
         console.log("Inputs: ", coinselectResult.inputs);
 
-        psbt.addInputs(await Promise.all(coinselectResult.inputs.map(async (input) => {
+        const formattedInputs = await Promise.all(coinselectResult.inputs.map(async (input) => {
             switch(input.type) {
                 case "p2tr":
+                    const parsed = p2tr(Buffer.from(accountPubkeys[input.address], "hex"));
                     return {
-                        hash: input.txId,
+                        txid: input.txId,
                         index: input.vout,
                         witnessUtxo: {
                             script: input.outputScript,
-                            value: input.value
+                            amount: BigInt(input.value)
                         },
-                        tapInternalKey: toXOnly(Buffer.from(accountPubkeys[input.address], "hex"))
+                        tapInternalKey: parsed.tapInternalKey,
+                        tapMerkleRoot: parsed.tapMerkleRoot,
+                        tapLeafScript: parsed.tapLeafScript
                     };
                 case "p2wpkh":
                     return {
-                        hash: input.txId,
+                        txid: input.txId,
                         index: input.vout,
                         witnessUtxo: {
                             script: input.outputScript,
-                            value: input.value
+                            amount: BigInt(input.value)
                         },
                         sighashType: 0x01
                     };
                 case "p2sh-p2wpkh":
                     return {
-                        hash: input.txId,
+                        txid: input.txId,
                         index: input.vout,
                         witnessUtxo: {
                             script: input.outputScript,
-                            value: input.value
+                            amount: BigInt(input.value)
                         },
-                        redeemScript: payments.p2wpkh({pubkey: Buffer.from(accountPubkeys[input.address], "hex"), network: this.network}).output,
+                        redeemScript: p2wpkh(Buffer.from(accountPubkeys[input.address], "hex"), this.network).script,
                         sighashType: 0x01
                     };
                 case "p2pkh":
                     return {
-                        hash: input.txId,
+                        txid: input.txId,
                         index: input.vout,
                         nonWitnessUtxo: await this.mempoolApi.getRawTransaction(input.txId),
                         sighashType: 0x01
                     };
             }
-        })));
+        }));
+
+        formattedInputs.forEach(input => psbt.addInput(input));
 
         psbt.addOutput({
-            script: address.toOutputScript(recipient, this.network),
-            value: amount
+            script: toOutputScript(this.network, recipient),
+            amount: BigInt(amount)
         });
 
         if(coinselectResult.outputs.length>1) {
             psbt.addOutput({
-                script: address.toOutputScript(sendingAccounts[0].address, this.network),
-                value: coinselectResult.outputs[1].value
+                script: toOutputScript(this.network, sendingAccounts[0].address),
+                amount: BigInt(coinselectResult.outputs[1].value)
             });
         }
 
@@ -207,7 +208,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
             addressType: CoinselectAddressTypes,
         }[],
     ): Promise<{
-        balance: BN,
+        balance: bigint,
         feeRate: number,
         totalFee: number
     }> {
@@ -217,31 +218,31 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
 
         console.log("Utxo pool: ", utxoPool);
 
-        const target = payments.p2wsh({
-            hash: randomBytes(32),
-            network: this.network
+        const target = OutScript.encode({
+            type: "wsh",
+            hash: randomBytes(32)
         });
 
-        let coinselectResult = maxSendable(utxoPool, target.output, "p2wsh", useFeeRate);
+        let coinselectResult = maxSendable(utxoPool, Buffer.from(target), "p2wsh", useFeeRate);
 
         console.log("Max spendable result: ", coinselectResult);
 
         return {
             feeRate: useFeeRate,
-            balance: new BN(coinselectResult.value),
+            balance: BigInt(coinselectResult.value),
             totalFee: coinselectResult.fee
         }
     }
 
-    abstract sendTransaction(address: string, amount: BN, feeRate?: number): Promise<string>;
-    abstract getTransactionFee(address: string, amount: BN, feeRate?: number): Promise<number>;
+    abstract sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string>;
+    abstract getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number>;
     abstract getReceiveAddress(): string;
     abstract getBalance(): Promise<{
-        confirmedBalance: BN,
-        unconfirmedBalance: BN
+        confirmedBalance: bigint,
+        unconfirmedBalance: bigint
     }>;
     abstract getSpendableBalance(): Promise<{
-        balance: BN,
+        balance: bigint,
         feeRate: number,
         totalFee: number
     }>;

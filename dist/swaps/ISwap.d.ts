@@ -3,7 +3,6 @@
 /// <reference types="node" />
 import { SwapType } from "./SwapType";
 import { EventEmitter } from "events";
-import * as BN from "bn.js";
 import { Buffer } from "buffer";
 import { ISwapWrapper } from "./ISwapWrapper";
 import { ChainType, SignatureData, SwapCommitStatus, SwapData } from "@atomiqlabs/base";
@@ -15,8 +14,8 @@ export type ISwapInit<T extends SwapData> = {
     pricingInfo: PriceInfoType;
     url: string;
     expiry: number;
-    swapFee: BN;
-    swapFeeBtc?: BN;
+    swapFee: bigint;
+    swapFeeBtc?: bigint;
     feeRate: any;
     signatureData?: SignatureData;
     data?: T;
@@ -45,8 +44,8 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     data: T["Data"];
     signatureData?: SignatureData;
     feeRate?: any;
-    protected swapFee: BN;
-    protected swapFeeBtc?: BN;
+    protected swapFee: bigint;
+    protected swapFeeBtc?: bigint;
     /**
      * Transaction IDs for the swap on the smart chain side
      */
@@ -105,7 +104,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Returns the price difference between offered price and current market price in PPM (parts per million)
      */
-    getPriceDifferencePPM(): BN;
+    getPriceDifferencePPM(): bigint;
     /**
      * Returns the price difference between offered price and current market price as a decimal number
      */
@@ -125,7 +124,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Returns the real swap fee percentage as PPM (parts per million)
      */
-    abstract getRealSwapFeePercentagePPM(): BN;
+    abstract getRealSwapFeePercentagePPM(): bigint;
     abstract getInputTxId(): string | null;
     abstract getOutputTxId(): string | null;
     abstract getInputAddress(): string | null;
@@ -206,7 +205,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Get the estimated smart chain fee of the commit transaction
      */
-    getCommitFee(): Promise<BN>;
+    getCommitFee(): Promise<bigint>;
     /**
      * Returns output amount of the swap, user receives this much
      */

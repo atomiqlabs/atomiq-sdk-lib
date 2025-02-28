@@ -1,6 +1,6 @@
 {
   "name": "@atomiqlabs/sdk-lib",
-  "version": "11.0.0-dev.28",
+  "version": "11.0.0-dev.29",
   "description": "Basic SDK functionality library for atomiq",
   "main": "./dist/index.js",
   "types:": "./dist/index.d.ts",
@@ -23,12 +23,10 @@
   "license": "ISC",
   "dependencies": {
     "@atomiqlabs/base": "github:atomiqlabs/atomiq-base#add-starknet",
-    "@bitcoinerlab/secp256k1": "1.0.5",
+    "@atomiqlabs/bolt11": "1.6.1",
+    "@scure/btc-signer": "^1.6.0",
     "aes-js": "3.1.2",
     "bech32": "2.0.0",
-    "bitcoinjs-lib": "6.1.5",
-    "bn.js": "5.2.1",
-    "bolt11": "1.4.1",
     "buffer": "6.0.3",
     "create-hash": "1.2.0",
     "events": "3.3.0",
@@ -36,7 +34,6 @@
   },
   "devDependencies": {
     "@types/aes-js": "3.1.4",
-    "@types/bn.js": "5.1.5",
     "@types/create-hash": "1.2.6",
     "@types/events": "3.0.3",
     "@types/node": "22.9.3",

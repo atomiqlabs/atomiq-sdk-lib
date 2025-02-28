@@ -1,6 +1,5 @@
 import {IFromBTCWrapper} from "../IFromBTCWrapper";
 import {FromBTCSwap, FromBTCSwapInit, FromBTCSwapState} from "./FromBTCSwap";
-import * as BN from "bn.js";
 import {
     ChainSwapType,
     ChainType,
@@ -17,18 +16,18 @@ import {EventEmitter} from "events";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {BitcoinRpcWithTxoListener} from "../../../btc/BitcoinRpcWithTxoListener";
 import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
-import {address, networks} from "bitcoinjs-lib";
 import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {SwapType} from "../../SwapType";
-import {extendAbortController, tryWithRetries} from "../../../utils/Utils";
+import {extendAbortController, toOutputScript, tryWithRetries} from "../../../utils/Utils";
 import {FromBTCResponseType, IntermediaryAPI} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
 import * as randomBytes from "randombytes";
+import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 
 export type FromBTCOptions = {
-    feeSafetyFactor?: BN,
+    feeSafetyFactor?: bigint,
     blockSafetyFactor?: number
 };
 
@@ -37,7 +36,7 @@ export type FromBTCWrapperOptions = ISwapWrapperOptions & {
     blocksTillTxConfirms?: number,
     maxConfirmations?: number,
     minSendWindow?: number,
-    bitcoinNetwork?: networks.Network,
+    bitcoinNetwork?: BTC_NETWORK,
     bitcoinBlocktime?: number
 };
 
@@ -79,7 +78,7 @@ export class FromBTCWrapper<
         events?: EventEmitter
     ) {
         if(options==null) options = {};
-        options.bitcoinNetwork = options.bitcoinNetwork || networks.testnet;
+        options.bitcoinNetwork = options.bitcoinNetwork ?? TEST_NETWORK;
         options.safetyFactor = options.safetyFactor || 2;
         options.blocksTillTxConfirms = options.blocksTillTxConfirms || 12;
         options.maxConfirmations = options.maxConfirmations || 6;
@@ -187,9 +186,9 @@ export class FromBTCWrapper<
      * @param data Parsed swap data
      * @param requiredConfirmations Confirmations required to claim the tx
      */
-    getOnchainSendTimeout(data: SwapData, requiredConfirmations: number): BN {
+    getOnchainSendTimeout(data: SwapData, requiredConfirmations: number): bigint {
         const tsDelta = (this.options.blocksTillTxConfirms + requiredConfirmations) * this.options.bitcoinBlocktime * this.options.safetyFactor;
-        return data.getExpiry().sub(new BN(tsDelta));
+        return data.getExpiry() - BigInt(tsDelta);
     }
 
     /**
@@ -208,20 +207,20 @@ export class FromBTCWrapper<
         options: FromBTCOptions,
         abortController: AbortController
     ): Promise<{
-        feePerBlock: BN,
+        feePerBlock: bigint,
         safetyFactor: number,
-        startTimestamp: BN,
+        startTimestamp: bigint,
         addBlock: number,
-        addFee: BN
+        addFee: bigint
     } | null> {
-        const startTimestamp = new BN(Math.floor(Date.now()/1000));
+        const startTimestamp = BigInt(Math.floor(Date.now()/1000));
 
-        const dummyAmount = new BN(randomBytes(3));
+        const dummyAmount = BigInt(Math.floor(Math.random()* 0x1000000));
         const dummySwapData = await this.contract.createSwapData(
             ChainSwapType.CHAIN, signer, signer, amountData.token,
             dummyAmount, this.contract.getHashForOnchain(randomBytes(20), dummyAmount, 3).toString("hex"),
-            this.getRandomSequence(), new BN(Math.floor(Date.now()/1000)), false, true,
-            new BN(randomBytes(2)), new BN(randomBytes(2))
+            this.getRandomSequence(), startTimestamp, false, true,
+            BigInt(Math.floor(Math.random() * 0x10000)), BigInt(Math.floor(Math.random() * 0x10000))
         );
 
         try {
@@ -229,17 +228,17 @@ export class FromBTCWrapper<
                 tryWithRetries(() => this.btcRelay.getFeePerBlock(), null, null, abortController.signal),
                 tryWithRetries(() => this.btcRelay.getTipData(), null, null, abortController.signal),
                 this.btcRpc.getTipHeight(),
-                tryWithRetries<BN>(() => this.contract.getClaimFee(signer, dummySwapData), null, null, abortController.signal)
+                tryWithRetries<bigint>(() => this.contract.getClaimFee(signer, dummySwapData), null, null, abortController.signal)
             ]);
 
             const currentBtcRelayBlock = btcRelayData.blockheight;
             const addBlock = Math.max(currentBtcBlock-currentBtcRelayBlock, 0);
             return {
-                feePerBlock: feePerBlock.mul(options.feeSafetyFactor),
+                feePerBlock: feePerBlock * options.feeSafetyFactor,
                 safetyFactor: options.blockSafetyFactor,
                 startTimestamp: startTimestamp,
                 addBlock,
-                addFee: claimFeeRate.mul(options.feeSafetyFactor)
+                addFee: claimFeeRate * options.feeSafetyFactor
             }
         } catch (e) {
             abortController.abort(e);
@@ -259,17 +258,17 @@ export class FromBTCWrapper<
         data: T["Data"],
         options: FromBTCOptions,
         claimerBounty: {
-            feePerBlock: BN,
+            feePerBlock: bigint,
             safetyFactor: number,
-            startTimestamp: BN,
+            startTimestamp: bigint,
             addBlock: number,
-            addFee: BN
+            addFee: bigint
         }
-    ): BN {
-        const tsDelta = data.getExpiry().sub(claimerBounty.startTimestamp);
-        const blocksDelta = tsDelta.div(new BN(this.options.bitcoinBlocktime)).mul(new BN(options.blockSafetyFactor));
-        const totalBlock = blocksDelta.add(new BN(claimerBounty.addBlock));
-        return claimerBounty.addFee.add(totalBlock.mul(claimerBounty.feePerBlock));
+    ) : bigint {
+        const tsDelta = data.getExpiry() - claimerBounty.startTimestamp;
+        const blocksDelta = tsDelta / BigInt(this.options.bitcoinBlocktime) * BigInt(options.blockSafetyFactor);
+        const totalBlock = blocksDelta + BigInt(claimerBounty.addBlock);
+        return claimerBounty.addFee + (totalBlock * claimerBounty.feePerBlock);
     }
 
     /**
@@ -292,20 +291,20 @@ export class FromBTCWrapper<
         lp: Intermediary,
         options: FromBTCOptions,
         data: T["Data"],
-        sequence: BN,
+        sequence: bigint,
         claimerBounty: {
-            feePerBlock: BN,
+            feePerBlock: bigint,
             safetyFactor: number,
-            startTimestamp: BN,
+            startTimestamp: bigint,
             addBlock: number,
-            addFee: BN
+            addFee: bigint
         },
         depositToken: string
     ): void {
         if(amountData.exactIn) {
-            if(!resp.amount.eq(amountData.amount)) throw new IntermediaryError("Invalid amount returned");
+            if(resp.amount !== amountData.amount) throw new IntermediaryError("Invalid amount returned");
         } else {
-            if(!resp.total.eq(amountData.amount)) throw new IntermediaryError("Invalid total returned");
+            if(resp.total !== amountData.amount) throw new IntermediaryError("Invalid total returned");
         }
 
         const requiredConfirmations = resp.confirmations ?? lp.services[SwapType.FROM_BTC].data.confirmations;
@@ -314,10 +313,10 @@ export class FromBTCWrapper<
         const totalClaimerBounty = this.getClaimerBounty(data, options, claimerBounty);
 
         if(
-            !data.getClaimerBounty().eq(totalClaimerBounty) ||
+            data.getClaimerBounty() !== totalClaimerBounty ||
             data.getType()!=ChainSwapType.CHAIN ||
-            !data.getSequence().eq(sequence) ||
-            !data.getAmount().eq(resp.total) ||
+            data.getSequence() !== sequence ||
+            data.getAmount() !== resp.total ||
             data.isPayIn() ||
             !data.isToken(amountData.token) ||
             data.getOfferer()!==lp.getAddress(this.chainIdentifier) ||
@@ -328,12 +327,12 @@ export class FromBTCWrapper<
 
         //Check that we have enough time to send the TX and for it to confirm
         const expiry = this.getOnchainSendTimeout(data, requiredConfirmations);
-        const currentTimestamp = new BN(Math.floor(Date.now()/1000));
-        if(expiry.sub(currentTimestamp).lt(new BN(this.options.minSendWindow))) {
+        const currentTimestamp = BigInt(Math.floor(Date.now()/1000));
+        if((expiry - currentTimestamp) < BigInt(this.options.minSendWindow)) {
             throw new IntermediaryError("Send window too low");
         }
 
-        const lockingScript = address.toOutputScript(resp.btcAddress, this.options.bitcoinNetwork);
+        const lockingScript = toOutputScript(this.options.bitcoinNetwork, resp.btcAddress);
         const desiredExtraData = this.contract.getExtraData(lockingScript, resp.amount, requiredConfirmations);
         const desiredClaimHash = this.contract.getHashForOnchain(lockingScript, resp.amount, requiredConfirmations);
         if(!desiredClaimHash.equals(Buffer.from(data.getClaimHash(), "hex"))) {
@@ -367,12 +366,12 @@ export class FromBTCWrapper<
     }[] {
         options ??= {};
         options.blockSafetyFactor ??= 1;
-        options.feeSafetyFactor ??= new BN(2);
+        options.feeSafetyFactor ??= 2n;
 
-        const sequence: BN = this.getRandomSequence();
+        const sequence: bigint = this.getRandomSequence();
 
         const _abortController = extendAbortController(abortSignal);
-        const pricePrefetchPromise: Promise<BN> = this.preFetchPrice(amountData, _abortController.signal);
+        const pricePrefetchPromise: Promise<bigint> = this.preFetchPrice(amountData, _abortController.signal);
         const claimerBountyPrefetchPromise = this.preFetchClaimerBounty(signer, amountData, options, _abortController);
         const nativeTokenAddress = this.contract.getNativeCurrencyAddress();
         const feeRatePromise: Promise<any> = this.preFetchFeeRate(signer, amountData, null, _abortController);
@@ -382,7 +381,7 @@ export class FromBTCWrapper<
                 intermediary: lp,
                 quote: (async () => {
                     const abortController = extendAbortController(_abortController.signal);
-                    const liquidityPromise: Promise<BN> = this.preFetchIntermediaryLiquidity(amountData, lp, abortController);
+                    const liquidityPromise: Promise<bigint> = this.preFetchIntermediaryLiquidity(amountData, lp, abortController);
 
                     try {
                         const {signDataPromise, resp} = await tryWithRetries(async(retryCount: number) => {

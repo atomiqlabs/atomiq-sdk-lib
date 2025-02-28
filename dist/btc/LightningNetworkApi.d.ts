@@ -1,7 +1,6 @@
-import * as BN from "bn.js";
 export type LNNodeLiquidity = {
     publicKey: string;
-    capacity: BN;
+    capacity: bigint;
     numChannels: number;
 };
 export interface LightningNetworkApi {

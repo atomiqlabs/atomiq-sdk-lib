@@ -1,7 +1,6 @@
 /// <reference types="node" />
 import { ToBTCLNSwap } from "./ToBTCLNSwap";
 import { IToBTCWrapper } from "../IToBTCWrapper";
-import * as BN from "bn.js";
 import { ChainType, IStorageManager } from "@atomiqlabs/base";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
@@ -10,10 +9,10 @@ import { EventEmitter } from "events";
 import { LNURLPayParamsWithUrl } from "../../../utils/LNURL";
 export type ToBTCLNOptions = {
     expirySeconds?: number;
-    maxFee?: BN | Promise<BN>;
-    expiryTimestamp?: BN;
-    maxRoutingPPM?: BN;
-    maxRoutingBaseFee?: BN;
+    maxFee?: bigint | Promise<bigint>;
+    expiryTimestamp?: bigint;
+    maxRoutingPPM?: bigint;
+    maxRoutingBaseFee?: bigint;
 };
 export type ToBTCLNWrapperOptions = ISwapWrapperOptions & {
     lightningBaseFee?: number;
@@ -78,7 +77,7 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
      */
     create(signer: string, bolt11PayRequest: string, amountData: Omit<AmountData, "amount">, lps: Intermediary[], options?: ToBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
         feeRatePromise: Promise<any>;
-        pricePreFetchPromise: Promise<BN>;
+        pricePreFetchPromise: Promise<bigint>;
     }): {
         quote: Promise<ToBTCLNSwap<T>>;
         intermediary: Intermediary;

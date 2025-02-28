@@ -1,6 +1,5 @@
 import {ISwapPrice, PriceInfoType} from "./abstract/ISwapPrice";
 import {ChainIds, MultiChain} from "../swaps/Swapper";
-import * as BN from "bn.js";
 import {Token} from "../swaps/Tokens";
 
 export class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends ChainIds<T>> {
@@ -8,7 +7,7 @@ export class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends Ch
     swapPrice: ISwapPrice<T>;
     chainIdentifier: ChainIdentifier;
 
-    maxAllowedFeeDifferencePPM: BN;
+    maxAllowedFeeDifferencePPM: bigint;
 
     constructor(swapPrice: ISwapPrice<T>, chainIdentifier: ChainIdentifier) {
         this.swapPrice = swapPrice;
@@ -27,13 +26,13 @@ export class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends Ch
      * @param preFetchedPrice Already pre-fetched price
      */
     public async isValidAmountSend(
-        amountSats: BN,
-        satsBaseFee: BN,
-        feePPM: BN,
-        paidToken: BN,
+        amountSats: bigint,
+        satsBaseFee: bigint,
+        feePPM: bigint,
+        paidToken: bigint,
         token: string,
         abortSignal?: AbortSignal,
-        preFetchedPrice?: BN
+        preFetchedPrice?: bigint
     ): Promise<PriceInfoType> {
         return this.swapPrice.isValidAmountSend<ChainIdentifier>(
             this.chainIdentifier, amountSats, satsBaseFee, feePPM, paidToken, token, abortSignal, preFetchedPrice
@@ -52,20 +51,20 @@ export class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends Ch
      * @param preFetchedPrice Already pre-fetched price
      */
     public async isValidAmountReceive(
-        amountSats: BN,
-        satsBaseFee: BN,
-        feePPM: BN,
-        receiveToken: BN,
+        amountSats: bigint,
+        satsBaseFee: bigint,
+        feePPM: bigint,
+        receiveToken: bigint,
         token: string,
         abortSignal?: AbortSignal,
-        preFetchedPrice?: BN
+        preFetchedPrice?: bigint
     ): Promise<PriceInfoType> {
         return this.swapPrice.isValidAmountReceive<ChainIdentifier>(
             this.chainIdentifier, amountSats, satsBaseFee, feePPM, receiveToken, token, abortSignal, preFetchedPrice
         );
     }
 
-    public preFetchPrice(token: string, abortSignal?: AbortSignal): Promise<BN> {
+    public preFetchPrice(token: string, abortSignal?: AbortSignal): Promise<bigint> {
         return this.swapPrice.preFetchPrice<ChainIdentifier>(this.chainIdentifier, token, abortSignal);
     }
 
@@ -83,11 +82,11 @@ export class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends Ch
      * @throws {Error} when token is not found
      */
     public async getFromBtcSwapAmount(
-        fromAmount: BN,
+        fromAmount: bigint,
         toToken: string,
         abortSignal?: AbortSignal,
-        preFetchedPrice?: BN
-    ): Promise<BN> {
+        preFetchedPrice?: bigint
+    ): Promise<bigint> {
         return this.swapPrice.getFromBtcSwapAmount<ChainIdentifier>(
             this.chainIdentifier, fromAmount, toToken, abortSignal, preFetchedPrice
         );
@@ -103,11 +102,11 @@ export class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends Ch
      * @throws {Error} when token is not found
      */
     public async getToBtcSwapAmount(
-        fromAmount: BN,
+        fromAmount: bigint,
         fromToken: string,
         abortSignal?: AbortSignal,
-        preFetchedPrice?: BN
-    ): Promise<BN> {
+        preFetchedPrice?: bigint
+    ): Promise<bigint> {
         return this.swapPrice.getToBtcSwapAmount<ChainIdentifier>(
             this.chainIdentifier, fromAmount, fromToken, abortSignal, preFetchedPrice
         );
@@ -124,7 +123,7 @@ export class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends Ch
     }
 
     public async getBtcUsdValue(
-        btcSats: BN,
+        btcSats: bigint,
         abortSignal?: AbortSignal,
         preFetchedPrice?: number
     ): Promise<number> {
@@ -132,7 +131,7 @@ export class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends Ch
     }
 
     public async getTokenUsdValue(
-        tokenAmount: BN,
+        tokenAmount: bigint,
         token: string,
         abortSignal?: AbortSignal,
         preFetchedPrice?: number
@@ -141,7 +140,7 @@ export class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends Ch
     }
 
     public getUsdValue(
-        amount: BN,
+        amount: bigint,
         token: Token<ChainIdentifier>,
         abortSignal?: AbortSignal,
         preFetchedUsdPrice?: number

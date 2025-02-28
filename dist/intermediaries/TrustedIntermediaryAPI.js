@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TrustedIntermediaryAPI = exports.InvoiceStatusResponseCodes = exports.AddressStatusResponseCodes = void 0;
 const Utils_1 = require("../utils/Utils");
@@ -27,12 +18,12 @@ var AddressStatusResponseCodes;
 })(AddressStatusResponseCodes = exports.AddressStatusResponseCodes || (exports.AddressStatusResponseCodes = {}));
 const TrustedFromBTCResponseSchema = {
     paymentHash: SchemaVerifier_1.FieldTypeEnum.String,
-    sequence: SchemaVerifier_1.FieldTypeEnum.BN,
+    sequence: SchemaVerifier_1.FieldTypeEnum.BigInt,
     btcAddress: SchemaVerifier_1.FieldTypeEnum.String,
-    amountSats: SchemaVerifier_1.FieldTypeEnum.BN,
-    swapFeeSats: SchemaVerifier_1.FieldTypeEnum.BN,
-    swapFee: SchemaVerifier_1.FieldTypeEnum.BN,
-    total: SchemaVerifier_1.FieldTypeEnum.BN,
+    amountSats: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    swapFeeSats: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    swapFee: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    total: SchemaVerifier_1.FieldTypeEnum.BigInt,
     intermediaryKey: SchemaVerifier_1.FieldTypeEnum.String,
     recommendedFee: SchemaVerifier_1.FieldTypeEnum.Number,
     expiresAt: SchemaVerifier_1.FieldTypeEnum.Number
@@ -47,8 +38,8 @@ var InvoiceStatusResponseCodes;
 })(InvoiceStatusResponseCodes = exports.InvoiceStatusResponseCodes || (exports.InvoiceStatusResponseCodes = {}));
 const TrustedFromBTCLNResponseSchema = {
     pr: SchemaVerifier_1.FieldTypeEnum.String,
-    swapFee: SchemaVerifier_1.FieldTypeEnum.BN,
-    total: SchemaVerifier_1.FieldTypeEnum.BN
+    swapFee: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    total: SchemaVerifier_1.FieldTypeEnum.BigInt
 };
 class TrustedIntermediaryAPI {
     /**
@@ -60,10 +51,8 @@ class TrustedIntermediaryAPI {
      * @param abortSignal
      * @throws {RequestError} if non-200 http response is returned
      */
-    static getInvoiceStatus(url, paymentHash, timeout, abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getInvoiceStatus?paymentHash=" + encodeURIComponent(paymentHash), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
-        });
+    static async getInvoiceStatus(url, paymentHash, timeout, abortSignal) {
+        return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getInvoiceStatus?paymentHash=" + encodeURIComponent(paymentHash), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
     }
     /**
      * Initiate a trusted swap from BTCLN to SC native currency, retries!
@@ -75,17 +64,15 @@ class TrustedIntermediaryAPI {
      * @param abortSignal
      * @throws {RequestError} If the response is non-200
      */
-    static initTrustedFromBTCLN(chainIdentifier, baseUrl, init, timeout, abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const resp = yield (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(baseUrl + "/lnforgas/createInvoice" +
-                "?address=" + encodeURIComponent(init.address) +
-                "&amount=" + encodeURIComponent(init.amount.toString(10)) +
-                "&chain=" + encodeURIComponent(chainIdentifier) +
-                "&token=" + encodeURIComponent(init.token), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
-            if (resp.code !== 10000)
-                throw RequestError_1.RequestError.parse(JSON.stringify(resp), 400);
-            return (0, SchemaVerifier_1.verifySchema)(resp.data, TrustedFromBTCLNResponseSchema);
-        });
+    static async initTrustedFromBTCLN(chainIdentifier, baseUrl, init, timeout, abortSignal) {
+        const resp = await (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(baseUrl + "/lnforgas/createInvoice" +
+            "?address=" + encodeURIComponent(init.address) +
+            "&amount=" + encodeURIComponent(init.amount.toString(10)) +
+            "&chain=" + encodeURIComponent(chainIdentifier) +
+            "&token=" + encodeURIComponent(init.token), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+        if (resp.code !== 10000)
+            throw RequestError_1.RequestError.parse(JSON.stringify(resp), 400);
+        return (0, SchemaVerifier_1.verifySchema)(resp.data, TrustedFromBTCLNResponseSchema);
     }
     /**
      * Fetches the address status from the intermediary node
@@ -97,10 +84,8 @@ class TrustedIntermediaryAPI {
      * @param abortSignal
      * @throws {RequestError} if non-200 http response is returned
      */
-    static getAddressStatus(url, paymentHash, sequence, timeout, abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getAddressStatus?paymentHash=" + encodeURIComponent(paymentHash) + "&sequence=" + encodeURIComponent(sequence.toString(10)), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
-        });
+    static async getAddressStatus(url, paymentHash, sequence, timeout, abortSignal) {
+        return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getAddressStatus?paymentHash=" + encodeURIComponent(paymentHash) + "&sequence=" + encodeURIComponent(sequence.toString(10)), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
     }
     /**
      * Sets the refund address for an on-chain gas swap
@@ -113,13 +98,11 @@ class TrustedIntermediaryAPI {
      * @param abortSignal
      * @throws {RequestError} if non-200 http response is returned
      */
-    static setRefundAddress(url, paymentHash, sequence, refundAddress, timeout, abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/setRefundAddress" +
-                "?paymentHash=" + encodeURIComponent(paymentHash) +
-                "&sequence=" + encodeURIComponent(sequence.toString(10)) +
-                "&refundAddress=" + encodeURIComponent(refundAddress), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
-        });
+    static async setRefundAddress(url, paymentHash, sequence, refundAddress, timeout, abortSignal) {
+        return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/setRefundAddress" +
+            "?paymentHash=" + encodeURIComponent(paymentHash) +
+            "&sequence=" + encodeURIComponent(sequence.toString(10)) +
+            "&refundAddress=" + encodeURIComponent(refundAddress), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
     }
     /**
      * Initiate a trusted swap from BTC to SC native currency, retries!
@@ -131,18 +114,16 @@ class TrustedIntermediaryAPI {
      * @param abortSignal
      * @throws {RequestError} If the response is non-200
      */
-    static initTrustedFromBTC(chainIdentifier, baseUrl, init, timeout, abortSignal) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const resp = yield (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(baseUrl + "/frombtc_trusted/getAddress?chain=" + encodeURIComponent(chainIdentifier) +
-                "&address=" + encodeURIComponent(init.address) +
-                "&amount=" + encodeURIComponent(init.amount.toString(10)) +
-                "&refundAddress=" + encodeURIComponent(init.refundAddress) +
-                "&exactIn=true" +
-                "&token=" + encodeURIComponent(init.token), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
-            if (resp.code !== 10000)
-                throw RequestError_1.RequestError.parse(JSON.stringify(resp), 400);
-            return (0, SchemaVerifier_1.verifySchema)(resp.data, TrustedFromBTCResponseSchema);
-        });
+    static async initTrustedFromBTC(chainIdentifier, baseUrl, init, timeout, abortSignal) {
+        const resp = await (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(baseUrl + "/frombtc_trusted/getAddress?chain=" + encodeURIComponent(chainIdentifier) +
+            "&address=" + encodeURIComponent(init.address) +
+            "&amount=" + encodeURIComponent(init.amount.toString(10)) +
+            "&refundAddress=" + encodeURIComponent(init.refundAddress) +
+            "&exactIn=true" +
+            "&token=" + encodeURIComponent(init.token), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+        if (resp.code !== 10000)
+            throw RequestError_1.RequestError.parse(JSON.stringify(resp), 400);
+        return (0, SchemaVerifier_1.verifySchema)(resp.data, TrustedFromBTCResponseSchema);
     }
 }
 exports.TrustedIntermediaryAPI = TrustedIntermediaryAPI;

@@ -1,7 +1,6 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import { SwapType } from "../../SwapType";
-import * as BN from "bn.js";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { Buffer } from "buffer";
 import { Fee, ISwap, ISwapInit } from "../../ISwap";
@@ -18,10 +17,10 @@ export declare enum OnchainForGasSwapState {
 }
 export type OnchainForGasSwapInit<T extends SwapData> = ISwapInit<T> & {
     paymentHash: string;
-    sequence: BN;
+    sequence: bigint;
     address: string;
-    inputAmount: BN;
-    outputAmount: BN;
+    inputAmount: bigint;
+    outputAmount: bigint;
     recipient: string;
     token: string;
     refundAddress?: string;
@@ -73,12 +72,12 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
     isSuccessful(): boolean;
     isQuoteValid(): Promise<boolean>;
     isActionable(): boolean;
-    protected getOutAmountWithoutFee(): BN;
+    protected getOutAmountWithoutFee(): bigint;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>>;
     getSwapFee(): Fee;
-    getRealSwapFeePercentagePPM(): BN;
+    getRealSwapFeePercentagePPM(): bigint;
     checkAddress(save?: boolean): Promise<boolean>;
     /**
      * A blocking promise resolving when payment was received by the intermediary and client can continue

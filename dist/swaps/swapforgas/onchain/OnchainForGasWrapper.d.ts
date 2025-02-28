@@ -1,5 +1,4 @@
 /// <reference types="node" />
-import * as BN from "bn.js";
 import { ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { ChainType, IStorageManager } from "@atomiqlabs/base";
 import { OnchainForGasSwap } from "./OnchainForGasSwap";
@@ -31,7 +30,7 @@ export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrap
      * @param lpOrUrl           Intermediary/Counterparty swap service Intermediary object or raw url
      * @param refundAddress     Bitcoin address to receive refund on in case the counterparty cannot execute the swap
      */
-    create(signer: string, amount: BN, lpOrUrl: Intermediary | string, refundAddress?: string): Promise<OnchainForGasSwap<T>>;
+    create(signer: string, amount: bigint, lpOrUrl: Intermediary | string, refundAddress?: string): Promise<OnchainForGasSwap<T>>;
     protected checkPastSwap(swap: OnchainForGasSwap<T>): Promise<boolean>;
     protected isOurSwap(signer: string, swap: OnchainForGasSwap<T>): boolean;
     protected tickSwap(swap: OnchainForGasSwap<T>): void;

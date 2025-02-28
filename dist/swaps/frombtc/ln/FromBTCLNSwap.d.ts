@@ -3,7 +3,6 @@
 import { FromBTCLNWrapper } from "./FromBTCLNWrapper";
 import { IFromBTCSwap } from "../IFromBTCSwap";
 import { SwapType } from "../../SwapType";
-import * as BN from "bn.js";
 import { ChainType, SignatureData, SwapData } from "@atomiqlabs/base";
 import { ISwapInit } from "../../ISwap";
 import { Buffer } from "buffer";
@@ -75,7 +74,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     /**
      * Estimated transaction fee for commit & claim txs combined
      */
-    getCommitAndClaimFee(): Promise<BN>;
+    getCommitAndClaimFee(): Promise<bigint>;
     getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
     hasEnoughForTxFees(): Promise<{
         enoughBalance: boolean;

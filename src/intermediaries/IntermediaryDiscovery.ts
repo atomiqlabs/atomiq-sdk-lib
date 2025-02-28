@@ -1,12 +1,10 @@
 import {Intermediary, ServicesType} from "./Intermediary";
 import {SwapType} from "../swaps/SwapType";
-import * as BN from "bn.js";
 import {SwapContract} from "@atomiqlabs/base";
 import {EventEmitter} from "events";
 import {Buffer} from "buffer";
-import {getLogger, httpGet, tryWithRetries} from "../utils/Utils";
+import {bigIntMax, bigIntMin, getLogger, httpGet, tryWithRetries} from "../utils/Utils";
 import {IntermediaryAPI} from "./IntermediaryAPI";
-import {ChainType} from "@atomiqlabs/base";
 
 export enum SwapHandlerType {
     TO_BTC = "TO_BTC",
@@ -36,8 +34,8 @@ type InfoHandlerResponseEnvelope = {
 
 export type TokenBounds = {
     [token: string]: {
-        min: BN,
-        max: BN
+        min: bigint,
+        max: bigint
     }
 }
 
@@ -83,7 +81,7 @@ function swapHandlerTypeToSwapType(swapHandlerType: SwapHandlerType): SwapType {
  * @param tokenAddress
  * @param swapAmount
  */
-function getIntermediaryComparator(swapType: SwapType, tokenAddress: string, swapAmount?: BN) {
+function getIntermediaryComparator(swapType: SwapType, tokenAddress: string, swapAmount?: bigint) {
 
     if(swapType===SwapType.TO_BTC) {
         //TODO: Also take reputation into account
@@ -91,12 +89,12 @@ function getIntermediaryComparator(swapType: SwapType, tokenAddress: string, swa
 
     return (a: Intermediary, b: Intermediary): number => {
         if(swapAmount==null) {
-            return new BN(a.services[swapType].swapFeePPM).sub(new BN(b.services[swapType].swapFeePPM)).toNumber();
+            return a.services[swapType].swapFeePPM - b.services[swapType].swapFeePPM;
         } else {
-            const feeA = new BN(a.services[swapType].swapBaseFee).add(swapAmount.mul(new BN(a.services[swapType].swapFeePPM)).div(new BN(1000000)));
-            const feeB = new BN(b.services[swapType].swapBaseFee).add(swapAmount.mul(new BN(b.services[swapType].swapFeePPM)).div(new BN(1000000)));
+            const feeA = BigInt(a.services[swapType].swapBaseFee) + (swapAmount * BigInt(a.services[swapType].swapFeePPM) / 1000000n);
+            const feeB = BigInt(b.services[swapType].swapBaseFee) + (swapAmount * BigInt(b.services[swapType].swapFeePPM) / 1000000n);
 
-            return feeA.sub(feeB).toNumber();
+            return feeA - feeB > 0n ? 1 : feeA === feeB ? 0 : -1;
         }
     }
 
@@ -273,12 +271,12 @@ export class IntermediaryDiscovery extends EventEmitter {
                         const tokenMinMax = tokenBounds[token];
                         if(tokenMinMax==null) {
                             tokenBounds[token] = {
-                                min: new BN(swapService.min),
-                                max: new BN(swapService.max)
+                                min: BigInt(swapService.min),
+                                max: BigInt(swapService.max)
                             }
                         } else {
-                            tokenMinMax.min = BN.min(tokenMinMax.min, new BN(swapService.min));
-                            tokenMinMax.max = BN.min(tokenMinMax.max, new BN(swapService.max));
+                            tokenMinMax.min = bigIntMax(tokenMinMax.min, BigInt(swapService.min));
+                            tokenMinMax.max = bigIntMin(tokenMinMax.max, BigInt(swapService.max));
                         }
                     }
                 }
@@ -306,12 +304,12 @@ export class IntermediaryDiscovery extends EventEmitter {
                         const tokenMinMax = tokenBounds[token];
                         if(tokenMinMax==null) {
                             tokenBounds[token] = {
-                                min: new BN(swapService.min),
-                                max: new BN(swapService.max)
+                                min: BigInt(swapService.min),
+                                max: BigInt(swapService.max)
                             }
                         } else {
-                            tokenMinMax.min = BN.min(tokenMinMax.min, new BN(swapService.min));
-                            tokenMinMax.max = BN.min(tokenMinMax.max, new BN(swapService.max));
+                            tokenMinMax.min = bigIntMax(tokenMinMax.min, BigInt(swapService.min));
+                            tokenMinMax.max = bigIntMin(tokenMinMax.max, BigInt(swapService.max));
                         }
                     }
                 }
@@ -374,12 +372,12 @@ export class IntermediaryDiscovery extends EventEmitter {
      * @param amount Amount to be swapped in sats - BTC
      * @param count How many intermediaries to return at most
      */
-    getSwapCandidates(chainIdentifier: string, swapType: SwapType, tokenAddress: any, amount?: BN, count?: number): Intermediary[] {
+    getSwapCandidates(chainIdentifier: string, swapType: SwapType, tokenAddress: any, amount?: bigint, count?: number): Intermediary[] {
         const candidates = this.intermediaries.filter(e => {
             const swapService = e.services[swapType];
             if(swapService==null) return false;
-            if(amount!=null && amount.lt(new BN(swapService.min))) return false;
-            if(amount!=null && amount.gt(new BN(swapService.max))) return false;
+            if(amount!=null && amount < BigInt(swapService.min)) return false;
+            if(amount!=null && amount > BigInt(swapService.max)) return false;
             if(swapService.chainTokens==null) return false;
             if(swapService.chainTokens[chainIdentifier]==null) return false;
             if(!swapService.chainTokens[chainIdentifier].includes(tokenAddress.toString())) return false;

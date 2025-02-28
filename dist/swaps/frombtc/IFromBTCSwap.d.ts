@@ -1,6 +1,5 @@
 import { IFromBTCWrapper } from "./IFromBTCWrapper";
 import { Fee, ISwap, ISwapInit } from "../ISwap";
-import * as BN from "bn.js";
 import { ChainType } from "@atomiqlabs/base";
 import { PriceInfoType } from "../../prices/abstract/ISwapPrice";
 import { BtcToken, SCToken, TokenAmount } from "../Tokens";
@@ -17,7 +16,7 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
     refreshPriceData(): Promise<PriceInfoType>;
     getSwapPrice(): number;
     getMarketPrice(): number;
-    getRealSwapFeePercentagePPM(): BN;
+    getRealSwapFeePercentagePPM(): bigint;
     abstract getInputTxId(): string | null;
     getOutputTxId(): string | null;
     getInputAddress(): string | null;
@@ -37,7 +36,7 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
      * Returns if the swap can be committed
      */
     abstract canCommit(): boolean;
-    protected getOutAmountWithoutFee(): BN;
+    protected getOutAmountWithoutFee(): bigint;
     getOutputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken>;
@@ -45,7 +44,7 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
     getSecurityDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getTotalDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getInitiator(): string;
-    getClaimFee(): Promise<BN>;
+    getClaimFee(): Promise<bigint>;
     hasEnoughForTxFees(): Promise<{
         enoughBalance: boolean;
         balance: TokenAmount;

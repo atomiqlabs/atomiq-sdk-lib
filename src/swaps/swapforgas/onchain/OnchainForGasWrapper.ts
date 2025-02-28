@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediaryAPI";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
@@ -51,7 +50,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
      * @param lpOrUrl           Intermediary/Counterparty swap service Intermediary object or raw url
      * @param refundAddress     Bitcoin address to receive refund on in case the counterparty cannot execute the swap
      */
-    async create(signer: string, amount: BN, lpOrUrl: Intermediary | string, refundAddress?: string): Promise<OnchainForGasSwap<T>> {
+    async create(signer: string, amount: bigint, lpOrUrl: Intermediary | string, refundAddress?: string): Promise<OnchainForGasSwap<T>> {
         if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
 
         const lpUrl = typeof(lpOrUrl)==="string" ? lpOrUrl : lpOrUrl.url;
@@ -65,7 +64,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
             token
         }, this.options.getRequestTimeout);
 
-        if(!resp.total.eq(amount)) throw new IntermediaryError("Invalid total returned");
+        if(resp.total !== amount) throw new IntermediaryError("Invalid total returned");
 
         const pricingInfo = await this.verifyReturnedPrice(
             typeof(lpOrUrl)==="string" ?

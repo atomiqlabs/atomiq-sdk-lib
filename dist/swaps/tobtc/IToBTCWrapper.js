@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IToBTCWrapper = void 0;
 const IToBTCSwap_1 = require("./IToBTCSwap");
@@ -23,39 +14,37 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
      * @param swap Swap to be checked
      * @private
      */
-    syncStateFromChain(swap) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED ||
-                swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED ||
-                swap.state === IToBTCSwap_1.ToBTCSwapState.COMMITED ||
-                swap.state === IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED ||
-                swap.state === IToBTCSwap_1.ToBTCSwapState.REFUNDABLE) {
-                const res = yield (0, Utils_1.tryWithRetries)(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
-                switch (res) {
-                    case base_1.SwapCommitStatus.PAID:
-                        swap.state = IToBTCSwap_1.ToBTCSwapState.CLAIMED;
+    async syncStateFromChain(swap) {
+        if (swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED ||
+            swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED ||
+            swap.state === IToBTCSwap_1.ToBTCSwapState.COMMITED ||
+            swap.state === IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED ||
+            swap.state === IToBTCSwap_1.ToBTCSwapState.REFUNDABLE) {
+            const res = await (0, Utils_1.tryWithRetries)(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
+            switch (res) {
+                case base_1.SwapCommitStatus.PAID:
+                    swap.state = IToBTCSwap_1.ToBTCSwapState.CLAIMED;
+                    return true;
+                case base_1.SwapCommitStatus.REFUNDABLE:
+                    swap.state = IToBTCSwap_1.ToBTCSwapState.REFUNDABLE;
+                    return true;
+                case base_1.SwapCommitStatus.EXPIRED:
+                    swap.state = IToBTCSwap_1.ToBTCSwapState.QUOTE_EXPIRED;
+                    return true;
+                case base_1.SwapCommitStatus.NOT_COMMITED:
+                    if (swap.state === IToBTCSwap_1.ToBTCSwapState.COMMITED || swap.state === IToBTCSwap_1.ToBTCSwapState.REFUNDABLE) {
+                        swap.state = IToBTCSwap_1.ToBTCSwapState.REFUNDED;
                         return true;
-                    case base_1.SwapCommitStatus.REFUNDABLE:
-                        swap.state = IToBTCSwap_1.ToBTCSwapState.REFUNDABLE;
+                    }
+                    break;
+                case base_1.SwapCommitStatus.COMMITED:
+                    if (swap.state !== IToBTCSwap_1.ToBTCSwapState.COMMITED && swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDABLE) {
+                        swap.state = IToBTCSwap_1.ToBTCSwapState.COMMITED;
                         return true;
-                    case base_1.SwapCommitStatus.EXPIRED:
-                        swap.state = IToBTCSwap_1.ToBTCSwapState.QUOTE_EXPIRED;
-                        return true;
-                    case base_1.SwapCommitStatus.NOT_COMMITED:
-                        if (swap.state === IToBTCSwap_1.ToBTCSwapState.COMMITED || swap.state === IToBTCSwap_1.ToBTCSwapState.REFUNDABLE) {
-                            swap.state = IToBTCSwap_1.ToBTCSwapState.REFUNDED;
-                            return true;
-                        }
-                        break;
-                    case base_1.SwapCommitStatus.COMMITED:
-                        if (swap.state !== IToBTCSwap_1.ToBTCSwapState.COMMITED && swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDABLE) {
-                            swap.state = IToBTCSwap_1.ToBTCSwapState.COMMITED;
-                            return true;
-                        }
-                        break;
-                }
+                    }
+                    break;
             }
-        });
+        }
     }
     /**
      * Pre-fetches intermediary's reputation, doesn't throw, instead aborts via abortController and returns null
@@ -95,20 +84,18 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             return null;
         });
     }
-    checkPastSwap(swap) {
-        return __awaiter(this, void 0, void 0, function* () {
-            let changed = yield this.syncStateFromChain(swap);
-            if ((swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED || swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED) && !(yield swap.isQuoteValid())) {
-                //Check if quote is still valid
-                swap.state = IToBTCSwap_1.ToBTCSwapState.QUOTE_EXPIRED;
-                changed || (changed = true);
-            }
-            if (swap.state === IToBTCSwap_1.ToBTCSwapState.COMMITED || swap.state === IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED) {
-                //Check if that maybe already concluded
-                changed || (changed = yield swap.checkIntermediarySwapProcessed(false));
-            }
-            return changed;
-        });
+    async checkPastSwap(swap) {
+        let changed = await this.syncStateFromChain(swap);
+        if ((swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED || swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED) && !await swap.isQuoteValid()) {
+            //Check if quote is still valid
+            swap.state = IToBTCSwap_1.ToBTCSwapState.QUOTE_EXPIRED;
+            changed || (changed = true);
+        }
+        if (swap.state === IToBTCSwap_1.ToBTCSwapState.COMMITED || swap.state === IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED) {
+            //Check if that maybe already concluded
+            changed || (changed = await swap.checkIntermediarySwapProcessed(false));
+        }
+        return changed;
     }
     tickSwap(swap) {
         switch (swap.state) {
@@ -125,18 +112,16 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                 break;
         }
     }
-    processEventInitialize(swap, event) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED || swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
-                const swapData = yield event.swapData();
-                if (swap.data != null && !swap.data.equals(swapData))
-                    return false;
-                if (swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED || swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED)
-                    swap.state = IToBTCSwap_1.ToBTCSwapState.COMMITED;
-                swap.data = swapData;
-                return true;
-            }
-        });
+    async processEventInitialize(swap, event) {
+        if (swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED || swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
+            const swapData = await event.swapData();
+            if (swap.data != null && !swap.data.equals(swapData))
+                return false;
+            if (swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED || swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED)
+                swap.state = IToBTCSwap_1.ToBTCSwapState.COMMITED;
+            swap.data = swapData;
+            return true;
+        }
     }
     processEventClaim(swap, event) {
         if (swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDED) {
