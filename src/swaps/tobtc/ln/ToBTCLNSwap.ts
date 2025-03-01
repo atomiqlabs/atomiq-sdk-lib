@@ -167,6 +167,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
     serialize(): any {
         return {
             ...super.serialize(),
+            paymentHash: this.getPaymentHash().toString("hex"),
             pr: this.pr,
             confidence: this.confidence,
             secret: this.secret,

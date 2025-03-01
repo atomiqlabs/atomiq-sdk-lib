@@ -14,6 +14,9 @@ import {IntermediaryAPI, ToBTCLNResponseType} from "../../../intermediaries/Inte
 import {RequestError} from "../../../errors/RequestError";
 import {LNURL, LNURLPayParamsWithUrl} from "../../../utils/LNURL";
 import {IToBTCSwapInit, ToBTCSwapState} from "../IToBTCSwap";
+import {ISwapStorage} from "../../../swap-storage/ISwapStorage";
+import {ToBTCSwap} from "../onchain/ToBTCSwap";
+import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
 
 export type ToBTCLNOptions = {
     expirySeconds?: number,
@@ -30,14 +33,14 @@ export type ToBTCLNWrapperOptions = ISwapWrapperOptions & {
 };
 
 export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCLNSwap<T>, ToBTCLNWrapperOptions> {
-
-    protected readonly swapDeserializer = ToBTCLNSwap;
+    public readonly TYPE = SwapType.TO_BTCLN;
+    public readonly swapDeserializer = ToBTCLNSwap;
 
     constructor(
         chainIdentifier: string,
-        storage: IStorageManager<ToBTCLNSwap<T>>,
+        unifiedStorage: ISwapStorage<ToBTCSwap<T>>,
+        unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
-        chainEvents: T["Events"],
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
         swapDataDeserializer: new (data: any) => T["Data"],
@@ -48,16 +51,18 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         options.paymentTimeoutSeconds ??= 4*24*60*60;
         options.lightningBaseFee ??= 10;
         options.lightningFeePPM ??= 2000;
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
     }
 
-    private checkPaymentHashWasPaid(paymentHash: string) {
-        const paymentHashBuffer = Buffer.from(paymentHash, "hex");
-        for(let value of this.swapData.values()) {
-            if(
-                (value.state===ToBTCSwapState.CLAIMED || value.state===ToBTCSwapState.SOFT_CLAIMED) &&
-                value.getPaymentHash().equals(paymentHashBuffer)
-            ) throw new UserError("Lightning invoice was already paid!");
+    private async checkPaymentHashWasPaid(paymentHash: string) {
+        const swaps = await this.unifiedStorage.query([[
+            {key: "type", value: this.TYPE},
+            {key: "paymentHash", value: paymentHash}
+        ]], this.swapDeserializer.bind(null, this));
+
+        for(let value of swaps) {
+            if(value.state===ToBTCSwapState.CLAIMED || value.state===ToBTCSwapState.SOFT_CLAIMED)
+                throw new UserError("Lightning invoice was already paid!");
         }
     }
 
@@ -224,7 +229,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
      * @param abortSignal           Abort signal for aborting the process
      * @param preFetches            Existing pre-fetches for the swap (only used internally for LNURL swaps)
      */
-    create(
+    async create(
         signer: string,
         bolt11PayRequest: string,
         amountData: Omit<AmountData, "amount">,
@@ -236,10 +241,10 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
             feeRatePromise: Promise<any>,
             pricePreFetchPromise: Promise<bigint>
         }
-    ): {
+    ): Promise<{
         quote: Promise<ToBTCLNSwap<T>>,
         intermediary: Intermediary
-    }[] {
+    }[]> {
         options ??= {};
         options.expirySeconds ??= this.options.paymentTimeoutSeconds;
         options.expiryTimestamp ??= BigInt(Math.floor(Date.now()/1000)+options.expirySeconds);
@@ -249,7 +254,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         const amountOut: bigint = (BigInt(parsedPr.millisatoshis) + 999n) / 1000n;
         options.maxFee ??= this.calculateFeeForAmount(amountOut, options.maxRoutingBaseFee, options.maxRoutingPPM);
 
-        this.checkPaymentHashWasPaid(parsedPr.tagsObject.payment_hash);
+        await this.checkPaymentHashWasPaid(parsedPr.tagsObject.payment_hash);
 
         const claimHash = this.contract.getHashForHtlc(Buffer.from(parsedPr.tagsObject.payment_hash, "hex"));
 
@@ -485,10 +490,10 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                     successAction
                 } = await LNURL.useLNURLPay(payRequest, amountData.amount, options.comment, this.options.getRequestTimeout, _abortController.signal);
 
-                return this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
+                return (await this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
                     feeRatePromise,
                     pricePreFetchPromise
-                }).map(data => {
+                })).map(data => {
                     return {
                         quote: data.quote.then(quote => {
                             quote.lnurl = payRequest.url;

@@ -100,6 +100,13 @@ export abstract class IToBTCWrapper<
         });
     }
 
+    protected readonly checkPastSwapStates = [
+        ToBTCSwapState.CREATED,
+        ToBTCSwapState.QUOTE_SOFT_EXPIRED,
+        ToBTCSwapState.COMMITED,
+        ToBTCSwapState.SOFT_CLAIMED,
+        ToBTCSwapState.REFUNDABLE
+    ];
     protected async checkPastSwap(swap: S): Promise<boolean> {
         let changed = await this.syncStateFromChain(swap);
 
@@ -117,6 +124,7 @@ export abstract class IToBTCWrapper<
         return changed;
     }
 
+    protected readonly tickSwapState = [ToBTCSwapState.CREATED, ToBTCSwapState.COMMITED, ToBTCSwapState.SOFT_CLAIMED];
     protected tickSwap(swap: S): void {
         switch(swap.state) {
             case ToBTCSwapState.CREATED:
@@ -160,20 +168,6 @@ export abstract class IToBTCWrapper<
 
     protected isOurSwap(signer: string, swap: S): boolean {
         return swap.data.isOfferer(signer);
-    }
-
-    /**
-     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
-     */
-    public getRefundableSwaps(signer?: string): Promise<S[]> {
-        return Promise.resolve(this.getRefundableSwapsSync(signer));
-    }
-
-    /**
-     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
-     */
-    public getRefundableSwapsSync(signer?: string): S[] {
-        return this.getAllSwapsSync(signer).filter(swap => swap.isRefundable());
     }
 
 }

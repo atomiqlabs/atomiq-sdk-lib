@@ -768,7 +768,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         expirySeconds ??= 5*24*3600;
         return this.createSwap(
             chainIdentifier as ChainIdentifier,
-            (candidates: Intermediary[], abortSignal: AbortSignal, chain) => Promise.resolve(chain.tobtcln.create(
+            (candidates: Intermediary[], abortSignal: AbortSignal, chain) => chain.tobtcln.create(
                 signer,
                 paymentRequest,
                 amountData,
@@ -780,7 +780,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 },
                 additionalParams,
                 abortSignal
-            )),
+            ),
             amountData,
             SwapType.TO_BTCLN
         );

@@ -84,18 +84,4 @@ export abstract class IFromBTCWrapper<
         return swap.data.isClaimer(signer);
     }
 
-    /**
-     * Returns all swaps that are claimable, and optionally only those initiated with signer's address
-     */
-    public getClaimableSwaps(signer?: string): Promise<S[]> {
-        return Promise.resolve(this.getClaimableSwapsSync(signer));
-    }
-
-    /**
-     * Returns all swaps that are claimable, and optionally only those initiated with signer's address
-     */
-    public getClaimableSwapsSync(signer?: string): S[] {
-        return this.getAllSwapsSync(signer).filter(swap => swap.isClaimable());
-    }
-
 }

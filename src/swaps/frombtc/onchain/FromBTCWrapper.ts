@@ -5,7 +5,6 @@ import {
     ChainType,
     ClaimEvent,
     InitializeEvent,
-    IStorageManager,
     RefundEvent,
     RelaySynchronizer,
     SwapCommitStatus,
@@ -25,6 +24,9 @@ import {FromBTCResponseType, IntermediaryAPI} from "../../../intermediaries/Inte
 import {RequestError} from "../../../errors/RequestError";
 import * as randomBytes from "randombytes";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
+import {ISwapStorage} from "../../../swap-storage/ISwapStorage";
+import {ToBTCSwap} from "../../tobtc/onchain/ToBTCSwap";
+import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint,
@@ -43,7 +45,8 @@ export type FromBTCWrapperOptions = ISwapWrapperOptions & {
 export class FromBTCWrapper<
     T extends ChainType
 > extends IFromBTCWrapper<T, FromBTCSwap<T>, FromBTCWrapperOptions> {
-    protected readonly swapDeserializer = FromBTCSwap;
+    public readonly TYPE = SwapType.FROM_BTC;
+    public readonly swapDeserializer = FromBTCSwap;
 
     readonly synchronizer: RelaySynchronizer<any, T["TX"], any>;
     readonly btcRelay: BtcRelay<any, T["TX"], any>;
@@ -51,9 +54,9 @@ export class FromBTCWrapper<
 
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents On-chain event listener
      * @param contract Underlying contract handling the swaps
-     * @param chainEvents On-chain event listener
      * @param prices Pricing to use
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
@@ -65,9 +68,9 @@ export class FromBTCWrapper<
      */
     constructor(
         chainIdentifier: string,
-        storage: IStorageManager<FromBTCSwap<T>>,
+        unifiedStorage: ISwapStorage<ToBTCSwap<T>>,
+        unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
-        chainEvents: T["Events"],
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
         swapDataDeserializer: new (data: any) => T["Data"],
@@ -84,12 +87,19 @@ export class FromBTCWrapper<
         options.maxConfirmations = options.maxConfirmations || 6;
         options.minSendWindow = options.minSendWindow || 30*60; //Minimum time window for user to send in the on-chain funds for From BTC swap
         options.bitcoinBlocktime = options.bitcoinBlocktime || 10*60;
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
         this.btcRelay = btcRelay;
         this.synchronizer = synchronizer;
         this.btcRpc = btcRpc;
     }
 
+    protected readonly checkPastSwapStates = [
+        FromBTCSwapState.PR_CREATED,
+        FromBTCSwapState.QUOTE_SOFT_EXPIRED,
+        FromBTCSwapState.CLAIM_COMMITED,
+        FromBTCSwapState.BTC_TX_CONFIRMED,
+        FromBTCSwapState.EXPIRED
+    ];
     protected async checkPastSwap(swap: FromBTCSwap<T>): Promise<boolean> {
         if(swap.state===FromBTCSwapState.PR_CREATED || swap.state===FromBTCSwapState.QUOTE_SOFT_EXPIRED) {
             const status = await tryWithRetries(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
@@ -136,6 +146,7 @@ export class FromBTCWrapper<
         }
     }
 
+    protected tickSwapState = [FromBTCSwapState.PR_CREATED, FromBTCSwapState.CLAIM_COMMITED, FromBTCSwapState.EXPIRED];
     protected tickSwap(swap: FromBTCSwap<T>): void {
         switch(swap.state) {
             case FromBTCSwapState.PR_CREATED:

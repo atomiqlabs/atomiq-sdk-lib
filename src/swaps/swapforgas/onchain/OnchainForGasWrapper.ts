@@ -8,17 +8,21 @@ import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {SwapType} from "../../SwapType";
+import {ISwapStorage} from "../../../swap-storage/ISwapStorage";
+import {ToBTCSwap} from "../../tobtc/onchain/ToBTCSwap";
+import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
 
 export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
-    protected readonly swapDeserializer = OnchainForGasSwap;
+    public readonly TYPE = SwapType.TRUSTED_FROM_BTC;
+    public readonly swapDeserializer = OnchainForGasSwap;
 
     readonly btcRpc: BitcoinRpcWithTxoListener<any>;
 
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents On-chain event listener
      * @param contract Underlying contract handling the swaps
-     * @param chainEvents On-chain event listener
      * @param prices Pricing to use
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
@@ -28,9 +32,9 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
      */
     constructor(
         chainIdentifier: string,
-        storage: IStorageManager<OnchainForGasSwap<T>>,
+        unifiedStorage: ISwapStorage<ToBTCSwap<T>>,
+        unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
-        chainEvents: T["Events"],
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
         swapDataDeserializer: new (data: any) => T["Data"],
@@ -38,7 +42,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         options?: ISwapWrapperOptions,
         events?: EventEmitter
     ) {
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
         this.btcRpc = btcRpc;
     }
 
@@ -95,6 +99,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         return quote;
     }
 
+    protected checkPastSwapStates = [OnchainForGasSwapState.PR_CREATED];
     protected async checkPastSwap(swap: OnchainForGasSwap<T>): Promise<boolean> {
         if(swap.state===OnchainForGasSwapState.PR_CREATED) {
             //Check if it's maybe already paid
@@ -107,6 +112,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         return signer===swap.getRecipient();
     }
 
+    protected tickSwapState = null;
     protected tickSwap(swap: OnchainForGasSwap<T>): void {}
 
 }

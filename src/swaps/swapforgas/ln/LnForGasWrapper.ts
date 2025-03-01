@@ -8,7 +8,8 @@ import {Intermediary} from "../../../intermediaries/Intermediary";
 import {SwapType} from "../../SwapType";
 
 export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForGasSwap<T>> {
-    protected readonly swapDeserializer = LnForGasSwap;
+    public TYPE = SwapType.TRUSTED_FROM_BTCLN;
+    public readonly swapDeserializer = LnForGasSwap;
 
     /**
      * Returns a newly created swap, receiving 'amount' on lightning network
@@ -59,6 +60,7 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
         return quote;
     }
 
+    protected checkPastSwapStates = [LnForGasSwapState.PR_CREATED];
     protected async checkPastSwap(swap: LnForGasSwap<T>): Promise<boolean> {
         if(swap.state===LnForGasSwapState.PR_CREATED) {
             //Check if it's maybe already paid
@@ -72,6 +74,7 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
         return signer===swap.getRecipient();
     }
 
+    protected tickSwapState = null;
     protected tickSwap(swap: LnForGasSwap<T>): void {}
 
 }

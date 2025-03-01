@@ -2,7 +2,7 @@ import {ToBTCSwap, ToBTCSwapInit} from "./ToBTCSwap";
 import {IToBTCWrapper} from "../IToBTCWrapper";
 import {
     ChainSwapType, ChainType,
-    IStorageManager, BitcoinRpc, BigIntBufferUtils
+    BitcoinRpc, BigIntBufferUtils
 } from "@atomiqlabs/base";
 import {Intermediary, SingleChainReputationType} from "../../../intermediaries/Intermediary";
 import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
@@ -17,7 +17,8 @@ import {extendAbortController, toOutputScript, tryWithRetries} from "../../../ut
 import {IntermediaryAPI, ToBTCResponseType} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
-import {OutScript} from "@scure/btc-signer";
+import {ISwapStorage} from "../../../swap-storage/ISwapStorage";
+import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
 
 export type ToBTCOptions = {
     confirmationTarget?: number,
@@ -36,16 +37,17 @@ export type ToBTCWrapperOptions = ISwapWrapperOptions & {
 };
 
 export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwap<T>, ToBTCWrapperOptions> {
-    protected readonly swapDeserializer = ToBTCSwap;
+    public readonly TYPE = SwapType.TO_BTC;
+    public readonly swapDeserializer = ToBTCSwap;
 
     readonly btcRpc: BitcoinRpc<any>;
 
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents Smart chain on-chain event listener
      * @param contract Chain specific swap contract
      * @param prices Swap pricing handler
-     * @param chainEvents Smart chain on-chain event listener
      * @param tokens
      * @param swapDataDeserializer Deserializer for chain specific SwapData
      * @param btcRpc Bitcoin RPC api
@@ -54,9 +56,9 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
      */
     constructor(
         chainIdentifier: string,
-        storage: IStorageManager<ToBTCSwap<T>>,
+        unifiedStorage: ISwapStorage<ToBTCSwap<T>>,
+        unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
-        chainEvents: T["Events"],
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
         swapDataDeserializer: new (data: any) => T["Data"],
@@ -71,7 +73,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
         options.bitcoinBlocktime = options.bitcoinBlocktime|| (60*10);
         options.maxExpectedOnchainSendSafetyFactor = options.maxExpectedOnchainSendSafetyFactor || 4;
         options.maxExpectedOnchainSendGracePeriodBlocks = options.maxExpectedOnchainSendGracePeriodBlocks || 12;
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
         this.btcRpc = btcRpc;
     }
 
