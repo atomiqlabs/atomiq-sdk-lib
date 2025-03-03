@@ -80,8 +80,7 @@ class MempoolBitcoinWallet {
         const psbt = new btc_signer_1.Transaction({ PSBTVersion: 2 });
         const inputAddressIndexes = {};
         coinselectResult.inputs.forEach((input, index) => {
-            var _a;
-            inputAddressIndexes[_a = input.address] ?? (inputAddressIndexes[_a] = []);
+            inputAddressIndexes[input.address] ??= [];
             inputAddressIndexes[input.address].push(index);
         });
         console.log("Inputs: ", coinselectResult.inputs);

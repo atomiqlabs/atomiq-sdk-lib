@@ -8,8 +8,6 @@ import { ToBTCWrapper } from "./tobtc/onchain/ToBTCWrapper";
 import { FromBTCLNWrapper } from "./frombtc/ln/FromBTCLNWrapper";
 import { FromBTCWrapper } from "./frombtc/onchain/FromBTCWrapper";
 import { IntermediaryDiscovery, MultichainSwapBounds, SwapBounds } from "../intermediaries/IntermediaryDiscovery";
-import { IFromBTCSwap } from "./frombtc/IFromBTCSwap";
-import { IToBTCSwap } from "./tobtc/IToBTCSwap";
 import { ISwap } from "./ISwap";
 import { SwapType } from "./SwapType";
 import { FromBTCLNSwap } from "./frombtc/ln/FromBTCLNSwap";
@@ -31,7 +29,9 @@ import { BtcToken, SCToken, Token } from "./Tokens";
 import { OnchainForGasSwap } from "./swapforgas/onchain/OnchainForGasSwap";
 import { OnchainForGasWrapper } from "./swapforgas/onchain/OnchainForGasWrapper";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
-import { ISwapStorage } from "../swap-storage/ISwapStorage";
+import { IUnifiedStorage } from "../storage/IUnifiedStorage";
+import { UnifiedSwapStorage } from "../swap-storage/UnifiedSwapStorage";
+import { UnifiedSwapEventListener } from "../events/UnifiedSwapEventListener";
 export type SwapperOptions = {
     intermediaryUrl?: string | string[];
     registryUrl?: string;
@@ -43,22 +43,31 @@ export type SwapperOptions = {
     };
     storagePrefix?: string;
     defaultTrustedIntermediaryUrl?: string;
-    swapStorage?: <T extends ChainType>(chainId: T["ChainId"]) => ISwapStorage<ISwap<T>>;
+    swapStorage?: <T extends ChainType>(chainId: T["ChainId"]) => IUnifiedStorage;
+    noTimers?: boolean;
+    noEvents?: boolean;
+    dontCheckPastSwaps?: boolean;
+    dontFetchLPs?: boolean;
 };
 export type MultiChain = {
     [chainIdentifier in string]: ChainType;
 };
 export type ChainSpecificData<T extends ChainType> = {
-    tobtcln: ToBTCLNWrapper<T>;
-    tobtc: ToBTCWrapper<T>;
-    frombtcln: FromBTCLNWrapper<T>;
-    frombtc: FromBTCWrapper<T>;
-    lnforgas: LnForGasWrapper<T>;
-    onchainforgas: OnchainForGasWrapper<T>;
+    wrappers: {
+        [SwapType.TO_BTCLN]: ToBTCLNWrapper<T>;
+        [SwapType.TO_BTC]: ToBTCWrapper<T>;
+        [SwapType.FROM_BTCLN]: FromBTCLNWrapper<T>;
+        [SwapType.FROM_BTC]: FromBTCWrapper<T>;
+        [SwapType.TRUSTED_FROM_BTCLN]: LnForGasWrapper<T>;
+        [SwapType.TRUSTED_FROM_BTC]: OnchainForGasWrapper<T>;
+    };
     chainEvents: T["Events"];
     swapContract: T["Contract"];
     btcRelay: BtcRelay<any, T["TX"], MempoolBitcoinBlock, T["Signer"]>;
     synchronizer: RelaySynchronizer<any, T["TX"], MempoolBitcoinBlock>;
+    unifiedChainEvents: UnifiedSwapEventListener<T>;
+    unifiedSwapStorage: UnifiedSwapStorage<T>;
+    reviver: (val: any) => ISwap<T>;
 };
 export type MultiChainData<T extends MultiChain> = {
     [chainIdentifier in keyof T]: ChainSpecificData<T[chainIdentifier]>;
@@ -174,11 +183,8 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
     getMinimum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, type: SwapType, token: string): bigint;
     /**
      * Initializes the swap storage and loads existing swaps, needs to be called before any other action
-     *
-     * @param noTimers      Whether to run without setting up the watchdog timers
-     * @param noEvents      Whether to leave out event handler
      */
-    init(noTimers?: boolean, noEvents?: boolean): Promise<void>;
+    init(): Promise<void>;
     /**
      * Stops listening for onchain events and closes this Swapper instance
      */
@@ -330,22 +336,6 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * Returns swaps where an action is required (either claim or refund) for the specific chain, and optionally also for a specific signer's address
      */
     getActionableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
-    /**
-     * Returns all swaps that are refundable
-     */
-    getRefundableSwaps(): Promise<IToBTCSwap[]>;
-    /**
-     * Returns swaps that are refundable for the specific chain, and optionally also for a specific signer's address
-     */
-    getRefundableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IToBTCSwap<T[C]>[]>;
-    /**
-     * Returns all swaps that are in-progress and are claimable
-     */
-    getClaimableSwaps(): Promise<IFromBTCSwap[]>;
-    /**
-     * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
-     */
-    getClaimableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IFromBTCSwap<T[C]>[]>;
     getBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>): Promise<bigint>;
     getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string): Promise<bigint>;
     getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<bigint>;

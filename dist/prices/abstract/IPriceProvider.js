@@ -3,14 +3,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.IPriceProvider = void 0;
 class IPriceProvider {
     constructor(coins) {
-        var _a;
         this.coinsMap = {};
         for (let coinData of coins) {
             if (coinData.coinId == null)
                 continue;
             for (let chainId in coinData.chains) {
                 const { address, decimals } = coinData.chains[chainId];
-                (_a = this.coinsMap)[chainId] ?? (_a[chainId] = {});
+                this.coinsMap[chainId] ??= {};
                 this.coinsMap[chainId][address.toString()] = {
                     coinId: coinData.coinId,
                     decimals

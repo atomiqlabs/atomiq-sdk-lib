@@ -12,7 +12,7 @@ class LnForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
         super(...arguments);
         this.TYPE = SwapType_1.SwapType.TRUSTED_FROM_BTCLN;
         this.swapDeserializer = LnForGasSwap_1.LnForGasSwap;
-        this.checkPastSwapStates = [LnForGasSwap_1.LnForGasSwapState.PR_CREATED];
+        this.pendingSwapStates = [LnForGasSwap_1.LnForGasSwapState.PR_CREATED];
         this.tickSwapState = null;
     }
     /**
@@ -54,18 +54,5 @@ class LnForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
         await quote._save();
         return quote;
     }
-    async checkPastSwap(swap) {
-        if (swap.state === LnForGasSwap_1.LnForGasSwapState.PR_CREATED) {
-            //Check if it's maybe already paid
-            const res = await swap.checkInvoicePaid(false);
-            if (res !== null)
-                return true;
-        }
-        return false;
-    }
-    isOurSwap(signer, swap) {
-        return signer === swap.getRecipient();
-    }
-    tickSwap(swap) { }
 }
 exports.LnForGasWrapper = LnForGasWrapper;

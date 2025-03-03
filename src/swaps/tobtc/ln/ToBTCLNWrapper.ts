@@ -14,9 +14,9 @@ import {IntermediaryAPI, ToBTCLNResponseType} from "../../../intermediaries/Inte
 import {RequestError} from "../../../errors/RequestError";
 import {LNURL, LNURLPayParamsWithUrl} from "../../../utils/LNURL";
 import {IToBTCSwapInit, ToBTCSwapState} from "../IToBTCSwap";
-import {ISwapStorage} from "../../../swap-storage/ISwapStorage";
 import {ToBTCSwap} from "../onchain/ToBTCSwap";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
+import {UnifiedSwapStorage} from "../../../swap-storage/UnifiedSwapStorage";
 
 export type ToBTCLNOptions = {
     expirySeconds?: number,
@@ -38,7 +38,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
 
     constructor(
         chainIdentifier: string,
-        unifiedStorage: ISwapStorage<ToBTCSwap<T>>,
+        unifiedStorage: UnifiedSwapStorage<T>,
         unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
         prices: ISwapPrice,
@@ -56,7 +56,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
 
     private async checkPaymentHashWasPaid(paymentHash: string) {
         const swaps = await this.unifiedStorage.query(
-            [{key: "type", value: this.TYPE}, {key: "paymentHash", value: paymentHash}],
+            [[{key: "type", value: this.TYPE}, {key: "paymentHash", value: paymentHash}]],
             this.swapDeserializer.bind(null, this)
         );
 

@@ -464,6 +464,84 @@ class IToBTCSwap extends ISwap_1.ISwap {
             networkFeeBtc: this.networkFeeBtc == null ? null : this.networkFeeBtc.toString(10)
         };
     }
+    //////////////////////////////
+    //// Swap ticks & sync
+    /**
+     * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
+     *  data
+     *
+     * @private
+     */
+    async syncStateFromChain() {
+        if (this.state === ToBTCSwapState.CREATED ||
+            this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED ||
+            this.state === ToBTCSwapState.COMMITED ||
+            this.state === ToBTCSwapState.SOFT_CLAIMED ||
+            this.state === ToBTCSwapState.REFUNDABLE) {
+            const res = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            switch (res) {
+                case base_1.SwapCommitStatus.PAID:
+                    this.state = ToBTCSwapState.CLAIMED;
+                    return true;
+                case base_1.SwapCommitStatus.REFUNDABLE:
+                    this.state = ToBTCSwapState.REFUNDABLE;
+                    return true;
+                case base_1.SwapCommitStatus.EXPIRED:
+                    this.state = ToBTCSwapState.QUOTE_EXPIRED;
+                    return true;
+                case base_1.SwapCommitStatus.NOT_COMMITED:
+                    if (this.state === ToBTCSwapState.COMMITED || this.state === ToBTCSwapState.REFUNDABLE) {
+                        this.state = ToBTCSwapState.REFUNDED;
+                        return true;
+                    }
+                    break;
+                case base_1.SwapCommitStatus.COMMITED:
+                    if (this.state !== ToBTCSwapState.COMMITED && this.state !== ToBTCSwapState.REFUNDABLE) {
+                        this.state = ToBTCSwapState.COMMITED;
+                        return true;
+                    }
+                    break;
+            }
+        }
+    }
+    async _sync(save) {
+        let changed = await this.syncStateFromChain();
+        if ((this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED) && !await this.isQuoteValid()) {
+            //Check if quote is still valid
+            this.state = ToBTCSwapState.QUOTE_EXPIRED;
+            changed ||= true;
+        }
+        if (this.state === ToBTCSwapState.COMMITED || this.state === ToBTCSwapState.SOFT_CLAIMED) {
+            //Check if that maybe already concluded
+            changed ||= await this.checkIntermediarySwapProcessed(false);
+        }
+        if (save && changed)
+            await this._saveAndEmit();
+        return changed;
+    }
+    async _tick(save) {
+        switch (this.state) {
+            case ToBTCSwapState.CREATED:
+                if (this.expiry < Date.now()) {
+                    this.state = ToBTCSwapState.QUOTE_SOFT_EXPIRED;
+                    if (save)
+                        await this._saveAndEmit();
+                    return true;
+                }
+                break;
+            case ToBTCSwapState.COMMITED:
+            case ToBTCSwapState.SOFT_CLAIMED:
+                const expired = await this.wrapper.contract.isExpired(this.getInitiator(), this.data);
+                if (expired) {
+                    this.state = ToBTCSwapState.REFUNDABLE;
+                    if (save)
+                        await this._saveAndEmit();
+                    return true;
+                }
+                break;
+        }
+        return false;
+    }
 }
 exports.IToBTCSwap = IToBTCSwap;
 var ToBTCSwapState;

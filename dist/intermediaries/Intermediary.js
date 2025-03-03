@@ -44,7 +44,6 @@ class Intermediary {
      * @param abortSignal
      */
     async getReputation(chainIdentifier, swapContract, tokens, abortSignal) {
-        var _a;
         const checkReputationTokens = tokens == null ?
             this.getSupportedTokens(chainIdentifier, [SwapType_1.SwapType.TO_BTC, SwapType_1.SwapType.TO_BTCLN]) :
             new Set(tokens);
@@ -56,8 +55,8 @@ class Intermediary {
             }));
         }
         await Promise.all(promises);
-        this.reputation ?? (this.reputation = {});
-        (_a = this.reputation)[chainIdentifier] ?? (_a[chainIdentifier] = {});
+        this.reputation ??= {};
+        this.reputation[chainIdentifier] ??= {};
         for (let key in reputation) {
             this.reputation[chainIdentifier][key] = reputation[key];
         }
@@ -72,10 +71,9 @@ class Intermediary {
      * @param abortSignal
      */
     async getLiquidity(chainIdentifier, swapContract, token, abortSignal) {
-        var _a;
         const result = await (0, Utils_1.tryWithRetries)(() => swapContract.getBalance(this.getAddress(chainIdentifier), token, true), null, null, abortSignal);
-        this.liquidity ?? (this.liquidity = {});
-        (_a = this.liquidity)[chainIdentifier] ?? (_a[chainIdentifier] = {});
+        this.liquidity ??= {};
+        this.liquidity[chainIdentifier] ??= {};
         this.liquidity[chainIdentifier][token] = result;
         return result;
     }

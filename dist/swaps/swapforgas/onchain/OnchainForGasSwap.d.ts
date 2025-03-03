@@ -100,4 +100,6 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
         balance: TokenAmount;
         required: TokenAmount;
     }>;
+    _sync(save?: boolean): Promise<boolean>;
+    _tick(save?: boolean): Promise<boolean>;
 }

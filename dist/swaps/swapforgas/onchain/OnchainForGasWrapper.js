@@ -23,7 +23,7 @@ class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
         this.TYPE = SwapType_1.SwapType.TRUSTED_FROM_BTC;
         this.swapDeserializer = OnchainForGasSwap_1.OnchainForGasSwap;
-        this.checkPastSwapStates = [OnchainForGasSwap_1.OnchainForGasSwapState.PR_CREATED];
+        this.pendingSwapStates = [OnchainForGasSwap_1.OnchainForGasSwapState.PR_CREATED];
         this.tickSwapState = null;
         this.btcRpc = btcRpc;
     }
@@ -71,16 +71,5 @@ class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
         await quote._save();
         return quote;
     }
-    async checkPastSwap(swap) {
-        if (swap.state === OnchainForGasSwap_1.OnchainForGasSwapState.PR_CREATED) {
-            //Check if it's maybe already paid
-            return await swap.checkAddress(false);
-        }
-        return false;
-    }
-    isOurSwap(signer, swap) {
-        return signer === swap.getRecipient();
-    }
-    tickSwap(swap) { }
 }
 exports.OnchainForGasWrapper = OnchainForGasWrapper;

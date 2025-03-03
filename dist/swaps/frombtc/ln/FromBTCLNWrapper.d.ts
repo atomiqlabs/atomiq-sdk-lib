@@ -12,9 +12,8 @@ import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { LNURLWithdrawParamsWithUrl } from "../../../utils/LNURL";
-import { ISwapStorage } from "../../../swap-storage/ISwapStorage";
-import { ToBTCSwap } from "../../tobtc/onchain/ToBTCSwap";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
+import { UnifiedSwapStorage } from "../../../swap-storage/UnifiedSwapStorage";
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer;
 };
@@ -34,11 +33,9 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: ISwapStorage<ToBTCSwap<T>>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: ISwapWrapperOptions, events?: EventEmitter);
-    protected readonly checkPastSwapStates: FromBTCLNSwapState[];
-    protected checkPastSwap(swap: FromBTCLNSwap<T>): Promise<boolean>;
-    protected readonly tickSwapState: FromBTCLNSwapState[];
-    protected tickSwap(swap: FromBTCLNSwap<T>): void;
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: ISwapWrapperOptions, events?: EventEmitter);
+    readonly pendingSwapStates: FromBTCLNSwapState[];
+    readonly tickSwapState: FromBTCLNSwapState[];
     protected processEventInitialize(swap: FromBTCLNSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean>;
     protected processEventClaim(swap: FromBTCLNSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean>;
     protected processEventRefund(swap: FromBTCLNSwap<T>, event: RefundEvent<T["Data"]>): Promise<boolean>;

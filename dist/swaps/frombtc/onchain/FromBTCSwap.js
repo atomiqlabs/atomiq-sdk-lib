@@ -327,5 +327,99 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             vout: this.vout
         };
     }
+    //////////////////////////////
+    //// Swap ticks & sync
+    /**
+     * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
+     *  data
+     *
+     * @private
+     */
+    async syncStateFromChain() {
+        if (this.state === FromBTCSwapState.PR_CREATED || this.state === FromBTCSwapState.QUOTE_SOFT_EXPIRED) {
+            const status = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            switch (status) {
+                case base_1.SwapCommitStatus.COMMITED:
+                    this.state = FromBTCSwapState.CLAIM_COMMITED;
+                    return true;
+                case base_1.SwapCommitStatus.EXPIRED:
+                    this.state = FromBTCSwapState.QUOTE_EXPIRED;
+                    return true;
+                case base_1.SwapCommitStatus.PAID:
+                    this.state = FromBTCSwapState.CLAIM_CLAIMED;
+                    return true;
+            }
+            if (!await this.isQuoteValid()) {
+                this.state = FromBTCSwapState.QUOTE_EXPIRED;
+                return true;
+            }
+            return false;
+        }
+        if (this.state === FromBTCSwapState.CLAIM_COMMITED || this.state === FromBTCSwapState.BTC_TX_CONFIRMED || this.state === FromBTCSwapState.EXPIRED) {
+            const status = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            switch (status) {
+                case base_1.SwapCommitStatus.PAID:
+                    this.state = FromBTCSwapState.CLAIM_CLAIMED;
+                    return true;
+                case base_1.SwapCommitStatus.NOT_COMMITED:
+                case base_1.SwapCommitStatus.EXPIRED:
+                    this.state = FromBTCSwapState.FAILED;
+                    return true;
+                case base_1.SwapCommitStatus.COMMITED:
+                    const res = await this.getBitcoinPayment();
+                    if (res != null && res.confirmations >= this.requiredConfirmations) {
+                        this.txId = res.txId;
+                        this.vout = res.vout;
+                        this.state = FromBTCSwapState.BTC_TX_CONFIRMED;
+                        return true;
+                    }
+                    break;
+            }
+        }
+    }
+    async _sync(save) {
+        const changed = await this.syncStateFromChain();
+        if (changed && save)
+            await this._saveAndEmit();
+        return changed;
+    }
+    async _tick(save) {
+        switch (this.state) {
+            case FromBTCSwapState.PR_CREATED:
+                if (this.expiry < Date.now()) {
+                    this.state = FromBTCSwapState.QUOTE_SOFT_EXPIRED;
+                    if (save)
+                        await this._saveAndEmit();
+                    return true;
+                }
+                break;
+            case FromBTCSwapState.CLAIM_COMMITED:
+                if (this.getTimeoutTime() < Date.now()) {
+                    this.state = FromBTCSwapState.EXPIRED;
+                    if (save)
+                        await this._saveAndEmit();
+                    return true;
+                }
+            case FromBTCSwapState.EXPIRED:
+                //Check if bitcoin payment was received every 2 minutes
+                if (Math.floor(Date.now() / 1000) % 120 === 0) {
+                    try {
+                        const res = await this.getBitcoinPayment();
+                        if (res != null && res.confirmations >= this.requiredConfirmations) {
+                            this.txId = res.txId;
+                            this.vout = res.vout;
+                            this.state = FromBTCSwapState.BTC_TX_CONFIRMED;
+                            if (save)
+                                await this._saveAndEmit();
+                            return true;
+                        }
+                    }
+                    catch (e) {
+                        this.logger.error("tickSwap(" + this.getIdentifierHashString() + "): ", e);
+                    }
+                }
+                break;
+        }
+    }
 }
 exports.FromBTCSwap = FromBTCSwap;

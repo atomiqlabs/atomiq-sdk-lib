@@ -8,7 +8,7 @@ class UnifiedSwapEventListener {
         this.events = events;
     }
     async processEvents(events) {
-        const swaps = await this.storage.query([{ key: "escrowHash", value: events.map(event => event.escrowHash) }], (val) => {
+        const swaps = await this.storage.query([[{ key: "escrowHash", value: events.map(event => event.escrowHash) }]], (val) => {
             const obj = this.listeners[val.type];
             if (obj == null)
                 return null;
@@ -30,6 +30,7 @@ class UnifiedSwapEventListener {
         if (this.listener != null)
             return;
         await this.storage.init();
+        await this.events.init();
         this.events.registerListener(this.listener = async (events) => {
             await this.processEvents(events);
             return true;

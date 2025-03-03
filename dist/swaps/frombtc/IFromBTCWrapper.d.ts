@@ -39,5 +39,4 @@ export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IFr
      * @throws {IntermediaryError} if intermediary's liquidity is lower than what's required for the swap
      */
     protected verifyIntermediaryLiquidity(amount: bigint, liquidityPromise: Promise<bigint>): Promise<void>;
-    protected isOurSwap(signer: string, swap: S): boolean;
 }

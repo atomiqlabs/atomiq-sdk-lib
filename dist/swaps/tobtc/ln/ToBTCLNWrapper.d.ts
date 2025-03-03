@@ -8,9 +8,8 @@ import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { SwapType } from "../../SwapType";
 import { LNURLPayParamsWithUrl } from "../../../utils/LNURL";
-import { ISwapStorage } from "../../../swap-storage/ISwapStorage";
-import { ToBTCSwap } from "../onchain/ToBTCSwap";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
+import { UnifiedSwapStorage } from "../../../swap-storage/UnifiedSwapStorage";
 export type ToBTCLNOptions = {
     expirySeconds?: number;
     maxFee?: bigint | Promise<bigint>;
@@ -26,7 +25,7 @@ export type ToBTCLNWrapperOptions = ISwapWrapperOptions & {
 export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCLNSwap<T>, ToBTCLNWrapperOptions> {
     readonly TYPE = SwapType.TO_BTCLN;
     readonly swapDeserializer: typeof ToBTCLNSwap;
-    constructor(chainIdentifier: string, unifiedStorage: ISwapStorage<ToBTCSwap<T>>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options?: ToBTCLNWrapperOptions, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options?: ToBTCLNWrapperOptions, events?: EventEmitter);
     private checkPaymentHashWasPaid;
     /**
      * Calculates maximum lightning network routing fee based on amount

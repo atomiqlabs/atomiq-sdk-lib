@@ -178,4 +178,13 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      */
     settleWithLNURLWithdraw(lnurl: string | LNURLWithdraw): Promise<void>;
     serialize(): any;
+    /**
+     * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
+     *  data
+     *
+     * @private
+     */
+    private syncStateFromChain;
+    _sync(save?: boolean): Promise<boolean>;
+    _tick(save?: boolean): Promise<boolean>;
 }

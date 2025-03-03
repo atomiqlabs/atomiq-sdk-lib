@@ -7,9 +7,8 @@ import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { SwapType } from "../../SwapType";
-import { ISwapStorage } from "../../../swap-storage/ISwapStorage";
-import { ToBTCSwap } from "../../tobtc/onchain/ToBTCSwap";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
+import { UnifiedSwapStorage } from "../../../swap-storage/UnifiedSwapStorage";
 export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
     readonly TYPE = SwapType.TRUSTED_FROM_BTC;
     readonly swapDeserializer: typeof OnchainForGasSwap;
@@ -26,7 +25,7 @@ export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrap
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: ISwapStorage<ToBTCSwap<T>>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRpc: BitcoinRpcWithTxoListener<any>, options?: ISwapWrapperOptions, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRpc: BitcoinRpcWithTxoListener<any>, options?: ISwapWrapperOptions, events?: EventEmitter);
     /**
      * Returns a newly created swap, receiving 'amount' base units of gas token
      *
@@ -36,9 +35,6 @@ export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrap
      * @param refundAddress     Bitcoin address to receive refund on in case the counterparty cannot execute the swap
      */
     create(signer: string, amount: bigint, lpOrUrl: Intermediary | string, refundAddress?: string): Promise<OnchainForGasSwap<T>>;
-    protected checkPastSwapStates: OnchainForGasSwapState[];
-    protected checkPastSwap(swap: OnchainForGasSwap<T>): Promise<boolean>;
-    protected isOurSwap(signer: string, swap: OnchainForGasSwap<T>): boolean;
-    protected tickSwapState: any;
-    protected tickSwap(swap: OnchainForGasSwap<T>): void;
+    readonly pendingSwapStates: OnchainForGasSwapState[];
+    readonly tickSwapState: any;
 }

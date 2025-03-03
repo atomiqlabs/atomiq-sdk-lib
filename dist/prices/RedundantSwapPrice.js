@@ -51,13 +51,12 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
         return new RedundantSwapPrice(maxAllowedFeeDiffPPM, assets, priceApis, cacheTimeout);
     }
     constructor(maxAllowedFeeDiffPPM, coinsDecimals, priceApis, cacheTimeout) {
-        var _a;
         super(maxAllowedFeeDiffPPM, cacheTimeout);
         this.coinsDecimals = {};
         for (let coinData of coinsDecimals) {
             for (let chainId in coinData.chains) {
                 const { address, decimals } = coinData.chains[chainId];
-                (_a = this.coinsDecimals)[chainId] ?? (_a[chainId] = {});
+                this.coinsDecimals[chainId] ??= {};
                 this.coinsDecimals[chainId][address.toString()] = decimals;
             }
         }

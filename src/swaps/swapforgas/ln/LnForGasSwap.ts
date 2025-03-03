@@ -356,4 +356,24 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         });
     }
 
+
+    //////////////////////////////
+    //// Swap ticks & sync
+
+    async _sync(save?: boolean): Promise<boolean> {
+        if(this.state===LnForGasSwapState.PR_CREATED) {
+            //Check if it's maybe already paid
+            const res = await this.checkInvoicePaid(false);
+            if(res!==null) {
+                if(save) await this._saveAndEmit();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    _tick(save?: boolean): Promise<boolean> {
+        return Promise.resolve(false);
+    }
+
 }

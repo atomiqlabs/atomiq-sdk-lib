@@ -60,21 +60,7 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
         return quote;
     }
 
-    protected checkPastSwapStates = [LnForGasSwapState.PR_CREATED];
-    protected async checkPastSwap(swap: LnForGasSwap<T>): Promise<boolean> {
-        if(swap.state===LnForGasSwapState.PR_CREATED) {
-            //Check if it's maybe already paid
-            const res = await swap.checkInvoicePaid(false);
-            if(res!==null) return true;
-        }
-        return false;
-    }
-
-    protected isOurSwap(signer: string, swap: LnForGasSwap<T>): boolean {
-        return signer===swap.getRecipient();
-    }
-
-    protected tickSwapState = null;
-    protected tickSwap(swap: LnForGasSwap<T>): void {}
+    public readonly pendingSwapStates = [LnForGasSwapState.PR_CREATED];
+    public readonly tickSwapState = null;
 
 }

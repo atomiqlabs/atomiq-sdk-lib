@@ -244,4 +244,20 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     _save(): Promise<void>;
     _saveAndEmit(state?: S): Promise<void>;
     _emitEvent(): void;
+    /**
+     * Synchronizes swap state from chain and/or LP node, usually ran on startup
+     *
+     * @param save whether to save the new swap state or not
+     *
+     * @returns {boolean} true if the swap changed, false if the swap hasn't changed
+     */
+    abstract _sync(save?: boolean): Promise<boolean>;
+    /**
+     * Runs quick checks on the swap, such as checking the expiry, usually ran periodically every few seconds
+     *
+     * @param save whether to save the new swap state or not
+     *
+     * @returns {boolean} true if the swap changed, false if the swap hasn't changed
+     */
+    abstract _tick(save?: boolean): Promise<boolean>;
 }

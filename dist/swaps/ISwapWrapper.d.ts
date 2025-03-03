@@ -6,9 +6,9 @@ import { ISwap } from "./ISwap";
 import { ISwapPrice, PriceInfoType } from "../prices/abstract/ISwapPrice";
 import { SCToken } from "./Tokens";
 import { ChainIds, MultiChain } from "./Swapper";
-import { ISwapStorage } from "../swap-storage/ISwapStorage";
 import { UnifiedSwapEventListener } from "../events/UnifiedSwapEventListener";
 import { SwapType } from "./SwapType";
+import { UnifiedSwapStorage } from "../swap-storage/UnifiedSwapStorage";
 export type AmountData = {
     amount: bigint;
     token: string;
@@ -33,7 +33,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
     abstract readonly TYPE: SwapType;
     protected readonly logger: import("../utils/Utils").LoggerType;
     abstract readonly swapDeserializer: new (wrapper: ISwapWrapper<T, S, O>, data: any) => S;
-    readonly unifiedStorage: ISwapStorage<S>;
+    readonly unifiedStorage: UnifiedSwapStorage<T>;
     readonly unifiedChainEvents: UnifiedSwapEventListener<T>;
     readonly chainIdentifier: string;
     readonly contract: T["Contract"];
@@ -57,7 +57,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: ISwapStorage<S>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options: O, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options: O, events?: EventEmitter);
     /**
      * Pre-fetches swap price for a given swap
      *
@@ -112,14 +112,6 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
         totalFee?: bigint;
     }, pricePrefetchPromise?: Promise<bigint>, abortSignal?: AbortSignal): Promise<PriceInfoType>;
     /**
-     * Checks if the provided swap is belonging to the provided signer's address
-     *
-     * @param signer
-     * @param swap Swap to be checked
-     * @protected
-     */
-    protected abstract isOurSwap(signer: string, swap: S): boolean;
-    /**
      * Processes InitializeEvent for a given swap
      * @param swap
      * @param event
@@ -143,16 +135,8 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * @returns Whether the swap was updated/changed
      */
     protected processEventRefund?(swap: S, event: RefundEvent<T["Data"]>): Promise<boolean>;
-    /**
-     * Checks past swap and syncs its state from the chain, this is called on initialization for all unfinished swaps
-     * @param swap
-     * @protected
-     * @returns Whether the swap was updated/changed
-     */
-    protected abstract checkPastSwap(swap: S): Promise<boolean>;
-    protected abstract checkPastSwapStates: Array<S["state"]>;
-    protected abstract tickSwap(swap: S): void;
-    protected abstract tickSwapState: Array<S["state"]>;
+    abstract readonly pendingSwapStates: Array<S["state"]>;
+    abstract readonly tickSwapState: Array<S["state"]>;
     /**
      * Processes a single SC on-chain event
      * @private
@@ -165,7 +149,8 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      */
     init(noTimers?: boolean, noCheckPastSwaps?: boolean): Promise<void>;
     protected startTickInterval(): void;
-    tick(): Promise<void>;
+    checkPastSwaps(pastSwaps?: S[]): Promise<void>;
+    tick(swaps?: S[]): Promise<void>;
     saveSwapData(swap: S): Promise<void>;
     removeSwapData(swap: S): Promise<void>;
     /**

@@ -303,8 +303,8 @@ class ISwap {
         if (this.pricingInfo == null)
             return {};
         return {
+            id: this.getIdentifierHashString(),
             type: this.getType(),
-            identifier: this.getIdentifierHashString(),
             escrowHash: this.getEscrowHash(),
             initiator: this.getInitiator(),
             _isValid: this.pricingInfo.isValid,

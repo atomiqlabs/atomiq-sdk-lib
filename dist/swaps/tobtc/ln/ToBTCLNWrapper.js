@@ -17,15 +17,15 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events) {
         if (options == null)
             options = {};
-        options.paymentTimeoutSeconds ?? (options.paymentTimeoutSeconds = 4 * 24 * 60 * 60);
-        options.lightningBaseFee ?? (options.lightningBaseFee = 10);
-        options.lightningFeePPM ?? (options.lightningFeePPM = 2000);
+        options.paymentTimeoutSeconds ??= 4 * 24 * 60 * 60;
+        options.lightningBaseFee ??= 10;
+        options.lightningFeePPM ??= 2000;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
         this.TYPE = SwapType_1.SwapType.TO_BTCLN;
         this.swapDeserializer = ToBTCLNSwap_1.ToBTCLNSwap;
     }
     async checkPaymentHashWasPaid(paymentHash) {
-        const swaps = await this.unifiedStorage.query([{ key: "type", value: this.TYPE }, { key: "paymentHash", value: paymentHash }], this.swapDeserializer.bind(null, this));
+        const swaps = await this.unifiedStorage.query([[{ key: "type", value: this.TYPE }, { key: "paymentHash", value: paymentHash }]], this.swapDeserializer.bind(null, this));
         for (let value of swaps) {
             if (value.state === IToBTCSwap_1.ToBTCSwapState.CLAIMED || value.state === IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED)
                 throw new UserError_1.UserError("Lightning invoice was already paid!");
@@ -90,7 +90,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      */
     async getIntermediaryQuote(signer, amountData, lp, pr, parsedPr, options, preFetches, abort, additionalParams) {
         const abortController = abort instanceof AbortController ? abort : (0, Utils_1.extendAbortController)(abort);
-        preFetches.reputationPromise ?? (preFetches.reputationPromise = this.preFetchIntermediaryReputation(amountData, lp, abortController));
+        preFetches.reputationPromise ??= this.preFetchIntermediaryReputation(amountData, lp, abortController);
         try {
             const { signDataPromise, resp } = await (0, Utils_1.tryWithRetries)(async (retryCount) => {
                 const { signDataPrefetch, response } = IntermediaryAPI_1.IntermediaryAPI.initToBTCLN(this.chainIdentifier, lp.url, {
@@ -154,14 +154,14 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @param preFetches            Existing pre-fetches for the swap (only used internally for LNURL swaps)
      */
     async create(signer, bolt11PayRequest, amountData, lps, options, additionalParams, abortSignal, preFetches) {
-        options ?? (options = {});
-        options.expirySeconds ?? (options.expirySeconds = this.options.paymentTimeoutSeconds);
-        options.expiryTimestamp ?? (options.expiryTimestamp = BigInt(Math.floor(Date.now() / 1000) + options.expirySeconds));
+        options ??= {};
+        options.expirySeconds ??= this.options.paymentTimeoutSeconds;
+        options.expiryTimestamp ??= BigInt(Math.floor(Date.now() / 1000) + options.expirySeconds);
         const parsedPr = (0, bolt11_1.decode)(bolt11PayRequest);
         if (parsedPr.millisatoshis == null)
             throw new UserError_1.UserError("Must be an invoice with amount");
         const amountOut = (BigInt(parsedPr.millisatoshis) + 999n) / 1000n;
-        options.maxFee ?? (options.maxFee = this.calculateFeeForAmount(amountOut, options.maxRoutingBaseFee, options.maxRoutingPPM));
+        options.maxFee ??= this.calculateFeeForAmount(amountOut, options.maxRoutingBaseFee, options.maxRoutingPPM);
         await this.checkPaymentHashWasPaid(parsedPr.tagsObject.payment_hash);
         const claimHash = this.contract.getHashForHtlc(Buffer.from(parsedPr.tagsObject.payment_hash, "hex"));
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
@@ -292,18 +292,18 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     async createViaLNURL(signer, lnurl, amountData, lps, options, additionalParams, abortSignal) {
         if (!this.isInitialized)
             throw new Error("Not initialized, call init() first!");
-        options ?? (options = {});
-        options.expirySeconds ?? (options.expirySeconds = this.options.paymentTimeoutSeconds);
-        options.expiryTimestamp ?? (options.expiryTimestamp = BigInt(Math.floor(Date.now() / 1000) + options.expirySeconds));
+        options ??= {};
+        options.expirySeconds ??= this.options.paymentTimeoutSeconds;
+        options.expiryTimestamp ??= BigInt(Math.floor(Date.now() / 1000) + options.expirySeconds);
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePreFetchPromise = this.preFetchPrice(amountData, _abortController.signal);
         const feeRatePromise = this.preFetchFeeRate(signer, amountData, null, _abortController);
-        options.maxRoutingPPM ?? (options.maxRoutingPPM = BigInt(this.options.lightningFeePPM));
-        options.maxRoutingBaseFee ?? (options.maxRoutingBaseFee = BigInt(this.options.lightningBaseFee));
+        options.maxRoutingPPM ??= BigInt(this.options.lightningFeePPM);
+        options.maxRoutingBaseFee ??= BigInt(this.options.lightningBaseFee);
         if (amountData.exactIn) {
-            options.maxFee ?? (options.maxFee = pricePreFetchPromise
+            options.maxFee ??= pricePreFetchPromise
                 .then(val => this.prices.getFromBtcSwapAmount(this.chainIdentifier, options.maxRoutingBaseFee, amountData.token, abortSignal, val))
-                .then(_maxBaseFee => this.calculateFeeForAmount(amountData.amount, _maxBaseFee, options.maxRoutingPPM)));
+                .then(_maxBaseFee => this.calculateFeeForAmount(amountData.amount, _maxBaseFee, options.maxRoutingPPM));
         }
         else {
             options.maxFee = this.calculateFeeForAmount(amountData.amount, options.maxRoutingBaseFee, options.maxRoutingPPM);

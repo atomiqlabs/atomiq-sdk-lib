@@ -158,18 +158,6 @@ class SwapperWithChain {
         return this.swapper.getActionableSwaps(this.chainIdentifier, signer);
     }
     /**
-     * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
-     */
-    getRefundableSwaps(signer) {
-        return this.swapper.getRefundableSwaps(this.chainIdentifier, signer);
-    }
-    /**
-     * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
-     */
-    getClaimableSwaps(signer) {
-        return this.swapper.getClaimableSwaps(this.chainIdentifier, signer);
-    }
-    /**
      * Returns the token balance of the wallet
      */
     getBalance(signer, token) {

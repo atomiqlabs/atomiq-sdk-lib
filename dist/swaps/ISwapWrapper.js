@@ -136,21 +136,21 @@ class ISwapWrapper {
             swapChanged = await this.processEventInitialize(swap, event);
             if (event.meta?.txId != null && swap.commitTxId !== event.meta.txId) {
                 swap.commitTxId = event.meta.txId;
-                swapChanged || (swapChanged = true);
+                swapChanged ||= true;
             }
         }
         if (event instanceof base_1.ClaimEvent) {
             swapChanged = await this.processEventClaim(swap, event);
             if (event.meta?.txId != null && swap.claimTxId !== event.meta.txId) {
                 swap.claimTxId = event.meta.txId;
-                swapChanged || (swapChanged = true);
+                swapChanged ||= true;
             }
         }
         if (event instanceof base_1.RefundEvent) {
             swapChanged = await this.processEventRefund(swap, event);
             if (event.meta?.txId != null && swap.refundTxId !== event.meta.txId) {
                 swap.refundTxId = event.meta.txId;
-                swapChanged || (swapChanged = true);
+                swapChanged ||= true;
             }
         }
         this.logger.info("processEvents(): " + event.constructor.name + " processed for " + swap.getIdentifierHashString() + " swap: ", swap);
@@ -175,23 +175,8 @@ class ISwapWrapper {
         };
         if (hasEventListener)
             this.unifiedChainEvents.registerListener(this.TYPE, initListener, this.swapDeserializer.bind(null, this));
-        if (!noCheckPastSwaps) {
-            const pastSwaps = await this.unifiedStorage.query([{ key: "type", value: this.TYPE }, { key: "state", value: this.checkPastSwapStates }], (val) => new this.swapDeserializer(this, val));
-            //Check past swaps
-            const changedSwaps = [];
-            const removeSwaps = [];
-            await Promise.all(pastSwaps.map((swap) => this.checkPastSwap(swap).then(changed => {
-                if (swap.isQuoteExpired()) {
-                    removeSwaps.push(swap);
-                }
-                else {
-                    if (changed)
-                        changedSwaps.push(swap);
-                }
-            }).catch(e => this.logger.error("init(): Error when checking swap " + swap.getIdentifierHashString() + ": ", e))));
-            await this.unifiedStorage.removeAll(removeSwaps);
-            await this.unifiedStorage.saveAll(changedSwaps);
-        }
+        if (!noCheckPastSwaps)
+            await this.checkPastSwaps();
         if (hasEventListener) {
             //Process accumulated event queue
             for (let event of eventQueue) {
@@ -213,10 +198,29 @@ class ISwapWrapper {
             this.tick();
         }, 1000);
     }
-    async tick() {
-        const swaps = await this.unifiedStorage.query([{ key: "type", value: this.TYPE }, { key: "state", value: this.tickSwapState }], (val) => new this.swapDeserializer(this, val));
+    async checkPastSwaps(pastSwaps) {
+        if (pastSwaps == null)
+            pastSwaps = await this.unifiedStorage.query([[{ key: "type", value: this.TYPE }, { key: "state", value: this.pendingSwapStates }]], (val) => new this.swapDeserializer(this, val));
+        //Check past swaps
+        const changedSwaps = [];
+        const removeSwaps = [];
+        await Promise.all(pastSwaps.map((swap) => swap._sync(false).then(changed => {
+            if (swap.isQuoteExpired()) {
+                removeSwaps.push(swap);
+            }
+            else {
+                if (changed)
+                    changedSwaps.push(swap);
+            }
+        }).catch(e => this.logger.error("init(): Error when checking swap " + swap.getIdentifierHashString() + ": ", e))));
+        await this.unifiedStorage.removeAll(removeSwaps);
+        await this.unifiedStorage.saveAll(changedSwaps);
+    }
+    async tick(swaps) {
+        if (swaps == null)
+            swaps = await this.unifiedStorage.query([[{ key: "type", value: this.TYPE }, { key: "state", value: this.tickSwapState }]], (val) => new this.swapDeserializer(this, val));
         swaps.forEach(value => {
-            this.tickSwap(value);
+            value._tick(true);
         });
     }
     saveSwapData(swap) {

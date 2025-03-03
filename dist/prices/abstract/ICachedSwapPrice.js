@@ -10,7 +10,6 @@ class ICachedSwapPrice extends ISwapPrice_1.ISwapPrice {
         this.cacheTimeout = cacheTimeout || DEFAULT_CACHE_DURATION;
     }
     getPrice(chainIdentifier, tokenAddress, abortSignal) {
-        var _a;
         const token = tokenAddress.toString();
         const chainCache = this.cache[chainIdentifier];
         if (chainCache != null) {
@@ -22,7 +21,7 @@ class ICachedSwapPrice extends ISwapPrice_1.ISwapPrice {
         }
         //Refresh cache
         const thisFetch = this.fetchPrice(chainIdentifier, token);
-        (_a = this.cache)[chainIdentifier] ?? (_a[chainIdentifier] = {});
+        this.cache[chainIdentifier] ??= {};
         this.cache[chainIdentifier][token] = {
             price: thisFetch,
             expiry: Date.now() + this.cacheTimeout

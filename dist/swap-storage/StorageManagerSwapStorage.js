@@ -124,7 +124,7 @@ class SwapWrapperStorage {
         const swapsByType = {};
         values.forEach(swapData => {
             const type = swapData.getType();
-            swapsByType[type] ?? (swapsByType[type] = []);
+            swapsByType[type] ??= [];
             swapsByType[type].push(swapData);
         });
         for (let type in swapsByType) {
@@ -162,7 +162,7 @@ class SwapWrapperStorage {
         const swapsByType = {};
         values.forEach(swapData => {
             const type = swapData.getType();
-            swapsByType[type] ?? (swapsByType[type] = []);
+            swapsByType[type] ??= [];
             swapsByType[type].push(swapData);
         });
         for (let type in swapsByType) {

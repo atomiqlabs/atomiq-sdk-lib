@@ -109,7 +109,7 @@ const DEFAULT_CHAIN = "SOLANA";
 
 export class IntermediaryDiscovery extends EventEmitter {
 
-    intermediaries: Intermediary[];
+    intermediaries: Intermediary[] = [];
 
     swapContracts: {[key: string]: SwapContract};
     registryUrl: string;

@@ -80,8 +80,4 @@ export abstract class IFromBTCWrapper<
         if(liquidity < amount) throw new IntermediaryError("Intermediary doesn't have enough liquidity");
     }
 
-    protected isOurSwap(signer: string, swap: S): boolean {
-        return swap.data.isClaimer(signer);
-    }
-
 }

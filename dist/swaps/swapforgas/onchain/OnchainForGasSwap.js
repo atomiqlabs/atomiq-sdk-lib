@@ -351,5 +351,22 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
             required: (0, Tokens_1.toTokenAmount)(0n, this.wrapper.getNativeToken(), this.wrapper.prices)
         });
     }
+    //////////////////////////////
+    //// Swap ticks & sync
+    async _sync(save) {
+        if (this.state === OnchainForGasSwapState.PR_CREATED) {
+            //Check if it's maybe already paid
+            const result = await this.checkAddress(false);
+            if (result) {
+                if (save)
+                    await this._saveAndEmit();
+                return true;
+            }
+        }
+        return false;
+    }
+    _tick(save) {
+        return Promise.resolve(false);
+    }
 }
 exports.OnchainForGasSwap = OnchainForGasSwap;

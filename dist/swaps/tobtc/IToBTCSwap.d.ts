@@ -170,6 +170,15 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      */
     waitTillRefunded(abortSignal?: AbortSignal): Promise<void>;
     serialize(): any;
+    /**
+     * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
+     *  data
+     *
+     * @private
+     */
+    private syncStateFromChain;
+    _sync(save?: boolean): Promise<boolean>;
+    _tick(save?: boolean): Promise<boolean>;
 }
 export declare enum ToBTCSwapState {
     REFUNDED = -3,

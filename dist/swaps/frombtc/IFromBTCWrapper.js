@@ -61,8 +61,5 @@ class IFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         if (liquidity < amount)
             throw new IntermediaryError_1.IntermediaryError("Intermediary doesn't have enough liquidity");
     }
-    isOurSwap(signer, swap) {
-        return swap.data.isClaimer(signer);
-    }
 }
 exports.IFromBTCWrapper = IFromBTCWrapper;

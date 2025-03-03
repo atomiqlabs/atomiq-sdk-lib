@@ -88,4 +88,6 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
         balance: TokenAmount;
         required: TokenAmount;
     }>;
+    _sync(save?: boolean): Promise<boolean>;
+    _tick(save?: boolean): Promise<boolean>;
 }

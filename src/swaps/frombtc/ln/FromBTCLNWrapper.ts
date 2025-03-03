@@ -24,9 +24,8 @@ import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {LNURL, LNURLWithdrawParamsWithUrl} from "../../../utils/LNURL";
-import {ISwapStorage} from "../../../swap-storage/ISwapStorage";
-import {ToBTCSwap} from "../../tobtc/onchain/ToBTCSwap";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
+import {UnifiedSwapStorage} from "../../../swap-storage/UnifiedSwapStorage";
 
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer
@@ -54,7 +53,7 @@ export class FromBTCLNWrapper<
      */
     constructor(
         chainIdentifier: string,
-        unifiedStorage: ISwapStorage<ToBTCSwap<T>>,
+        unifiedStorage: UnifiedSwapStorage<T>,
         unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
         prices: ISwapPrice,
@@ -68,83 +67,18 @@ export class FromBTCLNWrapper<
         this.lnApi = lnApi;
     }
 
-    protected readonly checkPastSwapStates = [
+    public readonly pendingSwapStates = [
         FromBTCLNSwapState.PR_CREATED,
         FromBTCLNSwapState.QUOTE_SOFT_EXPIRED,
         FromBTCLNSwapState.PR_PAID,
         FromBTCLNSwapState.CLAIM_COMMITED,
         FromBTCLNSwapState.EXPIRED
     ];
-    protected async checkPastSwap(swap: FromBTCLNSwap<T>): Promise<boolean> {
-        if(swap.state===FromBTCLNSwapState.PR_CREATED || (swap.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && swap.signatureData==null)) {
-            if(swap.getTimeoutTime()<Date.now()) {
-                swap.state = FromBTCLNSwapState.QUOTE_SOFT_EXPIRED;
-            }
-
-            const result = await swap.checkIntermediaryPaymentReceived(false);
-            if(result!==null) return true;
-        }
-
-        if(swap.state===FromBTCLNSwapState.PR_PAID || (swap.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && swap.signatureData!=null)) {
-            //Check if it's already committed
-            const status = await tryWithRetries(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
-            switch(status) {
-                case SwapCommitStatus.COMMITED:
-                    swap.state = FromBTCLNSwapState.CLAIM_COMMITED;
-                    return true;
-                case SwapCommitStatus.EXPIRED:
-                    swap.state = FromBTCLNSwapState.QUOTE_EXPIRED;
-                    return true;
-                case SwapCommitStatus.PAID:
-                    swap.state = FromBTCLNSwapState.CLAIM_CLAIMED;
-                    return true;
-            }
-
-            if(!await swap.isQuoteValid()) {
-                swap.state = FromBTCLNSwapState.QUOTE_EXPIRED;
-                return true;
-            }
-
-            return false;
-        }
-
-        if(swap.state===FromBTCLNSwapState.CLAIM_COMMITED || swap.state===FromBTCLNSwapState.EXPIRED) {
-            //Check if it's already successfully paid
-            const commitStatus = await tryWithRetries(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
-            if(commitStatus===SwapCommitStatus.PAID) {
-                swap.state = FromBTCLNSwapState.CLAIM_CLAIMED;
-                return true;
-            }
-
-            if(commitStatus===SwapCommitStatus.NOT_COMMITED || commitStatus===SwapCommitStatus.EXPIRED) {
-                swap.state = FromBTCLNSwapState.FAILED;
-                return true;
-            }
-
-            return false;
-        }
-    }
-
-    protected readonly tickSwapState = [
+    public readonly tickSwapState = [
         FromBTCLNSwapState.PR_CREATED,
         FromBTCLNSwapState.PR_PAID,
         FromBTCLNSwapState.CLAIM_COMMITED
     ];
-    protected tickSwap(swap: FromBTCLNSwap<T>): void {
-        switch(swap.state) {
-            case FromBTCLNSwapState.PR_CREATED:
-                if(swap.getTimeoutTime()<Date.now()) swap._saveAndEmit(FromBTCLNSwapState.QUOTE_SOFT_EXPIRED);
-                break;
-            case FromBTCLNSwapState.PR_PAID:
-                if(swap.expiry<Date.now()) swap._saveAndEmit(FromBTCLNSwapState.QUOTE_SOFT_EXPIRED);
-                break;
-            case FromBTCLNSwapState.CLAIM_COMMITED:
-                this.contract.isExpired(swap.getInitiator(), swap.data).then(expired => {
-                    if(expired) swap._saveAndEmit(FromBTCLNSwapState.EXPIRED)
-                });
-                break;
-        }
-    }
 
     protected async processEventInitialize(swap: FromBTCLNSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean> {
         if(swap.state===FromBTCLNSwapState.PR_PAID || swap.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {

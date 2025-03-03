@@ -67,6 +67,7 @@ const DEFAULT_CHAIN = "SOLANA";
 class IntermediaryDiscovery extends events_1.EventEmitter {
     constructor(swapContracts, registryUrl = REGISTRY_URL, nodeUrls, httpRequestTimeout) {
         super();
+        this.intermediaries = [];
         this.swapContracts = swapContracts;
         this.registryUrl = registryUrl;
         this.overrideNodeUrls = nodeUrls;
@@ -187,10 +188,10 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
         this.intermediaries.forEach(intermediary => {
             for (let swapType in intermediary.services) {
                 const swapService = intermediary.services[swapType];
-                bounds[swapType] ?? (bounds[swapType] = {});
+                bounds[swapType] ??= {};
                 const multichainBounds = bounds[swapType];
                 for (let chainId in swapService.chainTokens) {
-                    multichainBounds[chainId] ?? (multichainBounds[chainId] = {});
+                    multichainBounds[chainId] ??= {};
                     const tokenBounds = multichainBounds[chainId];
                     for (let token of swapService.chainTokens[chainId]) {
                         const tokenMinMax = tokenBounds[token];

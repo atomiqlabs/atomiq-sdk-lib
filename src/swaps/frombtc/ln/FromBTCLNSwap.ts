@@ -669,4 +669,105 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
             initialSwapData: this.initialSwapData==null ? null : this.initialSwapData.serialize()
         };
     }
+
+
+    //////////////////////////////
+    //// Swap ticks & sync
+
+    /**
+     * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
+     *  data
+     *
+     * @private
+     */
+    private async syncStateFromChain(): Promise<boolean> {
+        if(this.state===FromBTCLNSwapState.PR_PAID || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) {
+            //Check if it's already committed
+            const status = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            switch(status) {
+                case SwapCommitStatus.COMMITED:
+                    this.state = FromBTCLNSwapState.CLAIM_COMMITED;
+                    return true;
+                case SwapCommitStatus.EXPIRED:
+                    this.state = FromBTCLNSwapState.QUOTE_EXPIRED;
+                    return true;
+                case SwapCommitStatus.PAID:
+                    this.state = FromBTCLNSwapState.CLAIM_CLAIMED;
+                    return true;
+            }
+
+            return false;
+        }
+
+        if(this.state===FromBTCLNSwapState.CLAIM_COMMITED || this.state===FromBTCLNSwapState.EXPIRED) {
+            //Check if it's already successfully paid
+            const commitStatus = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            if(commitStatus===SwapCommitStatus.PAID) {
+                this.state = FromBTCLNSwapState.CLAIM_CLAIMED;
+                return true;
+            }
+
+            if(commitStatus===SwapCommitStatus.NOT_COMMITED || commitStatus===SwapCommitStatus.EXPIRED) {
+                this.state = FromBTCLNSwapState.FAILED;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    async _sync(save?: boolean): Promise<boolean> {
+        let changed = false;
+
+        if(this.state===FromBTCLNSwapState.PR_CREATED || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData==null)) {
+            if(this.getTimeoutTime()<Date.now()) {
+                this.state = FromBTCLNSwapState.QUOTE_SOFT_EXPIRED;
+                changed ||= true;
+            }
+
+            const result = await this.checkIntermediaryPaymentReceived(false);
+            if(result!==null) changed ||= true;
+        }
+
+        changed ||= await this.syncStateFromChain();
+
+        if(this.state===FromBTCLNSwapState.PR_PAID || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) {
+            if(!await this.isQuoteValid()) {
+                this.state = FromBTCLNSwapState.QUOTE_EXPIRED;
+                changed ||= true;
+            }
+        }
+
+        if(save && changed) this._saveAndEmit();
+
+        return changed;
+    }
+
+    async _tick(save?: boolean): Promise<boolean> {
+        switch(this.state) {
+            case FromBTCLNSwapState.PR_CREATED:
+                if(this.getTimeoutTime()<Date.now()) {
+                    this.state = FromBTCLNSwapState.QUOTE_SOFT_EXPIRED;
+                    if(save) await this._saveAndEmit();
+                    return true;
+                }
+                break;
+            case FromBTCLNSwapState.PR_PAID:
+                if(this.expiry<Date.now()) {
+                    this.state = FromBTCLNSwapState.QUOTE_SOFT_EXPIRED;
+                    if(save) await this._saveAndEmit();
+                    return true;
+                }
+                break;
+            case FromBTCLNSwapState.CLAIM_COMMITED:
+                const expired = await this.wrapper.contract.isExpired(this.getInitiator(), this.data);
+                if(expired) {
+                    this.state = FromBTCLNSwapState.EXPIRED;
+                    if(save) await this._saveAndEmit();
+                    return true;
+                }
+                break;
+        }
+    }
+
 }

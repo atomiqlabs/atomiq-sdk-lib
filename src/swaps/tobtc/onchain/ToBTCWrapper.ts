@@ -17,8 +17,8 @@ import {extendAbortController, toOutputScript, tryWithRetries} from "../../../ut
 import {IntermediaryAPI, ToBTCResponseType} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
-import {ISwapStorage} from "../../../swap-storage/ISwapStorage";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
+import {UnifiedSwapStorage} from "../../../swap-storage/UnifiedSwapStorage";
 
 export type ToBTCOptions = {
     confirmationTarget?: number,
@@ -56,7 +56,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
      */
     constructor(
         chainIdentifier: string,
-        unifiedStorage: ISwapStorage<ToBTCSwap<T>>,
+        unifiedStorage: UnifiedSwapStorage<T>,
         unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
         prices: ISwapPrice,

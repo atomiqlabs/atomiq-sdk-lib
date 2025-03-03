@@ -13,9 +13,9 @@ import {IntermediaryError} from "../errors/IntermediaryError";
 import {getLogger, tryWithRetries} from "../utils/Utils";
 import {SCToken} from "./Tokens";
 import {ChainIds, MultiChain} from "./Swapper";
-import {ISwapStorage} from "../swap-storage/ISwapStorage";
 import {UnifiedSwapEventListener} from "../events/UnifiedSwapEventListener";
 import {SwapType} from "./SwapType";
+import {UnifiedSwapStorage} from "../swap-storage/UnifiedSwapStorage";
 
 export type AmountData = {
     amount: bigint,
@@ -48,7 +48,7 @@ export abstract class ISwapWrapper<
 
     public readonly abstract swapDeserializer: new (wrapper: ISwapWrapper<T, S, O>, data: any) => S;
 
-    readonly unifiedStorage: ISwapStorage<S>;
+    readonly unifiedStorage: UnifiedSwapStorage<T>;
     readonly unifiedChainEvents: UnifiedSwapEventListener<T>;
 
     readonly chainIdentifier: string;
@@ -77,7 +77,7 @@ export abstract class ISwapWrapper<
      */
     constructor(
         chainIdentifier: string,
-        unifiedStorage: ISwapStorage<S>,
+        unifiedStorage: UnifiedSwapStorage<T>,
         unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
         prices: ISwapPrice,
@@ -222,15 +222,6 @@ export abstract class ISwapWrapper<
     }
 
     /**
-     * Checks if the provided swap is belonging to the provided signer's address
-     *
-     * @param signer
-     * @param swap Swap to be checked
-     * @protected
-     */
-    protected abstract isOurSwap(signer: string, swap: S): boolean;
-
-    /**
      * Processes InitializeEvent for a given swap
      * @param swap
      * @param event
@@ -257,17 +248,8 @@ export abstract class ISwapWrapper<
      */
     protected processEventRefund?(swap: S, event: RefundEvent<T["Data"]>): Promise<boolean>;
 
-    /**
-     * Checks past swap and syncs its state from the chain, this is called on initialization for all unfinished swaps
-     * @param swap
-     * @protected
-     * @returns Whether the swap was updated/changed
-     */
-    protected abstract checkPastSwap(swap: S): Promise<boolean>;
-    protected abstract checkPastSwapStates: Array<S["state"]>;
-
-    protected abstract tickSwap(swap: S): void;
-    protected abstract tickSwapState: Array<S["state"]>;
+    public abstract readonly pendingSwapStates: Array<S["state"]>;
+    public abstract readonly tickSwapState: Array<S["state"]>;
 
     /**
      * Processes a single SC on-chain event
@@ -329,29 +311,7 @@ export abstract class ISwapWrapper<
         }
         if(hasEventListener) this.unifiedChainEvents.registerListener(this.TYPE, initListener, this.swapDeserializer.bind(null, this));
 
-        if(!noCheckPastSwaps) {
-            const pastSwaps = await this.unifiedStorage.query<S>(
-                [{key: "type", value: this.TYPE}, {key: "state", value: this.checkPastSwapStates}],
-                (val: any) => new this.swapDeserializer(this, val)
-            );
-
-            //Check past swaps
-            const changedSwaps: S[] = [];
-            const removeSwaps: S[] = [];
-
-            await Promise.all(pastSwaps.map((swap: S) =>
-                this.checkPastSwap(swap).then(changed => {
-                    if(swap.isQuoteExpired()) {
-                        removeSwaps.push(swap);
-                    } else {
-                        if(changed) changedSwaps.push(swap);
-                    }
-                }).catch(e => this.logger.error("init(): Error when checking swap "+swap.getIdentifierHashString()+": ", e))
-            ));
-
-            await this.unifiedStorage.removeAll(removeSwaps);
-            await this.unifiedStorage.saveAll(changedSwaps);
-        }
+        if(!noCheckPastSwaps) await this.checkPastSwaps();
 
         if(hasEventListener) {
             //Process accumulated event queue
@@ -378,14 +338,38 @@ export abstract class ISwapWrapper<
         }, 1000);
     }
 
-    async tick(): Promise<void> {
-        const swaps = await this.unifiedStorage.query<S>(
-            [{key: "type", value: this.TYPE}, {key: "state", value: this.tickSwapState}],
+    async checkPastSwaps(pastSwaps?: S[]): Promise<void> {
+        if(pastSwaps==null) pastSwaps = await this.unifiedStorage.query<S>(
+            [[{key: "type", value: this.TYPE}, {key: "state", value: this.pendingSwapStates}]],
+            (val: any) => new this.swapDeserializer(this, val)
+        );
+
+        //Check past swaps
+        const changedSwaps: S[] = [];
+        const removeSwaps: S[] = [];
+
+        await Promise.all(pastSwaps.map((swap: S) =>
+            swap._sync(false).then(changed => {
+                if(swap.isQuoteExpired()) {
+                    removeSwaps.push(swap);
+                } else {
+                    if(changed) changedSwaps.push(swap);
+                }
+            }).catch(e => this.logger.error("init(): Error when checking swap "+swap.getIdentifierHashString()+": ", e))
+        ));
+
+        await this.unifiedStorage.removeAll(removeSwaps);
+        await this.unifiedStorage.saveAll(changedSwaps);
+    }
+
+    async tick(swaps?: S[]): Promise<void> {
+        if(swaps==null) swaps = await this.unifiedStorage.query<S>(
+            [[{key: "type", value: this.TYPE}, {key: "state", value: this.tickSwapState}]],
             (val: any) => new this.swapDeserializer(this, val)
         );
 
         swaps.forEach(value => {
-            this.tickSwap(value);
+            value._tick(true)
         })
     }
 

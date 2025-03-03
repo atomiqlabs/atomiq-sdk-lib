@@ -24,9 +24,8 @@ import {FromBTCResponseType, IntermediaryAPI} from "../../../intermediaries/Inte
 import {RequestError} from "../../../errors/RequestError";
 import * as randomBytes from "randombytes";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
-import {ISwapStorage} from "../../../swap-storage/ISwapStorage";
-import {ToBTCSwap} from "../../tobtc/onchain/ToBTCSwap";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
+import {UnifiedSwapStorage} from "../../../swap-storage/UnifiedSwapStorage";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint,
@@ -68,7 +67,7 @@ export class FromBTCWrapper<
      */
     constructor(
         chainIdentifier: string,
-        unifiedStorage: ISwapStorage<ToBTCSwap<T>>,
+        unifiedStorage: UnifiedSwapStorage<T>,
         unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
         prices: ISwapPrice,
@@ -93,79 +92,14 @@ export class FromBTCWrapper<
         this.btcRpc = btcRpc;
     }
 
-    protected readonly checkPastSwapStates = [
+    public readonly pendingSwapStates = [
         FromBTCSwapState.PR_CREATED,
         FromBTCSwapState.QUOTE_SOFT_EXPIRED,
         FromBTCSwapState.CLAIM_COMMITED,
         FromBTCSwapState.BTC_TX_CONFIRMED,
         FromBTCSwapState.EXPIRED
     ];
-    protected async checkPastSwap(swap: FromBTCSwap<T>): Promise<boolean> {
-        if(swap.state===FromBTCSwapState.PR_CREATED || swap.state===FromBTCSwapState.QUOTE_SOFT_EXPIRED) {
-            const status = await tryWithRetries(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
-            switch(status) {
-                case SwapCommitStatus.COMMITED:
-                    swap.state = FromBTCSwapState.CLAIM_COMMITED;
-                    return true;
-                case SwapCommitStatus.EXPIRED:
-                    swap.state = FromBTCSwapState.QUOTE_EXPIRED;
-                    return true;
-                case SwapCommitStatus.PAID:
-                    swap.state = FromBTCSwapState.CLAIM_CLAIMED;
-                    return true;
-            }
-
-            if(!await swap.isQuoteValid()) {
-                swap.state = FromBTCSwapState.QUOTE_EXPIRED;
-                return true;
-            }
-
-            return false;
-        }
-
-        if(swap.state===FromBTCSwapState.CLAIM_COMMITED || swap.state===FromBTCSwapState.BTC_TX_CONFIRMED || swap.state===FromBTCSwapState.EXPIRED) {
-            const status = await tryWithRetries(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
-            switch(status) {
-                case SwapCommitStatus.PAID:
-                    swap.state = FromBTCSwapState.CLAIM_CLAIMED;
-                    return true;
-                case SwapCommitStatus.NOT_COMMITED:
-                case SwapCommitStatus.EXPIRED:
-                    swap.state = FromBTCSwapState.FAILED;
-                    return true;
-                case SwapCommitStatus.COMMITED:
-                    const res = await swap.getBitcoinPayment();
-                    if(res!=null && res.confirmations>=swap.requiredConfirmations) {
-                        swap.txId = res.txId;
-                        swap.vout = res.vout;
-                        swap.state = FromBTCSwapState.BTC_TX_CONFIRMED;
-                        return true;
-                    }
-                    break;
-            }
-        }
-    }
-
-    protected tickSwapState = [FromBTCSwapState.PR_CREATED, FromBTCSwapState.CLAIM_COMMITED, FromBTCSwapState.EXPIRED];
-    protected tickSwap(swap: FromBTCSwap<T>): void {
-        switch(swap.state) {
-            case FromBTCSwapState.PR_CREATED:
-                if(swap.expiry<Date.now()) swap._saveAndEmit(FromBTCSwapState.QUOTE_SOFT_EXPIRED);
-                break;
-            case FromBTCSwapState.CLAIM_COMMITED:
-                if(swap.getTimeoutTime()<Date.now()) swap._saveAndEmit(FromBTCSwapState.EXPIRED);
-            case FromBTCSwapState.EXPIRED:
-                //Check if bitcoin payment was received every 2 minutes
-                if(Math.floor(Date.now()/1000)%120===0) swap.getBitcoinPayment().then(res => {
-                    if(res!=null && res.confirmations>=swap.requiredConfirmations) {
-                        swap.txId = res.txId;
-                        swap.vout = res.vout;
-                        return swap._saveAndEmit(FromBTCSwapState.BTC_TX_CONFIRMED);
-                    }
-                }).catch(e => this.logger.error("tickSwap("+swap.getIdentifierHashString()+"): ", e));
-                break;
-        }
-    }
+    public readonly tickSwapState = [FromBTCSwapState.PR_CREATED, FromBTCSwapState.CLAIM_COMMITED, FromBTCSwapState.EXPIRED];
 
     protected processEventInitialize(swap: FromBTCSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean> {
         if(swap.state===FromBTCSwapState.PR_CREATED || swap.state===FromBTCSwapState.QUOTE_SOFT_EXPIRED) {

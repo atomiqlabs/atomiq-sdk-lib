@@ -1,16 +1,15 @@
 import {ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediaryAPI";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
-import {ChainType, IStorageManager} from "@atomiqlabs/base";
+import {ChainType} from "@atomiqlabs/base";
 import {OnchainForGasSwap, OnchainForGasSwapInit, OnchainForGasSwapState} from "./OnchainForGasSwap";
 import {BitcoinRpcWithTxoListener} from "../../../btc/BitcoinRpcWithTxoListener";
 import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {SwapType} from "../../SwapType";
-import {ISwapStorage} from "../../../swap-storage/ISwapStorage";
-import {ToBTCSwap} from "../../tobtc/onchain/ToBTCSwap";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
+import {UnifiedSwapStorage} from "../../../swap-storage/UnifiedSwapStorage";
 
 export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
     public readonly TYPE = SwapType.TRUSTED_FROM_BTC;
@@ -32,7 +31,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
      */
     constructor(
         chainIdentifier: string,
-        unifiedStorage: ISwapStorage<ToBTCSwap<T>>,
+        unifiedStorage: UnifiedSwapStorage<T>,
         unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
         prices: ISwapPrice,
@@ -99,20 +98,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         return quote;
     }
 
-    protected checkPastSwapStates = [OnchainForGasSwapState.PR_CREATED];
-    protected async checkPastSwap(swap: OnchainForGasSwap<T>): Promise<boolean> {
-        if(swap.state===OnchainForGasSwapState.PR_CREATED) {
-            //Check if it's maybe already paid
-            return await swap.checkAddress(false);
-        }
-        return false;
-    }
-
-    protected isOurSwap(signer: string, swap: OnchainForGasSwap<T>): boolean {
-        return signer===swap.getRecipient();
-    }
-
-    protected tickSwapState = null;
-    protected tickSwap(swap: OnchainForGasSwap<T>): void {}
+    public readonly pendingSwapStates = [OnchainForGasSwapState.PR_CREATED];
+    public readonly tickSwapState = null;
 
 }

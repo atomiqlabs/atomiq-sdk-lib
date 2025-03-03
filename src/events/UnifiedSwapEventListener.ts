@@ -1,8 +1,8 @@
-import {ISwapStorage} from "../swap-storage/ISwapStorage";
 import {ChainType, SwapEvent} from "@atomiqlabs/base";
 import {ISwap} from "../swaps/ISwap";
 import {EventListener} from "@atomiqlabs/base/src/events/ChainEvents";
 import {SwapType} from "../swaps/SwapType";
+import {UnifiedSwapStorage} from "../swap-storage/UnifiedSwapStorage";
 
 export type SwapEventListener<
     T extends ChainType,
@@ -13,7 +13,7 @@ export class UnifiedSwapEventListener<
     T extends ChainType
 > {
 
-    readonly storage: ISwapStorage<ISwap<T>>;
+    readonly storage: UnifiedSwapStorage<T>;
     readonly events: T["Events"];
     readonly listeners: {
         [key in SwapType]?: {
@@ -22,14 +22,14 @@ export class UnifiedSwapEventListener<
         }
     } = {};
 
-    constructor(unifiedStorage: ISwapStorage<ISwap<T>>, events: T["Events"]) {
+    constructor(unifiedStorage: UnifiedSwapStorage<T>, events: T["Events"]) {
         this.storage = unifiedStorage;
         this.events = events;
     }
 
     async processEvents(events: SwapEvent<T["Data"]>[]) {
         const swaps = await this.storage.query<ISwap<T>>(
-            [{key: "escrowHash", value: events.map(event => event.escrowHash)}],
+            [[{key: "escrowHash", value: events.map(event => event.escrowHash)}]],
             (val: any) => {
                 const obj = this.listeners[val.type];
                 if(obj==null) return null;
@@ -52,6 +52,7 @@ export class UnifiedSwapEventListener<
     async start() {
         if(this.listener!=null) return;
         await this.storage.init();
+        await this.events.init();
         this.events.registerListener(this.listener = async (events) => {
             await this.processEvents(events);
             return true;

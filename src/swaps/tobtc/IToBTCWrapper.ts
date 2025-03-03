@@ -13,48 +13,6 @@ export abstract class IToBTCWrapper<
 > extends ISwapWrapper<T, S, O> {
 
     /**
-     * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
-     *  data
-     *
-     * @param swap Swap to be checked
-     * @private
-     */
-    private async syncStateFromChain(swap: S): Promise<boolean> {
-        if(
-            swap.state===ToBTCSwapState.CREATED ||
-            swap.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED ||
-            swap.state===ToBTCSwapState.COMMITED ||
-            swap.state===ToBTCSwapState.SOFT_CLAIMED ||
-            swap.state===ToBTCSwapState.REFUNDABLE
-        ) {
-            const res = await tryWithRetries(() => this.contract.getCommitStatus(swap.getInitiator(), swap.data));
-            switch(res) {
-                case SwapCommitStatus.PAID:
-                    swap.state = ToBTCSwapState.CLAIMED;
-                    return true;
-                case SwapCommitStatus.REFUNDABLE:
-                    swap.state = ToBTCSwapState.REFUNDABLE;
-                    return true;
-                case SwapCommitStatus.EXPIRED:
-                    swap.state = ToBTCSwapState.QUOTE_EXPIRED;
-                    return true;
-                case SwapCommitStatus.NOT_COMMITED:
-                    if(swap.state===ToBTCSwapState.COMMITED || swap.state===ToBTCSwapState.REFUNDABLE) {
-                        swap.state = ToBTCSwapState.REFUNDED;
-                        return true;
-                    }
-                    break;
-                case SwapCommitStatus.COMMITED:
-                    if(swap.state!==ToBTCSwapState.COMMITED && swap.state!==ToBTCSwapState.REFUNDABLE) {
-                        swap.state = ToBTCSwapState.COMMITED;
-                        return true;
-                    }
-                    break;
-            }
-        }
-    }
-
-    /**
      * Pre-fetches intermediary's reputation, doesn't throw, instead aborts via abortController and returns null
      *
      * @param amountData
@@ -100,44 +58,14 @@ export abstract class IToBTCWrapper<
         });
     }
 
-    protected readonly checkPastSwapStates = [
+    public readonly pendingSwapStates = [
         ToBTCSwapState.CREATED,
         ToBTCSwapState.QUOTE_SOFT_EXPIRED,
         ToBTCSwapState.COMMITED,
         ToBTCSwapState.SOFT_CLAIMED,
         ToBTCSwapState.REFUNDABLE
     ];
-    protected async checkPastSwap(swap: S): Promise<boolean> {
-        let changed = await this.syncStateFromChain(swap);
-
-        if((swap.state===ToBTCSwapState.CREATED || swap.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) && !await swap.isQuoteValid()) {
-            //Check if quote is still valid
-            swap.state = ToBTCSwapState.QUOTE_EXPIRED;
-            changed ||= true;
-        }
-
-        if(swap.state===ToBTCSwapState.COMMITED || swap.state===ToBTCSwapState.SOFT_CLAIMED) {
-            //Check if that maybe already concluded
-            changed ||= await swap.checkIntermediarySwapProcessed(false);
-        }
-
-        return changed;
-    }
-
-    protected readonly tickSwapState = [ToBTCSwapState.CREATED, ToBTCSwapState.COMMITED, ToBTCSwapState.SOFT_CLAIMED];
-    protected tickSwap(swap: S): void {
-        switch(swap.state) {
-            case ToBTCSwapState.CREATED:
-                if(swap.expiry<Date.now()) swap._saveAndEmit(ToBTCSwapState.QUOTE_SOFT_EXPIRED);
-                break;
-            case ToBTCSwapState.COMMITED:
-            case ToBTCSwapState.SOFT_CLAIMED:
-                this.contract.isExpired(swap.getInitiator(), swap.data).then(expired => {
-                    if(expired) swap._saveAndEmit(ToBTCSwapState.REFUNDABLE);
-                })
-                break;
-        }
-    }
+    public readonly tickSwapState = [ToBTCSwapState.CREATED, ToBTCSwapState.COMMITED, ToBTCSwapState.SOFT_CLAIMED];
 
     protected async processEventInitialize(swap: S, event: InitializeEvent<T["Data"]>): Promise<boolean> {
         if(swap.state===ToBTCSwapState.CREATED || swap.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
@@ -164,10 +92,6 @@ export abstract class IToBTCWrapper<
             return Promise.resolve(true);
         }
         return Promise.resolve(false);
-    }
-
-    protected isOurSwap(signer: string, swap: S): boolean {
-        return swap.data.isOfferer(signer);
     }
 
 }

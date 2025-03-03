@@ -5,8 +5,6 @@ import { IntermediaryDiscovery, SwapBounds } from "../intermediaries/Intermediar
 import { SwapType } from "./SwapType";
 import { LnForGasSwap } from "./swapforgas/ln/LnForGasSwap";
 import { ISwap } from "./ISwap";
-import { IToBTCSwap } from "./tobtc/IToBTCSwap";
-import { IFromBTCSwap } from "./frombtc/IFromBTCSwap";
 import { ChainIds, MultiChain, Swapper, SwapperBtcUtils } from "./Swapper";
 import { FromBTCLNSwap } from "./frombtc/ln/FromBTCLNSwap";
 import { Buffer } from "buffer";
@@ -109,14 +107,6 @@ export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier exte
      * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
      */
     getActionableSwaps(signer?: string): Promise<ISwap<T[ChainIdentifier]>[]>;
-    /**
-     * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
-     */
-    getRefundableSwaps(signer?: string): Promise<IToBTCSwap<T[ChainIdentifier]>[]>;
-    /**
-     * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
-     */
-    getClaimableSwaps(signer?: string): Promise<IFromBTCSwap<T[ChainIdentifier]>[]>;
     /**
      * Returns the token balance of the wallet
      */

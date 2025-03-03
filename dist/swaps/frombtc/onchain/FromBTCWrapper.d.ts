@@ -9,9 +9,8 @@ import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { SwapType } from "../../SwapType";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
-import { ISwapStorage } from "../../../swap-storage/ISwapStorage";
-import { ToBTCSwap } from "../../tobtc/onchain/ToBTCSwap";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
+import { UnifiedSwapStorage } from "../../../swap-storage/UnifiedSwapStorage";
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint;
     blockSafetyFactor?: number;
@@ -44,11 +43,9 @@ export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: ISwapStorage<ToBTCSwap<T>>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithTxoListener<any>, options?: FromBTCWrapperOptions, events?: EventEmitter);
-    protected readonly checkPastSwapStates: FromBTCSwapState[];
-    protected checkPastSwap(swap: FromBTCSwap<T>): Promise<boolean>;
-    protected tickSwapState: FromBTCSwapState[];
-    protected tickSwap(swap: FromBTCSwap<T>): void;
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithTxoListener<any>, options?: FromBTCWrapperOptions, events?: EventEmitter);
+    readonly pendingSwapStates: FromBTCSwapState[];
+    readonly tickSwapState: FromBTCSwapState[];
     protected processEventInitialize(swap: FromBTCSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean>;
     protected processEventClaim(swap: FromBTCSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean>;
     protected processEventRefund(swap: FromBTCSwap<T>, event: RefundEvent<T["Data"]>): Promise<boolean>;

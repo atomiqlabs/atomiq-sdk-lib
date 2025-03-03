@@ -121,9 +121,9 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     create(signer, address, amountData, lps, options, additionalParams, abortSignal) {
         if (!this.isInitialized)
             throw new Error("Not initialized, call init() first!");
-        options ?? (options = {});
-        options.confirmationTarget ?? (options.confirmationTarget = 3);
-        options.confirmations ?? (options.confirmations = 2);
+        options ??= {};
+        options.confirmationTarget ??= 3;
+        options.confirmations ??= 2;
         const nonce = this.getRandomNonce();
         const outputScript = this.btcAddressToOutputScript(address);
         const _hash = !amountData.exactIn ?

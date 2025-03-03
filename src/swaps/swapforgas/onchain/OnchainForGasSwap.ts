@@ -453,4 +453,24 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         });
     }
 
+
+    //////////////////////////////
+    //// Swap ticks & sync
+
+    async _sync(save?: boolean): Promise<boolean> {
+        if(this.state===OnchainForGasSwapState.PR_CREATED) {
+            //Check if it's maybe already paid
+            const result = await this.checkAddress(false);
+            if(result) {
+                if(save) await this._saveAndEmit();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    _tick(save?: boolean): Promise<boolean> {
+        return Promise.resolve(false);
+    }
+
 }

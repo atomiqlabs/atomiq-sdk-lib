@@ -249,20 +249,6 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
     }
 
     /**
-     * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
-     */
-    getRefundableSwaps(): Promise<IToBTCSwap<T[ChainIdentifier]>[]> {
-        return this.swapper.getRefundableSwaps(this.signer.getAddress());
-    }
-
-    /**
-     * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
-     */
-    getClaimableSwaps(): Promise<IFromBTCSwap<T[ChainIdentifier]>[]> {
-        return this.swapper.getClaimableSwaps(this.signer.getAddress());
-    }
-
-    /**
      * Returns the token balance of the wallet
      */
     getBalance(token: string | SCToken<ChainIdentifier>): Promise<bigint> {
