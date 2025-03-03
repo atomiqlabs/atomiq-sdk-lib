@@ -7,6 +7,17 @@ const ISwapWrapper_1 = require("../ISwapWrapper");
 const Utils_1 = require("../../utils/Utils");
 const IntermediaryError_1 = require("../../errors/IntermediaryError");
 class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
+    constructor() {
+        super(...arguments);
+        this.checkPastSwapStates = [
+            IToBTCSwap_1.ToBTCSwapState.CREATED,
+            IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED,
+            IToBTCSwap_1.ToBTCSwapState.COMMITED,
+            IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED,
+            IToBTCSwap_1.ToBTCSwapState.REFUNDABLE
+        ];
+        this.tickSwapState = [IToBTCSwap_1.ToBTCSwapState.CREATED, IToBTCSwap_1.ToBTCSwapState.COMMITED, IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED];
+    }
     /**
      * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
      *  data
@@ -140,18 +151,6 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
     }
     isOurSwap(signer, swap) {
         return swap.data.isOfferer(signer);
-    }
-    /**
-     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
-     */
-    getRefundableSwaps(signer) {
-        return Promise.resolve(this.getRefundableSwapsSync(signer));
-    }
-    /**
-     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
-     */
-    getRefundableSwapsSync(signer) {
-        return this.getAllSwapsSync(signer).filter(swap => swap.isRefundable());
     }
 }
 exports.IToBTCWrapper = IToBTCWrapper;

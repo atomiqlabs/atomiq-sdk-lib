@@ -1,4 +1,4 @@
-import { IToBTCSwap } from "./IToBTCSwap";
+import { IToBTCSwap, ToBTCSwapState } from "./IToBTCSwap";
 import { ChainType, ClaimEvent, InitializeEvent, RefundEvent } from "@atomiqlabs/base";
 import { AmountData, ISwapWrapper, ISwapWrapperOptions } from "../ISwapWrapper";
 import { Intermediary, SingleChainReputationType } from "../../intermediaries/Intermediary";
@@ -33,18 +33,12 @@ export declare abstract class IToBTCWrapper<T extends ChainType, S extends IToBT
      * @returns Fee rate
      */
     protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, claimHash: string | null, abortController: AbortController): Promise<any | null>;
+    protected readonly checkPastSwapStates: ToBTCSwapState[];
     protected checkPastSwap(swap: S): Promise<boolean>;
+    protected readonly tickSwapState: ToBTCSwapState[];
     protected tickSwap(swap: S): void;
     protected processEventInitialize(swap: S, event: InitializeEvent<T["Data"]>): Promise<boolean>;
     protected processEventClaim(swap: S, event: ClaimEvent<T["Data"]>): Promise<boolean>;
     protected processEventRefund(swap: S, event: RefundEvent<T["Data"]>): Promise<boolean>;
     protected isOurSwap(signer: string, swap: S): boolean;
-    /**
-     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
-     */
-    getRefundableSwaps(signer?: string): Promise<S[]>;
-    /**
-     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
-     */
-    getRefundableSwapsSync(signer?: string): S[];
 }

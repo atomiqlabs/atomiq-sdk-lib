@@ -64,17 +64,5 @@ class IFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
     isOurSwap(signer, swap) {
         return swap.data.isClaimer(signer);
     }
-    /**
-     * Returns all swaps that are claimable, and optionally only those initiated with signer's address
-     */
-    getClaimableSwaps(signer) {
-        return Promise.resolve(this.getClaimableSwapsSync(signer));
-    }
-    /**
-     * Returns all swaps that are claimable, and optionally only those initiated with signer's address
-     */
-    getClaimableSwapsSync(signer) {
-        return this.getAllSwapsSync(signer).filter(swap => swap.isClaimable());
-    }
 }
 exports.IFromBTCWrapper = IFromBTCWrapper;

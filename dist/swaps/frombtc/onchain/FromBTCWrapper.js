@@ -15,9 +15,9 @@ const utils_1 = require("@scure/btc-signer/utils");
 class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents On-chain event listener
      * @param contract Underlying contract handling the swaps
-     * @param chainEvents On-chain event listener
      * @param prices Pricing to use
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
@@ -27,7 +27,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, btcRelay, synchronizer, btcRpc, options, events) {
+    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, btcRelay, synchronizer, btcRpc, options, events) {
         if (options == null)
             options = {};
         options.bitcoinNetwork = options.bitcoinNetwork ?? utils_1.TEST_NETWORK;
@@ -36,8 +36,17 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         options.maxConfirmations = options.maxConfirmations || 6;
         options.minSendWindow = options.minSendWindow || 30 * 60; //Minimum time window for user to send in the on-chain funds for From BTC swap
         options.bitcoinBlocktime = options.bitcoinBlocktime || 10 * 60;
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
+        this.TYPE = SwapType_1.SwapType.FROM_BTC;
         this.swapDeserializer = FromBTCSwap_1.FromBTCSwap;
+        this.checkPastSwapStates = [
+            FromBTCSwap_1.FromBTCSwapState.PR_CREATED,
+            FromBTCSwap_1.FromBTCSwapState.QUOTE_SOFT_EXPIRED,
+            FromBTCSwap_1.FromBTCSwapState.CLAIM_COMMITED,
+            FromBTCSwap_1.FromBTCSwapState.BTC_TX_CONFIRMED,
+            FromBTCSwap_1.FromBTCSwapState.EXPIRED
+        ];
+        this.tickSwapState = [FromBTCSwap_1.FromBTCSwapState.PR_CREATED, FromBTCSwap_1.FromBTCSwapState.CLAIM_COMMITED, FromBTCSwap_1.FromBTCSwapState.EXPIRED];
         this.btcRelay = btcRelay;
         this.synchronizer = synchronizer;
         this.btcRpc = btcRpc;

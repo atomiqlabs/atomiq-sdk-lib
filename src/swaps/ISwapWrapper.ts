@@ -331,7 +331,7 @@ export abstract class ISwapWrapper<
 
         if(!noCheckPastSwaps) {
             const pastSwaps = await this.unifiedStorage.query<S>(
-                this.checkPastSwapStates.map(state => [{key: "type", value: this.TYPE}, {key: "state", value: state}]),
+                [{key: "type", value: this.TYPE}, {key: "state", value: this.checkPastSwapStates}],
                 (val: any) => new this.swapDeserializer(this, val)
             );
 
@@ -380,7 +380,7 @@ export abstract class ISwapWrapper<
 
     async tick(): Promise<void> {
         const swaps = await this.unifiedStorage.query<S>(
-            this.tickSwapState.map(state => [{key: "type", value: this.TYPE}, {key: "state", value: state}]),
+            [{key: "type", value: this.TYPE}, {key: "state", value: this.tickSwapState}],
             (val: any) => new this.swapDeserializer(this, val)
         );
 

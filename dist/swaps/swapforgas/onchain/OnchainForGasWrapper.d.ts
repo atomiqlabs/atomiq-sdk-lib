@@ -1,19 +1,24 @@
 /// <reference types="node" />
 import { ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
-import { ChainType, IStorageManager } from "@atomiqlabs/base";
-import { OnchainForGasSwap } from "./OnchainForGasSwap";
+import { ChainType } from "@atomiqlabs/base";
+import { OnchainForGasSwap, OnchainForGasSwapState } from "./OnchainForGasSwap";
 import { BitcoinRpcWithTxoListener } from "../../../btc/BitcoinRpcWithTxoListener";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { Intermediary } from "../../../intermediaries/Intermediary";
+import { SwapType } from "../../SwapType";
+import { ISwapStorage } from "../../../swap-storage/ISwapStorage";
+import { ToBTCSwap } from "../../tobtc/onchain/ToBTCSwap";
+import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
 export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
-    protected readonly swapDeserializer: typeof OnchainForGasSwap;
+    readonly TYPE = SwapType.TRUSTED_FROM_BTC;
+    readonly swapDeserializer: typeof OnchainForGasSwap;
     readonly btcRpc: BitcoinRpcWithTxoListener<any>;
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents On-chain event listener
      * @param contract Underlying contract handling the swaps
-     * @param chainEvents On-chain event listener
      * @param prices Pricing to use
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
@@ -21,7 +26,7 @@ export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrap
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, storage: IStorageManager<OnchainForGasSwap<T>>, contract: T["Contract"], chainEvents: T["Events"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRpc: BitcoinRpcWithTxoListener<any>, options?: ISwapWrapperOptions, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: ISwapStorage<ToBTCSwap<T>>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRpc: BitcoinRpcWithTxoListener<any>, options?: ISwapWrapperOptions, events?: EventEmitter);
     /**
      * Returns a newly created swap, receiving 'amount' base units of gas token
      *
@@ -31,7 +36,9 @@ export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrap
      * @param refundAddress     Bitcoin address to receive refund on in case the counterparty cannot execute the swap
      */
     create(signer: string, amount: bigint, lpOrUrl: Intermediary | string, refundAddress?: string): Promise<OnchainForGasSwap<T>>;
+    protected checkPastSwapStates: OnchainForGasSwapState[];
     protected checkPastSwap(swap: OnchainForGasSwap<T>): Promise<boolean>;
     protected isOurSwap(signer: string, swap: OnchainForGasSwap<T>): boolean;
+    protected tickSwapState: any;
     protected tickSwap(swap: OnchainForGasSwap<T>): void;
 }

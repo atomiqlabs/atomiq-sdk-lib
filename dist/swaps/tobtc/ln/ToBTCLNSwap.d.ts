@@ -19,6 +19,7 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
     protected readonly TYPE = SwapType.TO_BTCLN;
     private readonly confidence;
     private readonly pr;
+    readonly paymentHash: string;
     lnurl?: string;
     successAction?: LNURLPaySuccessAction;
     private secret?;

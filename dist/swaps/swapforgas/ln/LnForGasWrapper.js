@@ -10,7 +10,10 @@ const SwapType_1 = require("../../SwapType");
 class LnForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
     constructor() {
         super(...arguments);
+        this.TYPE = SwapType_1.SwapType.TRUSTED_FROM_BTCLN;
         this.swapDeserializer = LnForGasSwap_1.LnForGasSwap;
+        this.checkPastSwapStates = [LnForGasSwap_1.LnForGasSwapState.PR_CREATED];
+        this.tickSwapState = null;
     }
     /**
      * Returns a newly created swap, receiving 'amount' on lightning network

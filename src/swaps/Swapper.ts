@@ -33,7 +33,6 @@ import {EventEmitter} from "events";
 import {Buffer} from "buffer";
 import {IndexedDBStorageManager} from "../storage/IndexedDBStorageManager";
 import {MempoolBitcoinBlock} from "../btc/mempool/MempoolBitcoinBlock";
-import {LocalStorageManager} from "../storage/LocalStorageManager";
 import {Intermediary} from "../intermediaries/Intermediary";
 import {isLNURLPay, isLNURLWithdraw, LNURL, LNURLPay, LNURLWithdraw} from "../utils/LNURL";
 import {AmountData, WrapperCtorTokens} from "./ISwapWrapper";
@@ -46,6 +45,7 @@ import {OnchainForGasWrapper} from "./swapforgas/onchain/OnchainForGasWrapper";
 import * as randomBytes from "randombytes";
 import {BTC_NETWORK, NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {Address} from "@scure/btc-signer";
+import {ISwapStorage} from "../swap-storage/ISwapStorage";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -58,7 +58,8 @@ export type SwapperOptions = {
     defaultAdditionalParameters?: {[key: string]: any},
     storagePrefix?: string
     defaultTrustedIntermediaryUrl?: string,
-    storageCtor?: (name: string) => IStorageManager<any>
+
+    swapStorage?: <T extends ChainType>(chainId: T["ChainId"]) => ISwapStorage<ISwap<T>>
 };
 
 export type MultiChain = {
@@ -160,7 +161,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         const storagePrefix = options?.storagePrefix || "";
 
         options.bitcoinNetwork = options.bitcoinNetwork==null ? BitcoinNetwork.TESTNET : options.bitcoinNetwork;
-        options.storageCtor ??= (name: string) => new IndexedDBStorageManager(name);
+        options.swapStorage ??= (name: string) => {
+            
+        };
 
         this.bitcoinNetwork = options.bitcoinNetwork===BitcoinNetwork.MAINNET ? NETWORK :
                 options.bitcoinNetwork===BitcoinNetwork.TESTNET ? TEST_NETWORK : null;

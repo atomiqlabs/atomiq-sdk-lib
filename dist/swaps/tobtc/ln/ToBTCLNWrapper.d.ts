@@ -1,12 +1,16 @@
 /// <reference types="node" />
 import { ToBTCLNSwap } from "./ToBTCLNSwap";
 import { IToBTCWrapper } from "../IToBTCWrapper";
-import { ChainType, IStorageManager } from "@atomiqlabs/base";
+import { ChainType } from "@atomiqlabs/base";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
+import { SwapType } from "../../SwapType";
 import { LNURLPayParamsWithUrl } from "../../../utils/LNURL";
+import { ISwapStorage } from "../../../swap-storage/ISwapStorage";
+import { ToBTCSwap } from "../onchain/ToBTCSwap";
+import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
 export type ToBTCLNOptions = {
     expirySeconds?: number;
     maxFee?: bigint | Promise<bigint>;
@@ -20,8 +24,9 @@ export type ToBTCLNWrapperOptions = ISwapWrapperOptions & {
     paymentTimeoutSeconds?: number;
 };
 export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCLNSwap<T>, ToBTCLNWrapperOptions> {
-    protected readonly swapDeserializer: typeof ToBTCLNSwap;
-    constructor(chainIdentifier: string, storage: IStorageManager<ToBTCLNSwap<T>>, contract: T["Contract"], chainEvents: T["Events"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options?: ToBTCLNWrapperOptions, events?: EventEmitter);
+    readonly TYPE = SwapType.TO_BTCLN;
+    readonly swapDeserializer: typeof ToBTCLNSwap;
+    constructor(chainIdentifier: string, unifiedStorage: ISwapStorage<ToBTCSwap<T>>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options?: ToBTCLNWrapperOptions, events?: EventEmitter);
     private checkPaymentHashWasPaid;
     /**
      * Calculates maximum lightning network routing fee based on amount
@@ -78,10 +83,10 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
     create(signer: string, bolt11PayRequest: string, amountData: Omit<AmountData, "amount">, lps: Intermediary[], options?: ToBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
         feeRatePromise: Promise<any>;
         pricePreFetchPromise: Promise<bigint>;
-    }): {
+    }): Promise<{
         quote: Promise<ToBTCLNSwap<T>>;
         intermediary: Intermediary;
-    }[];
+    }[]>;
     /**
      * Parses and fetches lnurl pay params from the specified lnurl
      *

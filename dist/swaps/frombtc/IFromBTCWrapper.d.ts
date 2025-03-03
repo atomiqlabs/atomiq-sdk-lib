@@ -40,12 +40,4 @@ export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IFr
      */
     protected verifyIntermediaryLiquidity(amount: bigint, liquidityPromise: Promise<bigint>): Promise<void>;
     protected isOurSwap(signer: string, swap: S): boolean;
-    /**
-     * Returns all swaps that are claimable, and optionally only those initiated with signer's address
-     */
-    getClaimableSwaps(signer?: string): Promise<S[]>;
-    /**
-     * Returns all swaps that are claimable, and optionally only those initiated with signer's address
-     */
-    getClaimableSwapsSync(signer?: string): S[];
 }

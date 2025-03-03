@@ -15,17 +15,17 @@ const utils_1 = require("@scure/btc-signer/utils");
 class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents Smart chain on-chain event listener
      * @param contract Chain specific swap contract
      * @param prices Swap pricing handler
-     * @param chainEvents Smart chain on-chain event listener
      * @param tokens
      * @param swapDataDeserializer Deserializer for chain specific SwapData
      * @param btcRpc Bitcoin RPC api
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, btcRpc, options, events) {
+    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, btcRpc, options, events) {
         if (options == null)
             options = {};
         options.bitcoinNetwork = options.bitcoinNetwork ?? utils_1.TEST_NETWORK;
@@ -34,7 +34,8 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         options.bitcoinBlocktime = options.bitcoinBlocktime || (60 * 10);
         options.maxExpectedOnchainSendSafetyFactor = options.maxExpectedOnchainSendSafetyFactor || 4;
         options.maxExpectedOnchainSendGracePeriodBlocks = options.maxExpectedOnchainSendGracePeriodBlocks || 12;
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
+        this.TYPE = SwapType_1.SwapType.TO_BTC;
         this.swapDeserializer = ToBTCSwap_1.ToBTCSwap;
         this.btcRpc = btcRpc;
     }

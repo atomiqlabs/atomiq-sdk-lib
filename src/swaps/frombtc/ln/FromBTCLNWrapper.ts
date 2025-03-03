@@ -6,7 +6,6 @@ import {
     ChainType,
     ClaimEvent,
     InitializeEvent,
-    IStorageManager,
     RefundEvent,
     SwapCommitStatus, SwapData
 } from "@atomiqlabs/base";
@@ -25,6 +24,9 @@ import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {LNURL, LNURLWithdrawParamsWithUrl} from "../../../utils/LNURL";
+import {ISwapStorage} from "../../../swap-storage/ISwapStorage";
+import {ToBTCSwap} from "../../tobtc/onchain/ToBTCSwap";
+import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
 
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer
@@ -33,16 +35,17 @@ export type FromBTCLNOptions = {
 export class FromBTCLNWrapper<
     T extends ChainType
 > extends IFromBTCWrapper<T, FromBTCLNSwap<T>> {
-    protected readonly swapDeserializer = FromBTCLNSwap;
+    public readonly TYPE = SwapType.FROM_BTCLN;
+    public readonly swapDeserializer = FromBTCLNSwap;
 
     protected readonly lnApi: LightningNetworkApi;
 
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents On-chain event listener
      * @param contract Underlying contract handling the swaps
      * @param prices Swap pricing handler
-     * @param chainEvents On-chain event listener
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
      * @param lnApi
@@ -51,9 +54,9 @@ export class FromBTCLNWrapper<
      */
     constructor(
         chainIdentifier: string,
-        storage: IStorageManager<FromBTCLNSwap<T>>,
+        unifiedStorage: ISwapStorage<ToBTCSwap<T>>,
+        unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
-        chainEvents: T["Events"],
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
         swapDataDeserializer: new (data: any) => T["Data"],
@@ -61,10 +64,17 @@ export class FromBTCLNWrapper<
         options: ISwapWrapperOptions,
         events?: EventEmitter
     ) {
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
         this.lnApi = lnApi;
     }
 
+    protected readonly checkPastSwapStates = [
+        FromBTCLNSwapState.PR_CREATED,
+        FromBTCLNSwapState.QUOTE_SOFT_EXPIRED,
+        FromBTCLNSwapState.PR_PAID,
+        FromBTCLNSwapState.CLAIM_COMMITED,
+        FromBTCLNSwapState.EXPIRED
+    ];
     protected async checkPastSwap(swap: FromBTCLNSwap<T>): Promise<boolean> {
         if(swap.state===FromBTCLNSwapState.PR_CREATED || (swap.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && swap.signatureData==null)) {
             if(swap.getTimeoutTime()<Date.now()) {
@@ -115,6 +125,11 @@ export class FromBTCLNWrapper<
         }
     }
 
+    protected readonly tickSwapState = [
+        FromBTCLNSwapState.PR_CREATED,
+        FromBTCLNSwapState.PR_PAID,
+        FromBTCLNSwapState.CLAIM_COMMITED
+    ];
     protected tickSwap(swap: FromBTCLNSwap<T>): void {
         switch(swap.state) {
             case FromBTCLNSwapState.PR_CREATED:

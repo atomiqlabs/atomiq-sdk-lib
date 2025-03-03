@@ -14,20 +14,20 @@ const RequestError_1 = require("../../../errors/RequestError");
 const LNURL_1 = require("../../../utils/LNURL");
 const IToBTCSwap_1 = require("../IToBTCSwap");
 class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
-    constructor(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events) {
+    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events) {
         if (options == null)
             options = {};
         options.paymentTimeoutSeconds ?? (options.paymentTimeoutSeconds = 4 * 24 * 60 * 60);
         options.lightningBaseFee ?? (options.lightningBaseFee = 10);
         options.lightningFeePPM ?? (options.lightningFeePPM = 2000);
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
+        this.TYPE = SwapType_1.SwapType.TO_BTCLN;
         this.swapDeserializer = ToBTCLNSwap_1.ToBTCLNSwap;
     }
-    checkPaymentHashWasPaid(paymentHash) {
-        const paymentHashBuffer = Buffer.from(paymentHash, "hex");
-        for (let value of this.swapData.values()) {
-            if ((value.state === IToBTCSwap_1.ToBTCSwapState.CLAIMED || value.state === IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED) &&
-                value.getPaymentHash().equals(paymentHashBuffer))
+    async checkPaymentHashWasPaid(paymentHash) {
+        const swaps = await this.unifiedStorage.query([{ key: "type", value: this.TYPE }, { key: "paymentHash", value: paymentHash }], this.swapDeserializer.bind(null, this));
+        for (let value of swaps) {
+            if (value.state === IToBTCSwap_1.ToBTCSwapState.CLAIMED || value.state === IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED)
                 throw new UserError_1.UserError("Lightning invoice was already paid!");
         }
     }
@@ -153,7 +153,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @param abortSignal           Abort signal for aborting the process
      * @param preFetches            Existing pre-fetches for the swap (only used internally for LNURL swaps)
      */
-    create(signer, bolt11PayRequest, amountData, lps, options, additionalParams, abortSignal, preFetches) {
+    async create(signer, bolt11PayRequest, amountData, lps, options, additionalParams, abortSignal, preFetches) {
         options ?? (options = {});
         options.expirySeconds ?? (options.expirySeconds = this.options.paymentTimeoutSeconds);
         options.expiryTimestamp ?? (options.expiryTimestamp = BigInt(Math.floor(Date.now() / 1000) + options.expirySeconds));
@@ -162,7 +162,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             throw new UserError_1.UserError("Must be an invoice with amount");
         const amountOut = (BigInt(parsedPr.millisatoshis) + 999n) / 1000n;
         options.maxFee ?? (options.maxFee = this.calculateFeeForAmount(amountOut, options.maxRoutingBaseFee, options.maxRoutingPPM));
-        this.checkPaymentHashWasPaid(parsedPr.tagsObject.payment_hash);
+        await this.checkPaymentHashWasPaid(parsedPr.tagsObject.payment_hash);
         const claimHash = this.contract.getHashForHtlc(Buffer.from(parsedPr.tagsObject.payment_hash, "hex"));
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         if (preFetches == null)
@@ -333,10 +333,10 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                 if (amountData.amount > max)
                     throw new UserError_1.UserError("Amount more than maximum");
                 const { invoice, parsedInvoice, successAction } = await LNURL_1.LNURL.useLNURLPay(payRequest, amountData.amount, options.comment, this.options.getRequestTimeout, _abortController.signal);
-                return this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
+                return (await this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
                     feeRatePromise,
                     pricePreFetchPromise
-                }).map(data => {
+                })).map(data => {
                     return {
                         quote: data.quote.then(quote => {
                             quote.lnurl = payRequest.url;

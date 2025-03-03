@@ -1,13 +1,17 @@
 /// <reference types="node" />
 import { IFromBTCWrapper } from "../IFromBTCWrapper";
-import { FromBTCSwap } from "./FromBTCSwap";
-import { ChainType, ClaimEvent, InitializeEvent, IStorageManager, RefundEvent, RelaySynchronizer, SwapData, BtcRelay } from "@atomiqlabs/base";
+import { FromBTCSwap, FromBTCSwapState } from "./FromBTCSwap";
+import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, RelaySynchronizer, SwapData, BtcRelay } from "@atomiqlabs/base";
 import { EventEmitter } from "events";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { BitcoinRpcWithTxoListener } from "../../../btc/BitcoinRpcWithTxoListener";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
+import { SwapType } from "../../SwapType";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
+import { ISwapStorage } from "../../../swap-storage/ISwapStorage";
+import { ToBTCSwap } from "../../tobtc/onchain/ToBTCSwap";
+import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint;
     blockSafetyFactor?: number;
@@ -21,15 +25,16 @@ export type FromBTCWrapperOptions = ISwapWrapperOptions & {
     bitcoinBlocktime?: number;
 };
 export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper<T, FromBTCSwap<T>, FromBTCWrapperOptions> {
-    protected readonly swapDeserializer: typeof FromBTCSwap;
+    readonly TYPE = SwapType.FROM_BTC;
+    readonly swapDeserializer: typeof FromBTCSwap;
     readonly synchronizer: RelaySynchronizer<any, T["TX"], any>;
     readonly btcRelay: BtcRelay<any, T["TX"], any>;
     readonly btcRpc: BitcoinRpcWithTxoListener<any>;
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents On-chain event listener
      * @param contract Underlying contract handling the swaps
-     * @param chainEvents On-chain event listener
      * @param prices Pricing to use
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
@@ -39,8 +44,10 @@ export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, storage: IStorageManager<FromBTCSwap<T>>, contract: T["Contract"], chainEvents: T["Events"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithTxoListener<any>, options?: FromBTCWrapperOptions, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: ISwapStorage<ToBTCSwap<T>>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithTxoListener<any>, options?: FromBTCWrapperOptions, events?: EventEmitter);
+    protected readonly checkPastSwapStates: FromBTCSwapState[];
     protected checkPastSwap(swap: FromBTCSwap<T>): Promise<boolean>;
+    protected tickSwapState: FromBTCSwapState[];
     protected tickSwap(swap: FromBTCSwap<T>): void;
     protected processEventInitialize(swap: FromBTCSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean>;
     protected processEventClaim(swap: FromBTCSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean>;

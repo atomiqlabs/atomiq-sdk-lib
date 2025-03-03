@@ -1,12 +1,14 @@
 /// <reference types="node" />
 /// <reference types="node" />
-import { ChainType, ClaimEvent, InitializeEvent, IStorageManager, RefundEvent, SignatureData } from "@atomiqlabs/base";
+import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, SignatureData } from "@atomiqlabs/base";
 import { EventEmitter } from "events";
 import { ISwap } from "./ISwap";
-import { SwapWrapperStorage } from "./SwapWrapperStorage";
 import { ISwapPrice, PriceInfoType } from "../prices/abstract/ISwapPrice";
 import { SCToken } from "./Tokens";
 import { ChainIds, MultiChain } from "./Swapper";
+import { ISwapStorage } from "../swap-storage/ISwapStorage";
+import { UnifiedSwapEventListener } from "../events/UnifiedSwapEventListener";
+import { SwapType } from "./SwapType";
 export type AmountData = {
     amount: bigint;
     token: string;
@@ -28,35 +30,34 @@ export type WrapperCtorTokens<T extends MultiChain = MultiChain> = {
     };
 }[];
 export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<T>, O extends ISwapWrapperOptions = ISwapWrapperOptions> {
+    abstract readonly TYPE: SwapType;
     protected readonly logger: import("../utils/Utils").LoggerType;
-    protected readonly abstract swapDeserializer: new (wrapper: ISwapWrapper<T, S, O>, data: any) => S;
+    abstract readonly swapDeserializer: new (wrapper: ISwapWrapper<T, S, O>, data: any) => S;
+    readonly unifiedStorage: ISwapStorage<S>;
+    readonly unifiedChainEvents: UnifiedSwapEventListener<T>;
     readonly chainIdentifier: string;
-    readonly storage: SwapWrapperStorage<S>;
     readonly contract: T["Contract"];
     readonly prices: ISwapPrice;
-    readonly chainEvents: T["Events"];
     readonly swapDataDeserializer: new (data: any) => T["Data"];
     readonly events: EventEmitter;
     readonly options: O;
     readonly tokens: {
         [tokenAddress: string]: SCToken<T["ChainId"]>;
     };
-    swapData: Map<string, S>;
-    swapDataByEscrowHash: Map<string, S>;
     isInitialized: boolean;
     tickInterval: NodeJS.Timeout;
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage
+     * @param unifiedChainEvents
      * @param contract Underlying contract handling the swaps
      * @param prices Swap pricing handler
-     * @param chainEvents On-chain event listener
      * @param tokens Chain specific token data
      * @param swapDataDeserializer Deserializer for SwapData
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, storage: IStorageManager<S>, contract: T["Contract"], chainEvents: T["Events"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options: O, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: ISwapStorage<S>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options: O, events?: EventEmitter);
     /**
      * Pre-fetches swap price for a given swap
      *
@@ -149,18 +150,22 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * @returns Whether the swap was updated/changed
      */
     protected abstract checkPastSwap(swap: S): Promise<boolean>;
+    protected abstract checkPastSwapStates: Array<S["state"]>;
     protected abstract tickSwap(swap: S): void;
+    protected abstract tickSwapState: Array<S["state"]>;
     /**
-     * Processes batch of SC on-chain events
-     * @param events
+     * Processes a single SC on-chain event
      * @private
+     * @param event
+     * @param swap
      */
-    private processEvents;
-    private boundProcessEvents;
+    private processEvent;
     /**
      * Initializes the swap wrapper, needs to be called before any other action can be taken
      */
-    init(noTimers?: boolean): Promise<void>;
+    init(noTimers?: boolean, noCheckPastSwaps?: boolean): Promise<void>;
+    protected startTickInterval(): void;
+    tick(): Promise<void>;
     saveSwapData(swap: S): Promise<void>;
     removeSwapData(swap: S): Promise<void>;
     /**
@@ -168,23 +173,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      */
     stop(): Promise<void>;
     /**
-     * Returns all swaps, optionally only those which were intiated by as specific signer's address
-     */
-    getAllSwaps(signer?: string): Promise<S[]>;
-    /**
-     * Returns all swaps, optionally only those which were intiated by as specific signer's address
-     */
-    getAllSwapsSync(signer?: string): S[];
-    /**
      * Returns the smart chain's native token used to pay for fees
      */
     getNativeToken(): SCToken<T["ChainId"]>;
-    /**
-     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
-     */
-    getActionableSwaps(signer?: string): Promise<S[]>;
-    /**
-     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
-     */
-    getActionableSwapsSync(signer?: string): S[];
 }

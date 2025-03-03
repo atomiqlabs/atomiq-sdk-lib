@@ -9,9 +9,9 @@ const SwapType_1 = require("../../SwapType");
 class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents On-chain event listener
      * @param contract Underlying contract handling the swaps
-     * @param chainEvents On-chain event listener
      * @param prices Pricing to use
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
@@ -19,9 +19,12 @@ class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, btcRpc, options, events) {
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, btcRpc, options, events) {
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
+        this.TYPE = SwapType_1.SwapType.TRUSTED_FROM_BTC;
         this.swapDeserializer = OnchainForGasSwap_1.OnchainForGasSwap;
+        this.checkPastSwapStates = [OnchainForGasSwap_1.OnchainForGasSwapState.PR_CREATED];
+        this.tickSwapState = null;
         this.btcRpc = btcRpc;
     }
     /**

@@ -17,19 +17,32 @@ const LNURL_1 = require("../../../utils/LNURL");
 class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents On-chain event listener
      * @param contract Underlying contract handling the swaps
      * @param prices Swap pricing handler
-     * @param chainEvents On-chain event listener
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
      * @param lnApi
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, lnApi, options, events) {
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, lnApi, options, events) {
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
+        this.TYPE = SwapType_1.SwapType.FROM_BTCLN;
         this.swapDeserializer = FromBTCLNSwap_1.FromBTCLNSwap;
+        this.checkPastSwapStates = [
+            FromBTCLNSwap_1.FromBTCLNSwapState.PR_CREATED,
+            FromBTCLNSwap_1.FromBTCLNSwapState.QUOTE_SOFT_EXPIRED,
+            FromBTCLNSwap_1.FromBTCLNSwapState.PR_PAID,
+            FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED,
+            FromBTCLNSwap_1.FromBTCLNSwapState.EXPIRED
+        ];
+        this.tickSwapState = [
+            FromBTCLNSwap_1.FromBTCLNSwapState.PR_CREATED,
+            FromBTCLNSwap_1.FromBTCLNSwapState.PR_PAID,
+            FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED
+        ];
         this.lnApi = lnApi;
     }
     async checkPastSwap(swap) {

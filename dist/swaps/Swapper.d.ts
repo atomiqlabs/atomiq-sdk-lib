@@ -2,7 +2,7 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import { ISwapPrice } from "../prices/abstract/ISwapPrice";
-import { BitcoinNetwork, BtcRelay, ChainData, ChainType, IStorageManager, RelaySynchronizer } from "@atomiqlabs/base";
+import { BitcoinNetwork, BtcRelay, ChainData, ChainType, RelaySynchronizer } from "@atomiqlabs/base";
 import { ToBTCLNWrapper } from "./tobtc/ln/ToBTCLNWrapper";
 import { ToBTCWrapper } from "./tobtc/onchain/ToBTCWrapper";
 import { FromBTCLNWrapper } from "./frombtc/ln/FromBTCLNWrapper";
@@ -31,6 +31,7 @@ import { BtcToken, SCToken, Token } from "./Tokens";
 import { OnchainForGasSwap } from "./swapforgas/onchain/OnchainForGasSwap";
 import { OnchainForGasWrapper } from "./swapforgas/onchain/OnchainForGasWrapper";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
+import { ISwapStorage } from "../swap-storage/ISwapStorage";
 export type SwapperOptions = {
     intermediaryUrl?: string | string[];
     registryUrl?: string;
@@ -42,7 +43,7 @@ export type SwapperOptions = {
     };
     storagePrefix?: string;
     defaultTrustedIntermediaryUrl?: string;
-    storageCtor?: (name: string) => IStorageManager<any>;
+    swapStorage?: <T extends ChainType>(chainId: T["ChainId"]) => ISwapStorage<ISwap<T>>;
 };
 export type MultiChain = {
     [chainIdentifier in string]: ChainType;

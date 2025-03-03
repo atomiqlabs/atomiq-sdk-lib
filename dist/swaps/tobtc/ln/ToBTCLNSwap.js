@@ -32,6 +32,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
             this.successAction = initOrObj.successAction;
             this.secret = initOrObj.secret;
         }
+        this.paymentHash = this.getPaymentHash().toString("hex");
         this.logger = (0, Utils_1.getLogger)("ToBTCLN(" + this.getIdentifierHashString() + "): ");
         this.tryCalculateSwapFee();
     }
@@ -132,6 +133,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     serialize() {
         return {
             ...super.serialize(),
+            paymentHash: this.getPaymentHash().toString("hex"),
             pr: this.pr,
             confidence: this.confidence,
             secret: this.secret,

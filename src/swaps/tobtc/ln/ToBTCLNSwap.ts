@@ -32,6 +32,8 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
     private readonly confidence: number;
     private readonly pr: string;
 
+    readonly paymentHash: string;
+
     lnurl?: string;
     successAction?: LNURLPaySuccessAction;
 
@@ -50,6 +52,8 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
             this.successAction = initOrObj.successAction;
             this.secret = initOrObj.secret;
         }
+
+        this.paymentHash = this.getPaymentHash().toString("hex");
         this.logger = getLogger("ToBTCLN("+this.getIdentifierHashString()+"): ");
         this.tryCalculateSwapFee();
     }

@@ -28,12 +28,14 @@ export class UnifiedSwapEventListener<
     }
 
     async processEvents(events: SwapEvent<T["Data"]>[]) {
-        const escrowHashes = events.map(event => [{key: "escrowHash", value: event.escrowHash}]);
-        const swaps = await this.storage.query<ISwap<T>>(escrowHashes, (val: any) => {
-            const obj = this.listeners[val.type];
-            if(obj==null) return null;
-            return new obj.reviver(val);
-        });
+        const swaps = await this.storage.query<ISwap<T>>(
+            [{key: "escrowHash", value: events.map(event => event.escrowHash)}],
+            (val: any) => {
+                const obj = this.listeners[val.type];
+                if(obj==null) return null;
+                return new obj.reviver(val);
+            }
+        );
         const swapsObj: {[key: string]: ISwap<T>} = {};
         swaps.forEach(swap => swapsObj[swap.getEscrowHash()] = swap);
 

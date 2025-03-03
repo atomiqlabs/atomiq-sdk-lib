@@ -13,7 +13,6 @@ const SwapType_1 = require("./SwapType");
 const MempoolBtcRelaySynchronizer_1 = require("../btc/mempool/synchronizer/MempoolBtcRelaySynchronizer");
 const LnForGasWrapper_1 = require("./swapforgas/ln/LnForGasWrapper");
 const events_1 = require("events");
-const IndexedDBStorageManager_1 = require("../storage/IndexedDBStorageManager");
 const LNURL_1 = require("../utils/LNURL");
 const Utils_1 = require("../utils/Utils");
 const RequestError_1 = require("../errors/RequestError");
@@ -29,7 +28,8 @@ class Swapper extends events_1.EventEmitter {
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
         const storagePrefix = options?.storagePrefix || "";
         options.bitcoinNetwork = options.bitcoinNetwork == null ? base_1.BitcoinNetwork.TESTNET : options.bitcoinNetwork;
-        options.storageCtor ?? (options.storageCtor = (name) => new IndexedDBStorageManager_1.IndexedDBStorageManager(name));
+        options.swapStorage ?? (options.swapStorage = (name) => {
+        });
         this.bitcoinNetwork = options.bitcoinNetwork === base_1.BitcoinNetwork.MAINNET ? utils_1.NETWORK :
             options.bitcoinNetwork === base_1.BitcoinNetwork.TESTNET ? utils_1.TEST_NETWORK : null;
         this.prices = pricing;
@@ -484,11 +484,11 @@ class Swapper extends events_1.EventEmitter {
             exactIn: false
         };
         expirySeconds ?? (expirySeconds = 5 * 24 * 3600);
-        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.tobtcln.create(signer, paymentRequest, amountData, candidates, {
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.tobtcln.create(signer, paymentRequest, amountData, candidates, {
             expirySeconds,
             maxRoutingPPM,
             maxRoutingBaseFee
-        }, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.TO_BTCLN);
+        }, additionalParams, abortSignal), amountData, SwapType_1.SwapType.TO_BTCLN);
     }
     /**
      * Creates To BTCLN swap via LNURL-pay
