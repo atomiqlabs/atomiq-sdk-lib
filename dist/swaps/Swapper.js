@@ -28,9 +28,9 @@ class Swapper extends events_1.EventEmitter {
     constructor(bitcoinRpc, chainsData, pricing, tokens, options) {
         super();
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
-        const storagePrefix = options?.storagePrefix || "";
+        const storagePrefix = options?.storagePrefix ?? "atomiq-";
         options.bitcoinNetwork = options.bitcoinNetwork == null ? base_1.BitcoinNetwork.TESTNET : options.bitcoinNetwork;
-        options.swapStorage ??= (name) => new IndexedDBUnifiedStorage_1.IndexedDBUnifiedStorage("atomiq-" + name);
+        options.swapStorage ??= (name) => new IndexedDBUnifiedStorage_1.IndexedDBUnifiedStorage(name);
         this.bitcoinNetwork = options.bitcoinNetwork === base_1.BitcoinNetwork.MAINNET ? utils_1.NETWORK :
             options.bitcoinNetwork === base_1.BitcoinNetwork.TESTNET ? utils_1.TEST_NETWORK : null;
         this.prices = pricing;
@@ -57,7 +57,7 @@ class Swapper extends events_1.EventEmitter {
         this.chains = (0, Utils_1.objectMap)(chainsData, (chainData, key) => {
             const { swapContract, chainEvents, btcRelay } = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer_1.MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
-            const storageHandler = options.swapStorage(chainData.chainId);
+            const storageHandler = options.swapStorage(storagePrefix + chainData.chainId);
             const unifiedSwapStorage = new UnifiedSwapStorage_1.UnifiedSwapStorage(storageHandler);
             const unifiedChainEvents = new UnifiedSwapEventListener_1.UnifiedSwapEventListener(unifiedSwapStorage, chainEvents);
             const wrappers = {};

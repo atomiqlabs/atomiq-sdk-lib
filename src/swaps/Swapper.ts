@@ -167,10 +167,10 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         options?: SwapperOptions
     ) {
         super();
-        const storagePrefix = options?.storagePrefix || "";
+        const storagePrefix = options?.storagePrefix ?? "atomiq-";
 
         options.bitcoinNetwork = options.bitcoinNetwork==null ? BitcoinNetwork.TESTNET : options.bitcoinNetwork;
-        options.swapStorage ??= (name: string) => new IndexedDBUnifiedStorage("atomiq-"+name);
+        options.swapStorage ??= (name: string) => new IndexedDBUnifiedStorage(name);
 
         this.bitcoinNetwork = options.bitcoinNetwork===BitcoinNetwork.MAINNET ? NETWORK :
                 options.bitcoinNetwork===BitcoinNetwork.TESTNET ? TEST_NETWORK : null;
@@ -203,7 +203,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             const {swapContract, chainEvents, btcRelay} = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
 
-            const storageHandler = options.swapStorage(chainData.chainId);
+            const storageHandler = options.swapStorage(storagePrefix + chainData.chainId);
             const unifiedSwapStorage = new UnifiedSwapStorage<T[InputKey]>(storageHandler);
             const unifiedChainEvents = new UnifiedSwapEventListener<T[InputKey]>(unifiedSwapStorage, chainEvents);
 
