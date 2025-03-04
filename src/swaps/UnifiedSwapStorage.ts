@@ -13,7 +13,7 @@ const logger = getLogger("UnifiedSwapStorage: ");
 export class UnifiedSwapStorage<T extends ChainType> {
 
     readonly storage: IUnifiedStorage;
-    readonly weakRefCache: Map<string, WeakRef<ISwap<T>>>;
+    readonly weakRefCache: Map<string, WeakRef<ISwap<T>>> = new Map();
 
     constructor(storage: IUnifiedStorage) {
         this.storage = storage;

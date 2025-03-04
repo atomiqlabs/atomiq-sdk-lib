@@ -5,6 +5,7 @@ const Utils_1 = require("../utils/Utils");
 const logger = (0, Utils_1.getLogger)("UnifiedSwapStorage: ");
 class UnifiedSwapStorage {
     constructor(storage) {
+        this.weakRefCache = new Map();
         this.storage = storage;
     }
     init() {
