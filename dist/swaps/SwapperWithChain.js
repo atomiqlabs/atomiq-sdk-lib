@@ -164,6 +164,12 @@ class SwapperWithChain {
         return this.swapper.getSwapById(id, this.chainIdentifier, signer);
     }
     /**
+     * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes
+     */
+    async _syncSwaps(signer) {
+        return this.swapper._syncSwaps(this.chainIdentifier, signer);
+    }
+    /**
      * Returns the token balance of the wallet
      */
     getBalance(signer, token) {

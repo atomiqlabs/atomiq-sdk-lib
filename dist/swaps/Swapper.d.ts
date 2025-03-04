@@ -344,6 +344,13 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
     getSwapById<C extends ChainIds<T>>(id: string, chainId: C, signer?: string): Promise<ISwap<T[C]>>;
+    /**
+     * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes
+     *
+     * @param chainId
+     * @param signer
+     */
+    _syncSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<void>;
     getBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>): Promise<bigint>;
     getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string): Promise<bigint>;
     getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<bigint>;

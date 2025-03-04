@@ -474,7 +474,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
 
             for(let key in wrappers) {
                 this.logger.info("init(): Initializing "+SwapType[key]+": "+chainIdentifier);
-                wrappers[key].init(this.options.noTimers, this.options.dontCheckPastSwaps);
+                await wrappers[key].init(this.options.noTimers, this.options.dontCheckPastSwaps);
             }
         }
 
@@ -1101,7 +1101,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
                 queryParams.push(swapTypeQueryParams);
             }
-            return await unifiedSwapStorage.query(queryParams, reviver);
+            return (await unifiedSwapStorage.query(queryParams, reviver)).filter(swap => swap.isActionable());
         }
     }
 
@@ -1128,6 +1128,56 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         } else {
             const {unifiedSwapStorage, reviver} = this.chains[chainId];
             return (await unifiedSwapStorage.query([queryParams], reviver))[0];
+        }
+    }
+
+    /**
+     * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes
+     *
+     * @param chainId
+     * @param signer
+     */
+    async _syncSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<void> {
+        if(chainId==null) {
+            await Promise.all(Object.keys(this.chains).map(async (chainId) => {
+                const {unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
+                const queryParams: Array<QueryParams[]> = [];
+                for(let key in wrappers) {
+                    const wrapper = wrappers[key];
+                    const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
+                    if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+                    swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
+                    queryParams.push(swapTypeQueryParams);
+                }
+                const swaps = await unifiedSwapStorage.query(queryParams, reviver);
+
+                const changedSwaps: ISwap<T[string]>[] = [];
+                for(let swap of swaps) {
+                    const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
+                    if(swapChanged) changedSwaps.push(swap);
+                }
+
+                await unifiedSwapStorage.saveAll(changedSwaps);
+            }));
+        } else {
+            const {unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
+            const queryParams: Array<QueryParams[]> = [];
+            for(let key in wrappers) {
+                const wrapper = wrappers[key];
+                const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
+                if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+                swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
+                queryParams.push(swapTypeQueryParams);
+            }
+            const swaps = await unifiedSwapStorage.query(queryParams, reviver);
+
+            const changedSwaps: ISwap<T[C]>[] = [];
+            for(let swap of swaps) {
+                const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
+                if(swapChanged) changedSwaps.push(swap);
+            }
+
+            await unifiedSwapStorage.saveAll(changedSwaps);
         }
     }
 

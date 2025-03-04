@@ -112,6 +112,10 @@ export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier exte
      */
     getSwapById(id: string, signer?: string): Promise<ISwap<T[ChainIdentifier]>>;
     /**
+     * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes
+     */
+    _syncSwaps(signer?: string): Promise<void>;
+    /**
      * Returns the token balance of the wallet
      */
     getBalance(signer: string, token: string | SCToken<ChainIdentifier>): Promise<bigint>;

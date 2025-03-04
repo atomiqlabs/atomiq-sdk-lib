@@ -256,6 +256,13 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
     }
 
     /**
+     * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes
+     */
+    async _syncSwaps(): Promise<void> {
+        return this.swapper._syncSwaps(this.signer.getAddress());
+    }
+
+    /**
      * Returns the token balance of the wallet
      */
     getBalance(token: string | SCToken<ChainIdentifier>): Promise<bigint> {
