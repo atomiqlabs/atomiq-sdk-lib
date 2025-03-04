@@ -13,7 +13,7 @@ import { EventEmitter } from "events";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { LNURLWithdrawParamsWithUrl } from "../../../utils/LNURL";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
-import { UnifiedSwapStorage } from "../../../swap-storage/UnifiedSwapStorage";
+import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer;
 };

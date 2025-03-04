@@ -158,6 +158,12 @@ class SwapperWithChain {
         return this.swapper.getActionableSwaps(this.chainIdentifier, signer);
     }
     /**
+     * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
+     */
+    getSwapById(id, signer) {
+        return this.swapper.getSwapById(id, this.chainIdentifier, signer);
+    }
+    /**
      * Returns the token balance of the wallet
      */
     getBalance(signer, token) {

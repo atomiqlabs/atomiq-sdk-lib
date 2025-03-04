@@ -21,8 +21,8 @@ const OnchainForGasWrapper_1 = require("./swapforgas/onchain/OnchainForGasWrappe
 const randomBytes = require("randombytes");
 const utils_1 = require("@scure/btc-signer/utils");
 const btc_signer_1 = require("@scure/btc-signer");
-const IndexedDBUnifiedStorage_1 = require("../storage/IndexedDBUnifiedStorage");
-const UnifiedSwapStorage_1 = require("../swap-storage/UnifiedSwapStorage");
+const IndexedDBUnifiedStorage_1 = require("../browser-storage/IndexedDBUnifiedStorage");
+const UnifiedSwapStorage_1 = require("./UnifiedSwapStorage");
 const UnifiedSwapEventListener_1 = require("../events/UnifiedSwapEventListener");
 class Swapper extends events_1.EventEmitter {
     constructor(bitcoinRpc, chainsData, pricing, tokens, options) {
@@ -701,6 +701,23 @@ class Swapper extends events_1.EventEmitter {
                 queryParams.push(swapTypeQueryParams);
             }
             return await unifiedSwapStorage.query(queryParams, reviver);
+        }
+    }
+    async getSwapById(id, chainId, signer) {
+        const queryParams = [];
+        if (signer != null)
+            queryParams.push({ key: "intiator", value: signer });
+        queryParams.push({ key: "id", value: id });
+        if (chainId == null) {
+            const res = await Promise.all(Object.keys(this.chains).map((chainId) => {
+                const { unifiedSwapStorage, reviver } = this.chains[chainId];
+                return unifiedSwapStorage.query([queryParams], reviver);
+            }));
+            return res.flat()[0];
+        }
+        else {
+            const { unifiedSwapStorage, reviver } = this.chains[chainId];
+            return (await unifiedSwapStorage.query([queryParams], reviver))[0];
         }
     }
     /**

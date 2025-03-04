@@ -14,8 +14,6 @@ import {FromBTCLNWrapper} from "./frombtc/ln/FromBTCLNWrapper";
 import {FromBTCWrapper} from "./frombtc/onchain/FromBTCWrapper";
 import {IntermediaryDiscovery, MultichainSwapBounds, SwapBounds} from "../intermediaries/IntermediaryDiscovery";
 import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
-import {IFromBTCSwap} from "./frombtc/IFromBTCSwap";
-import {IToBTCSwap} from "./tobtc/IToBTCSwap";
 import {ISwap} from "./ISwap";
 import {IntermediaryError} from "../errors/IntermediaryError";
 import {SwapType} from "./SwapType";
@@ -30,7 +28,6 @@ import {LnForGasWrapper} from "./swapforgas/ln/LnForGasWrapper";
 import {LnForGasSwap} from "./swapforgas/ln/LnForGasSwap";
 import {EventEmitter} from "events";
 import {Buffer} from "buffer";
-import {IndexedDBStorageManager} from "../storage/IndexedDBStorageManager";
 import {MempoolBitcoinBlock} from "../btc/mempool/MempoolBitcoinBlock";
 import {Intermediary} from "../intermediaries/Intermediary";
 import {isLNURLPay, isLNURLWithdraw, LNURL, LNURLPay, LNURLWithdraw} from "../utils/LNURL";
@@ -45,8 +42,8 @@ import * as randomBytes from "randombytes";
 import {BTC_NETWORK, NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {Address} from "@scure/btc-signer";
 import {IUnifiedStorage, QueryParams} from "../storage/IUnifiedStorage";
-import {IndexedDBUnifiedStorage} from "../storage/IndexedDBUnifiedStorage";
-import {UnifiedSwapStorage} from "../swap-storage/UnifiedSwapStorage";
+import {IndexedDBUnifiedStorage} from "../browser-storage/IndexedDBUnifiedStorage";
+import {UnifiedSwapStorage} from "./UnifiedSwapStorage";
 import {UnifiedSwapEventListener} from "../events/UnifiedSwapEventListener";
 
 export type SwapperOptions = {
@@ -1105,6 +1102,32 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 queryParams.push(swapTypeQueryParams);
             }
             return await unifiedSwapStorage.query(queryParams, reviver);
+        }
+    }
+
+    /**
+     * Returns swap with a specific id (identifier)
+     */
+    getSwapById(id: string): Promise<ISwap>;
+
+    /**
+     * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
+     */
+    getSwapById<C extends ChainIds<T>>(id: string, chainId: C, signer?: string): Promise<ISwap<T[C]>>;
+
+    async getSwapById<C extends ChainIds<T>>(id: string, chainId?: C, signer?: string): Promise<ISwap> {
+        const queryParams: QueryParams[] = [];
+        if(signer!=null) queryParams.push({key: "intiator", value: signer});
+        queryParams.push({key: "id", value: id});
+        if(chainId==null) {
+            const res: ISwap[][] = await Promise.all(Object.keys(this.chains).map((chainId) => {
+                const {unifiedSwapStorage, reviver} = this.chains[chainId];
+                return unifiedSwapStorage.query([queryParams], reviver);
+            }));
+            return res.flat()[0];
+        } else {
+            const {unifiedSwapStorage, reviver} = this.chains[chainId];
+            return (await unifiedSwapStorage.query([queryParams], reviver))[0];
         }
     }
 

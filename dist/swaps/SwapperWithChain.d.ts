@@ -108,6 +108,10 @@ export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier exte
      */
     getActionableSwaps(signer?: string): Promise<ISwap<T[ChainIdentifier]>[]>;
     /**
+     * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
+     */
+    getSwapById(id: string, signer?: string): Promise<ISwap<T[ChainIdentifier]>>;
+    /**
      * Returns the token balance of the wallet
      */
     getBalance(signer: string, token: string | SCToken<ChainIdentifier>): Promise<bigint>;

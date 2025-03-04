@@ -30,7 +30,7 @@ import { OnchainForGasSwap } from "./swapforgas/onchain/OnchainForGasSwap";
 import { OnchainForGasWrapper } from "./swapforgas/onchain/OnchainForGasWrapper";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { IUnifiedStorage } from "../storage/IUnifiedStorage";
-import { UnifiedSwapStorage } from "../swap-storage/UnifiedSwapStorage";
+import { UnifiedSwapStorage } from "./UnifiedSwapStorage";
 import { UnifiedSwapEventListener } from "../events/UnifiedSwapEventListener";
 export type SwapperOptions = {
     intermediaryUrl?: string | string[];
@@ -336,6 +336,14 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * Returns swaps where an action is required (either claim or refund) for the specific chain, and optionally also for a specific signer's address
      */
     getActionableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
+    /**
+     * Returns swap with a specific id (identifier)
+     */
+    getSwapById(id: string): Promise<ISwap>;
+    /**
+     * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
+     */
+    getSwapById<C extends ChainIds<T>>(id: string, chainId: C, signer?: string): Promise<ISwap<T[C]>>;
     getBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>): Promise<bigint>;
     getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string): Promise<bigint>;
     getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<bigint>;

@@ -8,7 +8,7 @@ import { EventEmitter } from "events";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { SwapType } from "../../SwapType";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
-import { UnifiedSwapStorage } from "../../../swap-storage/UnifiedSwapStorage";
+import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
 export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
     readonly TYPE = SwapType.TRUSTED_FROM_BTC;
     readonly swapDeserializer: typeof OnchainForGasSwap;

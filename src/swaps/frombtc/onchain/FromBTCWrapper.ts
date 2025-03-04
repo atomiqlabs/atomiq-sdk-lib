@@ -25,7 +25,7 @@ import {RequestError} from "../../../errors/RequestError";
 import * as randomBytes from "randombytes";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
-import {UnifiedSwapStorage} from "../../../swap-storage/UnifiedSwapStorage";
+import {UnifiedSwapStorage} from "../../UnifiedSwapStorage";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint,

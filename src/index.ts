@@ -29,9 +29,6 @@ export * from "./prices/RedundantSwapPrice";
 export * from "./prices/SingleSwapPrice";
 export * from "./prices/SwapPriceWithChain";
 
-export * from "./storage/IndexedDBStorageManager";
-export * from "./storage/LocalStorageManager";
-
 export * from "./swaps/Tokens";
 export * from "./swaps/ISwap";
 export * from "./swaps/ISwapWrapper";
@@ -54,3 +51,6 @@ export * from "./swaps/swapforgas/ln/LnForGasSwap";
 export * from "./swaps/swapforgas/ln/LnForGasWrapper";
 
 export * from "./utils/LNURL";
+
+export * from "./storage/IUnifiedStorage";
+export * from "./browser-storage/IndexedDBUnifiedStorage";

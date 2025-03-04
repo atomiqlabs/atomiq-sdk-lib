@@ -9,7 +9,7 @@ import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapW
 import { SwapType } from "../../SwapType";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
-import { UnifiedSwapStorage } from "../../../swap-storage/UnifiedSwapStorage";
+import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
 export type ToBTCOptions = {
     confirmationTarget?: number;
     confirmations?: number;

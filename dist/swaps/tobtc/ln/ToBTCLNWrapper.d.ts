@@ -9,7 +9,7 @@ import { EventEmitter } from "events";
 import { SwapType } from "../../SwapType";
 import { LNURLPayParamsWithUrl } from "../../../utils/LNURL";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
-import { UnifiedSwapStorage } from "../../../swap-storage/UnifiedSwapStorage";
+import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
 export type ToBTCLNOptions = {
     expirySeconds?: number;
     maxFee?: bigint | Promise<bigint>;

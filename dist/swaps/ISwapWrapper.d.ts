@@ -8,7 +8,7 @@ import { SCToken } from "./Tokens";
 import { ChainIds, MultiChain } from "./Swapper";
 import { UnifiedSwapEventListener } from "../events/UnifiedSwapEventListener";
 import { SwapType } from "./SwapType";
-import { UnifiedSwapStorage } from "../swap-storage/UnifiedSwapStorage";
+import { UnifiedSwapStorage } from "./UnifiedSwapStorage";
 export type AmountData = {
     amount: bigint;
     token: string;

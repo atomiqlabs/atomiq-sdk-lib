@@ -16,7 +16,7 @@ import {LNURL, LNURLPayParamsWithUrl} from "../../../utils/LNURL";
 import {IToBTCSwapInit, ToBTCSwapState} from "../IToBTCSwap";
 import {ToBTCSwap} from "../onchain/ToBTCSwap";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
-import {UnifiedSwapStorage} from "../../../swap-storage/UnifiedSwapStorage";
+import {UnifiedSwapStorage} from "../../UnifiedSwapStorage";
 
 export type ToBTCLNOptions = {
     expirySeconds?: number,

@@ -1,5 +1,5 @@
 import { LoggerType } from "../utils/Utils";
-import { IUnifiedStorage, QueryParams, UnifiedStoredObject } from "./IUnifiedStorage";
+import { IUnifiedStorage, QueryParams, UnifiedStoredObject } from "../storage/IUnifiedStorage";
 export type QuerySetCondition = {
     key: string;
     values: Set<any>;
