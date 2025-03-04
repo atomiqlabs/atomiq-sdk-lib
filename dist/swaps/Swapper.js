@@ -679,7 +679,7 @@ class Swapper extends events_1.EventEmitter {
                 const queryParams = [];
                 for (let key in wrappers) {
                     const wrapper = wrappers[key];
-                    const swapTypeQueryParams = [{ key: "type", value: wrapper.getType() }];
+                    const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
                     if (signer != null)
                         swapTypeQueryParams.push({ key: "intiator", value: signer });
                     swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });
@@ -694,7 +694,7 @@ class Swapper extends events_1.EventEmitter {
             const queryParams = [];
             for (let key in wrappers) {
                 const wrapper = wrappers[key];
-                const swapTypeQueryParams = [{ key: "type", value: wrapper.getType() }];
+                const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
                 if (signer != null)
                     swapTypeQueryParams.push({ key: "intiator", value: signer });
                 swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });

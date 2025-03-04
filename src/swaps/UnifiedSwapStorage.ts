@@ -51,7 +51,7 @@ export class UnifiedSwapStorage<T extends ChainType> {
     }
 
     saveAll<S extends ISwap<T>>(value: S[]): Promise<void> {
-        return this.storage.save(value.map(obj => obj.serialize()));
+        return this.storage.saveAll(value.map(obj => obj.serialize()));
     }
 
     remove<S extends ISwap<T>>(value: S): Promise<void> {

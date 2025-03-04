@@ -35,7 +35,7 @@ class UnifiedSwapStorage {
         return this.storage.save(value.serialize());
     }
     saveAll(value) {
-        return this.storage.save(value.map(obj => obj.serialize()));
+        return this.storage.saveAll(value.map(obj => obj.serialize()));
     }
     remove(value) {
         return this.storage.remove(value.serialize());
