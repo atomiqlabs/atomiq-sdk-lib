@@ -337,6 +337,13 @@ export abstract class ISwap<
     }
 
     /**
+     * Returns the ID of the swap, as used in the storage and getSwapById function
+     */
+    getId(): string {
+        return this.getIdentifierHashString();
+    }
+
+    /**
      * Returns quote expiry in UNIX millis
      */
     getExpiry(): number {

@@ -225,6 +225,12 @@ class ISwap {
         return paymentHash.toString("hex");
     }
     /**
+     * Returns the ID of the swap, as used in the storage and getSwapById function
+     */
+    getId() {
+        return this.getIdentifierHashString();
+    }
+    /**
      * Returns quote expiry in UNIX millis
      */
     getExpiry() {

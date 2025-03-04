@@ -148,6 +148,10 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      */
     getIdentifierHashString(): string;
     /**
+     * Returns the ID of the swap, as used in the storage and getSwapById function
+     */
+    getId(): string;
+    /**
      * Returns quote expiry in UNIX millis
      */
     getExpiry(): number;
