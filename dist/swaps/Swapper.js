@@ -251,7 +251,7 @@ class Swapper extends events_1.EventEmitter {
             }
         }
         this.logger.info("init(): Initializing intermediary discovery");
-        if (this.options.dontFetchLPs)
+        if (!this.options.dontFetchLPs)
             await this.intermediaryDiscovery.init();
         if (this.options.defaultTrustedIntermediaryUrl != null) {
             this.defaultTrustedIntermediary = await this.intermediaryDiscovery.getIntermediary(this.options.defaultTrustedIntermediaryUrl);

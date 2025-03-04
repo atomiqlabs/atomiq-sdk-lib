@@ -479,7 +479,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         }
 
         this.logger.info("init(): Initializing intermediary discovery");
-        if(this.options.dontFetchLPs) await this.intermediaryDiscovery.init();
+        if(!this.options.dontFetchLPs) await this.intermediaryDiscovery.init();
 
         if(this.options.defaultTrustedIntermediaryUrl!=null) {
             this.defaultTrustedIntermediary = await this.intermediaryDiscovery.getIntermediary(this.options.defaultTrustedIntermediaryUrl);
