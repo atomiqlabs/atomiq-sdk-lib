@@ -44,6 +44,7 @@ const indexes = {
     "escrowHash": { key: "escrowHash", unique: true},
     "type": {key: "type", unique: false},
     "initiator": {key: "initiator", unique: false},
+    "initiator, id": {key: ["initiator", "id"], unique: false},
     "type, state": {key: ["type", "state"], unique: false},
     "type, paymentHash": {key: ["type", "paymentHash"], unique: false},
     "type, initiator, state": {key: ["type", "initiator", "state"], unique: false}
