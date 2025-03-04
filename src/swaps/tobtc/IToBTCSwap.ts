@@ -305,10 +305,8 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         );
 
         this.commitTxId = result[0];
-        if(this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
+        if(this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state===ToBTCSwapState.QUOTE_EXPIRED) {
             await this._saveAndEmit(ToBTCSwapState.COMMITED);
-        } else {
-            await this._save();
         }
         return result[0];
     }
@@ -324,8 +322,10 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     async txsCommit(skipChecks?: boolean): Promise<T["TX"][]> {
         if(!this.canCommit()) throw new Error("Must be in CREATED state!");
 
-        this.initiated = true;
-        await this._saveAndEmit();
+        if(!this.initiated) {
+            this.initiated = true;
+            await this._saveAndEmit();
+        }
 
         return await this.wrapper.contract.txsInit(
             this.data, this.signatureData, skipChecks, this.feeRate
@@ -359,7 +359,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
             return;
         }
 
-        if(this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state===ToBTCSwapState.CREATED) {
+        if(this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_EXPIRED) {
             await this._saveAndEmit(ToBTCSwapState.COMMITED);
         }
     }
@@ -401,7 +401,6 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
 
         switch(result.code) {
             case RefundAuthorizationResponseCodes.PAID:
-                await this._saveAndEmit();
                 return true;
             case RefundAuthorizationResponseCodes.REFUND_DATA:
                 await tryWithRetries(
@@ -434,7 +433,9 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
             if(resp.code===RefundAuthorizationResponseCodes.PAID) {
                 const validResponse = await this._setPaymentResult(resp.data, true);
                 if(validResponse) {
-                    this.state = ToBTCSwapState.SOFT_CLAIMED;
+                    if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.REFUNDABLE) {
+                        await this._saveAndEmit(ToBTCSwapState.SOFT_CLAIMED);
+                    }
                 } else {
                     resp = {code: RefundAuthorizationResponseCodes.PENDING, msg: ""};
                 }
@@ -497,8 +498,9 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         const result = await this.wrapper.contract.sendAndConfirm(signer, await this.txsRefund(), true, abortSignal)
 
         this.refundTxId = result[0];
-        await this._saveAndEmit(ToBTCSwapState.REFUNDED);
-
+        if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.REFUNDABLE || this.state===ToBTCSwapState.SOFT_CLAIMED) {
+            await this._saveAndEmit(ToBTCSwapState.REFUNDED);
+        }
         return result[0];
     }
 

@@ -153,7 +153,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
     commitAndClaim(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string[]>;
-    /**
+    /**==
      * Returns transactions for both commit & claim operation together, such that they can be signed all at once by
      *  the wallet. CAUTION: transactions must be sent sequentially, such that the claim (2nd) transaction is only
      *  sent after the commit (1st) transaction confirms. Failure to do so can reveal the HTLC pre-image too soon,

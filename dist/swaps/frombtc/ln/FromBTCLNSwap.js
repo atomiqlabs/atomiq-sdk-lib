@@ -219,14 +219,20 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         const abortController = new AbortController();
         if (abortSignal != null)
             abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
+        let save = false;
         if (this.lnurl != null && !this.prPosted) {
             LNURL_1.LNURL.postInvoiceToLNURLWithdraw({ k1: this.lnurlK1, callback: this.lnurlCallback }, this.pr).catch(e => {
                 this.lnurlFailSignal.abort(e);
             });
             this.prPosted = true;
+            save ||= true;
         }
-        this.initiated = true;
-        await this._saveAndEmit();
+        if (!this.initiated) {
+            this.initiated = true;
+            save ||= true;
+        }
+        if (save)
+            await this._saveAndEmit();
         let lnurlFailListener = () => abortController.abort(this.lnurlFailSignal.signal.reason);
         this.lnurlFailSignal.signal.addEventListener("abort", lnurlFailListener);
         this.lnurlFailSignal.signal.throwIfAborted();
@@ -411,7 +417,9 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     async claim(signer, abortSignal) {
         const result = await this.wrapper.contract.sendAndConfirm(signer, await this.txsClaim(), true, abortSignal);
         this.claimTxId = result[0];
-        await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
+        if (FromBTCLNSwapState.CLAIM_COMMITED || FromBTCLNSwapState.EXPIRED || FromBTCLNSwapState.FAILED) {
+            await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
+        }
         return result[0];
     }
     /**
@@ -479,9 +487,11 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         const result = await this.wrapper.contract.sendAndConfirm(signer, await this.txsCommitAndClaim(skipChecks), true, abortSignal);
         this.commitTxId = result[0] || this.commitTxId;
         this.claimTxId = result[result.length - 1] || this.claimTxId;
-        await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
+        if (this.state !== FromBTCLNSwapState.CLAIM_CLAIMED) {
+            await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
+        }
     }
-    /**
+    /**==
      * Returns transactions for both commit & claim operation together, such that they can be signed all at once by
      *  the wallet. CAUTION: transactions must be sent sequentially, such that the claim (2nd) transaction is only
      *  sent after the commit (1st) transaction confirms. Failure to do so can reveal the HTLC pre-image too soon,
@@ -610,7 +620,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             }
         }
         if (save && changed)
-            this._saveAndEmit();
+            await this._saveAndEmit();
         return changed;
     }
     async _tick(save) {

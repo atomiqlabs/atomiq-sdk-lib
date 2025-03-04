@@ -203,8 +203,10 @@ export abstract class IFromBTCSwap<
     async txsCommit(skipChecks?: boolean): Promise<T["TX"][]> {
         if(!this.canCommit()) throw new Error("Must be in CREATED state!");
 
-        this.initiated = true;
-        await this._saveAndEmit();
+        if(!this.initiated) {
+            this.initiated = true;
+            await this._saveAndEmit();
+        }
 
         return await this.wrapper.contract.txsInit(
             this.data, this.signatureData, skipChecks, this.feeRate

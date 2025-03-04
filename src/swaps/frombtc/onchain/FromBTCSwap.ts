@@ -341,7 +341,12 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         }
 
         this.claimTxId = txIds[0];
-        await this._saveAndEmit(FromBTCSwapState.CLAIM_CLAIMED);
+        if(
+            this.state===FromBTCSwapState.CLAIM_COMMITED || this.state===FromBTCSwapState.BTC_TX_CONFIRMED ||
+            this.state===FromBTCSwapState.EXPIRED || this.state===FromBTCSwapState.FAILED
+        ) {
+            await this._saveAndEmit(FromBTCSwapState.CLAIM_CLAIMED);
+        }
         return txIds[0];
     }
 

@@ -219,11 +219,8 @@ class IToBTCSwap extends ISwap_1.ISwap {
         this.checkSigner(signer);
         const result = await this.wrapper.contract.sendAndConfirm(signer, await this.txsCommit(skipChecks), true, abortSignal);
         this.commitTxId = result[0];
-        if (this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
+        if (this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state === ToBTCSwapState.QUOTE_EXPIRED) {
             await this._saveAndEmit(ToBTCSwapState.COMMITED);
-        }
-        else {
-            await this._save();
         }
         return result[0];
     }
@@ -238,8 +235,10 @@ class IToBTCSwap extends ISwap_1.ISwap {
     async txsCommit(skipChecks) {
         if (!this.canCommit())
             throw new Error("Must be in CREATED state!");
-        this.initiated = true;
-        await this._saveAndEmit();
+        if (!this.initiated) {
+            this.initiated = true;
+            await this._saveAndEmit();
+        }
         return await this.wrapper.contract.txsInit(this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
     }
     /**
@@ -270,7 +269,7 @@ class IToBTCSwap extends ISwap_1.ISwap {
             }
             return;
         }
-        if (this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state === ToBTCSwapState.CREATED) {
+        if (this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_EXPIRED) {
             await this._saveAndEmit(ToBTCSwapState.COMMITED);
         }
     }
@@ -309,7 +308,6 @@ class IToBTCSwap extends ISwap_1.ISwap {
         this.logger.debug("waitTillRefunded(): Resolved from intermediary response");
         switch (result.code) {
             case IntermediaryAPI_1.RefundAuthorizationResponseCodes.PAID:
-                await this._saveAndEmit();
                 return true;
             case IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA:
                 await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidRefundAuthorization(this.data, result.data), null, base_1.SignatureVerificationError, abortSignal);
@@ -332,7 +330,9 @@ class IToBTCSwap extends ISwap_1.ISwap {
             if (resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.PAID) {
                 const validResponse = await this._setPaymentResult(resp.data, true);
                 if (validResponse) {
-                    this.state = ToBTCSwapState.SOFT_CLAIMED;
+                    if (this.state === ToBTCSwapState.COMMITED || this.state === ToBTCSwapState.REFUNDABLE) {
+                        await this._saveAndEmit(ToBTCSwapState.SOFT_CLAIMED);
+                    }
                 }
                 else {
                     resp = { code: IntermediaryAPI_1.RefundAuthorizationResponseCodes.PENDING, msg: "" };
@@ -392,7 +392,9 @@ class IToBTCSwap extends ISwap_1.ISwap {
         this.checkSigner(signer);
         const result = await this.wrapper.contract.sendAndConfirm(signer, await this.txsRefund(), true, abortSignal);
         this.refundTxId = result[0];
-        await this._saveAndEmit(ToBTCSwapState.REFUNDED);
+        if (this.state === ToBTCSwapState.COMMITED || this.state === ToBTCSwapState.REFUNDABLE || this.state === ToBTCSwapState.SOFT_CLAIMED) {
+            await this._saveAndEmit(ToBTCSwapState.REFUNDED);
+        }
         return result[0];
     }
     /**

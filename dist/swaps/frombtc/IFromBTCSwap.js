@@ -110,8 +110,10 @@ class IFromBTCSwap extends ISwap_1.ISwap {
     async txsCommit(skipChecks) {
         if (!this.canCommit())
             throw new Error("Must be in CREATED state!");
-        this.initiated = true;
-        await this._saveAndEmit();
+        if (!this.initiated) {
+            this.initiated = true;
+            await this._saveAndEmit();
+        }
         return await this.wrapper.contract.txsInit(this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
     }
 }
