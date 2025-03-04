@@ -47,19 +47,23 @@ export class UnifiedSwapStorage<T extends ChainType> {
     }
 
     save<S extends ISwap<T>>(value: S): Promise<void> {
+        this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef<ISwap<T>>(value));
         return this.storage.save(value.serialize());
     }
 
-    saveAll<S extends ISwap<T>>(value: S[]): Promise<void> {
-        return this.storage.saveAll(value.map(obj => obj.serialize()));
+    saveAll<S extends ISwap<T>>(values: S[]): Promise<void> {
+        values.forEach(value => this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef<ISwap<T>>(value)));
+        return this.storage.saveAll(values.map(obj => obj.serialize()));
     }
 
     remove<S extends ISwap<T>>(value: S): Promise<void> {
+        this.weakRefCache.delete(value.getIdentifierHashString());
         return this.storage.remove(value.serialize());
     }
 
-    removeAll<S extends ISwap<T>>(value: S[]): Promise<void> {
-        return this.storage.removeAll(value.map(obj => obj.serialize()));
+    removeAll<S extends ISwap<T>>(values: S[]): Promise<void> {
+        values.forEach(value => this.weakRefCache.delete(value.getIdentifierHashString()));
+        return this.storage.removeAll(values.map(obj => obj.serialize()));
     }
 
 }

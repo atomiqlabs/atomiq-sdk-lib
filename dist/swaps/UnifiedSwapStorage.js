@@ -33,16 +33,20 @@ class UnifiedSwapStorage {
         });
     }
     save(value) {
+        this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef(value));
         return this.storage.save(value.serialize());
     }
-    saveAll(value) {
-        return this.storage.saveAll(value.map(obj => obj.serialize()));
+    saveAll(values) {
+        values.forEach(value => this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef(value)));
+        return this.storage.saveAll(values.map(obj => obj.serialize()));
     }
     remove(value) {
+        this.weakRefCache.delete(value.getIdentifierHashString());
         return this.storage.remove(value.serialize());
     }
-    removeAll(value) {
-        return this.storage.removeAll(value.map(obj => obj.serialize()));
+    removeAll(values) {
+        values.forEach(value => this.weakRefCache.delete(value.getIdentifierHashString()));
+        return this.storage.removeAll(values.map(obj => obj.serialize()));
     }
 }
 exports.UnifiedSwapStorage = UnifiedSwapStorage;

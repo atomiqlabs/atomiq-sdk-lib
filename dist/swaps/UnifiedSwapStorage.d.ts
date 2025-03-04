@@ -20,7 +20,7 @@ export declare class UnifiedSwapStorage<T extends ChainType> {
      */
     query<S extends ISwap<T>>(params: Array<Array<QueryParams>>, reviver: (obj: any) => S): Promise<Array<S>>;
     save<S extends ISwap<T>>(value: S): Promise<void>;
-    saveAll<S extends ISwap<T>>(value: S[]): Promise<void>;
+    saveAll<S extends ISwap<T>>(values: S[]): Promise<void>;
     remove<S extends ISwap<T>>(value: S): Promise<void>;
-    removeAll<S extends ISwap<T>>(value: S[]): Promise<void>;
+    removeAll<S extends ISwap<T>>(values: S[]): Promise<void>;
 }
