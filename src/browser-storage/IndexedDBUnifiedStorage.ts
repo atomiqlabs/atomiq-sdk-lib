@@ -142,7 +142,14 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
         const queryKeys = params.map(param => param.key);
         const requiredIndex = queryKeys.join(", ");
 
-        if(indexes[requiredIndex]!=null) {
+        if(requiredIndex==="id") {
+            //ID is the index
+            const values: any[] = Array.isArray(params[0].value) ? params[0].value : [params[0].value];
+            const res = await this.executeTransactionArr((objectStore) => {
+                return values.map(val => objectStore.getAll(val));
+            }, true);
+            return res.flat();
+        } else if(indexes[requiredIndex]!=null) {
             //Index exists
             const values: Array<any[]> = params.map(param => Array.isArray(param.value) ? param.value : [param.value]);
             const compositeIndexQueries = toCompositeIndex(values);
@@ -168,6 +175,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
     }
 
     async removeAll(arr: UnifiedStoredObject[]): Promise<void> {
+        if(arr.length===0) return;
         await this.executeTransactionArr<IDBValidKey>(store => arr.map(object => {
             return store.delete(object.id);
         }), false);
@@ -178,6 +186,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
     }
 
     async saveAll(arr: UnifiedStoredObject[]): Promise<void> {
+        if(arr.length===0) return;
         await this.executeTransactionArr<IDBValidKey>(store => arr.map(object => {
             return store.put(object);
         }), false);
