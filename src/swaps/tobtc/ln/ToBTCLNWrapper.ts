@@ -57,7 +57,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
     private async checkPaymentHashWasPaid(paymentHash: string) {
         const swaps = await this.unifiedStorage.query(
             [[{key: "type", value: this.TYPE}, {key: "paymentHash", value: paymentHash}]],
-            this.swapDeserializer.bind(null, this)
+            (obj: any) => new this.swapDeserializer(this, obj)
         );
 
         for(let value of swaps) {

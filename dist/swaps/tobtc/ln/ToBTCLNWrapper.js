@@ -25,7 +25,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         this.swapDeserializer = ToBTCLNSwap_1.ToBTCLNSwap;
     }
     async checkPaymentHashWasPaid(paymentHash) {
-        const swaps = await this.unifiedStorage.query([[{ key: "type", value: this.TYPE }, { key: "paymentHash", value: paymentHash }]], this.swapDeserializer.bind(null, this));
+        const swaps = await this.unifiedStorage.query([[{ key: "type", value: this.TYPE }, { key: "paymentHash", value: paymentHash }]], (obj) => new this.swapDeserializer(this, obj));
         for (let value of swaps) {
             if (value.state === IToBTCSwap_1.ToBTCSwapState.CLAIMED || value.state === IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED)
                 throw new UserError_1.UserError("Lightning invoice was already paid!");
