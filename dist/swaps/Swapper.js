@@ -703,6 +703,36 @@ class Swapper extends events_1.EventEmitter {
             return (await unifiedSwapStorage.query(queryParams, reviver)).filter(swap => swap.isActionable());
         }
     }
+    async getRefundableSwaps(chainId, signer) {
+        if (chainId == null) {
+            const res = await Promise.all(Object.keys(this.chains).map((chainId) => {
+                const { unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
+                const queryParams = [];
+                for (let wrapper of [wrappers[SwapType_1.SwapType.TO_BTCLN], wrappers[SwapType_1.SwapType.TO_BTC]]) {
+                    const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
+                    if (signer != null)
+                        swapTypeQueryParams.push({ key: "intiator", value: signer });
+                    swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });
+                    queryParams.push(swapTypeQueryParams);
+                }
+                return unifiedSwapStorage.query(queryParams, reviver);
+            }));
+            return res.flat().filter(swap => swap.isRefundable());
+        }
+        else {
+            const { unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
+            const queryParams = [];
+            for (let wrapper of [wrappers[SwapType_1.SwapType.TO_BTCLN], wrappers[SwapType_1.SwapType.TO_BTC]]) {
+                const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
+                if (signer != null)
+                    swapTypeQueryParams.push({ key: "intiator", value: signer });
+                swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });
+                queryParams.push(swapTypeQueryParams);
+            }
+            const result = await unifiedSwapStorage.query(queryParams, reviver);
+            return result.filter(swap => swap.isRefundable());
+        }
+    }
     async getSwapById(id, chainId, signer) {
         const queryParams = [];
         if (signer != null)

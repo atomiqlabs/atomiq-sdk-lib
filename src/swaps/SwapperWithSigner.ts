@@ -249,6 +249,13 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
     }
 
     /**
+     * Returns swaps that are refundable for the specific chain, optionally also for a specific signer's address
+     */
+    getRefundableSwaps(): Promise<IToBTCSwap<T[ChainIdentifier]>[]> {
+        return this.swapper.getRefundableSwaps(this.signer.getAddress());
+    }
+
+    /**
      * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
     getSwapById(id: string): Promise<ISwap<T[ChainIdentifier]>> {

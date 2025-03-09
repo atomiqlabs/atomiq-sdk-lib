@@ -45,6 +45,7 @@ import {IUnifiedStorage, QueryParams} from "../storage/IUnifiedStorage";
 import {IndexedDBUnifiedStorage} from "../browser-storage/IndexedDBUnifiedStorage";
 import {UnifiedSwapStorage} from "./UnifiedSwapStorage";
 import {UnifiedSwapEventListener} from "../events/UnifiedSwapEventListener";
+import {IToBTCSwap} from "./tobtc/IToBTCSwap";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -1102,6 +1103,44 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 queryParams.push(swapTypeQueryParams);
             }
             return (await unifiedSwapStorage.query(queryParams, reviver)).filter(swap => swap.isActionable());
+        }
+    }
+
+    /**
+     * Returns all swaps that are refundable
+     */
+    getRefundableSwaps(): Promise<IToBTCSwap[]>;
+
+    /**
+     * Returns swaps which are refundable for the specific chain, and optionally also for a specific signer's address
+     */
+    getRefundableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IToBTCSwap<T[C]>[]>;
+
+    async getRefundableSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<IToBTCSwap[]> {
+        if(chainId==null) {
+            const res: IToBTCSwap[][] = await Promise.all(Object.keys(this.chains).map((chainId) => {
+                const {unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
+                const queryParams: Array<QueryParams[]> = [];
+                for(let wrapper of [wrappers[SwapType.TO_BTCLN], wrappers[SwapType.TO_BTC]]) {
+                    const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
+                    if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+                    swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
+                    queryParams.push(swapTypeQueryParams);
+                }
+                return unifiedSwapStorage.query<IToBTCSwap<T[C]>>(queryParams, reviver as (val: any) => IToBTCSwap<T[C]>);
+            }));
+            return res.flat().filter(swap => swap.isRefundable());
+        } else {
+            const {unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
+            const queryParams: Array<QueryParams[]> = [];
+            for(let wrapper of [wrappers[SwapType.TO_BTCLN], wrappers[SwapType.TO_BTC]]) {
+                const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
+                if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+                swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
+                queryParams.push(swapTypeQueryParams);
+            }
+            const result = await unifiedSwapStorage.query<IToBTCSwap<T[C]>>(queryParams, reviver as (val: any) => IToBTCSwap<T[C]>);
+            return result.filter(swap => swap.isRefundable());
         }
     }
 

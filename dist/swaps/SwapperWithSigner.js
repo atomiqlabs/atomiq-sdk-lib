@@ -159,6 +159,12 @@ class SwapperWithSigner {
         return this.swapper.getActionableSwaps(this.signer.getAddress());
     }
     /**
+     * Returns swaps that are refundable for the specific chain, optionally also for a specific signer's address
+     */
+    getRefundableSwaps() {
+        return this.swapper.getRefundableSwaps(this.signer.getAddress());
+    }
+    /**
      * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
     getSwapById(id) {

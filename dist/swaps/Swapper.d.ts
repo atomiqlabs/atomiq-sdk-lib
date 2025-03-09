@@ -32,6 +32,7 @@ import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { IUnifiedStorage } from "../storage/IUnifiedStorage";
 import { UnifiedSwapStorage } from "./UnifiedSwapStorage";
 import { UnifiedSwapEventListener } from "../events/UnifiedSwapEventListener";
+import { IToBTCSwap } from "./tobtc/IToBTCSwap";
 export type SwapperOptions = {
     intermediaryUrl?: string | string[];
     registryUrl?: string;
@@ -336,6 +337,14 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * Returns swaps where an action is required (either claim or refund) for the specific chain, and optionally also for a specific signer's address
      */
     getActionableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
+    /**
+     * Returns all swaps that are refundable
+     */
+    getRefundableSwaps(): Promise<IToBTCSwap[]>;
+    /**
+     * Returns swaps which are refundable for the specific chain, and optionally also for a specific signer's address
+     */
+    getRefundableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IToBTCSwap<T[C]>[]>;
     /**
      * Returns swap with a specific id (identifier)
      */
