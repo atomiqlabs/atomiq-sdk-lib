@@ -160,7 +160,7 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      * @throws {SignatureVerificationError} If intermediary returned invalid cooperative refund signature
      * @throws {Error} When state is not refundable
      */
-    txsRefund(): Promise<T["TX"][]>;
+    txsRefund(signer?: string): Promise<T["TX"][]>;
     /**
      * Waits till a swap is refunded, should be called after sending the refund transactions manually
      *

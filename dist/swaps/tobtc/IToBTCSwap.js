@@ -389,8 +389,7 @@ class IToBTCSwap extends ISwap_1.ISwap {
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
     async refund(signer, abortSignal) {
-        this.checkSigner(signer);
-        const result = await this.wrapper.contract.sendAndConfirm(signer, await this.txsRefund(), true, abortSignal);
+        const result = await this.wrapper.contract.sendAndConfirm(signer, await this.txsRefund(signer.getAddress()), true, abortSignal);
         this.refundTxId = result[0];
         if (this.state === ToBTCSwapState.COMMITED || this.state === ToBTCSwapState.REFUNDABLE || this.state === ToBTCSwapState.SOFT_CLAIMED) {
             await this._saveAndEmit(ToBTCSwapState.REFUNDED);
@@ -404,16 +403,17 @@ class IToBTCSwap extends ISwap_1.ISwap {
      * @throws {SignatureVerificationError} If intermediary returned invalid cooperative refund signature
      * @throws {Error} When state is not refundable
      */
-    async txsRefund() {
+    async txsRefund(signer) {
         if (!this.isRefundable())
             throw new Error("Must be in REFUNDABLE state or expired!");
+        signer ??= this.getInitiator();
         if (await this.wrapper.contract.isExpired(this.getInitiator(), this.data)) {
-            return await this.wrapper.contract.txsRefund(this.data, true, true);
+            return await this.wrapper.contract.txsRefund(signer, this.data, true, true);
         }
         else {
             const res = await IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             if (res.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA) {
-                return await this.wrapper.contract.txsRefundWithAuthorization(this.data, res.data, true, true);
+                return await this.wrapper.contract.txsRefundWithAuthorization(signer, this.data, res.data, true, true);
             }
             throw new IntermediaryError_1.IntermediaryError("Invalid intermediary cooperative message returned");
         }
