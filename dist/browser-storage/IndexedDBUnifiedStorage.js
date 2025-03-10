@@ -106,7 +106,11 @@ class IndexedDBUnifiedStorage {
             });
             await this.saveAll(swaps.map(swap => swap.serialize()));
             //Remove the old database
-            window.indexedDB.deleteDatabase(storageKey);
+            await new Promise((resolve, reject) => {
+                const res = window.indexedDB.deleteDatabase(storageKey);
+                res.onsuccess = () => resolve();
+                res.onerror = (e) => reject(e);
+            });
             this.logger.info("tryMigrate(" + storageKey + "): Database successfully migrated from oldIndexedDB to unifiedIndexedDB!");
             return true;
         }
