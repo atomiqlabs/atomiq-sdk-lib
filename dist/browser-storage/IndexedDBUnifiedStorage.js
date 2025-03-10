@@ -77,10 +77,10 @@ class IndexedDBUnifiedStorage {
     async tryMigrateOldIndexedDB(storageKey, swapType, reviver) {
         const databases = await window.indexedDB.databases();
         if (databases.find(val => val.name === storageKey) == null) {
-            this.logger.info("tryMigrate(" + storageKey + "): Old database not found!");
+            this.logger.info("tryMigrateOldIndexedDB(" + storageKey + "): Old database not found!");
             return false;
         }
-        this.logger.debug("tryMigrate(" + storageKey + "): Old database found!");
+        this.logger.debug("tryMigrateOldIndexedDB(" + storageKey + "): Old database found!");
         let db;
         try {
             db = await new Promise((resolve, reject) => {
@@ -90,10 +90,10 @@ class IndexedDBUnifiedStorage {
             });
         }
         catch (e) {
-            this.logger.error("tryMigrate(" + storageKey + "): Error opening old IndexedDB!", e);
+            this.logger.error("tryMigrateOldIndexedDB(" + storageKey + "): Error opening old IndexedDB!", e);
             return false;
         }
-        this.logger.debug("tryMigrate(" + storageKey + "): Connection opened!");
+        this.logger.debug("tryMigrateOldIndexedDB(" + storageKey + "): Connection opened!");
         try {
             const data = await new Promise((resolve, reject) => {
                 const tx = db.transaction("swaps", "readonly", { durability: "strict" });
@@ -102,27 +102,27 @@ class IndexedDBUnifiedStorage {
                 req.onsuccess = (event) => resolve(event.target.result);
                 req.onerror = (event) => reject(event);
             });
-            this.logger.debug("tryMigrate(" + storageKey + "): Data retrieved!");
+            this.logger.debug("tryMigrateOldIndexedDB(" + storageKey + "): Data retrieved!");
             let swaps = data.map(({ id, data }) => {
                 data.type = swapType;
                 return reviver(data);
             });
-            this.logger.debug("tryMigrate(" + storageKey + "): Data revived!");
+            this.logger.debug("tryMigrateOldIndexedDB(" + storageKey + "): Data revived!");
             await this.saveAll(swaps.map(swap => swap.serialize()));
-            this.logger.debug("tryMigrate(" + storageKey + "): Data saved!");
+            this.logger.debug("tryMigrateOldIndexedDB(" + storageKey + "): Data saved!");
             //Remove the old database
             db.close();
-            this.logger.debug("tryMigrate(" + storageKey + "): DB connection closed!");
+            this.logger.debug("tryMigrateOldIndexedDB(" + storageKey + "): DB connection closed!");
             await new Promise((resolve, reject) => {
                 const res = window.indexedDB.deleteDatabase(storageKey);
                 res.onsuccess = () => resolve();
                 res.onerror = (e) => reject(e);
             });
-            this.logger.info("tryMigrate(" + storageKey + "): Database successfully migrated from oldIndexedDB to unifiedIndexedDB!");
+            this.logger.info("tryMigrateOldIndexedDB(" + storageKey + "): Database successfully migrated from oldIndexedDB to unifiedIndexedDB!");
             return true;
         }
         catch (e) {
-            this.logger.error("tryMigrate(" + storageKey + "): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
+            this.logger.error("tryMigrateOldIndexedDB(" + storageKey + "): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
             return false;
         }
     }
@@ -131,8 +131,10 @@ class IndexedDBUnifiedStorage {
         let someMigrated = false;
         for (let storageKey of storageKeys) {
             this.logger.info("tryMigrate(): Trying to migrate...", storageKey);
-            someMigrated ||= await this.tryMigrateLocalStorage(storageKey[0], storageKey[1], reviver);
-            someMigrated ||= await this.tryMigrateOldIndexedDB(storageKey[0], storageKey[1], reviver);
+            if (await this.tryMigrateLocalStorage(storageKey[0], storageKey[1], reviver))
+                someMigrated = true;
+            if (await this.tryMigrateOldIndexedDB(storageKey[0], storageKey[1], reviver))
+                someMigrated = true;
         }
         return someMigrated;
     }
