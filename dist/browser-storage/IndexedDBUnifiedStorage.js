@@ -80,6 +80,7 @@ class IndexedDBUnifiedStorage {
             this.logger.info("tryMigrate(" + storageKey + "): Old database not found!");
             return false;
         }
+        this.logger.debug("tryMigrate(" + storageKey + "): Old database found!");
         let db;
         try {
             db = await new Promise((resolve, reject) => {
@@ -92,6 +93,7 @@ class IndexedDBUnifiedStorage {
             this.logger.error("tryMigrate(" + storageKey + "): Error opening old IndexedDB!", e);
             return false;
         }
+        this.logger.debug("tryMigrate(" + storageKey + "): Connection opened!");
         try {
             const data = await new Promise((resolve, reject) => {
                 const tx = db.transaction("swaps", "readonly", { durability: "strict" });
@@ -100,13 +102,17 @@ class IndexedDBUnifiedStorage {
                 req.onsuccess = (event) => resolve(event.target.result);
                 req.onerror = (event) => reject(event);
             });
+            this.logger.debug("tryMigrate(" + storageKey + "): Data retrieved!");
             let swaps = data.map(({ id, data }) => {
                 data.type = swapType;
                 return reviver(data);
             });
+            this.logger.debug("tryMigrate(" + storageKey + "): Data revived!");
             await this.saveAll(swaps.map(swap => swap.serialize()));
+            this.logger.debug("tryMigrate(" + storageKey + "): Data saved!");
             //Remove the old database
             db.close();
+            this.logger.debug("tryMigrate(" + storageKey + "): DB connection closed!");
             await new Promise((resolve, reject) => {
                 const res = window.indexedDB.deleteDatabase(storageKey);
                 res.onsuccess = () => resolve();
