@@ -127,6 +127,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
             await this.saveAll(swaps.map(swap => swap.serialize()));
 
             //Remove the old database
+            db.close();
             await new Promise<void>((resolve, reject) => {
                 const res = window.indexedDB.deleteDatabase(storageKey);
                 res.onsuccess = () => resolve();

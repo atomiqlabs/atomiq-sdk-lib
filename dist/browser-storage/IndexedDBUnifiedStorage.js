@@ -106,6 +106,7 @@ class IndexedDBUnifiedStorage {
             });
             await this.saveAll(swaps.map(swap => swap.serialize()));
             //Remove the old database
+            db.close();
             await new Promise((resolve, reject) => {
                 const res = window.indexedDB.deleteDatabase(storageKey);
                 res.onsuccess = () => resolve();
