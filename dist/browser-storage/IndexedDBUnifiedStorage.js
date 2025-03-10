@@ -75,6 +75,11 @@ class IndexedDBUnifiedStorage {
     }
     //Reviver also needs to update the swap to the latest version
     async tryMigrateOldIndexedDB(storageKey, swapType, reviver) {
+        const databases = await window.indexedDB.databases();
+        if (databases.find(val => val.name === storageKey) == null) {
+            this.logger.info("tryMigrate(" + storageKey + "): Old database not found!");
+            return false;
+        }
         let db;
         try {
             db = await new Promise((resolve, reject) => {
@@ -83,9 +88,8 @@ class IndexedDBUnifiedStorage {
                 request.onsuccess = (e) => resolve(e.target.result);
             });
         }
-        catch (e) { }
-        if (db == null) {
-            this.logger.info("tryMigrate(" + storageKey + "): Old database not found!");
+        catch (e) {
+            this.logger.error("tryMigrate(" + storageKey + "): Error opening old IndexedDB!", e);
             return false;
         }
         try {
@@ -115,6 +119,7 @@ class IndexedDBUnifiedStorage {
     async tryMigrate(storageKeys, reviver) {
         let someMigrated = false;
         for (let storageKey of storageKeys) {
+            this.logger.info("tryMigrate(): Trying to migrate...", storageKey);
             someMigrated ||= await this.tryMigrateLocalStorage(storageKey[0], storageKey[1], reviver);
             someMigrated ||= await this.tryMigrateOldIndexedDB(storageKey[0], storageKey[1], reviver);
         }
