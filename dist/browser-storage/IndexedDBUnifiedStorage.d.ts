@@ -1,5 +1,7 @@
 import { LoggerType } from "../utils/Utils";
 import { IUnifiedStorage, QueryParams, UnifiedStoredObject } from "../storage/IUnifiedStorage";
+import { ISwap } from "../swaps/ISwap";
+import { SwapType } from "../swaps/SwapType";
 export type QuerySetCondition = {
     key: string;
     values: Set<any>;
@@ -9,6 +11,9 @@ export declare class IndexedDBUnifiedStorage implements IUnifiedStorage {
     storageKey: string;
     db: IDBDatabase;
     constructor(storageKey: string);
+    private tryMigrateLocalStorage;
+    private tryMigrateOldIndexedDB;
+    tryMigrate(storageKeys: [string, SwapType][], reviver: (obj: any) => ISwap): Promise<boolean>;
     private executeTransaction;
     private executeTransactionArr;
     private executeTransactionWithCursor;

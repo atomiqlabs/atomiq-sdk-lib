@@ -31,6 +31,7 @@ class Swapper extends events_1.EventEmitter {
         const storagePrefix = options?.storagePrefix ?? "atomiq-";
         options.bitcoinNetwork = options.bitcoinNetwork == null ? base_1.BitcoinNetwork.TESTNET : options.bitcoinNetwork;
         options.swapStorage ??= (name) => new IndexedDBUnifiedStorage_1.IndexedDBUnifiedStorage(name);
+        this._bitcoinNetwork = options.bitcoinNetwork;
         this.bitcoinNetwork = options.bitcoinNetwork === base_1.BitcoinNetwork.MAINNET ? utils_1.NETWORK :
             options.bitcoinNetwork === base_1.BitcoinNetwork.TESTNET ? utils_1.TEST_NETWORK : null;
         this.prices = pricing;
@@ -88,6 +89,12 @@ class Swapper extends events_1.EventEmitter {
                 postRequestTimeout: options.postRequestTimeout
             });
             Object.keys(wrappers).forEach(key => wrappers[key].events.on("swapState", this.swapStateListener));
+            const reviver = (val) => {
+                const wrapper = wrappers[val.type];
+                if (wrapper == null)
+                    return null;
+                return new wrapper.swapDeserializer(wrapper, val);
+            };
             return {
                 chainEvents,
                 swapContract,
@@ -96,12 +103,7 @@ class Swapper extends events_1.EventEmitter {
                 wrappers,
                 unifiedChainEvents,
                 unifiedSwapStorage,
-                reviver: (val) => {
-                    const wrapper = wrappers[val.type];
-                    if (wrapper == null)
-                        return null;
-                    return new wrapper.swapDeserializer(wrapper, val);
-                }
+                reviver
             };
         });
         const contracts = (0, Utils_1.objectMap)(chainsData, (data) => data.swapContract);
@@ -238,10 +240,32 @@ class Swapper extends events_1.EventEmitter {
     async init() {
         this.logger.info("init(): Intializing swapper: ", this);
         for (let chainIdentifier in this.chains) {
-            const { swapContract, unifiedChainEvents, unifiedSwapStorage, wrappers } = this.chains[chainIdentifier];
+            const { swapContract, unifiedChainEvents, unifiedSwapStorage, wrappers, reviver } = this.chains[chainIdentifier];
             await swapContract.start();
             this.logger.info("init(): Intialized swap contract: " + chainIdentifier);
             await unifiedSwapStorage.init();
+            if (unifiedSwapStorage.storage instanceof IndexedDBUnifiedStorage_1.IndexedDBUnifiedStorage) {
+                //Try to migrate the data here
+                const storagePrefix = chainIdentifier === "SOLANA" ?
+                    "SOLv4-" + this._bitcoinNetwork + "-Swaps-" :
+                    "atomiqsdk-" + this._bitcoinNetwork + chainIdentifier + "-Swaps-";
+                await unifiedSwapStorage.storage.tryMigrate([
+                    [storagePrefix + "FromBTC", SwapType_1.SwapType.FROM_BTC],
+                    [storagePrefix + "FromBTCLN", SwapType_1.SwapType.FROM_BTCLN],
+                    [storagePrefix + "ToBTC", SwapType_1.SwapType.TO_BTC],
+                    [storagePrefix + "ToBTCLN", SwapType_1.SwapType.TO_BTCLN]
+                ], (obj) => {
+                    const swap = reviver(obj);
+                    if (swap.randomNonce == null) {
+                        const oldIdentifierHash = swap.getIdentifierHashString();
+                        swap.randomNonce = randomBytes(16).toString("hex");
+                        const newIdentifierHash = swap.getIdentifierHashString();
+                        this.logger.info("init(): Found older swap version without randomNonce, replacing, old hash: " + oldIdentifierHash +
+                            " new hash: " + newIdentifierHash);
+                    }
+                    return swap;
+                });
+            }
             if (!this.options.noEvents)
                 await unifiedChainEvents.start();
             this.logger.info("init(): Intialized events: " + chainIdentifier);

@@ -50,6 +50,74 @@ class IndexedDBUnifiedStorage {
         this.storageKey = storageKey;
         this.logger = (0, Utils_1.getLogger)("IndexedDBUnifiedStorage(" + this.storageKey + "): ");
     }
+    //Reviver also needs to update the swap to the latest version
+    async tryMigrateLocalStorage(storageKey, swapType, reviver) {
+        const txt = window.localStorage.getItem(storageKey);
+        if (txt == null)
+            return false;
+        let data;
+        try {
+            data = JSON.parse(txt);
+        }
+        catch (e) {
+            this.logger.error("tryMigrate(): Tried to migrate the database, but cannot parse old local storage!");
+            return false;
+        }
+        let swaps = Object.keys(data).map(id => {
+            let swapData = data[id];
+            swapData.type = swapType;
+            return reviver(swapData);
+        });
+        await this.saveAll(swaps.map(swap => swap.serialize()));
+        window.localStorage.removeItem(storageKey);
+        this.logger.info("tryMigrate(): Database successfully migrated from localStorage to unifiedIndexedDB!");
+        return true;
+    }
+    //Reviver also needs to update the swap to the latest version
+    async tryMigrateOldIndexedDB(storageKey, swapType, reviver) {
+        let db;
+        try {
+            db = await new Promise((resolve, reject) => {
+                const request = window.indexedDB.open(storageKey, 1);
+                request.onerror = (e) => reject(e);
+                request.onsuccess = (e) => resolve(e.target.result);
+            });
+        }
+        catch (e) { }
+        if (db == null)
+            return false;
+        try {
+            const data = await new Promise((resolve, reject) => {
+                const tx = db.transaction("swaps", "readonly", { durability: "strict" });
+                const store = tx.objectStore("swaps");
+                const req = store.getAll();
+                req.onsuccess = (event) => resolve(event.target.result);
+                req.onerror = (event) => reject(event);
+            });
+            let swaps = data.map(({ id, data }) => {
+                data.type = swapType;
+                return reviver(data);
+            });
+            await this.saveAll(swaps.map(swap => swap.serialize()));
+            //Remove the old database
+            window.indexedDB.deleteDatabase(storageKey);
+            this.logger.info("tryMigrate(): Database successfully migrated from oldIndexedDB to unifiedIndexedDB!");
+            return true;
+        }
+        catch (e) {
+            this.logger.error("tryMigrate(): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
+            return false;
+        }
+    }
+    //NOTE: Reviver also needs to update the swap to the latest version
+    async tryMigrate(storageKeys, reviver) {
+        let someMigrated = false;
+        for (let storageKey of storageKeys) {
+            someMigrated ||= await this.tryMigrateLocalStorage(storageKey[0], storageKey[1], reviver);
+            someMigrated ||= await this.tryMigrateOldIndexedDB(storageKey[0], storageKey[1], reviver);
+        }
+        return someMigrated;
+    }
     executeTransaction(cbk, readonly) {
         return new Promise((resolve, reject) => {
             const tx = this.db.transaction("swaps", readonly ? "readonly" : "readwrite", { durability: "strict" });

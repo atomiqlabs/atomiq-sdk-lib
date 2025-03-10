@@ -154,6 +154,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
     readonly mempoolApi: MempoolApi;
     readonly bitcoinRpc: MempoolBitcoinRpc;
     readonly bitcoinNetwork: BTC_NETWORK;
+    private readonly _bitcoinNetwork: BitcoinNetwork;
     readonly tokens: {
         [chainId: string]: {
             [tokenAddress: string]: SCToken
@@ -173,6 +174,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         options.bitcoinNetwork = options.bitcoinNetwork==null ? BitcoinNetwork.TESTNET : options.bitcoinNetwork;
         options.swapStorage ??= (name: string) => new IndexedDBUnifiedStorage(name);
 
+        this._bitcoinNetwork = options.bitcoinNetwork;
         this.bitcoinNetwork = options.bitcoinNetwork===BitcoinNetwork.MAINNET ? NETWORK :
                 options.bitcoinNetwork===BitcoinNetwork.TESTNET ? TEST_NETWORK : null;
 
@@ -299,6 +301,12 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
 
             Object.keys(wrappers).forEach(key => wrappers[key].events.on("swapState", this.swapStateListener));
 
+            const reviver = (val: any) => {
+                const wrapper = wrappers[val.type];
+                if(wrapper==null) return null;
+                return new wrapper.swapDeserializer(wrapper, val);
+            };
+
             return {
                 chainEvents,
                 swapContract,
@@ -310,11 +318,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 unifiedChainEvents,
                 unifiedSwapStorage,
 
-                reviver: (val: any) => {
-                    const wrapper = wrappers[val.type];
-                    if(wrapper==null) return null;
-                    return new wrapper.swapDeserializer(wrapper, val);
-                }
+                reviver
             }
         });
 
@@ -464,12 +468,39 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 swapContract,
                 unifiedChainEvents,
                 unifiedSwapStorage,
-                wrappers
+                wrappers,
+                reviver
             } = this.chains[chainIdentifier];
             await swapContract.start();
             this.logger.info("init(): Intialized swap contract: "+chainIdentifier);
 
             await unifiedSwapStorage.init();
+            if(unifiedSwapStorage.storage instanceof IndexedDBUnifiedStorage) {
+                //Try to migrate the data here
+                const storagePrefix = chainIdentifier==="SOLANA" ?
+                    "SOLv4-"+this._bitcoinNetwork+"-Swaps-" :
+                    "atomiqsdk-"+this._bitcoinNetwork+chainIdentifier+"-Swaps-";
+                await unifiedSwapStorage.storage.tryMigrate(
+                    [
+                        [storagePrefix+"FromBTC", SwapType.FROM_BTC],
+                        [storagePrefix+"FromBTCLN", SwapType.FROM_BTCLN],
+                        [storagePrefix+"ToBTC", SwapType.TO_BTC],
+                        [storagePrefix+"ToBTCLN", SwapType.TO_BTCLN]
+                    ],
+                    (obj: any) => {
+                        const swap = reviver(obj);
+                        if(swap.randomNonce==null) {
+                            const oldIdentifierHash = swap.getIdentifierHashString();
+                            swap.randomNonce = randomBytes(16).toString("hex");
+                            const newIdentifierHash = swap.getIdentifierHashString();
+                            this.logger.info("init(): Found older swap version without randomNonce, replacing, old hash: "+oldIdentifierHash+
+                                " new hash: "+newIdentifierHash);
+                        }
+                        return swap;
+                    }
+                )
+            }
+
             if(!this.options.noEvents) await unifiedChainEvents.start();
             this.logger.info("init(): Intialized events: "+chainIdentifier);
 

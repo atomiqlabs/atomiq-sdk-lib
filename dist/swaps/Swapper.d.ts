@@ -121,6 +121,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
     readonly mempoolApi: MempoolApi;
     readonly bitcoinRpc: MempoolBitcoinRpc;
     readonly bitcoinNetwork: BTC_NETWORK;
+    private readonly _bitcoinNetwork;
     readonly tokens: {
         [chainId: string]: {
             [tokenAddress: string]: SCToken;
