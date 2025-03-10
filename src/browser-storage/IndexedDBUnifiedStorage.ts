@@ -73,7 +73,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
         try {
             data = JSON.parse(txt);
         } catch (e) {
-            this.logger.error("tryMigrate(): Tried to migrate the database, but cannot parse old local storage!");
+            this.logger.error("tryMigrate("+storageKey+"): Tried to migrate the database, but cannot parse old local storage!");
             return false;
         }
 
@@ -86,7 +86,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
 
         window.localStorage.removeItem(storageKey);
 
-        this.logger.info("tryMigrate(): Database successfully migrated from localStorage to unifiedIndexedDB!");
+        this.logger.info("tryMigrate("+storageKey+"): Database successfully migrated from localStorage to unifiedIndexedDB!");
 
         return true;
     }
@@ -102,7 +102,10 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
             });
         } catch (e) {}
 
-        if(db==null) return false;
+        if(db==null) {
+            this.logger.info("tryMigrate("+storageKey+"): Old database not found!");
+            return false;
+        }
 
         try {
             const data = await new Promise<{ id: string, data: any }[]>((resolve, reject) => {
@@ -122,10 +125,10 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
             //Remove the old database
             window.indexedDB.deleteDatabase(storageKey);
 
-            this.logger.info("tryMigrate(): Database successfully migrated from oldIndexedDB to unifiedIndexedDB!");
+            this.logger.info("tryMigrate("+storageKey+"): Database successfully migrated from oldIndexedDB to unifiedIndexedDB!");
             return true;
         } catch (e) {
-            this.logger.error("tryMigrate(): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
+            this.logger.error("tryMigrate("+storageKey+"): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
             return false;
         }
     }

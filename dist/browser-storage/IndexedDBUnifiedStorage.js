@@ -60,7 +60,7 @@ class IndexedDBUnifiedStorage {
             data = JSON.parse(txt);
         }
         catch (e) {
-            this.logger.error("tryMigrate(): Tried to migrate the database, but cannot parse old local storage!");
+            this.logger.error("tryMigrate(" + storageKey + "): Tried to migrate the database, but cannot parse old local storage!");
             return false;
         }
         let swaps = Object.keys(data).map(id => {
@@ -70,7 +70,7 @@ class IndexedDBUnifiedStorage {
         });
         await this.saveAll(swaps.map(swap => swap.serialize()));
         window.localStorage.removeItem(storageKey);
-        this.logger.info("tryMigrate(): Database successfully migrated from localStorage to unifiedIndexedDB!");
+        this.logger.info("tryMigrate(" + storageKey + "): Database successfully migrated from localStorage to unifiedIndexedDB!");
         return true;
     }
     //Reviver also needs to update the swap to the latest version
@@ -84,8 +84,10 @@ class IndexedDBUnifiedStorage {
             });
         }
         catch (e) { }
-        if (db == null)
+        if (db == null) {
+            this.logger.info("tryMigrate(" + storageKey + "): Old database not found!");
             return false;
+        }
         try {
             const data = await new Promise((resolve, reject) => {
                 const tx = db.transaction("swaps", "readonly", { durability: "strict" });
@@ -101,11 +103,11 @@ class IndexedDBUnifiedStorage {
             await this.saveAll(swaps.map(swap => swap.serialize()));
             //Remove the old database
             window.indexedDB.deleteDatabase(storageKey);
-            this.logger.info("tryMigrate(): Database successfully migrated from oldIndexedDB to unifiedIndexedDB!");
+            this.logger.info("tryMigrate(" + storageKey + "): Database successfully migrated from oldIndexedDB to unifiedIndexedDB!");
             return true;
         }
         catch (e) {
-            this.logger.error("tryMigrate(): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
+            this.logger.error("tryMigrate(" + storageKey + "): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
             return false;
         }
     }
