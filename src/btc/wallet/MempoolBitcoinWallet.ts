@@ -125,7 +125,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
             };
         }
 
-        const psbt = new Transaction({PSBTVersion: 2});
+        const psbt = new Transaction({PSBTVersion: 0});
 
         const inputAddressIndexes: {[address: string]: number[]} = {};
         coinselectResult.inputs.forEach((input, index) => {
@@ -191,7 +191,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         if(coinselectResult.outputs.length>1) {
             psbt.addOutput({
                 script: toOutputScript(this.network, sendingAccounts[0].address),
-                amount: BigInt(coinselectResult.outputs[1].value)
+                amount: BigInt(Math.floor(coinselectResult.outputs[1].value))
             });
         }
 
@@ -229,7 +229,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
 
         return {
             feeRate: useFeeRate,
-            balance: BigInt(coinselectResult.value),
+            balance: BigInt(Math.floor(coinselectResult.value)),
             totalFee: coinselectResult.fee
         }
     }

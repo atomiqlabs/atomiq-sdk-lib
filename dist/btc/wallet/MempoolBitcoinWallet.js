@@ -77,7 +77,7 @@ class MempoolBitcoinWallet {
                 inputAddressIndexes: null
             };
         }
-        const psbt = new btc_signer_1.Transaction({ PSBTVersion: 2 });
+        const psbt = new btc_signer_1.Transaction({ PSBTVersion: 0 });
         const inputAddressIndexes = {};
         coinselectResult.inputs.forEach((input, index) => {
             inputAddressIndexes[input.address] ??= [];
@@ -137,7 +137,7 @@ class MempoolBitcoinWallet {
         if (coinselectResult.outputs.length > 1) {
             psbt.addOutput({
                 script: (0, Utils_1.toOutputScript)(this.network, sendingAccounts[0].address),
-                amount: BigInt(coinselectResult.outputs[1].value)
+                amount: BigInt(Math.floor(coinselectResult.outputs[1].value))
             });
         }
         return {
@@ -158,7 +158,7 @@ class MempoolBitcoinWallet {
         console.log("Max spendable result: ", coinselectResult);
         return {
             feeRate: useFeeRate,
-            balance: BigInt(coinselectResult.value),
+            balance: BigInt(Math.floor(coinselectResult.value)),
             totalFee: coinselectResult.fee
         };
     }
