@@ -11,7 +11,7 @@ const logger = (0, Utils_1.getLogger)("StreamingFetch: ");
 const supportsRequestStreams = (() => {
     try {
         let duplexAccessed = false;
-        const request = new Request('', {
+        const request = new Request('https://example.com/', {
             body: new ReadableStream(),
             method: 'POST',
             get duplex() {
@@ -23,7 +23,7 @@ const supportsRequestStreams = (() => {
         return duplexAccessed && !hasContentType;
     }
     catch (e) {
-        console.error(e);
+        console.error("Error checking environment support for HTTP request stream", e);
         return false;
     }
 })();
