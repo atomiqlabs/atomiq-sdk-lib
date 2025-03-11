@@ -168,7 +168,7 @@ export class FromBTCLNWrapper<
             throw new IntermediaryError("Invalid pr returned - description hash");
 
         if(!amountData.exactIn) {
-            if(!resp.total.eq(amountData.amount)) throw new IntermediaryError("Invalid amount returned");
+            if(resp.total != amountData.amount) throw new IntermediaryError("Invalid amount returned");
         } else {
             if(amountIn !== amountData.amount) throw new IntermediaryError("Invalid payment request returned, amount mismatch");
         }

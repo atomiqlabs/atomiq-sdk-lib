@@ -203,7 +203,7 @@ const FromBTCLNResponseSchema = {
     total: FieldTypeEnum.BigInt,
     intermediaryKey: FieldTypeEnum.String,
     securityDeposit: FieldTypeEnum.BigInt
-}
+} as const;
 
 export type FromBTCLNResponseType = RequestSchemaResult<typeof FromBTCLNResponseSchema>;
 

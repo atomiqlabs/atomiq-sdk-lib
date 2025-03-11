@@ -44,6 +44,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
     readonly tokens: {
         [tokenAddress: string]: SCToken<T["ChainId"]>;
     };
+    readonly pendingSwaps: Map<string, WeakRef<S>>;
     isInitialized: boolean;
     tickInterval: NodeJS.Timeout;
     /**

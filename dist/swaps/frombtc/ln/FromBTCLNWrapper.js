@@ -121,7 +121,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         if (options.descriptionHash != null && decodedPr.tagsObject.purpose_commit_hash !== options.descriptionHash.toString("hex"))
             throw new IntermediaryError_1.IntermediaryError("Invalid pr returned - description hash");
         if (!amountData.exactIn) {
-            if (!resp.total.eq(amountData.amount))
+            if (resp.total != amountData.amount)
                 throw new IntermediaryError_1.IntermediaryError("Invalid amount returned");
         }
         else {

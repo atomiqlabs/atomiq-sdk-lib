@@ -60,6 +60,7 @@ export abstract class ISwapWrapper<
     readonly tokens: {
         [tokenAddress: string]: SCToken<T["ChainId"]>
     };
+    readonly pendingSwaps: Map<string, WeakRef<S>> = new Map();
 
     isInitialized: boolean = false;
     tickInterval: NodeJS.Timeout = null;
@@ -368,17 +369,29 @@ export abstract class ISwapWrapper<
             (val: any) => new this.swapDeserializer(this, val)
         );
 
+        for(let pendingSwap of this.pendingSwaps.values()) {
+            const value = pendingSwap.deref();
+            if(value != null) value._tick(true);
+        }
+
         swaps.forEach(value => {
             value._tick(true)
-        })
+        });
     }
 
     saveSwapData(swap: S): Promise<void> {
-        if(!swap.isInitiated()) return Promise.resolve();
+        if(!swap.isInitiated()) {
+            this.logger.debug("saveSwapData(): Swap "+swap.getId()+" not initiated, saving to pending swaps");
+            this.pendingSwaps.set(swap.getId(), new WeakRef<S>(swap));
+            return Promise.resolve();
+        } else {
+            this.pendingSwaps.delete(swap.getId());
+        }
         return this.unifiedStorage.save(swap);
     }
 
     removeSwapData(swap: S): Promise<void> {
+        this.pendingSwaps.delete(swap.getId());
         if(!swap.isInitiated) return Promise.resolve();
         return this.unifiedStorage.remove(swap);
     }

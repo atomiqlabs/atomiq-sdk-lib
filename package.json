@@ -1,6 +1,6 @@
 {
   "name": "@atomiqlabs/sdk-lib",
-  "version": "11.1.0-dev.20",
+  "version": "11.1.0",
   "description": "Basic SDK functionality library for atomiq",
   "main": "./dist/index.js",
   "types:": "./dist/index.d.ts",
@@ -22,7 +22,7 @@
   "author": "adambor",
   "license": "ISC",
   "dependencies": {
-    "@atomiqlabs/base": "github:atomiqlabs/atomiq-base#add-starknet",
+    "@atomiqlabs/base": "^8.0.0",
     "@atomiqlabs/bolt11": "1.6.1",
     "@scure/btc-signer": "^1.6.0",
     "aes-js": "3.1.2",

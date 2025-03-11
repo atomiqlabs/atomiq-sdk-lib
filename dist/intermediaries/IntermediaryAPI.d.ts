@@ -162,11 +162,11 @@ export type FromBTCInit = BaseFromBTCSwapInit & {
     }>;
 };
 declare const FromBTCLNResponseSchema: {
-    pr: FieldTypeEnum;
-    swapFee: FieldTypeEnum;
-    total: FieldTypeEnum;
-    intermediaryKey: FieldTypeEnum;
-    securityDeposit: FieldTypeEnum;
+    readonly pr: FieldTypeEnum.String;
+    readonly swapFee: FieldTypeEnum.BigInt;
+    readonly total: FieldTypeEnum.BigInt;
+    readonly intermediaryKey: FieldTypeEnum.String;
+    readonly securityDeposit: FieldTypeEnum.BigInt;
 };
 export type FromBTCLNResponseType = RequestSchemaResult<typeof FromBTCLNResponseSchema>;
 export type FromBTCLNInit = BaseFromBTCSwapInit & {

@@ -19,6 +19,7 @@ class ISwapWrapper {
      */
     constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events) {
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
+        this.pendingSwaps = new Map();
         this.isInitialized = false;
         this.tickInterval = null;
         this.unifiedStorage = unifiedStorage;
@@ -219,16 +220,28 @@ class ISwapWrapper {
     async tick(swaps) {
         if (swaps == null)
             swaps = await this.unifiedStorage.query([[{ key: "type", value: this.TYPE }, { key: "state", value: this.tickSwapState }]], (val) => new this.swapDeserializer(this, val));
+        for (let pendingSwap of this.pendingSwaps.values()) {
+            const value = pendingSwap.deref();
+            if (value != null)
+                value._tick(true);
+        }
         swaps.forEach(value => {
             value._tick(true);
         });
     }
     saveSwapData(swap) {
-        if (!swap.isInitiated())
+        if (!swap.isInitiated()) {
+            this.logger.debug("saveSwapData(): Swap " + swap.getId() + " not initiated, saving to pending swaps");
+            this.pendingSwaps.set(swap.getId(), new WeakRef(swap));
             return Promise.resolve();
+        }
+        else {
+            this.pendingSwaps.delete(swap.getId());
+        }
         return this.unifiedStorage.save(swap);
     }
     removeSwapData(swap) {
+        this.pendingSwaps.delete(swap.getId());
         if (!swap.isInitiated)
             return Promise.resolve();
         return this.unifiedStorage.remove(swap);
