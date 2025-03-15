@@ -275,8 +275,8 @@ export class IntermediaryDiscovery extends EventEmitter {
                                 max: BigInt(swapService.max)
                             }
                         } else {
-                            tokenMinMax.min = bigIntMax(tokenMinMax.min, BigInt(swapService.min));
-                            tokenMinMax.max = bigIntMin(tokenMinMax.max, BigInt(swapService.max));
+                            tokenMinMax.min = bigIntMin(tokenMinMax.min, BigInt(swapService.min));
+                            tokenMinMax.max = bigIntMax(tokenMinMax.max, BigInt(swapService.max));
                         }
                     }
                 }
@@ -308,8 +308,8 @@ export class IntermediaryDiscovery extends EventEmitter {
                                 max: BigInt(swapService.max)
                             }
                         } else {
-                            tokenMinMax.min = bigIntMax(tokenMinMax.min, BigInt(swapService.min));
-                            tokenMinMax.max = bigIntMin(tokenMinMax.max, BigInt(swapService.max));
+                            tokenMinMax.min = bigIntMin(tokenMinMax.min, BigInt(swapService.min));
+                            tokenMinMax.max = bigIntMax(tokenMinMax.max, BigInt(swapService.max));
                         }
                     }
                 }

@@ -202,8 +202,8 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
                             };
                         }
                         else {
-                            tokenMinMax.min = (0, Utils_1.bigIntMax)(tokenMinMax.min, BigInt(swapService.min));
-                            tokenMinMax.max = (0, Utils_1.bigIntMin)(tokenMinMax.max, BigInt(swapService.max));
+                            tokenMinMax.min = (0, Utils_1.bigIntMin)(tokenMinMax.min, BigInt(swapService.min));
+                            tokenMinMax.max = (0, Utils_1.bigIntMax)(tokenMinMax.max, BigInt(swapService.max));
                         }
                     }
                 }
@@ -232,8 +232,8 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
                             };
                         }
                         else {
-                            tokenMinMax.min = (0, Utils_1.bigIntMax)(tokenMinMax.min, BigInt(swapService.min));
-                            tokenMinMax.max = (0, Utils_1.bigIntMin)(tokenMinMax.max, BigInt(swapService.max));
+                            tokenMinMax.min = (0, Utils_1.bigIntMin)(tokenMinMax.min, BigInt(swapService.min));
+                            tokenMinMax.max = (0, Utils_1.bigIntMax)(tokenMinMax.max, BigInt(swapService.max));
                         }
                     }
                 }
