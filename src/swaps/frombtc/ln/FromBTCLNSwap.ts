@@ -601,6 +601,8 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         if(this.state!==FromBTCLNSwapState.CLAIM_CLAIMED) {
             await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
         }
+
+        return result;
     }
 
     /**==

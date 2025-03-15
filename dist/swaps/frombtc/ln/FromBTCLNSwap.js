@@ -490,6 +490,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         if (this.state !== FromBTCLNSwapState.CLAIM_CLAIMED) {
             await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
         }
+        return result;
     }
     /**==
      * Returns transactions for both commit & claim operation together, such that they can be signed all at once by
