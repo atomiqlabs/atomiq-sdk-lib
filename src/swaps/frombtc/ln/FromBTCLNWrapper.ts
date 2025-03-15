@@ -7,16 +7,15 @@ import {
     ClaimEvent,
     InitializeEvent,
     RefundEvent,
-    SwapCommitStatus, SwapData
+    SwapData
 } from "@atomiqlabs/base";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {Buffer} from "buffer";
 import {UserError} from "../../../errors/UserError";
-import * as randomBytes from "randombytes";
-import * as createHash from "create-hash";
+import {sha256} from "@noble/hashes/sha2";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {SwapType} from "../../SwapType";
-import {extendAbortController, tryWithRetries} from "../../../utils/Utils";
+import {extendAbortController, randomBytes, tryWithRetries} from "../../../utils/Utils";
 import {FromBTCLNResponseType, IntermediaryAPI} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
 import {LightningNetworkApi, LNNodeLiquidity} from "../../../btc/LightningNetworkApi";
@@ -120,7 +119,7 @@ export class FromBTCLNWrapper<
      */
     private getSecretAndHash(): {secret: Buffer, paymentHash: Buffer} {
         const secret = randomBytes(32);
-        const paymentHash = createHash("sha256").update(secret).digest();
+        const paymentHash = Buffer.from(sha256(secret));
         return {secret, paymentHash};
     }
 

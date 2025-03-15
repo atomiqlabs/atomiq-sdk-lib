@@ -5,7 +5,7 @@ const bolt11_1 = require("@atomiqlabs/bolt11");
 const IToBTCSwap_1 = require("../IToBTCSwap");
 const SwapType_1 = require("../../SwapType");
 const buffer_1 = require("buffer");
-const createHash = require("create-hash");
+const sha2_1 = require("@noble/hashes/sha2");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const LNURL_1 = require("../../../utils/LNURL");
 const Tokens_1 = require("../../Tokens");
@@ -43,7 +43,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
             throw new IntermediaryError_1.IntermediaryError("No payment secret returned!");
         if (check) {
             const secretBuffer = buffer_1.Buffer.from(result.secret, "hex");
-            const hash = createHash("sha256").update(secretBuffer).digest();
+            const hash = buffer_1.Buffer.from((0, sha2_1.sha256)(secretBuffer));
             if (!hash.equals(this.getPaymentHash()))
                 throw new IntermediaryError_1.IntermediaryError("Invalid payment secret returned");
         }

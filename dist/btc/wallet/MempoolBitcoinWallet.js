@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MempoolBitcoinWallet = void 0;
 const coinselect2_1 = require("../coinselect2");
 const btc_signer_1 = require("@scure/btc-signer");
-const randomBytes = require("randombytes");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../../utils/Utils");
 class MempoolBitcoinWallet {
@@ -152,7 +151,7 @@ class MempoolBitcoinWallet {
         console.log("Utxo pool: ", utxoPool);
         const target = btc_signer_1.OutScript.encode({
             type: "wsh",
-            hash: randomBytes(32)
+            hash: (0, Utils_1.randomBytes)(32)
         });
         let coinselectResult = (0, coinselect2_1.maxSendable)(utxoPool, buffer_1.Buffer.from(target), "p2wsh", useFeeRate);
         console.log("Max spendable result: ", coinselectResult);

@@ -18,7 +18,6 @@ const Utils_1 = require("../utils/Utils");
 const RequestError_1 = require("../errors/RequestError");
 const SwapperWithChain_1 = require("./SwapperWithChain");
 const OnchainForGasWrapper_1 = require("./swapforgas/onchain/OnchainForGasWrapper");
-const randomBytes = require("randombytes");
 const utils_1 = require("@scure/btc-signer/utils");
 const btc_signer_1 = require("@scure/btc-signer");
 const IndexedDBUnifiedStorage_1 = require("../browser-storage/IndexedDBUnifiedStorage");
@@ -258,7 +257,7 @@ class Swapper extends events_1.EventEmitter {
                     const swap = reviver(obj);
                     if (swap.randomNonce == null) {
                         const oldIdentifierHash = swap.getIdentifierHashString();
-                        swap.randomNonce = randomBytes(16).toString("hex");
+                        swap.randomNonce = (0, Utils_1.randomBytes)(16).toString("hex");
                         const newIdentifierHash = swap.getIdentifierHashString();
                         this.logger.info("init(): Found older swap version without randomNonce, replacing, old hash: " + oldIdentifierHash +
                             " new hash: " + newIdentifierHash);
@@ -870,7 +869,7 @@ class Swapper extends events_1.EventEmitter {
             this.getBalance(chainIdentifier, signer, token),
             swapContract.getCommitFee(
             //Use large amount, such that the fee for wrapping more tokens is always included!
-            await swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn, swapContract.getHashForHtlc(randomBytes(32)).toString("hex"), base_1.BigIntBufferUtils.fromBuffer(randomBytes(8)), BigInt(Math.floor(Date.now() / 1000)), true, false, base_1.BigIntBufferUtils.fromBuffer(randomBytes(2)), base_1.BigIntBufferUtils.fromBuffer(randomBytes(2))))
+            await swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn, swapContract.getHashForHtlc((0, Utils_1.randomBytes)(32)).toString("hex"), base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(8)), BigInt(Math.floor(Date.now() / 1000)), true, false, base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(2)), base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(2))))
         ]);
         if (feeMultiplier != null) {
             commitFee = commitFee * (BigInt(Math.floor(feeMultiplier * 1000000))) / 1000000n;

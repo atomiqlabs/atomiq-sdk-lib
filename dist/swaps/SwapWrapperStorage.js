@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwapWrapperStorage = void 0;
-const randomBytes = require("randombytes");
 const Utils_1 = require("../utils/Utils");
 const logger = (0, Utils_1.getLogger)("SwapWrapperStorage: ");
 class SwapWrapperStorage {
@@ -81,7 +80,7 @@ class SwapWrapperStorage {
                 //Workaround for old Solana swaps - take the first 32 bytes of the claim hash which should stay the same
                 // for both old and new version of the libs
                 await this.storage.removeData(oldIdentifierHash.slice(0, 64));
-                value.randomNonce = randomBytes(16).toString("hex");
+                value.randomNonce = (0, Utils_1.randomBytes)(16).toString("hex");
                 const newIdentifierHash = value.getIdentifierHashString();
                 await this.saveSwapData(value);
                 logger.info("init(): Found older swap version without randomNonce, replacing, old hash: " + oldIdentifierHash +

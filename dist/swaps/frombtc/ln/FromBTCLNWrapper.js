@@ -5,9 +5,9 @@ const FromBTCLNSwap_1 = require("./FromBTCLNSwap");
 const IFromBTCWrapper_1 = require("../IFromBTCWrapper");
 const bolt11_1 = require("@atomiqlabs/bolt11");
 const base_1 = require("@atomiqlabs/base");
+const buffer_1 = require("buffer");
 const UserError_1 = require("../../../errors/UserError");
-const randomBytes = require("randombytes");
-const createHash = require("create-hash");
+const sha2_1 = require("@noble/hashes/sha2");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const SwapType_1 = require("../../SwapType");
 const Utils_1 = require("../../../utils/Utils");
@@ -81,8 +81,8 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
      * @returns Hash pre-image & payment hash
      */
     getSecretAndHash() {
-        const secret = randomBytes(32);
-        const paymentHash = createHash("sha256").update(secret).digest();
+        const secret = (0, Utils_1.randomBytes)(32);
+        const paymentHash = buffer_1.Buffer.from((0, sha2_1.sha256)(secret));
         return { secret, paymentHash };
     }
     /**

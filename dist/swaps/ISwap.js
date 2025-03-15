@@ -9,7 +9,6 @@ const ISwapPrice_1 = require("../prices/abstract/ISwapPrice");
 const Utils_1 = require("../utils/Utils");
 const Tokens_1 = require("./Tokens");
 const SwapDirection_1 = require("./SwapDirection");
-const randomBytes = require("randombytes");
 function isISwapInit(obj) {
     return typeof obj === 'object' &&
         obj != null &&
@@ -41,7 +40,7 @@ class ISwap {
             Object.assign(this, swapInitOrObj);
             this.version = this.currentVersion;
             this.createdAt = Date.now();
-            this.randomNonce = randomBytes(16).toString("hex");
+            this.randomNonce = (0, Utils_1.randomBytes)(16).toString("hex");
         }
         else {
             this.expiry = swapInitOrObj.expiry;

@@ -4,7 +4,7 @@ import {isIToBTCSwapInit, IToBTCSwap, IToBTCSwapInit} from "../IToBTCSwap";
 import {SwapType} from "../../SwapType";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
-import * as createHash from "create-hash";
+import {sha256} from "@noble/hashes/sha2";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {LNURL, LNURLDecodedSuccessAction, LNURLPaySuccessAction, isLNURLPaySuccessAction} from "../../../utils/LNURL";
 import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../Tokens";
@@ -63,7 +63,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
         if(result.secret==null) throw new IntermediaryError("No payment secret returned!");
         if(check) {
             const secretBuffer = Buffer.from(result.secret, "hex");
-            const hash = createHash("sha256").update(secretBuffer).digest();
+            const hash = Buffer.from(sha256(secretBuffer));
 
             if(!hash.equals(this.getPaymentHash())) throw new IntermediaryError("Invalid payment secret returned");
         }

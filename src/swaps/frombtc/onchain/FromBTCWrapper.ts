@@ -19,10 +19,9 @@ import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWra
 import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {SwapType} from "../../SwapType";
-import {extendAbortController, toOutputScript, tryWithRetries} from "../../../utils/Utils";
+import {extendAbortController, randomBytes, toOutputScript, tryWithRetries} from "../../../utils/Utils";
 import {FromBTCResponseType, IntermediaryAPI} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
-import * as randomBytes from "randombytes";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../UnifiedSwapStorage";

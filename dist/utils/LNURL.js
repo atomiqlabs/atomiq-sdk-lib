@@ -3,12 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LNURL = exports.MAIL_REGEX = exports.BASE64_REGEX = exports.isLNURLPaySuccessAction = exports.isLNURLPayResult = exports.isLNURLWithdrawParams = exports.isLNURLPayParams = exports.isLNURLError = exports.isLNURLWithdraw = exports.isLNURLPay = void 0;
 const RequestError_1 = require("../errors/RequestError");
 const bolt11_1 = require("@atomiqlabs/bolt11");
-const createHash = require("create-hash");
 const UserError_1 = require("../errors/UserError");
 const Utils_1 = require("./Utils");
-const bech32_1 = require("bech32");
-const aes_js_1 = require("aes-js");
+const base_1 = require("@scure/base");
+const aes_1 = require("@noble/ciphers/aes");
 const buffer_1 = require("buffer");
+const sha2_1 = require("@noble/hashes/sha2");
 function isLNURLPay(value) {
     return (typeof value === "object" &&
         value != null &&
@@ -141,8 +141,8 @@ class LNURL {
         else {
             const lnurl = LNURL.findBech32LNURL(str);
             if (lnurl != null) {
-                let { prefix: hrp, words: dataPart } = bech32_1.bech32.decode(lnurl, 2000);
-                let requestByteArray = bech32_1.bech32.fromWords(dataPart);
+                let { prefix: hrp, words: dataPart } = base_1.bech32.decode(lnurl, 2000);
+                let requestByteArray = base_1.bech32.fromWords(dataPart);
                 return buffer_1.Buffer.from(requestByteArray).toString();
             }
         }
@@ -257,7 +257,7 @@ class LNURL {
         if (!isLNURLPayResult(response))
             throw new RequestError_1.RequestError("Invalid LNURL response!", 200);
         const parsedPR = (0, bolt11_1.decode)(response.pr);
-        const descHash = createHash("sha256").update(payRequest.metadata).digest().toString("hex");
+        const descHash = buffer_1.Buffer.from((0, sha2_1.sha256)(payRequest.metadata)).toString("hex");
         if (parsedPR.tagsObject.purpose_commit_hash !== descHash)
             throw new RequestError_1.RequestError("Invalid invoice received (description hash)!", 200);
         const invoiceMSats = BigInt(parsedPR.millisatoshis);
@@ -322,7 +322,7 @@ class LNURL {
             };
         }
         if (successAction.tag === "aes") {
-            const CBC = new aes_js_1.ModeOfOperation.cbc(buffer_1.Buffer.from(secret, "hex"), buffer_1.Buffer.from(successAction.iv, "hex"));
+            const CBC = (0, aes_1.cbc)(buffer_1.Buffer.from(secret, "hex"), buffer_1.Buffer.from(successAction.iv, "hex"));
             let plaintext = CBC.decrypt(buffer_1.Buffer.from(successAction.ciphertext, "base64"));
             // remove padding
             const size = plaintext.length;

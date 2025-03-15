@@ -4,9 +4,9 @@ exports.MempoolBitcoinRpc = void 0;
 const base_1 = require("@atomiqlabs/base");
 const MempoolBitcoinBlock_1 = require("./MempoolBitcoinBlock");
 const buffer_1 = require("buffer");
-const createHash = require("create-hash");
 const Utils_1 = require("../../utils/Utils");
 const btc_signer_1 = require("@scure/btc-signer");
+const sha2_1 = require("@noble/hashes/sha2");
 const BITCOIN_BLOCKTIME = 600 * 1000;
 const BITCOIN_BLOCKSIZE = 1024 * 1024;
 class MempoolBitcoinRpc {
@@ -20,10 +20,10 @@ class MempoolBitcoinRpc {
      * @private
      */
     static getTxoHash(vout) {
-        return createHash("sha256").update(buffer_1.Buffer.concat([
+        return buffer_1.Buffer.from((0, sha2_1.sha256)(buffer_1.Buffer.concat([
             base_1.BigIntBufferUtils.toBuffer(BigInt(vout.value), "le", 8),
             buffer_1.Buffer.from(vout.scriptpubkey, "hex")
-        ])).digest();
+        ])));
     }
     /**
      * Returns delay in milliseconds till an unconfirmed transaction is expected to confirm, returns -1

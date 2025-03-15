@@ -5,7 +5,6 @@ const RequestError_1 = require("../errors/RequestError");
 const SchemaVerifier_1 = require("../utils/paramcoders/SchemaVerifier");
 const StreamingFetchPromise_1 = require("../utils/paramcoders/client/StreamingFetchPromise");
 const Utils_1 = require("../utils/Utils");
-const randomBytes = require("randombytes");
 var RefundAuthorizationResponseCodes;
 (function (RefundAuthorizationResponseCodes) {
     RefundAuthorizationResponseCodes[RefundAuthorizationResponseCodes["EXPIRED"] = 20010] = "EXPIRED";
@@ -88,7 +87,7 @@ class IntermediaryAPI {
      * @throws {Error} If the supplied nonce doesn't match the response
      */
     static async getIntermediaryInfo(baseUrl, timeout, abortSignal) {
-        const nonce = randomBytes(32).toString("hex");
+        const nonce = (0, Utils_1.randomBytes)(32).toString("hex");
         const response = await (0, Utils_1.httpPost)(baseUrl + "/info", {
             nonce,
         }, timeout, abortSignal);

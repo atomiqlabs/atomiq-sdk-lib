@@ -1,11 +1,11 @@
 import {RequestError} from "../errors/RequestError";
 import {decode as bolt11Decode, PaymentRequestObject, TagsObject} from "@atomiqlabs/bolt11";
-import * as createHash from "create-hash";
 import {UserError} from "../errors/UserError";
 import {httpGet, tryWithRetries} from "./Utils";
-import {bech32} from "bech32";
-import {ModeOfOperation} from "aes-js";
+import {bech32} from "@scure/base";
+import {cbc} from "@noble/ciphers/aes";
 import {Buffer} from "buffer";
+import {sha256} from "@noble/hashes/sha2";
 
 export type LNURLWithdrawParams = {
     tag: "withdrawRequest";
@@ -224,7 +224,7 @@ export class LNURL {
             const lnurl = LNURL.findBech32LNURL(str);
 
             if(lnurl!=null) {
-                let { prefix: hrp, words: dataPart } = bech32.decode(lnurl, 2000);
+                let { prefix: hrp, words: dataPart } = bech32.decode(lnurl as any, 2000);
                 let requestByteArray = bech32.fromWords(dataPart);
 
                 return Buffer.from(requestByteArray).toString();
@@ -368,7 +368,7 @@ export class LNURL {
 
         const parsedPR = bolt11Decode(response.pr);
 
-        const descHash = createHash("sha256").update(payRequest.metadata).digest().toString("hex");
+        const descHash = Buffer.from(sha256(payRequest.metadata)).toString("hex");
         if(parsedPR.tagsObject.purpose_commit_hash!==descHash)
             throw new RequestError("Invalid invoice received (description hash)!", 200);
 
@@ -447,7 +447,7 @@ export class LNURL {
             };
         }
         if(successAction.tag==="aes") {
-            const CBC = new ModeOfOperation.cbc(Buffer.from(secret, "hex"), Buffer.from(successAction.iv, "hex"));
+            const CBC = cbc(Buffer.from(secret, "hex"), Buffer.from(successAction.iv, "hex"));
             let plaintext = CBC.decrypt(Buffer.from(successAction.ciphertext, "base64"));
             // remove padding
             const size = plaintext.length;
