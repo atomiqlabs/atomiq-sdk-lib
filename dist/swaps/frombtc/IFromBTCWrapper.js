@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IFromBTCWrapper = void 0;
 const ISwapWrapper_1 = require("../ISwapWrapper");
-const randomBytes = require("randombytes");
 const IntermediaryError_1 = require("../../errors/IntermediaryError");
 const Utils_1 = require("../../utils/Utils");
 const base_1 = require("@atomiqlabs/base");
@@ -14,7 +13,7 @@ class IFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
      * @returns Random 64-bit sequence number
      */
     getRandomSequence() {
-        return base_1.BigIntBufferUtils.fromBuffer(randomBytes(8));
+        return base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(8));
     }
     /**
      * Pre-fetches feeRate for a given swap

@@ -4,10 +4,9 @@ import {Buffer} from "buffer";
 import {ISwapWrapper} from "./ISwapWrapper";
 import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isPriceInfoType, PriceInfoType} from "../prices/abstract/ISwapPrice";
-import {LoggerType, timeoutPromise, tryWithRetries} from "../utils/Utils";
+import {LoggerType, randomBytes, timeoutPromise, tryWithRetries} from "../utils/Utils";
 import {SCToken, Token, TokenAmount, toTokenAmount} from "./Tokens";
 import {SwapDirection} from "./SwapDirection";
-import * as randomBytes from "randombytes";
 
 export type ISwapInit<T extends SwapData> = {
     pricingInfo: PriceInfoType,

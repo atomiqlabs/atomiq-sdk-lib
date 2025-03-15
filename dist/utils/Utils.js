@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.toOutputScript = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
+exports.randomBytes = exports.toOutputScript = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
 const RequestError_1 = require("../errors/RequestError");
 const buffer_1 = require("buffer");
 const btc_signer_1 = require("@scure/btc-signer");
+const utils_1 = require("@noble/hashes/utils");
 function isConstructor(fn) {
     return (typeof fn === 'function' &&
         fn.prototype != null &&
@@ -304,3 +305,7 @@ function toOutputScript(network, address) {
     }
 }
 exports.toOutputScript = toOutputScript;
+function randomBytes(bytesLength) {
+    return buffer_1.Buffer.from((0, utils_1.randomBytes)(bytesLength));
+}
+exports.randomBytes = randomBytes;

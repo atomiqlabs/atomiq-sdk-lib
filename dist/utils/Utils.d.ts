@@ -108,4 +108,5 @@ export declare function bigIntMin(a: bigint, b: bigint): bigint;
 export declare function bigIntMax(a: bigint, b: bigint): bigint;
 export declare function bigIntCompare(a: bigint, b: bigint): -1 | 0 | 1;
 export declare function toOutputScript(network: BTC_NETWORK, address: string): Buffer;
+export declare function randomBytes(bytesLength: number): Buffer;
 export {};

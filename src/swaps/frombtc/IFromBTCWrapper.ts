@@ -1,9 +1,8 @@
 import {IFromBTCSwap} from "./IFromBTCSwap";
 import {AmountData, ISwapWrapper, ISwapWrapperOptions} from "../ISwapWrapper";
-import * as randomBytes from "randombytes";
 import {Intermediary} from "../../intermediaries/Intermediary";
 import {IntermediaryError} from "../../errors/IntermediaryError";
-import {tryWithRetries} from "../../utils/Utils";
+import {randomBytes, tryWithRetries} from "../../utils/Utils";
 import {BigIntBufferUtils, ChainType} from "@atomiqlabs/base";
 
 export abstract class IFromBTCWrapper<

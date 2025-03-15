@@ -1,11 +1,10 @@
 import {coinSelect, maxSendable, CoinselectAddressTypes} from "../coinselect2";
 import {BTC_NETWORK} from "@scure/btc-signer/utils"
-import {p2wpkh, Address, OutScript, Transaction, p2tr} from "@scure/btc-signer";
-import * as randomBytes from "randombytes";
+import {p2wpkh, OutScript, Transaction, p2tr} from "@scure/btc-signer";
 import {IBitcoinWallet} from "./IBitcoinWallet";
 import {MempoolApi} from "../mempool/MempoolApi";
 import {Buffer} from "buffer";
-import {toOutputScript} from "../../utils/Utils";
+import {randomBytes, toOutputScript} from "../../utils/Utils";
 
 export type BitcoinWalletUtxo = {
     vout: number,

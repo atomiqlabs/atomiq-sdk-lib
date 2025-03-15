@@ -2,11 +2,11 @@ import {BigIntBufferUtils, BtcBlockWithTxs, BtcSyncInfo, BtcTx} from "@atomiqlab
 import {MempoolBitcoinBlock} from "./MempoolBitcoinBlock";
 import {BitcoinTransaction, MempoolApi, TxVout} from "./MempoolApi";
 import {Buffer} from "buffer";
-import * as createHash from "create-hash";
 import {BitcoinRpcWithTxoListener, BtcTxWithBlockheight} from "../BitcoinRpcWithTxoListener";
 import {LightningNetworkApi, LNNodeLiquidity} from "../LightningNetworkApi";
 import {timeoutPromise} from "../../utils/Utils";
 import {Transaction} from "@scure/btc-signer";
+import {sha256} from "@noble/hashes/sha2";
 
 const BITCOIN_BLOCKTIME = 600 * 1000;
 const BITCOIN_BLOCKSIZE = 1024*1024;
@@ -26,10 +26,10 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
      * @private
      */
     private static getTxoHash(vout: TxVout): Buffer {
-        return createHash("sha256").update(Buffer.concat([
+        return Buffer.from(sha256(Buffer.concat([
             BigIntBufferUtils.toBuffer(BigInt(vout.value), "le", 8),
             Buffer.from(vout.scriptpubkey, "hex")
-        ])).digest();
+        ])));
     }
 
     /**

@@ -1,8 +1,7 @@
 import {ISwap} from "./ISwap";
 import {IStorageManager} from "@atomiqlabs/base";
 import {ISwapWrapper} from "./ISwapWrapper";
-import * as randomBytes from "randombytes";
-import {getLogger} from "../utils/Utils";
+import {getLogger, randomBytes} from "../utils/Utils";
 
 const logger = getLogger("SwapWrapperStorage: ");
 

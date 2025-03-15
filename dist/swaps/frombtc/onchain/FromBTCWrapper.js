@@ -10,7 +10,6 @@ const SwapType_1 = require("../../SwapType");
 const Utils_1 = require("../../../utils/Utils");
 const IntermediaryAPI_1 = require("../../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../../errors/RequestError");
-const randomBytes = require("randombytes");
 const utils_1 = require("@scure/btc-signer/utils");
 class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
     /**
@@ -95,7 +94,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
     async preFetchClaimerBounty(signer, amountData, options, abortController) {
         const startTimestamp = BigInt(Math.floor(Date.now() / 1000));
         const dummyAmount = BigInt(Math.floor(Math.random() * 0x1000000));
-        const dummySwapData = await this.contract.createSwapData(base_1.ChainSwapType.CHAIN, signer, signer, amountData.token, dummyAmount, this.contract.getHashForOnchain(randomBytes(20), dummyAmount, 3).toString("hex"), this.getRandomSequence(), startTimestamp, false, true, BigInt(Math.floor(Math.random() * 0x10000)), BigInt(Math.floor(Math.random() * 0x10000)));
+        const dummySwapData = await this.contract.createSwapData(base_1.ChainSwapType.CHAIN, signer, signer, amountData.token, dummyAmount, this.contract.getHashForOnchain((0, Utils_1.randomBytes)(20), dummyAmount, 3).toString("hex"), this.getRandomSequence(), startTimestamp, false, true, BigInt(Math.floor(Math.random() * 0x10000)), BigInt(Math.floor(Math.random() * 0x10000)));
         try {
             const [feePerBlock, btcRelayData, currentBtcBlock, claimFeeRate] = await Promise.all([
                 (0, Utils_1.tryWithRetries)(() => this.btcRelay.getFeePerBlock(), null, null, abortController.signal),

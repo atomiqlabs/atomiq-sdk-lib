@@ -2,6 +2,7 @@ import {RequestError} from "../errors/RequestError";
 import {BTC_NETWORK} from "@scure/btc-signer/utils";
 import {Buffer} from "buffer";
 import {Address, OutScript} from "@scure/btc-signer";
+import {randomBytes as randomBytesNoble} from "@noble/hashes/utils";
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
@@ -326,4 +327,8 @@ export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
                 pubkey: outputScript.pubkey
             }));
     }
+}
+
+export function randomBytes(bytesLength: number): Buffer {
+    return Buffer.from(randomBytesNoble(bytesLength));
 }

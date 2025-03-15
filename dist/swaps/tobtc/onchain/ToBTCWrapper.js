@@ -4,7 +4,6 @@ exports.ToBTCWrapper = void 0;
 const ToBTCSwap_1 = require("./ToBTCSwap");
 const IToBTCWrapper_1 = require("../IToBTCWrapper");
 const base_1 = require("@atomiqlabs/base");
-const randomBytes = require("randombytes");
 const UserError_1 = require("../../../errors/UserError");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const SwapType_1 = require("../../SwapType");
@@ -46,7 +45,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      */
     getRandomNonce() {
         const firstPart = BigInt(Math.floor((Date.now() / 1000)) - 700000000);
-        return (firstPart << 24n) | base_1.BigIntBufferUtils.fromBuffer(randomBytes(3));
+        return (firstPart << 24n) | base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(3));
     }
     /**
      * Converts bitcoin address to its corresponding output script
