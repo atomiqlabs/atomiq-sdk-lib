@@ -29,6 +29,8 @@ export * from "./swaps/Tokens";
 export * from "./swaps/ISwap";
 export * from "./swaps/ISwapWrapper";
 export * from "./swaps/Swapper";
+export * from "./swaps/SwapperWithSigner";
+export * from "./swaps/SwapperWithChain";
 export * from "./swaps/SwapType";
 export * from "./swaps/SwapDirection";
 export * from "./swaps/tobtc/IToBTCSwap";

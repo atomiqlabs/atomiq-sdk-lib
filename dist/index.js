@@ -45,6 +45,8 @@ __exportStar(require("./swaps/Tokens"), exports);
 __exportStar(require("./swaps/ISwap"), exports);
 __exportStar(require("./swaps/ISwapWrapper"), exports);
 __exportStar(require("./swaps/Swapper"), exports);
+__exportStar(require("./swaps/SwapperWithSigner"), exports);
+__exportStar(require("./swaps/SwapperWithChain"), exports);
 __exportStar(require("./swaps/SwapType"), exports);
 __exportStar(require("./swaps/SwapDirection"), exports);
 __exportStar(require("./swaps/tobtc/IToBTCSwap"), exports);
