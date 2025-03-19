@@ -7,7 +7,6 @@ import {
     InitializeEvent,
     RefundEvent,
     RelaySynchronizer,
-    SwapCommitStatus,
     SwapData,
     BtcRelay
 } from "@atomiqlabs/base";
@@ -28,7 +27,8 @@ import {UnifiedSwapStorage} from "../../UnifiedSwapStorage";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint,
-    blockSafetyFactor?: number
+    blockSafetyFactor?: number,
+    unsafeZeroWatchtowerFee?: boolean
 };
 
 export type FromBTCWrapperOptions = ISwapWrapperOptions & {
@@ -158,6 +158,16 @@ export class FromBTCWrapper<
         addFee: bigint
     } | null> {
         const startTimestamp = BigInt(Math.floor(Date.now()/1000));
+
+        if(options.unsafeZeroWatchtowerFee) {
+            return {
+                feePerBlock: 0n,
+                safetyFactor: options.blockSafetyFactor,
+                startTimestamp: startTimestamp,
+                addBlock: 0,
+                addFee: 0n
+            }
+        }
 
         const dummyAmount = BigInt(Math.floor(Math.random()* 0x1000000));
         const dummySwapData = await this.contract.createSwapData(

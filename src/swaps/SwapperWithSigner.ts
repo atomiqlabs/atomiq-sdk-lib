@@ -18,6 +18,10 @@ import {BTC_NETWORK} from "@scure/btc-signer/utils";
 import {SwapPriceWithChain} from "../prices/SwapPriceWithChain";
 import {SwapWithSigner, wrapSwapWithSigner} from "./SwapWithSigner";
 import {BtcToken, SCToken, Token} from "./Tokens";
+import {FromBTCLNOptions} from "./frombtc/ln/FromBTCLNWrapper";
+import {FromBTCOptions} from "./frombtc/onchain/FromBTCWrapper";
+import {ToBTCLNOptions} from "./tobtc/ln/ToBTCLNWrapper";
+import {ToBTCOptions} from "./tobtc/onchain/ToBTCWrapper";
 
 export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends ChainIds<T>> implements SwapperBtcUtils {
 
@@ -140,24 +144,21 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
         tokenAddress: string,
         address: string,
         amount: bigint,
-        confirmationTarget?: number,
-        confirmations?: number,
         exactIn?: boolean,
-        additionalParams?: Record<string, any>
+        additionalParams?: Record<string, any>,
+        options?: ToBTCOptions
     ): Promise<SwapWithSigner<ToBTCSwap<T[ChainIdentifier]>>> {
-        return this.swapper.createToBTCSwap(this.signer.getAddress(), tokenAddress, address, amount, confirmationTarget, confirmations, exactIn, additionalParams)
+        return this.swapper.createToBTCSwap(this.signer.getAddress(), tokenAddress, address, amount, exactIn, additionalParams, options)
             .then(swap => wrapSwapWithSigner(swap, this.signer));
     }
 
     createToBTCLNSwap(
         tokenAddress: string,
         paymentRequest: string,
-        expirySeconds?: number,
-        maxRoutingBaseFee?: bigint,
-        maxRoutingPPM?: bigint,
-        additionalParams?: Record<string, any>
+        additionalParams?: Record<string, any>,
+        options?: ToBTCLNOptions
     ): Promise<SwapWithSigner<ToBTCLNSwap<T[ChainIdentifier]>>> {
-        return this.swapper.createToBTCLNSwap(this.signer.getAddress(), tokenAddress, paymentRequest, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, additionalParams)
+        return this.swapper.createToBTCLNSwap(this.signer.getAddress(), tokenAddress, paymentRequest, additionalParams, options)
             .then(swap => wrapSwapWithSigner(swap, this.signer));
     }
 
@@ -165,14 +166,11 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
         tokenAddress: string,
         lnurlPay: string | LNURLPay,
         amount: bigint,
-        comment: string,
-        expirySeconds?: number,
-        maxRoutingBaseFee?: bigint,
-        maxRoutingPPM?: bigint,
         exactIn?: boolean,
-        additionalParams?: Record<string, any>
+        additionalParams?: Record<string, any>,
+        options?: ToBTCLNOptions
     ): Promise<SwapWithSigner<ToBTCLNSwap<T[ChainIdentifier]>>> {
-        return this.swapper.createToBTCLNSwapViaLNURL(this.signer.getAddress(), tokenAddress, lnurlPay, amount, comment, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, exactIn, additionalParams)
+        return this.swapper.createToBTCLNSwapViaLNURL(this.signer.getAddress(), tokenAddress, lnurlPay, amount, exactIn, additionalParams, options)
             .then(swap => wrapSwapWithSigner(swap, this.signer));
     }
 
@@ -180,9 +178,10 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
         tokenAddress: string,
         amount: bigint,
         exactOut?: boolean,
-        additionalParams?: Record<string, any>
+        additionalParams?: Record<string, any>,
+        options?: FromBTCOptions
     ): Promise<SwapWithSigner<FromBTCSwap<T[ChainIdentifier]>>> {
-        return this.swapper.createFromBTCSwap(this.signer.getAddress(), tokenAddress, amount, exactOut, additionalParams)
+        return this.swapper.createFromBTCSwap(this.signer.getAddress(), tokenAddress, amount, exactOut, additionalParams, options)
             .then(swap => wrapSwapWithSigner(swap, this.signer));
     }
 
@@ -190,10 +189,10 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
         tokenAddress: string,
         amount: bigint,
         exactOut?: boolean,
-        descriptionHash?: Buffer,
-        additionalParams?: Record<string, any>
+        additionalParams?: Record<string, any>,
+        options?: FromBTCLNOptions
     ): Promise<SwapWithSigner<FromBTCLNSwap<T[ChainIdentifier]>>> {
-        return this.swapper.createFromBTCLNSwap(this.signer.getAddress(), tokenAddress, amount, exactOut, descriptionHash, additionalParams)
+        return this.swapper.createFromBTCLNSwap(this.signer.getAddress(), tokenAddress, amount, exactOut, additionalParams, options)
             .then(swap => wrapSwapWithSigner(swap, this.signer));
     }
 

@@ -452,25 +452,20 @@ class Swapper extends events_1.EventEmitter {
      * @param tokenAddress          Token address to pay with
      * @param address               Recipient's bitcoin address
      * @param amount                Amount to send in satoshis (bitcoin's smallest denomination)
-     * @param confirmationTarget    How soon should the transaction be confirmed (determines the fee)
-     * @param confirmations         How many confirmations must the intermediary wait to claim the funds
      * @param exactIn               Whether to use exact in instead of exact out
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createToBTCSwap(chainIdentifier, signer, tokenAddress, address, amount, confirmationTarget, confirmations, exactIn, additionalParams = this.options.defaultAdditionalParameters) {
-        if (confirmationTarget == null)
-            confirmationTarget = 3;
-        if (confirmations == null)
-            confirmations = 2;
+    createToBTCSwap(chainIdentifier, signer, tokenAddress, address, amount, exactIn, additionalParams = this.options.defaultAdditionalParameters, options) {
+        options ??= {};
+        options.confirmationTarget ??= 3;
+        options.confirmations ??= 2;
         const amountData = {
             amount,
             token: tokenAddress,
             exactIn
         };
-        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.wrappers[SwapType_1.SwapType.TO_BTC].create(signer, address, amountData, candidates, {
-            confirmationTarget,
-            confirmations
-        }, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.TO_BTC);
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.wrappers[SwapType_1.SwapType.TO_BTC].create(signer, address, amountData, candidates, options, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.TO_BTC);
     }
     /**
      * Creates To BTCLN swap
@@ -479,24 +474,19 @@ class Swapper extends events_1.EventEmitter {
      * @param signer
      * @param tokenAddress          Token address to pay with
      * @param paymentRequest        BOLT11 lightning network invoice to be paid (needs to have a fixed amount)
-     * @param expirySeconds         For how long to lock your funds (higher expiry means higher probability of payment success)
-     * @param maxRoutingBaseFee     Maximum routing fee to use - base fee (higher routing fee means higher probability of payment success)
-     * @param maxRoutingPPM         Maximum routing fee to use - proportional fee in PPM (higher routing fee means higher probability of payment success)
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    async createToBTCLNSwap(chainIdentifier, signer, tokenAddress, paymentRequest, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, additionalParams = this.options.defaultAdditionalParameters) {
+    async createToBTCLNSwap(chainIdentifier, signer, tokenAddress, paymentRequest, additionalParams = this.options.defaultAdditionalParameters, options) {
+        options ??= {};
         const parsedPR = (0, bolt11_1.decode)(paymentRequest);
         const amountData = {
             amount: (BigInt(parsedPR.millisatoshis) + 999n) / 1000n,
             token: tokenAddress,
             exactIn: false
         };
-        expirySeconds ??= 5 * 24 * 3600;
-        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.wrappers[SwapType_1.SwapType.TO_BTCLN].create(signer, paymentRequest, amountData, candidates, {
-            expirySeconds,
-            maxRoutingPPM,
-            maxRoutingBaseFee
-        }, additionalParams, abortSignal), amountData, SwapType_1.SwapType.TO_BTCLN);
+        options.expirySeconds ??= 5 * 24 * 3600;
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.wrappers[SwapType_1.SwapType.TO_BTCLN].create(signer, paymentRequest, amountData, candidates, options, additionalParams, abortSignal), amountData, SwapType_1.SwapType.TO_BTCLN);
     }
     /**
      * Creates To BTCLN swap via LNURL-pay
@@ -506,26 +496,19 @@ class Swapper extends events_1.EventEmitter {
      * @param tokenAddress          Token address to pay with
      * @param lnurlPay              LNURL-pay link to use for the payment
      * @param amount                Amount to be paid in sats
-     * @param comment               Optional comment for the payment
-     * @param expirySeconds         For how long to lock your funds (higher expiry means higher probability of payment success)
-     * @param maxRoutingBaseFee     Maximum routing fee to use - base fee (higher routing fee means higher probability of payment success)
-     * @param maxRoutingPPM         Maximum routing fee to use - proportional fee in PPM (higher routing fee means higher probability of payment success)
      * @param exactIn               Whether to do an exact in swap instead of exact out
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    async createToBTCLNSwapViaLNURL(chainIdentifier, signer, tokenAddress, lnurlPay, amount, comment, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, exactIn, additionalParams = this.options.defaultAdditionalParameters) {
+    async createToBTCLNSwapViaLNURL(chainIdentifier, signer, tokenAddress, lnurlPay, amount, exactIn, additionalParams = this.options.defaultAdditionalParameters, options) {
+        options ??= {};
         const amountData = {
             amount,
             token: tokenAddress,
             exactIn
         };
-        expirySeconds ??= 5 * 24 * 3600;
-        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.wrappers[SwapType_1.SwapType.TO_BTCLN].createViaLNURL(signer, typeof (lnurlPay) === "string" ? lnurlPay : lnurlPay.params, amountData, candidates, {
-            expirySeconds,
-            comment,
-            maxRoutingBaseFee,
-            maxRoutingPPM
-        }, additionalParams, abortSignal), amountData, SwapType_1.SwapType.TO_BTCLN);
+        options.expirySeconds ??= 5 * 24 * 3600;
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.wrappers[SwapType_1.SwapType.TO_BTCLN].createViaLNURL(signer, typeof (lnurlPay) === "string" ? lnurlPay : lnurlPay.params, amountData, candidates, options, additionalParams, abortSignal), amountData, SwapType_1.SwapType.TO_BTCLN);
     }
     /**
      * Creates From BTC swap
@@ -536,14 +519,15 @@ class Swapper extends events_1.EventEmitter {
      * @param amount                Amount to receive, in satoshis (bitcoin's smallest denomination)
      * @param exactOut              Whether to use a exact out instead of exact in
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    async createFromBTCSwap(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters) {
+    async createFromBTCSwap(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters, options) {
         const amountData = {
             amount,
             token: tokenAddress,
             exactIn: !exactOut
         };
-        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.wrappers[SwapType_1.SwapType.FROM_BTC].create(signer, amountData, candidates, null, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.FROM_BTC);
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.wrappers[SwapType_1.SwapType.FROM_BTC].create(signer, amountData, candidates, options, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.FROM_BTC);
     }
     /**
      * Creates From BTCLN swap
@@ -553,18 +537,16 @@ class Swapper extends events_1.EventEmitter {
      * @param tokenAddress      Token address to receive
      * @param amount            Amount to receive, in satoshis (bitcoin's smallest denomination)
      * @param exactOut          Whether to use exact out instead of exact in
-     * @param descriptionHash   Description hash for ln invoice
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    async createFromBTCLNSwap(chainIdentifier, signer, tokenAddress, amount, exactOut, descriptionHash, additionalParams = this.options.defaultAdditionalParameters) {
+    async createFromBTCLNSwap(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters, options) {
         const amountData = {
             amount,
             token: tokenAddress,
             exactIn: !exactOut
         };
-        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.wrappers[SwapType_1.SwapType.FROM_BTCLN].create(signer, amountData, candidates, {
-            descriptionHash
-        }, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.FROM_BTCLN);
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.wrappers[SwapType_1.SwapType.FROM_BTCLN].create(signer, amountData, candidates, options, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.FROM_BTCLN);
     }
     /**
      * Creates From BTCLN swap, withdrawing from LNURL-withdraw
@@ -622,7 +604,7 @@ class Swapper extends events_1.EventEmitter {
                     if (typeof (addressLnurlLightningInvoice) !== "string" && !(0, LNURL_1.isLNURLPay)(addressLnurlLightningInvoice))
                         throw new Error("Destination LNURL link/lightning invoice must be a string or LNURLPay object!");
                     if ((0, LNURL_1.isLNURLPay)(addressLnurlLightningInvoice) || this.isValidLNURL(addressLnurlLightningInvoice)) {
-                        return this.createToBTCLNSwapViaLNURL(srcToken.chainId, signer, srcToken.address, addressLnurlLightningInvoice, amount, null, null, null, null, exactIn);
+                        return this.createToBTCLNSwapViaLNURL(srcToken.chainId, signer, srcToken.address, addressLnurlLightningInvoice, amount, exactIn);
                     }
                     else if (this.isLightningInvoice(addressLnurlLightningInvoice)) {
                         if (!this.isValidLightningInvoice(addressLnurlLightningInvoice))
@@ -638,7 +620,7 @@ class Swapper extends events_1.EventEmitter {
                 else {
                     if (typeof (addressLnurlLightningInvoice) !== "string")
                         throw new Error("Destination bitcoin address must be a string!");
-                    return this.createToBTCSwap(srcToken.chainId, signer, srcToken.address, addressLnurlLightningInvoice, amount, null, null, exactIn);
+                    return this.createToBTCSwap(srcToken.chainId, signer, srcToken.address, addressLnurlLightningInvoice, amount, exactIn);
                 }
             }
         }

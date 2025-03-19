@@ -8,10 +8,10 @@ import {
     ChainType,
     RelaySynchronizer
 } from "@atomiqlabs/base";
-import {ToBTCLNWrapper} from "./tobtc/ln/ToBTCLNWrapper";
-import {ToBTCWrapper} from "./tobtc/onchain/ToBTCWrapper";
-import {FromBTCLNWrapper} from "./frombtc/ln/FromBTCLNWrapper";
-import {FromBTCWrapper} from "./frombtc/onchain/FromBTCWrapper";
+import {ToBTCLNOptions, ToBTCLNWrapper} from "./tobtc/ln/ToBTCLNWrapper";
+import {ToBTCOptions, ToBTCWrapper} from "./tobtc/onchain/ToBTCWrapper";
+import {FromBTCLNOptions, FromBTCLNWrapper} from "./frombtc/ln/FromBTCLNWrapper";
+import {FromBTCOptions, FromBTCWrapper} from "./frombtc/onchain/FromBTCWrapper";
 import {IntermediaryDiscovery, MultichainSwapBounds, SwapBounds} from "../intermediaries/IntermediaryDiscovery";
 import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {ISwap} from "./ISwap";
@@ -711,10 +711,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param tokenAddress          Token address to pay with
      * @param address               Recipient's bitcoin address
      * @param amount                Amount to send in satoshis (bitcoin's smallest denomination)
-     * @param confirmationTarget    How soon should the transaction be confirmed (determines the fee)
-     * @param confirmations         How many confirmations must the intermediary wait to claim the funds
      * @param exactIn               Whether to use exact in instead of exact out
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
     createToBTCSwap<ChainIdentifier extends ChainIds<T>>(
         chainIdentifier: ChainIdentifier,
@@ -722,13 +721,13 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         tokenAddress: string,
         address: string,
         amount: bigint,
-        confirmationTarget?: number,
-        confirmations?: number,
         exactIn?: boolean,
-        additionalParams: Record<string, any> = this.options.defaultAdditionalParameters
+        additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
+        options?: ToBTCOptions
     ): Promise<ToBTCSwap<T[ChainIdentifier]>> {
-        if(confirmationTarget==null) confirmationTarget = 3;
-        if(confirmations==null) confirmations = 2;
+        options ??= {};
+        options.confirmationTarget ??= 3;
+        options.confirmations ??= 2;
         const amountData = {
             amount,
             token: tokenAddress,
@@ -741,10 +740,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 address,
                 amountData,
                 candidates,
-                {
-                    confirmationTarget,
-                    confirmations
-                },
+                options,
                 additionalParams,
                 abortSignal
             )),
@@ -760,28 +756,25 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param signer
      * @param tokenAddress          Token address to pay with
      * @param paymentRequest        BOLT11 lightning network invoice to be paid (needs to have a fixed amount)
-     * @param expirySeconds         For how long to lock your funds (higher expiry means higher probability of payment success)
-     * @param maxRoutingBaseFee     Maximum routing fee to use - base fee (higher routing fee means higher probability of payment success)
-     * @param maxRoutingPPM         Maximum routing fee to use - proportional fee in PPM (higher routing fee means higher probability of payment success)
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
     async createToBTCLNSwap<ChainIdentifier extends ChainIds<T>>(
         chainIdentifier: ChainIdentifier,
         signer: string,
         tokenAddress: string,
         paymentRequest: string,
-        expirySeconds?: number,
-        maxRoutingBaseFee?: bigint,
-        maxRoutingPPM?: bigint,
-        additionalParams: Record<string, any> = this.options.defaultAdditionalParameters
+        additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
+        options?: ToBTCLNOptions
     ): Promise<ToBTCLNSwap<T[ChainIdentifier]>> {
+        options ??= {};
         const parsedPR = bolt11Decode(paymentRequest);
         const amountData = {
             amount: (BigInt(parsedPR.millisatoshis) + 999n) / 1000n,
             token: tokenAddress,
             exactIn: false
         };
-        expirySeconds ??= 5*24*3600;
+        options.expirySeconds ??= 5*24*3600;
         return this.createSwap(
             chainIdentifier as ChainIdentifier,
             (candidates: Intermediary[], abortSignal: AbortSignal, chain) => chain.wrappers[SwapType.TO_BTCLN].create(
@@ -789,11 +782,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 paymentRequest,
                 amountData,
                 candidates,
-                {
-                    expirySeconds,
-                    maxRoutingPPM,
-                    maxRoutingBaseFee
-                },
+                options,
                 additionalParams,
                 abortSignal
             ),
@@ -810,12 +799,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param tokenAddress          Token address to pay with
      * @param lnurlPay              LNURL-pay link to use for the payment
      * @param amount                Amount to be paid in sats
-     * @param comment               Optional comment for the payment
-     * @param expirySeconds         For how long to lock your funds (higher expiry means higher probability of payment success)
-     * @param maxRoutingBaseFee     Maximum routing fee to use - base fee (higher routing fee means higher probability of payment success)
-     * @param maxRoutingPPM         Maximum routing fee to use - proportional fee in PPM (higher routing fee means higher probability of payment success)
      * @param exactIn               Whether to do an exact in swap instead of exact out
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
     async createToBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(
         chainIdentifier: ChainIdentifier,
@@ -823,19 +809,17 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         tokenAddress: string,
         lnurlPay: string | LNURLPay,
         amount: bigint,
-        comment: string,
-        expirySeconds?: number,
-        maxRoutingBaseFee?: bigint,
-        maxRoutingPPM?: bigint,
         exactIn?: boolean,
-        additionalParams: Record<string, any>  = this.options.defaultAdditionalParameters
+        additionalParams: Record<string, any>  = this.options.defaultAdditionalParameters,
+        options?: ToBTCLNOptions
     ): Promise<ToBTCLNSwap<T[ChainIdentifier]>> {
+        options ??= {};
         const amountData = {
             amount,
             token: tokenAddress,
             exactIn
         };
-        expirySeconds ??= 5*24*3600;
+        options.expirySeconds ??= 5*24*3600;
         return this.createSwap(
             chainIdentifier as ChainIdentifier,
             (candidates: Intermediary[], abortSignal: AbortSignal, chain) => chain.wrappers[SwapType.TO_BTCLN].createViaLNURL(
@@ -843,12 +827,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 typeof(lnurlPay)==="string" ? lnurlPay : lnurlPay.params,
                 amountData,
                 candidates,
-                {
-                    expirySeconds,
-                    comment,
-                    maxRoutingBaseFee,
-                    maxRoutingPPM
-                },
+                options,
                 additionalParams,
                 abortSignal
             ),
@@ -866,6 +845,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param amount                Amount to receive, in satoshis (bitcoin's smallest denomination)
      * @param exactOut              Whether to use a exact out instead of exact in
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
     async createFromBTCSwap<ChainIdentifier extends ChainIds<T>>(
         chainIdentifier: ChainIdentifier,
@@ -873,7 +853,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         tokenAddress: string,
         amount: bigint,
         exactOut?: boolean,
-        additionalParams: Record<string, any> = this.options.defaultAdditionalParameters
+        additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
+        options?: FromBTCOptions
     ): Promise<FromBTCSwap<T[ChainIdentifier]>> {
         const amountData = {
             amount,
@@ -886,7 +867,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 signer,
                 amountData,
                 candidates,
-                null,
+                options,
                 additionalParams,
                 abortSignal
             )),
@@ -903,8 +884,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      * @param tokenAddress      Token address to receive
      * @param amount            Amount to receive, in satoshis (bitcoin's smallest denomination)
      * @param exactOut          Whether to use exact out instead of exact in
-     * @param descriptionHash   Description hash for ln invoice
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
+     * @param options
      */
     async createFromBTCLNSwap<ChainIdentifier extends ChainIds<T>>(
         chainIdentifier: ChainIdentifier,
@@ -912,8 +893,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         tokenAddress: string,
         amount: bigint,
         exactOut?: boolean,
-        descriptionHash?: Buffer,
-        additionalParams: Record<string, any> = this.options.defaultAdditionalParameters
+        additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
+        options?: FromBTCLNOptions
     ): Promise<FromBTCLNSwap<T[ChainIdentifier]>> {
         const amountData = {
             amount,
@@ -926,9 +907,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 signer,
                 amountData,
                 candidates,
-                {
-                    descriptionHash
-                },
+                options,
                 additionalParams,
                 abortSignal
             )),
@@ -1015,7 +994,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 if(dstToken.lightning) {
                     if(typeof(addressLnurlLightningInvoice)!=="string" && !isLNURLPay(addressLnurlLightningInvoice)) throw new Error("Destination LNURL link/lightning invoice must be a string or LNURLPay object!");
                     if(isLNURLPay(addressLnurlLightningInvoice) || this.isValidLNURL(addressLnurlLightningInvoice)) {
-                        return this.createToBTCLNSwapViaLNURL(srcToken.chainId, signer, srcToken.address, addressLnurlLightningInvoice, amount, null, null, null, null, exactIn);
+                        return this.createToBTCLNSwapViaLNURL(srcToken.chainId, signer, srcToken.address, addressLnurlLightningInvoice, amount, exactIn);
                     } else if(this.isLightningInvoice(addressLnurlLightningInvoice)) {
                         if(!this.isValidLightningInvoice(addressLnurlLightningInvoice))
                             throw new Error("Invalid lightning invoice specified, lightning invoice MUST contain pre-set amount!");
@@ -1027,7 +1006,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                     }
                 } else {
                     if(typeof(addressLnurlLightningInvoice)!=="string") throw new Error("Destination bitcoin address must be a string!");
-                    return this.createToBTCSwap(srcToken.chainId, signer, srcToken.address, addressLnurlLightningInvoice, amount, null, null, exactIn);
+                    return this.createToBTCSwap(srcToken.chainId, signer, srcToken.address, addressLnurlLightningInvoice, amount, exactIn);
                 }
             }
         }

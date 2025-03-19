@@ -1,12 +1,10 @@
 /// <reference types="node" />
-/// <reference types="node" />
-/// <reference types="node" />
 import { ISwapPrice } from "../prices/abstract/ISwapPrice";
 import { BitcoinNetwork, BtcRelay, ChainData, ChainType, RelaySynchronizer } from "@atomiqlabs/base";
-import { ToBTCLNWrapper } from "./tobtc/ln/ToBTCLNWrapper";
-import { ToBTCWrapper } from "./tobtc/onchain/ToBTCWrapper";
-import { FromBTCLNWrapper } from "./frombtc/ln/FromBTCLNWrapper";
-import { FromBTCWrapper } from "./frombtc/onchain/FromBTCWrapper";
+import { ToBTCLNOptions, ToBTCLNWrapper } from "./tobtc/ln/ToBTCLNWrapper";
+import { ToBTCOptions, ToBTCWrapper } from "./tobtc/onchain/ToBTCWrapper";
+import { FromBTCLNOptions, FromBTCLNWrapper } from "./frombtc/ln/FromBTCLNWrapper";
+import { FromBTCOptions, FromBTCWrapper } from "./frombtc/onchain/FromBTCWrapper";
 import { IntermediaryDiscovery, MultichainSwapBounds, SwapBounds } from "../intermediaries/IntermediaryDiscovery";
 import { ISwap } from "./ISwap";
 import { SwapType } from "./SwapType";
@@ -19,7 +17,6 @@ import { MempoolBitcoinRpc } from "../btc/mempool/MempoolBitcoinRpc";
 import { LnForGasWrapper } from "./swapforgas/ln/LnForGasWrapper";
 import { LnForGasSwap } from "./swapforgas/ln/LnForGasSwap";
 import { EventEmitter } from "events";
-import { Buffer } from "buffer";
 import { MempoolBitcoinBlock } from "../btc/mempool/MempoolBitcoinBlock";
 import { Intermediary } from "../intermediaries/Intermediary";
 import { LNURLPay, LNURLWithdraw } from "../utils/LNURL";
@@ -225,12 +222,11 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param tokenAddress          Token address to pay with
      * @param address               Recipient's bitcoin address
      * @param amount                Amount to send in satoshis (bitcoin's smallest denomination)
-     * @param confirmationTarget    How soon should the transaction be confirmed (determines the fee)
-     * @param confirmations         How many confirmations must the intermediary wait to claim the funds
      * @param exactIn               Whether to use exact in instead of exact out
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createToBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, address: string, amount: bigint, confirmationTarget?: number, confirmations?: number, exactIn?: boolean, additionalParams?: Record<string, any>): Promise<ToBTCSwap<T[ChainIdentifier]>>;
+    createToBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, address: string, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCOptions): Promise<ToBTCSwap<T[ChainIdentifier]>>;
     /**
      * Creates To BTCLN swap
      *
@@ -238,12 +234,10 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param signer
      * @param tokenAddress          Token address to pay with
      * @param paymentRequest        BOLT11 lightning network invoice to be paid (needs to have a fixed amount)
-     * @param expirySeconds         For how long to lock your funds (higher expiry means higher probability of payment success)
-     * @param maxRoutingBaseFee     Maximum routing fee to use - base fee (higher routing fee means higher probability of payment success)
-     * @param maxRoutingPPM         Maximum routing fee to use - proportional fee in PPM (higher routing fee means higher probability of payment success)
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createToBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, paymentRequest: string, expirySeconds?: number, maxRoutingBaseFee?: bigint, maxRoutingPPM?: bigint, additionalParams?: Record<string, any>): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    createToBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, paymentRequest: string, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates To BTCLN swap via LNURL-pay
      *
@@ -252,14 +246,11 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param tokenAddress          Token address to pay with
      * @param lnurlPay              LNURL-pay link to use for the payment
      * @param amount                Amount to be paid in sats
-     * @param comment               Optional comment for the payment
-     * @param expirySeconds         For how long to lock your funds (higher expiry means higher probability of payment success)
-     * @param maxRoutingBaseFee     Maximum routing fee to use - base fee (higher routing fee means higher probability of payment success)
-     * @param maxRoutingPPM         Maximum routing fee to use - proportional fee in PPM (higher routing fee means higher probability of payment success)
      * @param exactIn               Whether to do an exact in swap instead of exact out
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createToBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurlPay: string | LNURLPay, amount: bigint, comment: string, expirySeconds?: number, maxRoutingBaseFee?: bigint, maxRoutingPPM?: bigint, exactIn?: boolean, additionalParams?: Record<string, any>): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    createToBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurlPay: string | LNURLPay, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTC swap
      *
@@ -269,8 +260,9 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param amount                Amount to receive, in satoshis (bitcoin's smallest denomination)
      * @param exactOut              Whether to use a exact out instead of exact in
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createFromBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>): Promise<FromBTCSwap<T[ChainIdentifier]>>;
+    createFromBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCOptions): Promise<FromBTCSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTCLN swap
      *
@@ -279,10 +271,10 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param tokenAddress      Token address to receive
      * @param amount            Amount to receive, in satoshis (bitcoin's smallest denomination)
      * @param exactOut          Whether to use exact out instead of exact in
-     * @param descriptionHash   Description hash for ln invoice
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createFromBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, descriptionHash?: Buffer, additionalParams?: Record<string, any>): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
+    createFromBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNOptions): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTCLN swap, withdrawing from LNURL-withdraw
      *

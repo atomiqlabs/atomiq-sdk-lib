@@ -17,6 +17,10 @@ import {MempoolApi} from "../btc/mempool/MempoolApi";
 import {MempoolBitcoinRpc} from "../btc/mempool/MempoolBitcoinRpc";
 import {BtcToken, SCToken, Token} from "./Tokens";
 import {BTC_NETWORK} from "@scure/btc-signer/utils";
+import {ToBTCOptions} from "./tobtc/onchain/ToBTCWrapper";
+import {ToBTCLNOptions} from "./tobtc/ln/ToBTCLNWrapper";
+import {FromBTCOptions} from "./frombtc/onchain/FromBTCWrapper";
+import {FromBTCLNOptions} from "./frombtc/ln/FromBTCLNWrapper";
 
 export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends ChainIds<T>> implements SwapperBtcUtils {
 
@@ -145,24 +149,21 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
         tokenAddress: string,
         address: string,
         amount: bigint,
-        confirmationTarget?: number,
-        confirmations?: number,
         exactIn?: boolean,
-        additionalParams?: Record<string, any>
+        additionalParams?: Record<string, any>,
+        options?: ToBTCOptions
     ): Promise<ToBTCSwap<T[ChainIdentifier]>> {
-        return this.swapper.createToBTCSwap(this.chainIdentifier, signer, tokenAddress, address, amount, confirmationTarget, confirmations, exactIn, additionalParams);
+        return this.swapper.createToBTCSwap(this.chainIdentifier, signer, tokenAddress, address, amount, exactIn, additionalParams, options);
     }
 
     createToBTCLNSwap(
         signer: string,
         tokenAddress: string,
         paymentRequest: string,
-        expirySeconds?: number,
-        maxRoutingBaseFee?: bigint,
-        maxRoutingPPM?: bigint,
-        additionalParams?: Record<string, any>
+        additionalParams?: Record<string, any>,
+        options?: ToBTCLNOptions
     ): Promise<ToBTCLNSwap<T[ChainIdentifier]>> {
-        return this.swapper.createToBTCLNSwap(this.chainIdentifier, signer, tokenAddress, paymentRequest, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, additionalParams);
+        return this.swapper.createToBTCLNSwap(this.chainIdentifier, signer, tokenAddress, paymentRequest, additionalParams, options);
     }
 
     createToBTCLNSwapViaLNURL(
@@ -170,14 +171,11 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
         tokenAddress: string,
         lnurlPay: string | LNURLPay,
         amount: bigint,
-        comment: string,
-        expirySeconds?: number,
-        maxRoutingBaseFee?: bigint,
-        maxRoutingPPM?: bigint,
         exactIn?: boolean,
-        additionalParams?: Record<string, any>
+        additionalParams?: Record<string, any>,
+        options?: ToBTCLNOptions
     ): Promise<ToBTCLNSwap<T[ChainIdentifier]>> {
-        return this.swapper.createToBTCLNSwapViaLNURL(this.chainIdentifier, signer, tokenAddress, lnurlPay, amount, comment, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, exactIn, additionalParams);
+        return this.swapper.createToBTCLNSwapViaLNURL(this.chainIdentifier, signer, tokenAddress, lnurlPay, amount, exactIn, additionalParams, options);
     }
 
     createFromBTCSwap(
@@ -185,9 +183,10 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
         tokenAddress: string,
         amount: bigint,
         exactOut?: boolean,
-        additionalParams?: Record<string, any>
+        additionalParams?: Record<string, any>,
+        options?: FromBTCOptions
     ): Promise<FromBTCSwap<T[ChainIdentifier]>> {
-        return this.swapper.createFromBTCSwap(this.chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams);
+        return this.swapper.createFromBTCSwap(this.chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams, options);
     }
 
     createFromBTCLNSwap(
@@ -195,10 +194,10 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
         tokenAddress: string,
         amount: bigint,
         exactOut?: boolean,
-        descriptionHash?: Buffer,
-        additionalParams?: Record<string, any>
+        additionalParams?: Record<string, any>,
+        options?: FromBTCLNOptions
     ): Promise<FromBTCLNSwap<T[ChainIdentifier]>> {
-        return this.swapper.createFromBTCLNSwap(this.chainIdentifier, signer, tokenAddress, amount, exactOut, descriptionHash, additionalParams);
+        return this.swapper.createFromBTCLNSwap(this.chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams, options);
     }
 
     createFromBTCLNSwapViaLNURL(

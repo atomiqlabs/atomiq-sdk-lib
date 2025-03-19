@@ -14,6 +14,7 @@ import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint;
     blockSafetyFactor?: number;
+    unsafeZeroWatchtowerFee?: boolean;
 };
 export type FromBTCWrapperOptions = ISwapWrapperOptions & {
     safetyFactor?: number;

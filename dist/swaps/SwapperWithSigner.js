@@ -103,24 +103,24 @@ class SwapperWithSigner {
     getSupportedTokenAddresses(swapType) {
         return this.swapper.getSupportedTokenAddresses(swapType);
     }
-    createToBTCSwap(tokenAddress, address, amount, confirmationTarget, confirmations, exactIn, additionalParams) {
-        return this.swapper.createToBTCSwap(this.signer.getAddress(), tokenAddress, address, amount, confirmationTarget, confirmations, exactIn, additionalParams)
+    createToBTCSwap(tokenAddress, address, amount, exactIn, additionalParams, options) {
+        return this.swapper.createToBTCSwap(this.signer.getAddress(), tokenAddress, address, amount, exactIn, additionalParams, options)
             .then(swap => (0, SwapWithSigner_1.wrapSwapWithSigner)(swap, this.signer));
     }
-    createToBTCLNSwap(tokenAddress, paymentRequest, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, additionalParams) {
-        return this.swapper.createToBTCLNSwap(this.signer.getAddress(), tokenAddress, paymentRequest, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, additionalParams)
+    createToBTCLNSwap(tokenAddress, paymentRequest, additionalParams, options) {
+        return this.swapper.createToBTCLNSwap(this.signer.getAddress(), tokenAddress, paymentRequest, additionalParams, options)
             .then(swap => (0, SwapWithSigner_1.wrapSwapWithSigner)(swap, this.signer));
     }
-    createToBTCLNSwapViaLNURL(tokenAddress, lnurlPay, amount, comment, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, exactIn, additionalParams) {
-        return this.swapper.createToBTCLNSwapViaLNURL(this.signer.getAddress(), tokenAddress, lnurlPay, amount, comment, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, exactIn, additionalParams)
+    createToBTCLNSwapViaLNURL(tokenAddress, lnurlPay, amount, exactIn, additionalParams, options) {
+        return this.swapper.createToBTCLNSwapViaLNURL(this.signer.getAddress(), tokenAddress, lnurlPay, amount, exactIn, additionalParams, options)
             .then(swap => (0, SwapWithSigner_1.wrapSwapWithSigner)(swap, this.signer));
     }
-    createFromBTCSwap(tokenAddress, amount, exactOut, additionalParams) {
-        return this.swapper.createFromBTCSwap(this.signer.getAddress(), tokenAddress, amount, exactOut, additionalParams)
+    createFromBTCSwap(tokenAddress, amount, exactOut, additionalParams, options) {
+        return this.swapper.createFromBTCSwap(this.signer.getAddress(), tokenAddress, amount, exactOut, additionalParams, options)
             .then(swap => (0, SwapWithSigner_1.wrapSwapWithSigner)(swap, this.signer));
     }
-    createFromBTCLNSwap(tokenAddress, amount, exactOut, descriptionHash, additionalParams) {
-        return this.swapper.createFromBTCLNSwap(this.signer.getAddress(), tokenAddress, amount, exactOut, descriptionHash, additionalParams)
+    createFromBTCLNSwap(tokenAddress, amount, exactOut, additionalParams, options) {
+        return this.swapper.createFromBTCLNSwap(this.signer.getAddress(), tokenAddress, amount, exactOut, additionalParams, options)
             .then(swap => (0, SwapWithSigner_1.wrapSwapWithSigner)(swap, this.signer));
     }
     createFromBTCLNSwapViaLNURL(tokenAddress, lnurl, amount, exactOut, additionalParams) {

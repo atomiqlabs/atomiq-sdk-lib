@@ -93,6 +93,15 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
      */
     async preFetchClaimerBounty(signer, amountData, options, abortController) {
         const startTimestamp = BigInt(Math.floor(Date.now() / 1000));
+        if (options.unsafeZeroWatchtowerFee) {
+            return {
+                feePerBlock: 0n,
+                safetyFactor: options.blockSafetyFactor,
+                startTimestamp: startTimestamp,
+                addBlock: 0,
+                addFee: 0n
+            };
+        }
         const dummyAmount = BigInt(Math.floor(Math.random() * 0x1000000));
         const dummySwapData = await this.contract.createSwapData(base_1.ChainSwapType.CHAIN, signer, signer, amountData.token, dummyAmount, this.contract.getHashForOnchain((0, Utils_1.randomBytes)(20), dummyAmount, 3).toString("hex"), this.getRandomSequence(), startTimestamp, false, true, BigInt(Math.floor(Math.random() * 0x10000)), BigInt(Math.floor(Math.random() * 0x10000)));
         try {
