@@ -5,11 +5,49 @@ import {Buffer} from "buffer";
 import {BitcoinRpcWithTxoListener, BtcTxWithBlockheight} from "../BitcoinRpcWithTxoListener";
 import {LightningNetworkApi, LNNodeLiquidity} from "../LightningNetworkApi";
 import {timeoutPromise} from "../../utils/Utils";
-import {Transaction} from "@scure/btc-signer";
+import {Script, Transaction} from "@scure/btc-signer";
 import {sha256} from "@noble/hashes/sha2";
 
 const BITCOIN_BLOCKTIME = 600 * 1000;
 const BITCOIN_BLOCKSIZE = 1024*1024;
+
+function bitcoinTxToBtcTx(btcTx: Transaction): BtcTx {
+    return {
+        locktime: btcTx.lockTime,
+        version: btcTx.version,
+        blockhash: null,
+        confirmations: 0,
+        txid: btcTx.id,
+        hex: Buffer.from(btcTx.toBytes(true, false)).toString("hex"),
+        raw: Buffer.from(btcTx.toBytes(true, true)).toString("hex"),
+        vsize: btcTx.vsize,
+
+        outs: Array.from({length: btcTx.outputsLength}, (_, i) => i).map((index) => {
+            const output = btcTx.getOutput(index);
+            return {
+                value: Number(output.amount),
+                n: index,
+                scriptPubKey: {
+                    asm: Script.decode(output.script).map(val => typeof(val)==="object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: Buffer.from(output.script).toString("hex")
+                }
+            }
+        }),
+        ins: Array.from({length: btcTx.inputsLength}, (_, i) => i).map(index => {
+            const input = btcTx.getInput(index);
+            return {
+                txid: Buffer.from(input.txid).toString("hex"),
+                vout: input.index,
+                scriptSig: {
+                    asm: Script.decode(input.finalScriptSig).map(val => typeof(val)==="object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: Buffer.from(input.finalScriptSig).toString("hex")
+                },
+                sequence: input.sequence,
+                txinwitness: input.finalScriptWitness.map(witness => Buffer.from(witness).toString("hex"))
+            }
+        })
+    }
+}
 
 export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitcoinBlock>, LightningNetworkApi {
 
@@ -102,6 +140,8 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
         }
 
         return {
+            locktime: tx.locktime,
+            version: tx.version,
             blockheight: tx.status?.block_height,
             blockhash: tx.status?.block_hash,
             confirmations,
@@ -282,6 +322,24 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
 
     sendRawPackage(rawTx: string[]): Promise<string[]> {
         throw new Error("Unsupported");
+    }
+
+    async isSpent(utxo: string): Promise<boolean> {
+        const [txId, voutStr] = utxo.split(":");
+        const vout = parseInt(voutStr);
+        const outspends = await this.api.getOutspends(txId);
+        if(outspends[vout]==null) return true;
+        return outspends[vout].spent;
+    }
+
+    parseTransaction(rawTx: string): Promise<BtcTx> {
+        const btcTx = Transaction.fromRaw(Buffer.from(rawTx, "hex"), {
+            allowLegacyWitnessUtxo: true,
+            allowUnknownInputs: true,
+            allowUnknownOutputs: true,
+            disableScriptCheck: true
+        });
+        return Promise.resolve(bitcoinTxToBtcTx(btcTx));
     }
 
 }

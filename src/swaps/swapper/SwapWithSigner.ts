@@ -1,8 +1,8 @@
 import {ISwap} from "../ISwap";
 import {ChainType} from "@atomiqlabs/base";
-import {IToBTCSwap} from "../tobtc/IToBTCSwap";
-import {IFromBTCSwap} from "../frombtc/IFromBTCSwap";
-import {FromBTCLNSwap} from "../frombtc/ln/FromBTCLNSwap";
+import {IToBTCSwap} from "../escrow_swaps/tobtc/IToBTCSwap";
+import {IFromBTCSwap} from "../escrow_swaps/frombtc/IFromBTCSwap";
+import {FromBTCLNSwap} from "../escrow_swaps/frombtc/ln/FromBTCLNSwap";
 
 export type SwapWithSigner<T extends ISwap> = {
     [K in keyof T]:

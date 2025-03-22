@@ -1,4 +1,4 @@
-import { ChainType, SwapEvent } from "@atomiqlabs/base";
+import { ChainEvent, ChainType, SwapEvent } from "@atomiqlabs/base";
 import { ISwap } from "../swaps/ISwap";
 import { EventListener } from "@atomiqlabs/base/src/events/ChainEvents";
 import { SwapType } from "../swaps/enums/SwapType";
@@ -14,7 +14,7 @@ export declare class UnifiedSwapEventListener<T extends ChainType> {
         };
     };
     constructor(unifiedStorage: UnifiedSwapStorage<T>, events: T["Events"]);
-    processEvents(events: SwapEvent<T["Data"]>[]): Promise<void>;
+    processEvents(events: ChainEvent<T["Data"]>[]): Promise<void>;
     listener: EventListener<T["Data"]>;
     start(): Promise<void>;
     stop(): void;

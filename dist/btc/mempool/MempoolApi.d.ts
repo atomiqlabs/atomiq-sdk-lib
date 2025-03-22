@@ -1,6 +1,12 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import { Buffer } from "buffer";
+export type BitcoinTransactionStatus = {
+    confirmed: boolean;
+    block_height: number;
+    block_hash: string;
+    block_time: number;
+};
 export type TxVout = {
     scriptpubkey: string;
     scriptpubkey_asm: string;
@@ -28,12 +34,7 @@ export type BitcoinTransaction = {
     size: number;
     weight: number;
     fee: number;
-    status: {
-        confirmed: boolean;
-        block_height: number;
-        block_hash: string;
-        block_time: number;
-    };
+    status: BitcoinTransactionStatus;
 };
 export type BlockData = {
     bits: number;
@@ -151,6 +152,12 @@ export type TransactionProof = {
     block_height: number;
     merkle: string[];
     pos: number;
+};
+export type TransactionOutspend = {
+    spent: boolean;
+    txid: string;
+    vin: number;
+    status: BitcoinTransactionStatus;
 };
 export declare class MempoolApi {
     backends: {
@@ -288,6 +295,12 @@ export declare class MempoolApi {
      * @param txId
      */
     getTransactionProof(txId: string): Promise<TransactionProof>;
+    /**
+     * Returns the transaction's proof (merkle proof)
+     *
+     * @param txId
+     */
+    getOutspends(txId: string): Promise<TransactionOutspend[]>;
     /**
      * Returns blockhash of a block at a specific blockheight
      *

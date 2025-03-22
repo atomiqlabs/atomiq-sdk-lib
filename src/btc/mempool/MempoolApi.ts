@@ -2,6 +2,13 @@ import {Buffer} from "buffer";
 import {fetchWithTimeout, promiseAny, tryWithRetries} from "../../utils/Utils";
 import {RequestError} from "../../errors/RequestError";
 
+export type BitcoinTransactionStatus = {
+    confirmed: boolean,
+    block_height: number,
+    block_hash: string,
+    block_time: number
+};
+
 export type TxVout = {
     scriptpubkey: string,
     scriptpubkey_asm: string,
@@ -31,12 +38,7 @@ export type BitcoinTransaction = {
     size: number,
     weight: number,
     fee: number,
-    status: {
-        confirmed: boolean,
-        block_height: number,
-        block_hash: string,
-        block_time: number
-    }
+    status: BitcoinTransactionStatus
 };
 
 export type BlockData = {
@@ -157,6 +159,13 @@ export type TransactionProof = {
     block_height: number,
     merkle: string[],
     pos: number
+};
+
+export type TransactionOutspend = {
+    spent: boolean,
+    txid: string,
+    vin: number,
+    status: BitcoinTransactionStatus
 };
 
 export class MempoolApi {
@@ -453,6 +462,15 @@ export class MempoolApi {
      */
     getTransactionProof(txId: string) : Promise<TransactionProof> {
         return this.request<TransactionProof>("tx/"+txId+"/merkle-proof", "obj");
+    }
+
+    /**
+     * Returns the transaction's proof (merkle proof)
+     *
+     * @param txId
+     */
+    getOutspends(txId: string) : Promise<TransactionOutspend[]> {
+        return this.request<TransactionOutspend[]>("tx/"+txId+"/outspends", "obj");
     }
 
     /**
