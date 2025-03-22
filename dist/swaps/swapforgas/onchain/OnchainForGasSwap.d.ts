@@ -1,11 +1,11 @@
 /// <reference types="node" />
 /// <reference types="node" />
-import { SwapType } from "../../SwapType";
+import { SwapType } from "../../enums/SwapType";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { Buffer } from "buffer";
 import { Fee, ISwap, ISwapInit } from "../../ISwap";
 import { PriceInfoType } from "../../../prices/abstract/ISwapPrice";
-import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
+import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
 import { OnchainForGasWrapper } from "./OnchainForGasWrapper";
 export declare enum OnchainForGasSwapState {
     EXPIRED = -3,

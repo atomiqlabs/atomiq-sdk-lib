@@ -1,6 +1,6 @@
 import { CoinType, CtorCoinTypes } from "../abstract/IPriceProvider";
 import { ExchangePriceProvider } from "./abstract/ExchangePriceProvider";
-import { MultiChain } from "../../swaps/Swapper";
+import { MultiChain } from "../../swaps/swapper/Swapper";
 export type KrakenResponse = {
     error: string[];
     result: {

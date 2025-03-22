@@ -17,13 +17,13 @@ import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 import {extendAbortController, randomBytes, toOutputScript, tryWithRetries} from "../../../utils/Utils";
 import {FromBTCResponseType, IntermediaryAPI} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
-import {UnifiedSwapStorage} from "../../UnifiedSwapStorage";
+import {UnifiedSwapStorage} from "../../../storage/UnifiedSwapStorage";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint,

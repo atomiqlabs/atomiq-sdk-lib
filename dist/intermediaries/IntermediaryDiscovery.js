@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IntermediaryDiscovery = exports.SwapHandlerType = void 0;
 const Intermediary_1 = require("./Intermediary");
-const SwapType_1 = require("../swaps/SwapType");
+const SwapType_1 = require("../swaps/enums/SwapType");
 const events_1 = require("events");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../utils/Utils");

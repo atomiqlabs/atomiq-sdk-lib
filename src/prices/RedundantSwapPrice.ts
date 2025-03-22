@@ -6,7 +6,7 @@ import {CoinPaprikaPriceProvider} from "./providers/CoinPaprikaPriceProvider";
 import {promiseAny, tryWithRetries, getLogger} from "../utils/Utils";
 import {ICachedSwapPrice} from "./abstract/ICachedSwapPrice";
 import {RequestError} from "../errors/RequestError";
-import {ChainIds, MultiChain} from "../swaps/Swapper";
+import {ChainIds, MultiChain} from "../swaps/swapper/Swapper";
 import {KrakenPriceProvider} from "./providers/KrakenPriceProvider";
 
 export type RedundantSwapPriceAssets<T extends MultiChain> = {

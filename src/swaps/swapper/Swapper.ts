@@ -1,4 +1,4 @@
-import {ISwapPrice} from "../prices/abstract/ISwapPrice";
+import {ISwapPrice} from "../../prices/abstract/ISwapPrice";
 import {
     BigIntBufferUtils,
     BitcoinNetwork,
@@ -8,43 +8,43 @@ import {
     ChainType,
     RelaySynchronizer
 } from "@atomiqlabs/base";
-import {ToBTCLNOptions, ToBTCLNWrapper} from "./tobtc/ln/ToBTCLNWrapper";
-import {ToBTCOptions, ToBTCWrapper} from "./tobtc/onchain/ToBTCWrapper";
-import {FromBTCLNOptions, FromBTCLNWrapper} from "./frombtc/ln/FromBTCLNWrapper";
-import {FromBTCOptions, FromBTCWrapper} from "./frombtc/onchain/FromBTCWrapper";
-import {IntermediaryDiscovery, MultichainSwapBounds, SwapBounds} from "../intermediaries/IntermediaryDiscovery";
+import {ToBTCLNOptions, ToBTCLNWrapper} from "../tobtc/ln/ToBTCLNWrapper";
+import {ToBTCOptions, ToBTCWrapper} from "../tobtc/onchain/ToBTCWrapper";
+import {FromBTCLNOptions, FromBTCLNWrapper} from "../frombtc/ln/FromBTCLNWrapper";
+import {FromBTCOptions, FromBTCWrapper} from "../frombtc/onchain/FromBTCWrapper";
+import {IntermediaryDiscovery, MultichainSwapBounds, SwapBounds} from "../../intermediaries/IntermediaryDiscovery";
 import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
-import {ISwap} from "./ISwap";
-import {IntermediaryError} from "../errors/IntermediaryError";
-import {SwapType} from "./SwapType";
-import {FromBTCLNSwap} from "./frombtc/ln/FromBTCLNSwap";
-import {FromBTCSwap} from "./frombtc/onchain/FromBTCSwap";
-import {ToBTCLNSwap} from "./tobtc/ln/ToBTCLNSwap";
-import {ToBTCSwap} from "./tobtc/onchain/ToBTCSwap";
-import {MempoolApi} from "../btc/mempool/MempoolApi";
-import {MempoolBitcoinRpc} from "../btc/mempool/MempoolBitcoinRpc";
-import {MempoolBtcRelaySynchronizer} from "../btc/mempool/synchronizer/MempoolBtcRelaySynchronizer";
-import {LnForGasWrapper} from "./swapforgas/ln/LnForGasWrapper";
-import {LnForGasSwap} from "./swapforgas/ln/LnForGasSwap";
+import {ISwap} from "../ISwap";
+import {IntermediaryError} from "../../errors/IntermediaryError";
+import {SwapType} from "../enums/SwapType";
+import {FromBTCLNSwap} from "../frombtc/ln/FromBTCLNSwap";
+import {FromBTCSwap} from "../frombtc/onchain/FromBTCSwap";
+import {ToBTCLNSwap} from "../tobtc/ln/ToBTCLNSwap";
+import {ToBTCSwap} from "../tobtc/onchain/ToBTCSwap";
+import {MempoolApi} from "../../btc/mempool/MempoolApi";
+import {MempoolBitcoinRpc} from "../../btc/mempool/MempoolBitcoinRpc";
+import {MempoolBtcRelaySynchronizer} from "../../btc/mempool/synchronizer/MempoolBtcRelaySynchronizer";
+import {LnForGasWrapper} from "../swapforgas/ln/LnForGasWrapper";
+import {LnForGasSwap} from "../swapforgas/ln/LnForGasSwap";
 import {EventEmitter} from "events";
 import {Buffer} from "buffer";
-import {MempoolBitcoinBlock} from "../btc/mempool/MempoolBitcoinBlock";
-import {Intermediary} from "../intermediaries/Intermediary";
-import {isLNURLPay, isLNURLWithdraw, LNURL, LNURLPay, LNURLWithdraw} from "../utils/LNURL";
-import {AmountData, WrapperCtorTokens} from "./ISwapWrapper";
-import {bigIntCompare, bigIntMax, bigIntMin, getLogger, objectMap, randomBytes} from "../utils/Utils";
-import {OutOfBoundsError} from "../errors/RequestError";
+import {MempoolBitcoinBlock} from "../../btc/mempool/MempoolBitcoinBlock";
+import {Intermediary} from "../../intermediaries/Intermediary";
+import {isLNURLPay, isLNURLWithdraw, LNURL, LNURLPay, LNURLWithdraw} from "../../utils/LNURL";
+import {AmountData, WrapperCtorTokens} from "../ISwapWrapper";
+import {bigIntCompare, bigIntMax, bigIntMin, getLogger, objectMap, randomBytes} from "../../utils/Utils";
+import {OutOfBoundsError} from "../../errors/RequestError";
 import {SwapperWithChain} from "./SwapperWithChain";
-import {BtcToken, SCToken, Token} from "./Tokens";
-import {OnchainForGasSwap} from "./swapforgas/onchain/OnchainForGasSwap";
-import {OnchainForGasWrapper} from "./swapforgas/onchain/OnchainForGasWrapper";
+import {BtcToken, SCToken, Token} from "../../Tokens";
+import {OnchainForGasSwap} from "../swapforgas/onchain/OnchainForGasSwap";
+import {OnchainForGasWrapper} from "../swapforgas/onchain/OnchainForGasWrapper";
 import {BTC_NETWORK, NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {Address} from "@scure/btc-signer";
-import {IUnifiedStorage, QueryParams} from "../storage/IUnifiedStorage";
-import {IndexedDBUnifiedStorage} from "../browser-storage/IndexedDBUnifiedStorage";
-import {UnifiedSwapStorage} from "./UnifiedSwapStorage";
-import {UnifiedSwapEventListener} from "../events/UnifiedSwapEventListener";
-import {IToBTCSwap} from "./tobtc/IToBTCSwap";
+import {IUnifiedStorage, QueryParams} from "../../storage/IUnifiedStorage";
+import {IndexedDBUnifiedStorage} from "../../browser-storage/IndexedDBUnifiedStorage";
+import {UnifiedSwapStorage} from "../../storage/UnifiedSwapStorage";
+import {UnifiedSwapEventListener} from "../../events/UnifiedSwapEventListener";
+import {IToBTCSwap} from "../tobtc/IToBTCSwap";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],

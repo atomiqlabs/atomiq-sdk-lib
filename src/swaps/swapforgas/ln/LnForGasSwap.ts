@@ -1,5 +1,5 @@
 import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {LnForGasWrapper} from "./LnForGasWrapper";
 import {Buffer} from "buffer";
@@ -11,7 +11,7 @@ import {
     InvoiceStatusResponseCodes,
     TrustedIntermediaryAPI
 } from "../../../intermediaries/TrustedIntermediaryAPI";
-import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
+import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 
 export enum LnForGasSwapState {
     EXPIRED = -2,

@@ -2,13 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LnForGasSwap = exports.isLnForGasSwapInit = exports.LnForGasSwapState = void 0;
 const bolt11_1 = require("@atomiqlabs/bolt11");
-const SwapType_1 = require("../../SwapType");
+const SwapType_1 = require("../../enums/SwapType");
 const buffer_1 = require("buffer");
 const PaymentAuthError_1 = require("../../../errors/PaymentAuthError");
 const Utils_1 = require("../../../utils/Utils");
 const ISwap_1 = require("../../ISwap");
 const TrustedIntermediaryAPI_1 = require("../../../intermediaries/TrustedIntermediaryAPI");
-const Tokens_1 = require("../../Tokens");
+const Tokens_1 = require("../../../Tokens");
 var LnForGasSwapState;
 (function (LnForGasSwapState) {
     LnForGasSwapState[LnForGasSwapState["EXPIRED"] = -2] = "EXPIRED";

@@ -11,13 +11,13 @@ import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWra
 import {Buffer} from "buffer";
 import {UserError} from "../../../errors/UserError";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 import {extendAbortController, randomBytes, toOutputScript, tryWithRetries} from "../../../utils/Utils";
 import {IntermediaryAPI, ToBTCResponseType} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
-import {UnifiedSwapStorage} from "../../UnifiedSwapStorage";
+import {UnifiedSwapStorage} from "../../../storage/UnifiedSwapStorage";
 
 export type ToBTCOptions = {
     confirmationTarget?: number,

@@ -5,7 +5,7 @@ import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {ChainType} from "@atomiqlabs/base";
 import {Intermediary} from "../../../intermediaries/Intermediary";
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 
 export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForGasSwap<T>> {
     public TYPE = SwapType.TRUSTED_FROM_BTCLN;

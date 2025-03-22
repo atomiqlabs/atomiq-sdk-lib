@@ -2,10 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToBTCSwap = exports.isToBTCSwapInit = void 0;
 const IToBTCSwap_1 = require("../IToBTCSwap");
-const SwapType_1 = require("../../SwapType");
+const SwapType_1 = require("../../enums/SwapType");
 const buffer_1 = require("buffer");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
-const Tokens_1 = require("../../Tokens");
+const Tokens_1 = require("../../../Tokens");
 const Utils_1 = require("../../../utils/Utils");
 function isToBTCSwapInit(obj) {
     return typeof (obj.address) === "string" &&

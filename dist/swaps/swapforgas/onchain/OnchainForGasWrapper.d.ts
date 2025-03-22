@@ -6,9 +6,9 @@ import { BitcoinRpcWithTxoListener } from "../../../btc/BitcoinRpcWithTxoListene
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { Intermediary } from "../../../intermediaries/Intermediary";
-import { SwapType } from "../../SwapType";
+import { SwapType } from "../../enums/SwapType";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
-import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
+import { UnifiedSwapStorage } from "../../../storage/UnifiedSwapStorage";
 export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
     readonly TYPE = SwapType.TRUSTED_FROM_BTC;
     readonly swapDeserializer: typeof OnchainForGasSwap;

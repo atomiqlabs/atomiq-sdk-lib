@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.IFromBTCSwap = void 0;
 const ISwap_1 = require("../ISwap");
 const base_1 = require("@atomiqlabs/base");
-const Tokens_1 = require("../Tokens");
+const Tokens_1 = require("../../Tokens");
 class IFromBTCSwap extends ISwap_1.ISwap {
     constructor(wrapper, initOrObj) {
         super(wrapper, initOrObj);

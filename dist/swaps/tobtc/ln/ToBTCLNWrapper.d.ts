@@ -6,10 +6,10 @@ import { Intermediary } from "../../../intermediaries/Intermediary";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
-import { SwapType } from "../../SwapType";
+import { SwapType } from "../../enums/SwapType";
 import { LNURLPayParamsWithUrl } from "../../../utils/LNURL";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
-import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
+import { UnifiedSwapStorage } from "../../../storage/UnifiedSwapStorage";
 export type ToBTCLNOptions = {
     expirySeconds?: number;
     maxFee?: bigint | Promise<bigint>;

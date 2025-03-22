@@ -1,4 +1,4 @@
-import { SwapType } from "../swaps/SwapType";
+import { SwapType } from "../swaps/enums/SwapType";
 import { SwapHandlerInfoType } from "./IntermediaryDiscovery";
 import { ChainSwapType, SwapContract } from "@atomiqlabs/base";
 import { LNNodeLiquidity } from "../btc/LightningNetworkApi";

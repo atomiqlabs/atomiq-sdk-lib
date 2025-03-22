@@ -5,7 +5,7 @@ const ISwapWrapper_1 = require("../../ISwapWrapper");
 const TrustedIntermediaryAPI_1 = require("../../../intermediaries/TrustedIntermediaryAPI");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const OnchainForGasSwap_1 = require("./OnchainForGasSwap");
-const SwapType_1 = require("../../SwapType");
+const SwapType_1 = require("../../enums/SwapType");
 class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
     /**
      * @param chainIdentifier

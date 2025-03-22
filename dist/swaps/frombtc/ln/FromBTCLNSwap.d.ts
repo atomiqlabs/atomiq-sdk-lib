@@ -2,12 +2,12 @@
 /// <reference types="node" />
 import { FromBTCLNWrapper } from "./FromBTCLNWrapper";
 import { IFromBTCSwap } from "../IFromBTCSwap";
-import { SwapType } from "../../SwapType";
+import { SwapType } from "../../enums/SwapType";
 import { ChainType, SignatureData, SwapData } from "@atomiqlabs/base";
 import { ISwapInit } from "../../ISwap";
 import { Buffer } from "buffer";
 import { LNURLWithdraw } from "../../../utils/LNURL";
-import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
+import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
 export declare enum FromBTCLNSwapState {
     FAILED = -4,
     QUOTE_EXPIRED = -3,

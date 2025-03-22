@@ -1,5 +1,5 @@
 import {Intermediary, ServicesType} from "./Intermediary";
-import {SwapType} from "../swaps/SwapType";
+import {SwapType} from "../swaps/enums/SwapType";
 import {SwapContract} from "@atomiqlabs/base";
 import {EventEmitter} from "events";
 import {Buffer} from "buffer";

@@ -1,6 +1,6 @@
 import {IPriceProvider} from "./abstract/IPriceProvider";
 import {ICachedSwapPrice} from "./abstract/ICachedSwapPrice";
-import {ChainIds, MultiChain} from "../swaps/Swapper";
+import {ChainIds, MultiChain} from "../swaps/swapper/Swapper";
 
 /**
  * Swap price API using single price source

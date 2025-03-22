@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.FromBTCLNSwap = exports.isFromBTCLNSwapInit = exports.FromBTCLNSwapState = void 0;
 const bolt11_1 = require("@atomiqlabs/bolt11");
 const IFromBTCSwap_1 = require("../IFromBTCSwap");
-const SwapType_1 = require("../../SwapType");
+const SwapType_1 = require("../../enums/SwapType");
 const base_1 = require("@atomiqlabs/base");
 const ISwap_1 = require("../../ISwap");
 const buffer_1 = require("buffer");
@@ -13,7 +13,7 @@ const IntermediaryAPI_1 = require("../../../intermediaries/IntermediaryAPI");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const PaymentAuthError_1 = require("../../../errors/PaymentAuthError");
 const Utils_1 = require("../../../utils/Utils");
-const Tokens_1 = require("../../Tokens");
+const Tokens_1 = require("../../../Tokens");
 var FromBTCLNSwapState;
 (function (FromBTCLNSwapState) {
     FromBTCLNSwapState[FromBTCLNSwapState["FAILED"] = -4] = "FAILED";

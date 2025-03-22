@@ -1,4 +1,4 @@
-import {ISwapPrice} from "../prices/abstract/ISwapPrice";
+import {ISwapPrice} from "./prices/abstract/ISwapPrice";
 
 export type BtcToken<L = boolean> = {
     chain: "BTC",

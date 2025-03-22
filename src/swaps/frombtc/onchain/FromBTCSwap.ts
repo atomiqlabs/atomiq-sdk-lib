@@ -1,10 +1,10 @@
 import {IFromBTCSwap} from "../IFromBTCSwap";
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 import {FromBTCWrapper} from "./FromBTCWrapper";
 import {ChainType, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isISwapInit, ISwapInit} from "../../ISwap";
 import {Buffer} from "buffer";
-import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
+import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {extendAbortController, getLogger, tryWithRetries} from "../../../utils/Utils";
 
 export enum FromBTCSwapState {

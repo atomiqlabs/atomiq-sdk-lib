@@ -1,4 +1,4 @@
-import {ChainIds, MultiChain} from "../../swaps/Swapper";
+import {ChainIds, MultiChain} from "../../swaps/swapper/Swapper";
 
 export type CoinType = {
     coinId: string;

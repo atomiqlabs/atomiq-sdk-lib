@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwapperWithChain = void 0;
 const SwapperWithSigner_1 = require("./SwapperWithSigner");
-const SwapPriceWithChain_1 = require("../prices/SwapPriceWithChain");
+const SwapPriceWithChain_1 = require("../../prices/SwapPriceWithChain");
 class SwapperWithChain {
     get intermediaryDiscovery() {
         return this.swapper.intermediaryDiscovery;

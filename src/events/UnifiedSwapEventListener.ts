@@ -1,8 +1,8 @@
 import {ChainType, SwapEvent} from "@atomiqlabs/base";
 import {ISwap} from "../swaps/ISwap";
 import {EventListener} from "@atomiqlabs/base/src/events/ChainEvents";
-import {SwapType} from "../swaps/SwapType";
-import {UnifiedSwapStorage} from "../swaps/UnifiedSwapStorage";
+import {SwapType} from "../swaps/enums/SwapType";
+import {UnifiedSwapStorage} from "../storage/UnifiedSwapStorage";
 
 export type SwapEventListener<
     T extends ChainType,

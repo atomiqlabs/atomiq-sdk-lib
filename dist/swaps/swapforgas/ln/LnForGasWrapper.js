@@ -6,7 +6,7 @@ const ISwapWrapper_1 = require("../../ISwapWrapper");
 const TrustedIntermediaryAPI_1 = require("../../../intermediaries/TrustedIntermediaryAPI");
 const bolt11_1 = require("@atomiqlabs/bolt11");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
-const SwapType_1 = require("../../SwapType");
+const SwapType_1 = require("../../enums/SwapType");
 class LnForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
     constructor() {
         super(...arguments);

@@ -1,6 +1,6 @@
 import { CoinType, CtorCoinTypes } from "../abstract/IPriceProvider";
 import { HttpPriceProvider } from "./abstract/HttpPriceProvider";
-import { MultiChain } from "../../swaps/Swapper";
+import { MultiChain } from "../../swaps/swapper/Swapper";
 export type CoinPaprikaResponse<Currency extends string> = {
     quotes: {
         [curr in Currency]: {

@@ -1,8 +1,8 @@
 import { ToBTCWrapper } from "./ToBTCWrapper";
 import { IToBTCSwap, IToBTCSwapInit } from "../IToBTCSwap";
-import { SwapType } from "../../SwapType";
+import { SwapType } from "../../enums/SwapType";
 import { ChainType, SwapData } from "@atomiqlabs/base";
-import { BtcToken, TokenAmount } from "../../Tokens";
+import { BtcToken, TokenAmount } from "../../../Tokens";
 export type ToBTCSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     address: string;
     amount: bigint;

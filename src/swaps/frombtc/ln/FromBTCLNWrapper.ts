@@ -14,7 +14,7 @@ import {Buffer} from "buffer";
 import {UserError} from "../../../errors/UserError";
 import {sha256} from "@noble/hashes/sha2";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 import {extendAbortController, randomBytes, tryWithRetries} from "../../../utils/Utils";
 import {FromBTCLNResponseType, IntermediaryAPI} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
@@ -24,7 +24,7 @@ import {EventEmitter} from "events";
 import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {LNURL, LNURLWithdrawParamsWithUrl} from "../../../utils/LNURL";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
-import {UnifiedSwapStorage} from "../../UnifiedSwapStorage";
+import {UnifiedSwapStorage} from "../../../storage/UnifiedSwapStorage";
 
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer

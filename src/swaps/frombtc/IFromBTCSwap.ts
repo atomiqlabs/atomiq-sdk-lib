@@ -6,7 +6,7 @@ import {
     SignatureVerificationError,
 } from "@atomiqlabs/base";
 import {PriceInfoType} from "../../prices/abstract/ISwapPrice";
-import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../Tokens";
+import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
 
 
 export abstract class IFromBTCSwap<

@@ -1,7 +1,7 @@
 import {CoinType, CtorCoinTypes} from "../abstract/IPriceProvider";
 import {HttpPriceProvider} from "./abstract/HttpPriceProvider";
 import {httpGet} from "../../utils/Utils";
-import {MultiChain} from "../../swaps/Swapper";
+import {MultiChain} from "../../swaps/swapper/Swapper";
 
 export type CoinGeckoResponse<Currency extends string> = {
     [coinId: string]: {[c in Currency]: number}

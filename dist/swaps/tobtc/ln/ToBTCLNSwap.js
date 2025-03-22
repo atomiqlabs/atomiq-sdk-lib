@@ -3,12 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToBTCLNSwap = exports.isToBTCLNSwapInit = void 0;
 const bolt11_1 = require("@atomiqlabs/bolt11");
 const IToBTCSwap_1 = require("../IToBTCSwap");
-const SwapType_1 = require("../../SwapType");
+const SwapType_1 = require("../../enums/SwapType");
 const buffer_1 = require("buffer");
 const sha2_1 = require("@noble/hashes/sha2");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const LNURL_1 = require("../../../utils/LNURL");
-const Tokens_1 = require("../../Tokens");
+const Tokens_1 = require("../../../Tokens");
 const Utils_1 = require("../../../utils/Utils");
 function isToBTCLNSwapInit(obj) {
     return typeof (obj.confidence) === "number" &&
