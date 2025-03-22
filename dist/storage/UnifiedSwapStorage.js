@@ -37,22 +37,22 @@ class UnifiedSwapStorage {
     }
     save(value) {
         if (!this.noWeakRefMap)
-            this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef(value));
+            this.weakRefCache.set(value.getId(), new WeakRef(value));
         return this.storage.save(value.serialize());
     }
     saveAll(values) {
         if (!this.noWeakRefMap)
-            values.forEach(value => this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef(value)));
+            values.forEach(value => this.weakRefCache.set(value.getId(), new WeakRef(value)));
         return this.storage.saveAll(values.map(obj => obj.serialize()));
     }
     remove(value) {
         if (!this.noWeakRefMap)
-            this.weakRefCache.delete(value.getIdentifierHashString());
+            this.weakRefCache.delete(value.getId());
         return this.storage.remove(value.serialize());
     }
     removeAll(values) {
         if (!this.noWeakRefMap)
-            values.forEach(value => this.weakRefCache.delete(value.getIdentifierHashString()));
+            values.forEach(value => this.weakRefCache.delete(value.getId()));
         return this.storage.removeAll(values.map(obj => obj.serialize()));
     }
 }

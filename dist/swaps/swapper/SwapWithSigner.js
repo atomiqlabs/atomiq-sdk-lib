@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.wrapSwapWithSigner = void 0;
-const IToBTCSwap_1 = require("../tobtc/IToBTCSwap");
-const IFromBTCSwap_1 = require("../frombtc/IFromBTCSwap");
-const FromBTCLNSwap_1 = require("../frombtc/ln/FromBTCLNSwap");
+const IToBTCSwap_1 = require("../escrow_swaps/tobtc/IToBTCSwap");
+const IFromBTCSwap_1 = require("../escrow_swaps/frombtc/IFromBTCSwap");
+const FromBTCLNSwap_1 = require("../escrow_swaps/frombtc/ln/FromBTCLNSwap");
 function wrapSwapWithSigner(swap, signer) {
     return new Proxy(swap, {
         get: (target, prop, receiver) => {

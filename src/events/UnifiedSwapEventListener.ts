@@ -1,4 +1,4 @@
-import {ChainType, SwapEvent} from "@atomiqlabs/base";
+import {ChainEvent, ChainType, SpvVaultEvent, SwapEvent} from "@atomiqlabs/base";
 import {ISwap} from "../swaps/ISwap";
 import {EventListener} from "@atomiqlabs/base/src/events/ChainEvents";
 import {SwapType} from "../swaps/enums/SwapType";
@@ -27,20 +27,31 @@ export class UnifiedSwapEventListener<
         this.events = events;
     }
 
-    async processEvents(events: SwapEvent<T["Data"]>[]) {
-        const swaps = await this.storage.query<ISwap<T>>(
-            [[{key: "escrowHash", value: events.map(event => event.escrowHash)}]],
-            (val: any) => {
-                const obj = this.listeners[val.type];
-                if(obj==null) return null;
-                return new obj.reviver(val);
-            }
-        );
-        const swapsObj: {[key: string]: ISwap<T>} = {};
-        swaps.forEach(swap => swapsObj[swap.getEscrowHash()] = swap);
+    async processEvents(events: ChainEvent<T["Data"]>[]) {
+        const escrowEvents: SwapEvent<T["Data"]>[] = [];
+        const spvVaultEvents: SpvVaultEvent[] = [];
+        events.forEach(e => {
+            if(e instanceof SwapEvent) escrowEvents.push(e);
+            if(e instanceof SpvVaultEvent) spvVaultEvents.push(e);
+        })
 
-        for(let event of events) {
-            const swap = swapsObj[event.escrowHash];
+        const escrowSwaps: {[key: string]: ISwap<T>} = {};
+        if(escrowEvents.length>0) {
+            const swaps = await this.storage.query<ISwap<T>>(
+                [[{key: "escrowHash", value: escrowEvents.map(event => event.escrowHash)}]],
+                (val: any) => {
+                    const obj = this.listeners[val.type];
+                    if(obj==null) return null;
+                    return new obj.reviver(val);
+                }
+            );
+            swaps.forEach(swap => escrowSwaps[swap.getEscrowHash()] = swap);
+        }
+
+        //TODO: Also get spv vault swaps from the DB
+
+        for(let event of escrowEvents) {
+            const swap = escrowSwaps[event.escrowHash];
             if(swap==null) continue;
             const obj = this.listeners[swap.getType()];
             if(obj==null) continue;

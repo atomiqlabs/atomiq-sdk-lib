@@ -2,22 +2,22 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Swapper = void 0;
 const base_1 = require("@atomiqlabs/base");
-const ToBTCLNWrapper_1 = require("../tobtc/ln/ToBTCLNWrapper");
-const ToBTCWrapper_1 = require("../tobtc/onchain/ToBTCWrapper");
-const FromBTCLNWrapper_1 = require("../frombtc/ln/FromBTCLNWrapper");
-const FromBTCWrapper_1 = require("../frombtc/onchain/FromBTCWrapper");
+const ToBTCLNWrapper_1 = require("../escrow_swaps/tobtc/ln/ToBTCLNWrapper");
+const ToBTCWrapper_1 = require("../escrow_swaps/tobtc/onchain/ToBTCWrapper");
+const FromBTCLNWrapper_1 = require("../escrow_swaps/frombtc/ln/FromBTCLNWrapper");
+const FromBTCWrapper_1 = require("../escrow_swaps/frombtc/onchain/FromBTCWrapper");
 const IntermediaryDiscovery_1 = require("../../intermediaries/IntermediaryDiscovery");
 const bolt11_1 = require("@atomiqlabs/bolt11");
 const IntermediaryError_1 = require("../../errors/IntermediaryError");
 const SwapType_1 = require("../enums/SwapType");
 const MempoolBtcRelaySynchronizer_1 = require("../../btc/mempool/synchronizer/MempoolBtcRelaySynchronizer");
-const LnForGasWrapper_1 = require("../swapforgas/ln/LnForGasWrapper");
+const LnForGasWrapper_1 = require("../trusted/ln/LnForGasWrapper");
 const events_1 = require("events");
 const LNURL_1 = require("../../utils/LNURL");
 const Utils_1 = require("../../utils/Utils");
 const RequestError_1 = require("../../errors/RequestError");
 const SwapperWithChain_1 = require("./SwapperWithChain");
-const OnchainForGasWrapper_1 = require("../swapforgas/onchain/OnchainForGasWrapper");
+const OnchainForGasWrapper_1 = require("../trusted/onchain/OnchainForGasWrapper");
 const utils_1 = require("@scure/btc-signer/utils");
 const btc_signer_1 = require("@scure/btc-signer");
 const IndexedDBUnifiedStorage_1 = require("../../browser-storage/IndexedDBUnifiedStorage");
@@ -56,35 +56,35 @@ class Swapper extends events_1.EventEmitter {
             this.emit("swapState", swap);
         };
         this.chains = (0, Utils_1.objectMap)(chainsData, (chainData, key) => {
-            const { swapContract, chainEvents, btcRelay } = chainData;
+            const { swapContract, chainEvents, btcRelay, chainInterface } = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer_1.MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
             const storageHandler = options.swapStorage(storagePrefix + chainData.chainId);
             const unifiedSwapStorage = new UnifiedSwapStorage_1.UnifiedSwapStorage(storageHandler, this.options.noSwapCache);
             const unifiedChainEvents = new UnifiedSwapEventListener_1.UnifiedSwapEventListener(unifiedSwapStorage, chainEvents);
             const wrappers = {};
-            wrappers[SwapType_1.SwapType.TO_BTCLN] = new ToBTCLNWrapper_1.ToBTCLNWrapper(key, unifiedSwapStorage, unifiedChainEvents, swapContract, pricing, tokens, chainData.swapDataConstructor, {
+            wrappers[SwapType_1.SwapType.TO_BTCLN] = new ToBTCLNWrapper_1.ToBTCLNWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, swapContract, pricing, tokens, chainData.swapDataConstructor, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout,
             });
-            wrappers[SwapType_1.SwapType.TO_BTC] = new ToBTCWrapper_1.ToBTCWrapper(key, unifiedSwapStorage, unifiedChainEvents, swapContract, pricing, tokens, chainData.swapDataConstructor, this.bitcoinRpc, {
-                getRequestTimeout: options.getRequestTimeout,
-                postRequestTimeout: options.postRequestTimeout,
-                bitcoinNetwork: this.bitcoinNetwork
-            });
-            wrappers[SwapType_1.SwapType.FROM_BTCLN] = new FromBTCLNWrapper_1.FromBTCLNWrapper(key, unifiedSwapStorage, unifiedChainEvents, swapContract, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, {
-                getRequestTimeout: options.getRequestTimeout,
-                postRequestTimeout: options.postRequestTimeout
-            });
-            wrappers[SwapType_1.SwapType.FROM_BTC] = new FromBTCWrapper_1.FromBTCWrapper(key, unifiedSwapStorage, unifiedChainEvents, swapContract, pricing, tokens, chainData.swapDataConstructor, btcRelay, synchronizer, this.bitcoinRpc, {
+            wrappers[SwapType_1.SwapType.TO_BTC] = new ToBTCWrapper_1.ToBTCWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, swapContract, pricing, tokens, chainData.swapDataConstructor, this.bitcoinRpc, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout,
                 bitcoinNetwork: this.bitcoinNetwork
             });
-            wrappers[SwapType_1.SwapType.TRUSTED_FROM_BTCLN] = new LnForGasWrapper_1.LnForGasWrapper(key, unifiedSwapStorage, unifiedChainEvents, swapContract, pricing, tokens, chainData.swapDataConstructor, {
+            wrappers[SwapType_1.SwapType.FROM_BTCLN] = new FromBTCLNWrapper_1.FromBTCLNWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, swapContract, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout
             });
-            wrappers[SwapType_1.SwapType.TRUSTED_FROM_BTC] = new OnchainForGasWrapper_1.OnchainForGasWrapper(key, unifiedSwapStorage, unifiedChainEvents, swapContract, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, {
+            wrappers[SwapType_1.SwapType.FROM_BTC] = new FromBTCWrapper_1.FromBTCWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, swapContract, pricing, tokens, chainData.swapDataConstructor, btcRelay, synchronizer, this.bitcoinRpc, {
+                getRequestTimeout: options.getRequestTimeout,
+                postRequestTimeout: options.postRequestTimeout,
+                bitcoinNetwork: this.bitcoinNetwork
+            });
+            wrappers[SwapType_1.SwapType.TRUSTED_FROM_BTCLN] = new LnForGasWrapper_1.LnForGasWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, pricing, tokens, chainData.swapDataConstructor, {
+                getRequestTimeout: options.getRequestTimeout,
+                postRequestTimeout: options.postRequestTimeout
+            });
+            wrappers[SwapType_1.SwapType.TRUSTED_FROM_BTC] = new OnchainForGasWrapper_1.OnchainForGasWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout
             });
@@ -98,6 +98,7 @@ class Swapper extends events_1.EventEmitter {
             return {
                 chainEvents,
                 swapContract,
+                chainInterface,
                 btcRelay,
                 synchronizer,
                 wrappers,
@@ -256,9 +257,9 @@ class Swapper extends events_1.EventEmitter {
                 ], (obj) => {
                     const swap = reviver(obj);
                     if (swap.randomNonce == null) {
-                        const oldIdentifierHash = swap.getIdentifierHashString();
+                        const oldIdentifierHash = swap.getId();
                         swap.randomNonce = (0, Utils_1.randomBytes)(16).toString("hex");
-                        const newIdentifierHash = swap.getIdentifierHashString();
+                        const newIdentifierHash = swap.getId();
                         this.logger.info("init(): Found older swap version without randomNonce, replacing, old hash: " + oldIdentifierHash +
                             " new hash: " + newIdentifierHash);
                     }
@@ -781,7 +782,7 @@ class Swapper extends events_1.EventEmitter {
                 const removeSwaps = [];
                 for (let swap of swaps) {
                     this.logger.debug("_syncSwaps(): Syncing swap: " + swap.getId());
-                    const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: " + swap.getIdentifierHashString(), e));
+                    const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: " + swap.getId(), e));
                     this.logger.debug("_syncSwaps(): Synced swap: " + swap.getId());
                     if (swap.isQuoteExpired()) {
                         removeSwaps.push(swap);
@@ -814,7 +815,7 @@ class Swapper extends events_1.EventEmitter {
             const removeSwaps = [];
             for (let swap of swaps) {
                 this.logger.debug("_syncSwaps(): Syncing swap: " + swap.getId());
-                const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: " + swap.getIdentifierHashString(), e));
+                const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: " + swap.getId(), e));
                 this.logger.debug("_syncSwaps(): Synced swap: " + swap.getId());
                 if (swap.isQuoteExpired()) {
                     removeSwaps.push(swap);
@@ -868,8 +869,8 @@ class Swapper extends events_1.EventEmitter {
         }
         if (this.chains[chainIdentifier] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
-        const swapContract = this.chains[chainIdentifier].swapContract;
-        if (swapContract.getNativeCurrencyAddress() !== token)
+        const { swapContract, chainInterface } = this.chains[chainIdentifier];
+        if (chainInterface.getNativeCurrencyAddress() !== token)
             return await this.getBalance(chainIdentifier, signer, token);
         let [balance, commitFee] = await Promise.all([
             this.getBalance(chainIdentifier, signer, token),
@@ -888,7 +889,7 @@ class Swapper extends events_1.EventEmitter {
     getNativeBalance(chainIdentifier, signer) {
         if (this.chains[chainIdentifier] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
-        return this.chains[chainIdentifier].swapContract.getBalance(signer, this.getNativeTokenAddress(chainIdentifier), false);
+        return this.chains[chainIdentifier].chainInterface.getBalance(signer, this.getNativeTokenAddress(chainIdentifier));
     }
     /**
      * Returns the address of the native token's address of the chain
@@ -896,7 +897,7 @@ class Swapper extends events_1.EventEmitter {
     getNativeTokenAddress(chainIdentifier) {
         if (this.chains[chainIdentifier] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
-        return this.chains[chainIdentifier].swapContract.getNativeCurrencyAddress();
+        return this.chains[chainIdentifier].chainInterface.getNativeCurrencyAddress();
     }
     /**
      * Returns the address of the native currency of the chain
@@ -904,7 +905,7 @@ class Swapper extends events_1.EventEmitter {
     getNativeToken(chainIdentifier) {
         if (this.chains[chainIdentifier] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
-        return this.tokens[chainIdentifier][this.chains[chainIdentifier].swapContract.getNativeCurrencyAddress()];
+        return this.tokens[chainIdentifier][this.chains[chainIdentifier].chainInterface.getNativeCurrencyAddress()];
     }
     withChain(chainIdentifier) {
         if (this.chains[chainIdentifier] == null)
@@ -914,7 +915,7 @@ class Swapper extends events_1.EventEmitter {
     randomSigner(chainIdentifier) {
         if (this.chains[chainIdentifier] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
-        return this.chains[chainIdentifier].swapContract.randomSigner();
+        return this.chains[chainIdentifier].chainInterface.randomSigner();
     }
     getChains() {
         return Object.keys(this.chains);

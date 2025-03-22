@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UnifiedSwapEventListener = void 0;
+const base_1 = require("@atomiqlabs/base");
 class UnifiedSwapEventListener {
     constructor(unifiedStorage, events) {
         this.listeners = {};
@@ -8,16 +9,27 @@ class UnifiedSwapEventListener {
         this.events = events;
     }
     async processEvents(events) {
-        const swaps = await this.storage.query([[{ key: "escrowHash", value: events.map(event => event.escrowHash) }]], (val) => {
-            const obj = this.listeners[val.type];
-            if (obj == null)
-                return null;
-            return new obj.reviver(val);
+        const escrowEvents = [];
+        const spvVaultEvents = [];
+        events.forEach(e => {
+            if (e instanceof base_1.SwapEvent)
+                escrowEvents.push(e);
+            if (e instanceof base_1.SpvVaultEvent)
+                spvVaultEvents.push(e);
         });
-        const swapsObj = {};
-        swaps.forEach(swap => swapsObj[swap.getEscrowHash()] = swap);
-        for (let event of events) {
-            const swap = swapsObj[event.escrowHash];
+        const escrowSwaps = {};
+        if (escrowEvents.length > 0) {
+            const swaps = await this.storage.query([[{ key: "escrowHash", value: escrowEvents.map(event => event.escrowHash) }]], (val) => {
+                const obj = this.listeners[val.type];
+                if (obj == null)
+                    return null;
+                return new obj.reviver(val);
+            });
+            swaps.forEach(swap => escrowSwaps[swap.getEscrowHash()] = swap);
+        }
+        //TODO: Also get spv vault swaps from the DB
+        for (let event of escrowEvents) {
+            const swap = escrowSwaps[event.escrowHash];
             if (swap == null)
                 continue;
             const obj = this.listeners[swap.getType()];

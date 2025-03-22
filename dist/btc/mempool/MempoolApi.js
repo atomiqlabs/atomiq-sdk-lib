@@ -248,6 +248,14 @@ class MempoolApi {
         return this.request("tx/" + txId + "/merkle-proof", "obj");
     }
     /**
+     * Returns the transaction's proof (merkle proof)
+     *
+     * @param txId
+     */
+    getOutspends(txId) {
+        return this.request("tx/" + txId + "/outspends", "obj");
+    }
+    /**
      * Returns blockhash of a block at a specific blockheight
      *
      * @param height

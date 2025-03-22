@@ -8,26 +8,25 @@ import {
     ChainType,
     RelaySynchronizer
 } from "@atomiqlabs/base";
-import {ToBTCLNOptions, ToBTCLNWrapper} from "../tobtc/ln/ToBTCLNWrapper";
-import {ToBTCOptions, ToBTCWrapper} from "../tobtc/onchain/ToBTCWrapper";
-import {FromBTCLNOptions, FromBTCLNWrapper} from "../frombtc/ln/FromBTCLNWrapper";
-import {FromBTCOptions, FromBTCWrapper} from "../frombtc/onchain/FromBTCWrapper";
+import {ToBTCLNOptions, ToBTCLNWrapper} from "../escrow_swaps/tobtc/ln/ToBTCLNWrapper";
+import {ToBTCOptions, ToBTCWrapper} from "../escrow_swaps/tobtc/onchain/ToBTCWrapper";
+import {FromBTCLNOptions, FromBTCLNWrapper} from "../escrow_swaps/frombtc/ln/FromBTCLNWrapper";
+import {FromBTCOptions, FromBTCWrapper} from "../escrow_swaps/frombtc/onchain/FromBTCWrapper";
 import {IntermediaryDiscovery, MultichainSwapBounds, SwapBounds} from "../../intermediaries/IntermediaryDiscovery";
 import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {ISwap} from "../ISwap";
 import {IntermediaryError} from "../../errors/IntermediaryError";
 import {SwapType} from "../enums/SwapType";
-import {FromBTCLNSwap} from "../frombtc/ln/FromBTCLNSwap";
-import {FromBTCSwap} from "../frombtc/onchain/FromBTCSwap";
-import {ToBTCLNSwap} from "../tobtc/ln/ToBTCLNSwap";
-import {ToBTCSwap} from "../tobtc/onchain/ToBTCSwap";
+import {FromBTCLNSwap} from "../escrow_swaps/frombtc/ln/FromBTCLNSwap";
+import {FromBTCSwap} from "../escrow_swaps/frombtc/onchain/FromBTCSwap";
+import {ToBTCLNSwap} from "../escrow_swaps/tobtc/ln/ToBTCLNSwap";
+import {ToBTCSwap} from "../escrow_swaps/tobtc/onchain/ToBTCSwap";
 import {MempoolApi} from "../../btc/mempool/MempoolApi";
 import {MempoolBitcoinRpc} from "../../btc/mempool/MempoolBitcoinRpc";
 import {MempoolBtcRelaySynchronizer} from "../../btc/mempool/synchronizer/MempoolBtcRelaySynchronizer";
-import {LnForGasWrapper} from "../swapforgas/ln/LnForGasWrapper";
-import {LnForGasSwap} from "../swapforgas/ln/LnForGasSwap";
+import {LnForGasWrapper} from "../trusted/ln/LnForGasWrapper";
+import {LnForGasSwap} from "../trusted/ln/LnForGasSwap";
 import {EventEmitter} from "events";
-import {Buffer} from "buffer";
 import {MempoolBitcoinBlock} from "../../btc/mempool/MempoolBitcoinBlock";
 import {Intermediary} from "../../intermediaries/Intermediary";
 import {isLNURLPay, isLNURLWithdraw, LNURL, LNURLPay, LNURLWithdraw} from "../../utils/LNURL";
@@ -36,15 +35,15 @@ import {bigIntCompare, bigIntMax, bigIntMin, getLogger, objectMap, randomBytes} 
 import {OutOfBoundsError} from "../../errors/RequestError";
 import {SwapperWithChain} from "./SwapperWithChain";
 import {BtcToken, SCToken, Token} from "../../Tokens";
-import {OnchainForGasSwap} from "../swapforgas/onchain/OnchainForGasSwap";
-import {OnchainForGasWrapper} from "../swapforgas/onchain/OnchainForGasWrapper";
+import {OnchainForGasSwap} from "../trusted/onchain/OnchainForGasSwap";
+import {OnchainForGasWrapper} from "../trusted/onchain/OnchainForGasWrapper";
 import {BTC_NETWORK, NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {Address} from "@scure/btc-signer";
 import {IUnifiedStorage, QueryParams} from "../../storage/IUnifiedStorage";
 import {IndexedDBUnifiedStorage} from "../../browser-storage/IndexedDBUnifiedStorage";
 import {UnifiedSwapStorage} from "../../storage/UnifiedSwapStorage";
 import {UnifiedSwapEventListener} from "../../events/UnifiedSwapEventListener";
-import {IToBTCSwap} from "../tobtc/IToBTCSwap";
+import {IToBTCSwap} from "../escrow_swaps/tobtc/IToBTCSwap";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -64,7 +63,7 @@ export type SwapperOptions = {
     noEvents?: boolean,
     noSwapCache?: boolean,
     dontCheckPastSwaps?: boolean,
-    dontFetchLPs?: boolean,
+    dontFetchLPs?: boolean
 };
 
 export type MultiChain = {
@@ -82,6 +81,7 @@ export type ChainSpecificData<T extends ChainType> = {
     }
     chainEvents: T["Events"],
     swapContract: T["Contract"],
+    chainInterface: T["ChainInterface"],
     btcRelay: BtcRelay<any, T["TX"], MempoolBitcoinBlock, T["Signer"]>,
     synchronizer: RelaySynchronizer<any, T["TX"], MempoolBitcoinBlock>,
     unifiedChainEvents: UnifiedSwapEventListener<T>,
@@ -205,7 +205,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         };
 
         this.chains = objectMap<CtorMultiChainData<T>, MultiChainData<T>>(chainsData, <InputKey extends keyof CtorMultiChainData<T>>(chainData: CtorMultiChainData<T>[InputKey], key: string) => {
-            const {swapContract, chainEvents, btcRelay} = chainData;
+            const {swapContract, chainEvents, btcRelay, chainInterface} = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
 
             const storageHandler = options.swapStorage(storagePrefix + chainData.chainId);
@@ -218,6 +218,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 key,
                 unifiedSwapStorage,
                 unifiedChainEvents,
+                chainInterface,
                 swapContract,
                 pricing,
                 tokens,
@@ -231,6 +232,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 key,
                 unifiedSwapStorage,
                 unifiedChainEvents,
+                chainInterface,
                 swapContract,
                 pricing,
                 tokens,
@@ -246,6 +248,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 key,
                 unifiedSwapStorage,
                 unifiedChainEvents,
+                chainInterface,
                 swapContract,
                 pricing,
                 tokens,
@@ -260,6 +263,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 key,
                 unifiedSwapStorage,
                 unifiedChainEvents,
+                chainInterface,
                 swapContract,
                 pricing,
                 tokens,
@@ -277,7 +281,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 key,
                 unifiedSwapStorage,
                 unifiedChainEvents,
-                swapContract,
+                chainInterface,
                 pricing,
                 tokens,
                 chainData.swapDataConstructor,
@@ -290,7 +294,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 key,
                 unifiedSwapStorage,
                 unifiedChainEvents,
-                swapContract,
+                chainInterface,
                 pricing,
                 tokens,
                 chainData.swapDataConstructor,
@@ -312,6 +316,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             return {
                 chainEvents,
                 swapContract,
+                chainInterface,
                 btcRelay,
                 synchronizer,
 
@@ -490,9 +495,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                     (obj: any) => {
                         const swap = reviver(obj);
                         if(swap.randomNonce==null) {
-                            const oldIdentifierHash = swap.getIdentifierHashString();
+                            const oldIdentifierHash = swap.getId();
                             swap.randomNonce = randomBytes(16).toString("hex");
-                            const newIdentifierHash = swap.getIdentifierHashString();
+                            const newIdentifierHash = swap.getId();
                             this.logger.info("init(): Found older swap version without randomNonce, replacing, old hash: "+oldIdentifierHash+
                                 " new hash: "+newIdentifierHash);
                         }
@@ -1206,7 +1211,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 const removeSwaps: ISwap<T[string]>[] = [];
                 for(let swap of swaps) {
                     this.logger.debug("_syncSwaps(): Syncing swap: "+swap.getId());
-                    const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
+                    const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: "+swap.getId(), e));
                     this.logger.debug("_syncSwaps(): Synced swap: "+swap.getId());
                     if(swap.isQuoteExpired()) {
                         removeSwaps.push(swap);
@@ -1237,7 +1242,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             const removeSwaps: ISwap<T[C]>[] = [];
             for(let swap of swaps) {
                 this.logger.debug("_syncSwaps(): Syncing swap: "+swap.getId());
-                const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
+                const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: "+swap.getId(), e));
                 this.logger.debug("_syncSwaps(): Synced swap: "+swap.getId());
                 if(swap.isQuoteExpired()) {
                     removeSwaps.push(swap);
@@ -1300,9 +1305,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         }
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
 
-        const swapContract = this.chains[chainIdentifier].swapContract;
+        const {swapContract, chainInterface} = this.chains[chainIdentifier];
 
-        if(swapContract.getNativeCurrencyAddress()!==token) return await this.getBalance(chainIdentifier, signer, token);
+        if(chainInterface.getNativeCurrencyAddress()!==token) return await this.getBalance(chainIdentifier, signer, token);
 
         let [balance, commitFee] = await Promise.all([
             this.getBalance(chainIdentifier, signer, token),
@@ -1330,7 +1335,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      */
     getNativeBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string): Promise<bigint> {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
-        return this.chains[chainIdentifier].swapContract.getBalance(signer, this.getNativeTokenAddress(chainIdentifier), false);
+        return this.chains[chainIdentifier].chainInterface.getBalance(signer, this.getNativeTokenAddress(chainIdentifier));
     }
 
     /**
@@ -1338,7 +1343,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      */
     getNativeTokenAddress<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): string {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
-        return this.chains[chainIdentifier].swapContract.getNativeCurrencyAddress();
+        return this.chains[chainIdentifier].chainInterface.getNativeCurrencyAddress();
     }
 
     /**
@@ -1346,7 +1351,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
      */
     getNativeToken<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SCToken<ChainIdentifier> {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
-        return this.tokens[chainIdentifier][this.chains[chainIdentifier].swapContract.getNativeCurrencyAddress()] as SCToken<ChainIdentifier>;
+        return this.tokens[chainIdentifier][this.chains[chainIdentifier].chainInterface.getNativeCurrencyAddress()] as SCToken<ChainIdentifier>;
     }
 
     withChain<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SwapperWithChain<T, ChainIdentifier> {
@@ -1356,7 +1361,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
 
     randomSigner<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): T[ChainIdentifier]["Signer"] {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
-        return this.chains[chainIdentifier].swapContract.randomSigner();
+        return this.chains[chainIdentifier].chainInterface.randomSigner();
     }
 
     getChains(): ChainIds<T>[] {
