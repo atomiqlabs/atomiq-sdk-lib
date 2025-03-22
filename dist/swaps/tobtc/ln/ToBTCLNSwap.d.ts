@@ -2,11 +2,11 @@
 /// <reference types="node" />
 import { ToBTCLNWrapper } from "./ToBTCLNWrapper";
 import { IToBTCSwap, IToBTCSwapInit } from "../IToBTCSwap";
-import { SwapType } from "../../SwapType";
+import { SwapType } from "../../enums/SwapType";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { Buffer } from "buffer";
 import { LNURLDecodedSuccessAction, LNURLPaySuccessAction } from "../../../utils/LNURL";
-import { BtcToken, TokenAmount } from "../../Tokens";
+import { BtcToken, TokenAmount } from "../../../Tokens";
 export type ToBTCLNSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     confidence: number;
     pr: string;

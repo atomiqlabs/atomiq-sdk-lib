@@ -1,6 +1,6 @@
 import { CtorCoinTypes } from "../abstract/IPriceProvider";
 import { ExchangePriceProvider } from "./abstract/ExchangePriceProvider";
-import { MultiChain } from "../../swaps/Swapper";
+import { MultiChain } from "../../swaps/swapper/Swapper";
 export type BinanceResponse = {
     symbol: string;
     price: string;

@@ -1,26 +1,26 @@
-import {LNURLPay, LNURLWithdraw} from "../utils/LNURL";
-import {IntermediaryDiscovery, SwapBounds} from "../intermediaries/IntermediaryDiscovery";
-import {SwapType} from "./SwapType";
-import {LnForGasSwap} from "./swapforgas/ln/LnForGasSwap";
-import {ISwap} from "./ISwap";
-import {IToBTCSwap} from "./tobtc/IToBTCSwap";
-import {IFromBTCSwap} from "./frombtc/IFromBTCSwap";
+import {LNURLPay, LNURLWithdraw} from "../../utils/LNURL";
+import {IntermediaryDiscovery, SwapBounds} from "../../intermediaries/IntermediaryDiscovery";
+import {SwapType} from "../enums/SwapType";
+import {LnForGasSwap} from "../swapforgas/ln/LnForGasSwap";
+import {ISwap} from "../ISwap";
+import {IToBTCSwap} from "../tobtc/IToBTCSwap";
+import {IFromBTCSwap} from "../frombtc/IFromBTCSwap";
 import {ChainIds, MultiChain, Swapper, SwapperBtcUtils} from "./Swapper";
-import {FromBTCLNSwap} from "./frombtc/ln/FromBTCLNSwap";
+import {FromBTCLNSwap} from "../frombtc/ln/FromBTCLNSwap";
 import {Buffer} from "buffer";
-import {FromBTCSwap} from "./frombtc/onchain/FromBTCSwap";
-import {ToBTCLNSwap} from "./tobtc/ln/ToBTCLNSwap";
-import {ToBTCSwap} from "./tobtc/onchain/ToBTCSwap";
+import {FromBTCSwap} from "../frombtc/onchain/FromBTCSwap";
+import {ToBTCLNSwap} from "../tobtc/ln/ToBTCLNSwap";
+import {ToBTCSwap} from "../tobtc/onchain/ToBTCSwap";
 import {SwapperWithSigner} from "./SwapperWithSigner";
-import {SwapPriceWithChain} from "../prices/SwapPriceWithChain";
-import {MempoolApi} from "../btc/mempool/MempoolApi";
-import {MempoolBitcoinRpc} from "../btc/mempool/MempoolBitcoinRpc";
-import {BtcToken, SCToken, Token} from "./Tokens";
+import {SwapPriceWithChain} from "../../prices/SwapPriceWithChain";
+import {MempoolApi} from "../../btc/mempool/MempoolApi";
+import {MempoolBitcoinRpc} from "../../btc/mempool/MempoolBitcoinRpc";
+import {BtcToken, SCToken, Token} from "../../Tokens";
 import {BTC_NETWORK} from "@scure/btc-signer/utils";
-import {ToBTCOptions} from "./tobtc/onchain/ToBTCWrapper";
-import {ToBTCLNOptions} from "./tobtc/ln/ToBTCLNWrapper";
-import {FromBTCOptions} from "./frombtc/onchain/FromBTCWrapper";
-import {FromBTCLNOptions} from "./frombtc/ln/FromBTCLNWrapper";
+import {ToBTCOptions} from "../tobtc/onchain/ToBTCWrapper";
+import {ToBTCLNOptions} from "../tobtc/ln/ToBTCLNWrapper";
+import {FromBTCOptions} from "../frombtc/onchain/FromBTCWrapper";
+import {FromBTCLNOptions} from "../frombtc/ln/FromBTCLNWrapper";
 
 export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends ChainIds<T>> implements SwapperBtcUtils {
 

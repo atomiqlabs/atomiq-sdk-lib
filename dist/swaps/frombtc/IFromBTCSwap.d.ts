@@ -2,7 +2,7 @@ import { IFromBTCWrapper } from "./IFromBTCWrapper";
 import { Fee, ISwap, ISwapInit } from "../ISwap";
 import { ChainType } from "@atomiqlabs/base";
 import { PriceInfoType } from "../../prices/abstract/ISwapPrice";
-import { BtcToken, SCToken, TokenAmount } from "../Tokens";
+import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
 export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S extends number = number> extends ISwap<T, S> {
     protected abstract readonly inputToken: BtcToken;
     protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, init: ISwapInit<T["Data"]>);

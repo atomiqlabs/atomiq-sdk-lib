@@ -1,7 +1,7 @@
 import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {FromBTCLNWrapper} from "./FromBTCLNWrapper";
 import {IFromBTCSwap} from "../IFromBTCSwap";
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isISwapInit, ISwapInit} from "../../ISwap";
 import {Buffer} from "buffer";
@@ -15,8 +15,7 @@ import {
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
 import {extendAbortController, getLogger, timeoutPromise, tryWithRetries} from "../../../utils/Utils";
-import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
-import exp from "node:constants";
+import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 
 export enum FromBTCLNSwapState {
     FAILED = -4,

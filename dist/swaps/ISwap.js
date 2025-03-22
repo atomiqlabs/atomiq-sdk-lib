@@ -1,14 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ISwap = exports.isISwapInit = void 0;
-const SwapType_1 = require("./SwapType");
+const SwapType_1 = require("./enums/SwapType");
 const events_1 = require("events");
 const buffer_1 = require("buffer");
 const base_1 = require("@atomiqlabs/base");
 const ISwapPrice_1 = require("../prices/abstract/ISwapPrice");
 const Utils_1 = require("../utils/Utils");
-const Tokens_1 = require("./Tokens");
-const SwapDirection_1 = require("./SwapDirection");
+const Tokens_1 = require("../Tokens");
+const SwapDirection_1 = require("./enums/SwapDirection");
 function isISwapInit(obj) {
     return typeof obj === 'object' &&
         obj != null &&

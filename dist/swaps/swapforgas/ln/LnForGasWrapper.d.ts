@@ -2,7 +2,7 @@ import { LnForGasSwap, LnForGasSwapState } from "./LnForGasSwap";
 import { ISwapWrapper } from "../../ISwapWrapper";
 import { ChainType } from "@atomiqlabs/base";
 import { Intermediary } from "../../../intermediaries/Intermediary";
-import { SwapType } from "../../SwapType";
+import { SwapType } from "../../enums/SwapType";
 export declare class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForGasSwap<T>> {
     TYPE: SwapType;
     readonly swapDeserializer: typeof LnForGasSwap;

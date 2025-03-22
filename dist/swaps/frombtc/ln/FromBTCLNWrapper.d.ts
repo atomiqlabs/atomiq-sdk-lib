@@ -6,14 +6,14 @@ import { IFromBTCWrapper } from "../IFromBTCWrapper";
 import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { Buffer } from "buffer";
-import { SwapType } from "../../SwapType";
+import { SwapType } from "../../enums/SwapType";
 import { LightningNetworkApi } from "../../../btc/LightningNetworkApi";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { LNURLWithdrawParamsWithUrl } from "../../../utils/LNURL";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
-import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
+import { UnifiedSwapStorage } from "../../../storage/UnifiedSwapStorage";
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer;
 };

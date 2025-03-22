@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Intermediary = void 0;
-const SwapType_1 = require("../swaps/SwapType");
+const SwapType_1 = require("../swaps/enums/SwapType");
 const Utils_1 = require("../utils/Utils");
 class Intermediary {
     constructor(url, addresses, services, reputation = {}) {

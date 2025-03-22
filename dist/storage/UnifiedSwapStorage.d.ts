@@ -1,6 +1,6 @@
 import { ChainType } from "@atomiqlabs/base";
-import { IUnifiedStorage } from "../storage/IUnifiedStorage";
-import { ISwap } from "./ISwap";
+import { IUnifiedStorage } from "./IUnifiedStorage";
+import { ISwap } from "../swaps/ISwap";
 export type QueryParams = {
     key: string;
     value: any | any[];

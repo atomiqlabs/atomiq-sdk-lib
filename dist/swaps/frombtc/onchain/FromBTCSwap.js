@@ -2,11 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FromBTCSwap = exports.isFromBTCSwapInit = exports.FromBTCSwapState = void 0;
 const IFromBTCSwap_1 = require("../IFromBTCSwap");
-const SwapType_1 = require("../../SwapType");
+const SwapType_1 = require("../../enums/SwapType");
 const base_1 = require("@atomiqlabs/base");
 const ISwap_1 = require("../../ISwap");
 const buffer_1 = require("buffer");
-const Tokens_1 = require("../../Tokens");
+const Tokens_1 = require("../../../Tokens");
 const Utils_1 = require("../../../utils/Utils");
 var FromBTCSwapState;
 (function (FromBTCSwapState) {

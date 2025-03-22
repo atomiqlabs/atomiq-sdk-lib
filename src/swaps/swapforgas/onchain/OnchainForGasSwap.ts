@@ -1,4 +1,4 @@
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
@@ -9,7 +9,7 @@ import {
     AddressStatusResponseCodes,
     TrustedIntermediaryAPI
 } from "../../../intermediaries/TrustedIntermediaryAPI";
-import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
+import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {OnchainForGasWrapper} from "./OnchainForGasWrapper";
 
 export enum OnchainForGasSwapState {

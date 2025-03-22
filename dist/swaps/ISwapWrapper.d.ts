@@ -4,11 +4,11 @@ import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, SignatureData } fr
 import { EventEmitter } from "events";
 import { ISwap } from "./ISwap";
 import { ISwapPrice, PriceInfoType } from "../prices/abstract/ISwapPrice";
-import { SCToken } from "./Tokens";
-import { ChainIds, MultiChain } from "./Swapper";
+import { SCToken } from "../Tokens";
+import { ChainIds, MultiChain } from "./swapper/Swapper";
 import { UnifiedSwapEventListener } from "../events/UnifiedSwapEventListener";
-import { SwapType } from "./SwapType";
-import { UnifiedSwapStorage } from "./UnifiedSwapStorage";
+import { SwapType } from "./enums/SwapType";
+import { UnifiedSwapStorage } from "../storage/UnifiedSwapStorage";
 export type AmountData = {
     amount: bigint;
     token: string;

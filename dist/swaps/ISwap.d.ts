@@ -1,15 +1,15 @@
 /// <reference types="node" />
 /// <reference types="node" />
 /// <reference types="node" />
-import { SwapType } from "./SwapType";
+import { SwapType } from "./enums/SwapType";
 import { EventEmitter } from "events";
 import { Buffer } from "buffer";
 import { ISwapWrapper } from "./ISwapWrapper";
 import { ChainType, SignatureData, SwapCommitStatus, SwapData } from "@atomiqlabs/base";
 import { PriceInfoType } from "../prices/abstract/ISwapPrice";
 import { LoggerType } from "../utils/Utils";
-import { SCToken, Token, TokenAmount } from "./Tokens";
-import { SwapDirection } from "./SwapDirection";
+import { SCToken, Token, TokenAmount } from "../Tokens";
+import { SwapDirection } from "./enums/SwapDirection";
 export type ISwapInit<T extends SwapData> = {
     pricingInfo: PriceInfoType;
     url: string;

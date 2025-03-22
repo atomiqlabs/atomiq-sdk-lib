@@ -1,10 +1,10 @@
 import {ToBTCWrapper} from "./ToBTCWrapper";
 import {isIToBTCSwapInit, IToBTCSwap, IToBTCSwapInit} from "../IToBTCSwap";
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
-import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../Tokens";
+import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../../Tokens";
 import {getLogger} from "../../../utils/Utils";
 
 

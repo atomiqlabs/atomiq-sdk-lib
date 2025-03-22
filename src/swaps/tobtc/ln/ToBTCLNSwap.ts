@@ -1,13 +1,13 @@
 import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {ToBTCLNWrapper} from "./ToBTCLNWrapper";
 import {isIToBTCSwapInit, IToBTCSwap, IToBTCSwapInit} from "../IToBTCSwap";
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import {sha256} from "@noble/hashes/sha2";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {LNURL, LNURLDecodedSuccessAction, LNURLPaySuccessAction, isLNURLPaySuccessAction} from "../../../utils/LNURL";
-import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../Tokens";
+import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../../Tokens";
 import {getLogger} from "../../../utils/Utils";
 
 export type ToBTCLNSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {

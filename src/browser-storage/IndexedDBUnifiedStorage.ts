@@ -1,7 +1,7 @@
 import {getLogger, LoggerType} from "../utils/Utils";
 import {IUnifiedStorage, QueryParams, UnifiedStoredObject} from "../storage/IUnifiedStorage";
 import {ISwap} from "../swaps/ISwap";
-import {SwapType} from "../swaps/SwapType";
+import {SwapType} from "../swaps/enums/SwapType";
 
 export type QuerySetCondition = {
     key: string,

@@ -1,5 +1,5 @@
-import { ChainIds, MultiChain } from "../../swaps/Swapper";
-import { Token } from "../../swaps/Tokens";
+import { ChainIds, MultiChain } from "../../swaps/swapper/Swapper";
+import { Token } from "../../Tokens";
 export type PriceInfoType = {
     isValid: boolean;
     differencePPM: bigint;

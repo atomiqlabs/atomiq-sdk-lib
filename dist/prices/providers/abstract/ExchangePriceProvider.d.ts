@@ -1,6 +1,6 @@
 import { HttpPriceProvider } from "./HttpPriceProvider";
 import { CoinType } from "../../abstract/IPriceProvider";
-import { MultiChain } from "../../../swaps/Swapper";
+import { MultiChain } from "../../../swaps/swapper/Swapper";
 export declare abstract class ExchangePriceProvider<T extends MultiChain> extends HttpPriceProvider<T> {
     /**
      * Fetches the price on the specific exchange pair

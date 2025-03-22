@@ -6,7 +6,7 @@ const base_1 = require("@atomiqlabs/base");
 const IntermediaryAPI_1 = require("../../intermediaries/IntermediaryAPI");
 const IntermediaryError_1 = require("../../errors/IntermediaryError");
 const Utils_1 = require("../../utils/Utils");
-const Tokens_1 = require("../Tokens");
+const Tokens_1 = require("../../Tokens");
 function isIToBTCSwapInit(obj) {
     return typeof (obj.networkFee) === "bigint" &&
         (obj.networkFeeBtc == null || typeof (obj.networkFeeBtc) === "bigint") &&

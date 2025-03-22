@@ -3,7 +3,7 @@ import { Fee, ISwap, ISwapInit } from "../ISwap";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { PriceInfoType } from "../../prices/abstract/ISwapPrice";
 import { RefundAuthorizationResponse } from "../../intermediaries/IntermediaryAPI";
-import { BtcToken, SCToken, TokenAmount } from "../Tokens";
+import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
 export type IToBTCSwapInit<T extends SwapData> = ISwapInit<T> & {
     networkFee: bigint;
     networkFeeBtc?: bigint;

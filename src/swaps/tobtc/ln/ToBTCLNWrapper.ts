@@ -8,7 +8,7 @@ import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWra
 import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
-import {SwapType} from "../../SwapType";
+import {SwapType} from "../../enums/SwapType";
 import {extendAbortController, tryWithRetries} from "../../../utils/Utils";
 import {IntermediaryAPI, ToBTCLNResponseType} from "../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../errors/RequestError";
@@ -16,7 +16,7 @@ import {LNURL, LNURLPayParamsWithUrl} from "../../../utils/LNURL";
 import {IToBTCSwapInit, ToBTCSwapState} from "../IToBTCSwap";
 import {ToBTCSwap} from "../onchain/ToBTCSwap";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
-import {UnifiedSwapStorage} from "../../UnifiedSwapStorage";
+import {UnifiedSwapStorage} from "../../../storage/UnifiedSwapStorage";
 
 export type ToBTCLNOptions = {
     expirySeconds?: number,

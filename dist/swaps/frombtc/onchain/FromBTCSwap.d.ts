@@ -1,9 +1,9 @@
 import { IFromBTCSwap } from "../IFromBTCSwap";
-import { SwapType } from "../../SwapType";
+import { SwapType } from "../../enums/SwapType";
 import { FromBTCWrapper } from "./FromBTCWrapper";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { ISwapInit } from "../../ISwap";
-import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
+import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
 export declare enum FromBTCSwapState {
     FAILED = -4,
     EXPIRED = -3,
