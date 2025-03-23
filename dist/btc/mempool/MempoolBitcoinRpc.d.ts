@@ -75,9 +75,10 @@ export declare class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<Memp
         tx: BtcTxWithBlockheight;
         vout: number;
     }>;
+    waitForTransaction(txId: string, requiredConfirmations: number, stateUpdateCbk: (confirmations: number, txId: string, txEtaMS: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<BtcTxWithBlockheight>;
     getLNNodeLiquidity(pubkey: string): Promise<LNNodeLiquidity>;
     sendRawTransaction(rawTx: string): Promise<string>;
     sendRawPackage(rawTx: string[]): Promise<string[]>;
-    isSpent(utxo: string): Promise<boolean>;
+    isSpent(utxo: string, confirmed?: boolean): Promise<boolean>;
     parseTransaction(rawTx: string): Promise<BtcTx>;
 }

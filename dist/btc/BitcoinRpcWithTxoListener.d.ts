@@ -7,6 +7,7 @@ export type BtcTxWithBlockheight = BtcTx & {
 };
 export interface BitcoinRpcWithTxoListener<T extends BtcBlock> extends BitcoinRpc<T> {
     getTransaction(txId: string): Promise<BtcTxWithBlockheight>;
+    waitForTransaction(txId: string, requiredConfirmations: number, stateUpdateCbk: (confirmations: number, txId: string, txEtaMS: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<BtcTxWithBlockheight>;
     /**
      * Returns an estimate after which time the tx will confirm with the required amount of confirmations,
      *  confirmationDelay of -1 means the transaction won't confirm in the near future

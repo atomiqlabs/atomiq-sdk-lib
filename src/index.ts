@@ -54,6 +54,10 @@ export * from "./swaps/escrow_swaps/frombtc/onchain/FromBTCSwap";
 export * from "./swaps/escrow_swaps/frombtc/onchain/FromBTCWrapper";
 export * from "./swaps/trusted/ln/LnForGasSwap";
 export * from "./swaps/trusted/ln/LnForGasWrapper";
+export * from "./swaps/trusted/onchain/OnchainForGasSwap";
+export * from "./swaps/trusted/onchain/OnchainForGasWrapper";
+export * from "./swaps/spv_swaps/SpvFromBTCSwap";
+export * from "./swaps/spv_swaps/SpvFromBTCWrapper";
 
 export * from "./utils/LNURL";
 

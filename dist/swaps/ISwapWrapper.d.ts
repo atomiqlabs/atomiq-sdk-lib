@@ -38,7 +38,6 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
     readonly chainIdentifier: string;
     readonly chain: T["ChainInterface"];
     readonly prices: ISwapPrice;
-    readonly swapDataDeserializer: new (data: any) => T["Data"];
     readonly events: EventEmitter;
     readonly options: O;
     readonly tokens: {
@@ -59,7 +58,18 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options: O, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, options: O, events?: EventEmitter);
+    /**
+     * Pre-fetches swap price for a given swap
+     *
+     * @param amountData
+     * @param abortSignal
+     * @protected
+     * @returns Price of the token in uSats (micro sats)
+     */
+    protected preFetchPrice(amountData: {
+        token: string;
+    }, abortSignal?: AbortSignal): Promise<bigint | null>;
     /**
      * Verifies returned  price for swaps
      *
@@ -79,9 +89,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
         swapBaseFee: number;
         swapFeePPM: number;
     }, send: boolean, amountSats: bigint, amountToken: bigint, token: string, feeData: {
-        swapFee: bigint;
         networkFee?: bigint;
-        totalFee?: bigint;
     }, pricePrefetchPromise?: Promise<bigint>, abortSignal?: AbortSignal): Promise<PriceInfoType>;
     abstract readonly pendingSwapStates: Array<S["state"]>;
     abstract readonly tickSwapState: Array<S["state"]>;

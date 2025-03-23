@@ -30,6 +30,8 @@ import { IUnifiedStorage } from "../../storage/IUnifiedStorage";
 import { UnifiedSwapStorage } from "../../storage/UnifiedSwapStorage";
 import { UnifiedSwapEventListener } from "../../events/UnifiedSwapEventListener";
 import { IToBTCSwap } from "../escrow_swaps/tobtc/IToBTCSwap";
+import { SpvFromBTCOptions, SpvFromBTCWrapper } from "../spv_swaps/SpvFromBTCWrapper";
+import { SpvFromBTCSwap } from "../spv_swaps/SpvFromBTCSwap";
 export type SwapperOptions = {
     intermediaryUrl?: string | string[];
     registryUrl?: string;
@@ -59,9 +61,11 @@ export type ChainSpecificData<T extends ChainType> = {
         [SwapType.FROM_BTC]: FromBTCWrapper<T>;
         [SwapType.TRUSTED_FROM_BTCLN]: LnForGasWrapper<T>;
         [SwapType.TRUSTED_FROM_BTC]: OnchainForGasWrapper<T>;
+        [SwapType.SPV_VAULT_FROM_BTC]: SpvFromBTCWrapper<T>;
     };
     chainEvents: T["Events"];
     swapContract: T["Contract"];
+    spvVaultContract: T["SpvVaultContract"];
     chainInterface: T["ChainInterface"];
     btcRelay: BtcRelay<any, T["TX"], MempoolBitcoinBlock, T["Signer"]>;
     synchronizer: RelaySynchronizer<any, T["TX"], MempoolBitcoinBlock>;
@@ -253,6 +257,18 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param options
      */
     createToBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurlPay: string | LNURLPay, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    /**
+     * Creates From BTC swap
+     *
+     * @param chainIdentifier
+     * @param signer
+     * @param tokenAddress          Token address to receive
+     * @param amount                Amount to receive, in satoshis (bitcoin's smallest denomination)
+     * @param exactOut              Whether to use a exact out instead of exact in
+     * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
+     */
+    createFromBTCSwapNew<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: SpvFromBTCOptions): Promise<SpvFromBTCSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTC swap
      *

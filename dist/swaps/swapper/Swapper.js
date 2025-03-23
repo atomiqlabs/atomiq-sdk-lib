@@ -23,6 +23,7 @@ const btc_signer_1 = require("@scure/btc-signer");
 const IndexedDBUnifiedStorage_1 = require("../../browser-storage/IndexedDBUnifiedStorage");
 const UnifiedSwapStorage_1 = require("../../storage/UnifiedSwapStorage");
 const UnifiedSwapEventListener_1 = require("../../events/UnifiedSwapEventListener");
+const SpvFromBTCWrapper_1 = require("../spv_swaps/SpvFromBTCWrapper");
 class Swapper extends events_1.EventEmitter {
     constructor(bitcoinRpc, chainsData, pricing, tokens, options) {
         super();
@@ -56,7 +57,7 @@ class Swapper extends events_1.EventEmitter {
             this.emit("swapState", swap);
         };
         this.chains = (0, Utils_1.objectMap)(chainsData, (chainData, key) => {
-            const { swapContract, chainEvents, btcRelay, chainInterface } = chainData;
+            const { swapContract, chainEvents, btcRelay, chainInterface, spvVaultContract, spvVaultWithdrawalDataConstructor } = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer_1.MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
             const storageHandler = options.swapStorage(storagePrefix + chainData.chainId);
             const unifiedSwapStorage = new UnifiedSwapStorage_1.UnifiedSwapStorage(storageHandler, this.options.noSwapCache);
@@ -80,14 +81,21 @@ class Swapper extends events_1.EventEmitter {
                 postRequestTimeout: options.postRequestTimeout,
                 bitcoinNetwork: this.bitcoinNetwork
             });
-            wrappers[SwapType_1.SwapType.TRUSTED_FROM_BTCLN] = new LnForGasWrapper_1.LnForGasWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, pricing, tokens, chainData.swapDataConstructor, {
+            wrappers[SwapType_1.SwapType.TRUSTED_FROM_BTCLN] = new LnForGasWrapper_1.LnForGasWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, pricing, tokens, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout
             });
-            wrappers[SwapType_1.SwapType.TRUSTED_FROM_BTC] = new OnchainForGasWrapper_1.OnchainForGasWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, {
+            wrappers[SwapType_1.SwapType.TRUSTED_FROM_BTC] = new OnchainForGasWrapper_1.OnchainForGasWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, pricing, tokens, bitcoinRpc, {
                 getRequestTimeout: options.getRequestTimeout,
                 postRequestTimeout: options.postRequestTimeout
             });
+            if (spvVaultContract != null) {
+                wrappers[SwapType_1.SwapType.SPV_VAULT_FROM_BTC] = new SpvFromBTCWrapper_1.SpvFromBTCWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, spvVaultContract, pricing, tokens, spvVaultWithdrawalDataConstructor, btcRelay, synchronizer, bitcoinRpc, {
+                    getRequestTimeout: options.getRequestTimeout,
+                    postRequestTimeout: options.postRequestTimeout,
+                    bitcoinNetwork: this.bitcoinNetwork
+                });
+            }
             Object.keys(wrappers).forEach(key => wrappers[key].events.on("swapState", this.swapStateListener));
             const reviver = (val) => {
                 const wrapper = wrappers[val.type];
@@ -97,6 +105,7 @@ class Swapper extends events_1.EventEmitter {
             };
             return {
                 chainEvents,
+                spvVaultContract,
                 swapContract,
                 chainInterface,
                 btcRelay,
@@ -510,6 +519,25 @@ class Swapper extends events_1.EventEmitter {
         };
         options.expirySeconds ??= 5 * 24 * 3600;
         return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.wrappers[SwapType_1.SwapType.TO_BTCLN].createViaLNURL(signer, typeof (lnurlPay) === "string" ? lnurlPay : lnurlPay.params, amountData, candidates, options, additionalParams, abortSignal), amountData, SwapType_1.SwapType.TO_BTCLN);
+    }
+    /**
+     * Creates From BTC swap
+     *
+     * @param chainIdentifier
+     * @param signer
+     * @param tokenAddress          Token address to receive
+     * @param amount                Amount to receive, in satoshis (bitcoin's smallest denomination)
+     * @param exactOut              Whether to use a exact out instead of exact in
+     * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
+     */
+    async createFromBTCSwapNew(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters, options) {
+        const amountData = {
+            amount,
+            token: tokenAddress,
+            exactIn: !exactOut
+        };
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.wrappers[SwapType_1.SwapType.SPV_VAULT_FROM_BTC].create(signer, amountData, candidates, options, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.SPV_VAULT_FROM_BTC);
     }
     /**
      * Creates From BTC swap

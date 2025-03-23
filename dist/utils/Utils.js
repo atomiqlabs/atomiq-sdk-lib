@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.randomBytes = exports.toOutputScript = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
+exports.randomBytes = exports.toCoinselectAddressType = exports.toOutputScript = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
 const RequestError_1 = require("../errors/RequestError");
 const buffer_1 = require("buffer");
 const btc_signer_1 = require("@scure/btc-signer");
@@ -305,6 +305,23 @@ function toOutputScript(network, address) {
     }
 }
 exports.toOutputScript = toOutputScript;
+function toCoinselectAddressType(outputScript) {
+    const data = btc_signer_1.OutScript.decode(outputScript);
+    switch (data.type) {
+        case "pkh":
+            return "p2pkh";
+        case "sh":
+            return "p2sh-p2wpkh";
+        case "wpkh":
+            return "p2wpkh";
+        case "wsh":
+            return "p2wsh";
+        case "tr":
+            return "p2tr";
+    }
+    throw new Error("Unrecognized address type!");
+}
+exports.toCoinselectAddressType = toCoinselectAddressType;
 function randomBytes(bytesLength) {
     return buffer_1.Buffer.from((0, utils_1.randomBytes)(bytesLength));
 }

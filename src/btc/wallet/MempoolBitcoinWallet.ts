@@ -1,10 +1,10 @@
-import {coinSelect, maxSendable, CoinselectAddressTypes} from "../coinselect2";
+import {coinSelect, maxSendable, CoinselectAddressTypes, CoinselectTxInput} from "../coinselect2";
 import {BTC_NETWORK} from "@scure/btc-signer/utils"
 import {p2wpkh, OutScript, Transaction, p2tr} from "@scure/btc-signer";
 import {IBitcoinWallet} from "./IBitcoinWallet";
 import {MempoolApi} from "../mempool/MempoolApi";
 import {Buffer} from "buffer";
-import {randomBytes, toOutputScript} from "../../utils/Utils";
+import {randomBytes, toCoinselectAddressType, toOutputScript} from "../../utils/Utils";
 
 export type BitcoinWalletUtxo = {
     vout: number,
@@ -25,16 +25,18 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
     mempoolApi: MempoolApi;
     network: BTC_NETWORK;
     feeMultiplier: number;
+    feeOverride: number;
 
-    constructor(mempoolApi: MempoolApi, network: BTC_NETWORK, feeMultiplier: number = 1.25) {
+    constructor(mempoolApi: MempoolApi, network: BTC_NETWORK, feeMultiplier: number = 1.25, feeOverride?: number) {
         this.mempoolApi = mempoolApi;
         this.network = network;
         this.feeMultiplier = feeMultiplier;
+        this.feeOverride = feeOverride;
     }
 
-    protected async _getFeeRate(): Promise<number> {
-        if(process.env.REACT_APP_OVERRIDE_BITCOIN_FEE!=null) {
-            return parseInt(process.env.REACT_APP_OVERRIDE_BITCOIN_FEE);
+    async getFeeRate(): Promise<number> {
+        if(this.feeOverride!=null) {
+            return this.feeOverride;
         }
         return Math.floor((await this.mempoolApi.getFees()).fastestFee*this.feeMultiplier);
     }
@@ -95,7 +97,24 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         amount: number,
         feeRate?: number
     ): Promise<{psbt: Transaction, fee: number, inputAddressIndexes: {[address: string]: number[]}}> {
-        if(feeRate==null) feeRate = await this._getFeeRate();
+        const psbt = new Transaction({PSBTVersion: 0});
+        psbt.addOutput({
+            amount: BigInt(amount),
+            script: toOutputScript(this.network, recipient)
+        });
+        return this._fundPsbt(sendingAccounts, psbt, feeRate);
+    }
+
+    protected async _fundPsbt(
+        sendingAccounts: {
+            pubkey: string,
+            address: string,
+            addressType: CoinselectAddressTypes,
+        }[],
+        psbt: Transaction,
+        feeRate?: number
+    ): Promise<{psbt: Transaction, fee: number, inputAddressIndexes: {[address: string]: number[]}}> {
+        if(feeRate==null) feeRate = await this.getFeeRate();
 
         const utxoPool: BitcoinWalletUtxo[] = (await Promise.all(sendingAccounts.map(acc => this._getUtxoPool(acc.address, acc.addressType)))).flat();
 
@@ -104,16 +123,30 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         const accountPubkeys = {};
         sendingAccounts.forEach(acc => accountPubkeys[acc.address] = acc.pubkey);
 
-        const targets = [
-            {
-                address: recipient,
-                value: amount,
-                script: toOutputScript(this.network, recipient)
-            }
-        ];
+        const requiredInputs: CoinselectTxInput[] = [];
+        for(let i=0;i<psbt.inputsLength;i++) {
+            const input = psbt.getInput(i);
+            let amount: bigint = input.witnessUtxo!=null ? input.witnessUtxo.amount : input.nonWitnessUtxo.outputs[input.index].amount;
+            let script: Uint8Array = input.witnessUtxo!=null ? input.witnessUtxo.script : input.nonWitnessUtxo.outputs[input.index].script;
+            requiredInputs.push({
+                txId: Buffer.from(input.txid).toString('hex'),
+                vout: input.index,
+                value: Number(amount),
+                type: toCoinselectAddressType(script)
+            })
+        }
+
+        const targets: {value: number, script: Buffer}[] = [];
+        for(let i=0;i<psbt.outputsLength;i++) {
+            const output = psbt.getOutput(i);
+            targets.push({
+                value: Number(output.amount),
+                script: Buffer.from(output.script)
+            })
+        }
         console.log("Coinselect targets: ", targets);
 
-        let coinselectResult = coinSelect(utxoPool, targets, feeRate, sendingAccounts[0].addressType);
+        let coinselectResult = coinSelect(utxoPool, targets, feeRate, sendingAccounts[0].addressType, requiredInputs);
         console.log("Coinselect result: ", coinselectResult);
 
         if(coinselectResult.inputs==null || coinselectResult.outputs==null) {
@@ -124,7 +157,9 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
             };
         }
 
-        const psbt = new Transaction({PSBTVersion: 0});
+        // Remove in/outs that are already in the PSBT
+        coinselectResult.inputs.splice(0, psbt.inputsLength);
+        coinselectResult.outputs.splice(0, psbt.outputsLength);
 
         const inputAddressIndexes: {[address: string]: number[]} = {};
         coinselectResult.inputs.forEach((input, index) => {
@@ -182,17 +217,20 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
 
         formattedInputs.forEach(input => psbt.addInput(input));
 
-        psbt.addOutput({
-            script: toOutputScript(this.network, recipient),
-            amount: BigInt(amount)
+        coinselectResult.outputs.forEach(output => {
+            if(output.script==null && output.address==null) {
+                //Change output
+                psbt.addOutput({
+                    script: toOutputScript(this.network, sendingAccounts[0].address),
+                    amount: BigInt(Math.floor(output.value))
+                });
+            } else {
+                psbt.addOutput({
+                    script: output.script ?? toOutputScript(this.network, output.address),
+                    amount: BigInt(output.value)
+                });
+            }
         });
-
-        if(coinselectResult.outputs.length>1) {
-            psbt.addOutput({
-                script: toOutputScript(this.network, sendingAccounts[0].address),
-                amount: BigInt(Math.floor(coinselectResult.outputs[1].value))
-            });
-        }
 
         return {
             psbt,
@@ -211,7 +249,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         feeRate: number,
         totalFee: number
     }> {
-        const useFeeRate = await this._getFeeRate();
+        const useFeeRate = await this.getFeeRate();
 
         const utxoPool: BitcoinWalletUtxo[] = (await Promise.all(sendingAccounts.map(acc => this._getUtxoPool(acc.address, acc.addressType)))).flat();
 
@@ -222,7 +260,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
             hash: randomBytes(32)
         });
 
-        let coinselectResult = maxSendable(utxoPool, Buffer.from(target), "p2wsh", useFeeRate);
+        let coinselectResult = maxSendable(utxoPool, {script: Buffer.from(target), type: "p2wsh"}, useFeeRate);
 
         console.log("Max spendable result: ", coinselectResult);
 
@@ -234,6 +272,9 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
     }
 
     abstract sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string>;
+    abstract fundPsbt(psbt: Transaction): Promise<Transaction>;
+    abstract signPsbt(psbt: Transaction): Promise<Transaction>;
+
     abstract getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number>;
     abstract getReceiveAddress(): string;
     abstract getBalance(): Promise<{
@@ -245,5 +286,6 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         feeRate: number,
         totalFee: number
     }>;
+
 
 }

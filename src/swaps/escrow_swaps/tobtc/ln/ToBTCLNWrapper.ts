@@ -183,7 +183,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
             const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                 this.verifyReturnedPrice(
                     lp.services[SwapType.TO_BTCLN], true, amountOut, data.getAmount(),
-                    amountData.token, {swapFee: resp.swapFee, networkFee: resp.maxFee, totalFee},
+                    amountData.token, {networkFee: resp.maxFee},
                     preFetches.pricePreFetchPromise, abortController.signal
                 ),
                 this.verifyReturnedSignature(
@@ -372,7 +372,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
             const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                 this.verifyReturnedPrice(
                     lp.services[SwapType.TO_BTCLN], true, prepareResp.amount, data.getAmount(),
-                    amountData.token, {swapFee: resp.swapFee, networkFee: resp.maxFee, totalFee},
+                    amountData.token, {networkFee: resp.maxFee},
                     preFetches.pricePreFetchPromise, abortSignal
                 ),
                 this.verifyReturnedSignature(

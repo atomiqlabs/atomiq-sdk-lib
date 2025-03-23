@@ -6,22 +6,9 @@ const base_1 = require("@atomiqlabs/base");
 const Utils_1 = require("../../utils/Utils");
 class IEscrowSwapWrapper extends ISwapWrapper_1.ISwapWrapper {
     constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, options, events) {
-        super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
+        this.swapDataDeserializer = swapDataDeserializer;
         this.contract = contract;
-    }
-    /**
-     * Pre-fetches swap price for a given swap
-     *
-     * @param amountData
-     * @param abortSignal
-     * @protected
-     * @returns Price of the token in uSats (micro sats)
-     */
-    preFetchPrice(amountData, abortSignal) {
-        return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
-            this.logger.error("preFetchPrice(): Error: ", e);
-            return null;
-        });
     }
     /**
      * Pre-fetches signature verification data from the server's pre-sent promise, doesn't throw, instead returns null

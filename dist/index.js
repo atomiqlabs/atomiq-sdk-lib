@@ -66,6 +66,10 @@ __exportStar(require("./swaps/escrow_swaps/frombtc/onchain/FromBTCSwap"), export
 __exportStar(require("./swaps/escrow_swaps/frombtc/onchain/FromBTCWrapper"), exports);
 __exportStar(require("./swaps/trusted/ln/LnForGasSwap"), exports);
 __exportStar(require("./swaps/trusted/ln/LnForGasWrapper"), exports);
+__exportStar(require("./swaps/trusted/onchain/OnchainForGasSwap"), exports);
+__exportStar(require("./swaps/trusted/onchain/OnchainForGasWrapper"), exports);
+__exportStar(require("./swaps/spv_swaps/SpvFromBTCSwap"), exports);
+__exportStar(require("./swaps/spv_swaps/SpvFromBTCWrapper"), exports);
 __exportStar(require("./utils/LNURL"), exports);
 __exportStar(require("./storage/IUnifiedStorage"), exports);
 __exportStar(require("./browser-storage/IndexedDBUnifiedStorage"), exports);

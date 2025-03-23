@@ -288,7 +288,7 @@ export class FromBTCLNWrapper<
                         const [pricingInfo] = await Promise.all([
                             this.verifyReturnedPrice(
                                 lp.services[SwapType.FROM_BTCLN], false, amountIn, resp.total,
-                                amountData.token, resp, preFetches.pricePrefetchPromise, abortController.signal
+                                amountData.token, {}, preFetches.pricePrefetchPromise, abortController.signal
                             ),
                             this.verifyIntermediaryLiquidity(resp.total, liquidityPromise),
                             this.verifyLnNodeCapacity(lp, decodedPr, amountIn, lnCapacityPromise, abortController.signal)

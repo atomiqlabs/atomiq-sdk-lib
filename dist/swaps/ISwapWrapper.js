@@ -17,7 +17,7 @@ class ISwapWrapper {
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, swapDataDeserializer, options, events) {
+    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events) {
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
         this.pendingSwaps = new Map();
         this.isInitialized = false;
@@ -27,7 +27,6 @@ class ISwapWrapper {
         this.chainIdentifier = chainIdentifier;
         this.chain = chain;
         this.prices = prices;
-        this.swapDataDeserializer = swapDataDeserializer;
         this.events = events || new events_1.EventEmitter();
         this.options = options;
         this.tokens = {};
@@ -45,6 +44,20 @@ class ISwapWrapper {
                 displayDecimals: chainData.displayDecimals
             };
         }
+    }
+    /**
+     * Pre-fetches swap price for a given swap
+     *
+     * @param amountData
+     * @param abortSignal
+     * @protected
+     * @returns Price of the token in uSats (micro sats)
+     */
+    preFetchPrice(amountData, abortSignal) {
+        return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
+            this.logger.error("preFetchPrice(): Error: ", e);
+            return null;
+        });
     }
     /**
      * Verifies returned  price for swaps

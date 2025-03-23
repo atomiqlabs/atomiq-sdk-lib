@@ -372,7 +372,7 @@ export class FromBTCWrapper<
                             //Get intermediary's liquidity
                             this.verifyReturnedPrice(
                                 lp.services[SwapType.FROM_BTC], false, resp.amount, resp.total,
-                                amountData.token, resp, pricePrefetchPromise, abortController.signal
+                                amountData.token, {}, pricePrefetchPromise, abortController.signal
                             ),
                             this.verifyReturnedSignature(data, resp, feeRatePromise, signDataPromise, abortController.signal),
                             this.verifyIntermediaryLiquidity(data.getAmount(), liquidityPromise),

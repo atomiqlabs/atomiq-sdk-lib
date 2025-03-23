@@ -23,8 +23,9 @@ export declare abstract class MempoolBitcoinWallet implements IBitcoinWallet {
     mempoolApi: MempoolApi;
     network: BTC_NETWORK;
     feeMultiplier: number;
-    constructor(mempoolApi: MempoolApi, network: BTC_NETWORK, feeMultiplier?: number);
-    protected _getFeeRate(): Promise<number>;
+    feeOverride: number;
+    constructor(mempoolApi: MempoolApi, network: BTC_NETWORK, feeMultiplier?: number, feeOverride?: number);
+    getFeeRate(): Promise<number>;
     protected _sendTransaction(rawHex: string): Promise<string>;
     protected _getBalance(address: string): Promise<{
         confirmedBalance: bigint;
@@ -42,6 +43,17 @@ export declare abstract class MempoolBitcoinWallet implements IBitcoinWallet {
             [address: string]: number[];
         };
     }>;
+    protected _fundPsbt(sendingAccounts: {
+        pubkey: string;
+        address: string;
+        addressType: CoinselectAddressTypes;
+    }[], psbt: Transaction, feeRate?: number): Promise<{
+        psbt: Transaction;
+        fee: number;
+        inputAddressIndexes: {
+            [address: string]: number[];
+        };
+    }>;
     protected _getSpendableBalance(sendingAccounts: {
         address: string;
         addressType: CoinselectAddressTypes;
@@ -51,6 +63,8 @@ export declare abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         totalFee: number;
     }>;
     abstract sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string>;
+    abstract fundPsbt(psbt: Transaction): Promise<Transaction>;
+    abstract signPsbt(psbt: Transaction): Promise<Transaction>;
     abstract getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number>;
     abstract getReceiveAddress(): string;
     abstract getBalance(): Promise<{

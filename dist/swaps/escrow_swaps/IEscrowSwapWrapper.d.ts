@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { AmountData, ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens } from "../ISwapWrapper";
+import { ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens } from "../ISwapWrapper";
 import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, SignatureData, SwapEvent } from "@atomiqlabs/base";
 import { UnifiedSwapStorage } from "../../storage/UnifiedSwapStorage";
 import { UnifiedSwapEventListener } from "../../events/UnifiedSwapEventListener";
@@ -15,16 +15,8 @@ export declare abstract class IEscrowSwapWrapper<T extends ChainType, S extends 
     };
     readonly abstract tickSwapState: Array<S["state"]>;
     readonly contract: T["Contract"];
+    readonly swapDataDeserializer: new (data: any) => T["Data"];
     constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options: O, events?: EventEmitter);
-    /**
-     * Pre-fetches swap price for a given swap
-     *
-     * @param amountData
-     * @param abortSignal
-     * @protected
-     * @returns Price of the token in uSats (micro sats)
-     */
-    protected preFetchPrice(amountData: Omit<AmountData, "amount">, abortSignal?: AbortSignal): Promise<bigint | null>;
     /**
      * Pre-fetches signature verification data from the server's pre-sent promise, doesn't throw, instead returns null
      *

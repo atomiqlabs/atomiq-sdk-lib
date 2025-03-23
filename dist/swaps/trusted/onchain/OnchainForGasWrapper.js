@@ -14,13 +14,12 @@ class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
      * @param chain
      * @param prices Pricing to use
      * @param tokens
-     * @param swapDataDeserializer Deserializer for SwapData
      * @param btcRpc Bitcoin RPC which also supports getting transactions by txoHash
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, swapDataDeserializer, btcRpc, options, events) {
-        super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, swapDataDeserializer, options, events);
+    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, btcRpc, options, events) {
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
         this.TYPE = SwapType_1.SwapType.TRUSTED_FROM_BTC;
         this.swapDeserializer = OnchainForGasSwap_1.OnchainForGasSwap;
         this.pendingSwapStates = [OnchainForGasSwap_1.OnchainForGasSwapState.PR_CREATED];
@@ -51,7 +50,7 @@ class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
             throw new IntermediaryError_1.IntermediaryError("Invalid total returned");
         const pricingInfo = await this.verifyReturnedPrice(typeof (lpOrUrl) === "string" ?
             { swapFeePPM: 10000, swapBaseFee: 10 } :
-            lpOrUrl.services[SwapType_1.SwapType.TRUSTED_FROM_BTC], false, resp.amountSats, amount, this.chain.getNativeCurrencyAddress(), resp);
+            lpOrUrl.services[SwapType_1.SwapType.TRUSTED_FROM_BTC], false, resp.amountSats, amount, this.chain.getNativeCurrencyAddress(), {});
         const quote = new OnchainForGasSwap_1.OnchainForGasSwap(this, {
             paymentHash: resp.paymentHash,
             sequence: resp.sequence,

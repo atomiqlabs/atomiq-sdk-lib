@@ -24,7 +24,6 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
      * @param chain
      * @param prices Pricing to use
      * @param tokens
-     * @param swapDataDeserializer Deserializer for SwapData
      * @param btcRpc Bitcoin RPC which also supports getting transactions by txoHash
      * @param options
      * @param events Instance to use for emitting events
@@ -36,12 +35,11 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         chain: T["ChainInterface"],
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
-        swapDataDeserializer: new (data: any) => T["Data"],
         btcRpc: BitcoinRpcWithTxoListener<any>,
         options?: ISwapWrapperOptions,
         events?: EventEmitter
     ) {
-        super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
         this.btcRpc = btcRpc;
     }
 
@@ -74,7 +72,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
                 {swapFeePPM: 10000, swapBaseFee: 10} :
                 lpOrUrl.services[SwapType.TRUSTED_FROM_BTC],
             false, resp.amountSats,
-            amount, this.chain.getNativeCurrencyAddress(), resp
+            amount, this.chain.getNativeCurrencyAddress(), {}
         );
 
         const quote = new OnchainForGasSwap(this, {

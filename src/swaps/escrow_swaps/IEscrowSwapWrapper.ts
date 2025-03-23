@@ -27,6 +27,7 @@ export abstract class IEscrowSwapWrapper<
     readonly abstract tickSwapState: Array<S["state"]>;
 
     readonly contract: T["Contract"];
+    readonly swapDataDeserializer: new (data: any) => T["Data"];
 
     constructor(
         chainIdentifier: string,
@@ -40,23 +41,9 @@ export abstract class IEscrowSwapWrapper<
         options: O,
         events?: EventEmitter
     ) {
-        super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
+        this.swapDataDeserializer = swapDataDeserializer;
         this.contract = contract;
-    }
-
-    /**
-     * Pre-fetches swap price for a given swap
-     *
-     * @param amountData
-     * @param abortSignal
-     * @protected
-     * @returns Price of the token in uSats (micro sats)
-     */
-    protected preFetchPrice(amountData: Omit<AmountData, "amount">, abortSignal?: AbortSignal): Promise<bigint | null> {
-        return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
-            this.logger.error("preFetchPrice(): Error: ", e);
-            return null;
-        });
     }
 
     /**
