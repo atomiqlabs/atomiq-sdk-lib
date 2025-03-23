@@ -121,7 +121,14 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
 
     async refreshPriceData(): Promise<PriceInfoType> {
         if(this.pricingInfo==null) return null;
-        const priceData = await this.wrapper.prices.isValidAmountSend(this.chainIdentifier, this.getOutput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
+        const priceData = await this.wrapper.prices.isValidAmountSend(
+            this.chainIdentifier,
+            this.getOutput().rawAmount,
+            this.pricingInfo.satsBaseFee,
+            this.pricingInfo.feePPM,
+            this.data.getAmount(),
+            this.data.getToken()
+        );
         this.pricingInfo = priceData;
         return priceData;
     }

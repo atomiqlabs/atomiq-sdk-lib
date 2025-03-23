@@ -307,6 +307,38 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
         abortSignal.throwIfAborted();
     }
 
+
+    async waitForTransaction(
+        txId: string, requiredConfirmations: number,
+        stateUpdateCbk: (confirmations: number, txId: string, txEtaMS: number) => void,
+        abortSignal?: AbortSignal, intervalSeconds?: number
+    ): Promise<BtcTxWithBlockheight> {
+        if(abortSignal!=null) abortSignal.throwIfAborted();
+
+        while(abortSignal==null || !abortSignal.aborted) {
+            await timeoutPromise((intervalSeconds || 5)*1000, abortSignal);
+
+            const result = await this.getTransaction(txId);
+            if(result==null) {
+                stateUpdateCbk(null, null, null);
+                continue;
+            }
+
+            const confirmationDelay = await this.getConfirmationDelay(result, requiredConfirmations);
+            if(confirmationDelay==null) continue;
+
+            if(stateUpdateCbk!=null) stateUpdateCbk(
+                result.confirmations,
+                result.txid,
+                confirmationDelay
+            );
+
+            if(confirmationDelay===0) return result;
+        }
+
+        abortSignal.throwIfAborted();
+    }
+
     async getLNNodeLiquidity(pubkey: string): Promise<LNNodeLiquidity> {
         const nodeInfo = await this.api.getLNNodeInfo(pubkey);
         return {
@@ -324,11 +356,14 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
         throw new Error("Unsupported");
     }
 
-    async isSpent(utxo: string): Promise<boolean> {
+    async isSpent(utxo: string, confirmed?: boolean): Promise<boolean> {
         const [txId, voutStr] = utxo.split(":");
         const vout = parseInt(voutStr);
         const outspends = await this.api.getOutspends(txId);
         if(outspends[vout]==null) return true;
+        if(confirmed) {
+            return outspends[vout].spent && outspends[vout].status.confirmed;
+        }
         return outspends[vout].spent;
     }
 

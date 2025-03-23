@@ -41,7 +41,7 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
                 {swapFeePPM: 10000, swapBaseFee: 10} :
                 lpOrUrl.services[SwapType.TRUSTED_FROM_BTCLN],
             false, amountIn,
-            amount, token, resp
+            amount, token, {}
         );
 
         const quote = new LnForGasSwap(this, {

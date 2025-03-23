@@ -4,14 +4,14 @@ exports.accumulative = void 0;
 const utils_1 = require("./utils");
 // add inputs until we reach or surpass the target value (or deplete)
 // worst-case: O(n)
-function accumulative(utxos, outputs, feeRate, type) {
+function accumulative(utxos, outputs, feeRate, type, requiredInputs) {
     if (!isFinite(utils_1.utils.uintOrNaN(feeRate)))
         return null;
-    let bytesAccum = utils_1.utils.transactionBytes([], outputs, type);
+    const inputs = requiredInputs ?? [];
+    let bytesAccum = utils_1.utils.transactionBytes(inputs, outputs, type);
     let fee = feeRate * bytesAccum;
     let cpfpAddFee = 0;
-    let inAccum = 0;
-    const inputs = [];
+    let inAccum = utils_1.utils.sumOrNaN(inputs);
     const outAccum = utils_1.utils.sumOrNaN(outputs);
     console.log("CoinSelect: accumulative(): total output: ", outAccum);
     for (let i = 0; i < utxos.length; ++i) {

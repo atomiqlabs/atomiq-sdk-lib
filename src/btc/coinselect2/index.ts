@@ -16,6 +16,7 @@ export function coinSelect (
     outputs: CoinselectTxOutput[],
     feeRate: number,
     type: CoinselectAddressTypes,
+    requiredInputs?: CoinselectTxInput[]
 ): {
     inputs?: CoinselectTxInput[],
     outputs?: CoinselectTxOutput[],
@@ -29,28 +30,31 @@ export function coinSelect (
     });
 
     // attempt to use the blackjack strategy first (no change output)
-    const base = blackjack(utxos, outputs, feeRate, type);
+    const base = blackjack(utxos, outputs, feeRate, type, requiredInputs);
     if (base.inputs) return base;
 
     // else, try the accumulative strategy
-    return accumulative(utxos, outputs, feeRate, type);
+    return accumulative(utxos, outputs, feeRate, type, requiredInputs);
 }
 
 export function maxSendable (
     utxos: CoinselectTxInput[],
-    outputScript: Buffer,
-    outputType: CoinselectAddressTypes,
+    output: {script: Buffer, type: CoinselectAddressTypes},
     feeRate: number,
+    requiredInputs?: CoinselectTxInput[],
+    additionalOutputs?: {script: Buffer, value: number}[],
 ): {
     value: number,
     fee: number
 } {
     if (!isFinite(utils.uintOrNaN(feeRate))) return null;
 
-    let bytesAccum = utils.transactionBytes([], [{script: outputScript}], null);
+    const outputs = additionalOutputs ?? [];
+    const inputs = requiredInputs ?? [];
+    let bytesAccum = utils.transactionBytes(inputs, (outputs as {script: Buffer}[]).concat([output]) , null);
     let cpfpAddFee = 0;
-    let inAccum = 0;
-    const inputs = [];
+    let inAccum = utils.sumOrNaN(inputs);
+    let outAccum = utils.sumOrNaN(outputs);
 
     for (let i = 0; i < utxos.length; ++i) {
         const utxo = utxos[i];
@@ -72,9 +76,9 @@ export function maxSendable (
     }
 
     const fee = (feeRate * bytesAccum) + cpfpAddFee;
-    const outputValue = inAccum - fee;
+    const outputValue = inAccum - fee - outAccum;
 
-    const dustThreshold = DUST_THRESHOLDS[outputType];
+    const dustThreshold = DUST_THRESHOLDS[output.type];
 
     if(outputValue<dustThreshold) return {
         fee,

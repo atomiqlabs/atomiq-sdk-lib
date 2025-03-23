@@ -55,7 +55,6 @@ export abstract class ISwapWrapper<
     readonly chainIdentifier: string;
     readonly chain: T["ChainInterface"];
     readonly prices: ISwapPrice;
-    readonly swapDataDeserializer: new (data: any) => T["Data"];
     readonly events: EventEmitter;
     readonly options: O;
     readonly tokens: {
@@ -85,7 +84,6 @@ export abstract class ISwapWrapper<
         chain: T["ChainInterface"],
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
-        swapDataDeserializer: new (data: any) => T["Data"],
         options: O,
         events?: EventEmitter
     ) {
@@ -95,7 +93,6 @@ export abstract class ISwapWrapper<
         this.chainIdentifier = chainIdentifier;
         this.chain = chain;
         this.prices = prices;
-        this.swapDataDeserializer = swapDataDeserializer;
         this.events = events || new EventEmitter();
         this.options = options;
         this.tokens = {};
@@ -112,6 +109,21 @@ export abstract class ISwapWrapper<
                 displayDecimals: chainData.displayDecimals
             };
         }
+    }
+
+    /**
+     * Pre-fetches swap price for a given swap
+     *
+     * @param amountData
+     * @param abortSignal
+     * @protected
+     * @returns Price of the token in uSats (micro sats)
+     */
+    protected preFetchPrice(amountData: { token: string }, abortSignal?: AbortSignal): Promise<bigint | null> {
+        return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
+            this.logger.error("preFetchPrice(): Error: ", e);
+            return null;
+        });
     }
 
     /**
@@ -136,9 +148,7 @@ export abstract class ISwapWrapper<
         amountToken: bigint,
         token: string,
         feeData: {
-            swapFee: bigint,
-            networkFee?: bigint,
-            totalFee?: bigint
+            networkFee?: bigint
         },
         pricePrefetchPromise: Promise<bigint> = Promise.resolve(null),
         abortSignal?: AbortSignal

@@ -260,6 +260,26 @@ class MempoolBitcoinRpc {
         }
         abortSignal.throwIfAborted();
     }
+    async waitForTransaction(txId, requiredConfirmations, stateUpdateCbk, abortSignal, intervalSeconds) {
+        if (abortSignal != null)
+            abortSignal.throwIfAborted();
+        while (abortSignal == null || !abortSignal.aborted) {
+            await (0, Utils_1.timeoutPromise)((intervalSeconds || 5) * 1000, abortSignal);
+            const result = await this.getTransaction(txId);
+            if (result == null) {
+                stateUpdateCbk(null, null, null);
+                continue;
+            }
+            const confirmationDelay = await this.getConfirmationDelay(result, requiredConfirmations);
+            if (confirmationDelay == null)
+                continue;
+            if (stateUpdateCbk != null)
+                stateUpdateCbk(result.confirmations, result.txid, confirmationDelay);
+            if (confirmationDelay === 0)
+                return result;
+        }
+        abortSignal.throwIfAborted();
+    }
     async getLNNodeLiquidity(pubkey) {
         const nodeInfo = await this.api.getLNNodeInfo(pubkey);
         return {
@@ -274,12 +294,15 @@ class MempoolBitcoinRpc {
     sendRawPackage(rawTx) {
         throw new Error("Unsupported");
     }
-    async isSpent(utxo) {
+    async isSpent(utxo, confirmed) {
         const [txId, voutStr] = utxo.split(":");
         const vout = parseInt(voutStr);
         const outspends = await this.api.getOutspends(txId);
         if (outspends[vout] == null)
             return true;
+        if (confirmed) {
+            return outspends[vout].spent && outspends[vout].status.confirmed;
+        }
         return outspends[vout].spent;
     }
     parseTransaction(rawTx) {

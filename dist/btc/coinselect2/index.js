@@ -12,7 +12,7 @@ function utxoScore(x, feeRate) {
         valueAfterFee -= x.cpfp.txVsize * (feeRate - x.cpfp.txEffectiveFeeRate);
     return valueAfterFee;
 }
-function coinSelect(utxos, outputs, feeRate, type) {
+function coinSelect(utxos, outputs, feeRate, type, requiredInputs) {
     // order by descending value, minus the inputs approximate fee
     utxos = utxos.sort((a, b) => {
         // if(a.cpfp!=null && b.cpfp==null) return 1;
@@ -20,20 +20,22 @@ function coinSelect(utxos, outputs, feeRate, type) {
         return utxoScore(b, feeRate) - utxoScore(a, feeRate);
     });
     // attempt to use the blackjack strategy first (no change output)
-    const base = (0, blackjack_1.blackjack)(utxos, outputs, feeRate, type);
+    const base = (0, blackjack_1.blackjack)(utxos, outputs, feeRate, type, requiredInputs);
     if (base.inputs)
         return base;
     // else, try the accumulative strategy
-    return (0, accumulative_1.accumulative)(utxos, outputs, feeRate, type);
+    return (0, accumulative_1.accumulative)(utxos, outputs, feeRate, type, requiredInputs);
 }
 exports.coinSelect = coinSelect;
-function maxSendable(utxos, outputScript, outputType, feeRate) {
+function maxSendable(utxos, output, feeRate, requiredInputs, additionalOutputs) {
     if (!isFinite(utils_1.utils.uintOrNaN(feeRate)))
         return null;
-    let bytesAccum = utils_1.utils.transactionBytes([], [{ script: outputScript }], null);
+    const outputs = additionalOutputs ?? [];
+    const inputs = requiredInputs ?? [];
+    let bytesAccum = utils_1.utils.transactionBytes(inputs, outputs.concat([output]), null);
     let cpfpAddFee = 0;
-    let inAccum = 0;
-    const inputs = [];
+    let inAccum = utils_1.utils.sumOrNaN(inputs);
+    let outAccum = utils_1.utils.sumOrNaN(outputs);
     for (let i = 0; i < utxos.length; ++i) {
         const utxo = utxos[i];
         const utxoBytes = utils_1.utils.inputBytes(utxo);
@@ -52,8 +54,8 @@ function maxSendable(utxos, outputScript, outputType, feeRate) {
         inputs.push(utxo);
     }
     const fee = (feeRate * bytesAccum) + cpfpAddFee;
-    const outputValue = inAccum - fee;
-    const dustThreshold = utils_1.DUST_THRESHOLDS[outputType];
+    const outputValue = inAccum - fee - outAccum;
+    const dustThreshold = utils_1.DUST_THRESHOLDS[output.type];
     if (outputValue < dustThreshold)
         return {
             fee,

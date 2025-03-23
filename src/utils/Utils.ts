@@ -3,6 +3,7 @@ import {BTC_NETWORK} from "@scure/btc-signer/utils";
 import {Buffer} from "buffer";
 import {Address, OutScript} from "@scure/btc-signer";
 import {randomBytes as randomBytesNoble} from "@noble/hashes/utils";
+import {CoinselectAddressTypes} from "../btc/coinselect2";
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
@@ -327,6 +328,23 @@ export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
                 pubkey: outputScript.pubkey
             }));
     }
+}
+
+export function toCoinselectAddressType(outputScript: Uint8Array): CoinselectAddressTypes {
+    const data = OutScript.decode(outputScript);
+    switch(data.type) {
+        case "pkh":
+            return "p2pkh";
+        case "sh":
+            return "p2sh-p2wpkh";
+        case "wpkh":
+            return "p2wpkh"
+        case "wsh":
+            return "p2wsh"
+        case "tr":
+            return "p2tr"
+    }
+    throw new Error("Unrecognized address type!");
 }
 
 export function randomBytes(bytesLength: number): Buffer {

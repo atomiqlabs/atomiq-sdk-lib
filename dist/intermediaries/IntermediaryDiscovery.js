@@ -15,6 +15,7 @@ var SwapHandlerType;
     SwapHandlerType["FROM_BTCLN"] = "FROM_BTCLN";
     SwapHandlerType["FROM_BTC_TRUSTED"] = "FROM_BTC_TRUSTED";
     SwapHandlerType["FROM_BTCLN_TRUSTED"] = "FROM_BTCLN_TRUSTED";
+    SwapHandlerType["FROM_BTC_SPV"] = "FROM_BTC_SPV";
 })(SwapHandlerType = exports.SwapHandlerType || (exports.SwapHandlerType = {}));
 /**
  * Converts SwapHandlerType (represented as string & used in REST API communication with intermediaries) to regular
@@ -36,6 +37,8 @@ function swapHandlerTypeToSwapType(swapHandlerType) {
             return SwapType_1.SwapType.TRUSTED_FROM_BTC;
         case SwapHandlerType.FROM_BTCLN_TRUSTED:
             return SwapType_1.SwapType.TRUSTED_FROM_BTCLN;
+        case SwapHandlerType.FROM_BTC_SPV:
+            return SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
     }
 }
 /**

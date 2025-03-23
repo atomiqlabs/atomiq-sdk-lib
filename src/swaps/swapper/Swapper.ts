@@ -44,6 +44,8 @@ import {IndexedDBUnifiedStorage} from "../../browser-storage/IndexedDBUnifiedSto
 import {UnifiedSwapStorage} from "../../storage/UnifiedSwapStorage";
 import {UnifiedSwapEventListener} from "../../events/UnifiedSwapEventListener";
 import {IToBTCSwap} from "../escrow_swaps/tobtc/IToBTCSwap";
+import {SpvFromBTCOptions, SpvFromBTCWrapper} from "../spv_swaps/SpvFromBTCWrapper";
+import {SpvFromBTCSwap} from "../spv_swaps/SpvFromBTCSwap";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -77,10 +79,12 @@ export type ChainSpecificData<T extends ChainType> = {
         [SwapType.FROM_BTCLN]: FromBTCLNWrapper<T>,
         [SwapType.FROM_BTC]: FromBTCWrapper<T>,
         [SwapType.TRUSTED_FROM_BTCLN]: LnForGasWrapper<T>,
-        [SwapType.TRUSTED_FROM_BTC]: OnchainForGasWrapper<T>
+        [SwapType.TRUSTED_FROM_BTC]: OnchainForGasWrapper<T>,
+        [SwapType.SPV_VAULT_FROM_BTC]: SpvFromBTCWrapper<T>
     }
     chainEvents: T["Events"],
     swapContract: T["Contract"],
+    spvVaultContract: T["SpvVaultContract"],
     chainInterface: T["ChainInterface"],
     btcRelay: BtcRelay<any, T["TX"], MempoolBitcoinBlock, T["Signer"]>,
     synchronizer: RelaySynchronizer<any, T["TX"], MempoolBitcoinBlock>,
@@ -205,7 +209,10 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         };
 
         this.chains = objectMap<CtorMultiChainData<T>, MultiChainData<T>>(chainsData, <InputKey extends keyof CtorMultiChainData<T>>(chainData: CtorMultiChainData<T>[InputKey], key: string) => {
-            const {swapContract, chainEvents, btcRelay, chainInterface} = chainData;
+            const {
+                swapContract, chainEvents, btcRelay,
+                chainInterface, spvVaultContract, spvVaultWithdrawalDataConstructor
+            } = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
 
             const storageHandler = options.swapStorage(storagePrefix + chainData.chainId);
@@ -284,7 +291,6 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 chainInterface,
                 pricing,
                 tokens,
-                chainData.swapDataConstructor,
                 {
                     getRequestTimeout: options.getRequestTimeout,
                     postRequestTimeout: options.postRequestTimeout
@@ -297,13 +303,33 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 chainInterface,
                 pricing,
                 tokens,
-                chainData.swapDataConstructor,
                 bitcoinRpc,
                 {
                     getRequestTimeout: options.getRequestTimeout,
                     postRequestTimeout: options.postRequestTimeout
                 }
             );
+
+            if(spvVaultContract!=null) {
+                wrappers[SwapType.SPV_VAULT_FROM_BTC] = new SpvFromBTCWrapper<T[InputKey]>(
+                    key,
+                    unifiedSwapStorage,
+                    unifiedChainEvents,
+                    chainInterface,
+                    spvVaultContract,
+                    pricing,
+                    tokens,
+                    spvVaultWithdrawalDataConstructor,
+                    btcRelay,
+                    synchronizer,
+                    bitcoinRpc,
+                    {
+                        getRequestTimeout: options.getRequestTimeout,
+                        postRequestTimeout: options.postRequestTimeout,
+                        bitcoinNetwork: this.bitcoinNetwork
+                    }
+                );
+            }
 
             Object.keys(wrappers).forEach(key => wrappers[key].events.on("swapState", this.swapStateListener));
 
@@ -315,6 +341,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
 
             return {
                 chainEvents,
+                spvVaultContract,
                 swapContract,
                 chainInterface,
                 btcRelay,
@@ -839,6 +866,46 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             ),
             amountData,
             SwapType.TO_BTCLN
+        );
+    }
+
+    /**
+     * Creates From BTC swap
+     *
+     * @param chainIdentifier
+     * @param signer
+     * @param tokenAddress          Token address to receive
+     * @param amount                Amount to receive, in satoshis (bitcoin's smallest denomination)
+     * @param exactOut              Whether to use a exact out instead of exact in
+     * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
+     */
+    async createFromBTCSwapNew<ChainIdentifier extends ChainIds<T>>(
+        chainIdentifier: ChainIdentifier,
+        signer: string,
+        tokenAddress: string,
+        amount: bigint,
+        exactOut?: boolean,
+        additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
+        options?: SpvFromBTCOptions
+    ): Promise<SpvFromBTCSwap<T[ChainIdentifier]>> {
+        const amountData = {
+            amount,
+            token: tokenAddress,
+            exactIn: !exactOut
+        };
+        return this.createSwap(
+            chainIdentifier as ChainIdentifier,
+            (candidates: Intermediary[], abortSignal: AbortSignal, chain) => Promise.resolve(chain.wrappers[SwapType.SPV_VAULT_FROM_BTC].create(
+                signer,
+                amountData,
+                candidates,
+                options,
+                additionalParams,
+                abortSignal
+            )),
+            amountData,
+            SwapType.SPV_VAULT_FROM_BTC
         );
     }
 

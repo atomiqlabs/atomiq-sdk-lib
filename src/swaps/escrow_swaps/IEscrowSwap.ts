@@ -191,6 +191,17 @@ export abstract class IEscrowSwap<
         }
     }
 
+    /**
+     * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
+     */
+    async isQuoteDefinitelyExpired(): Promise<boolean> {
+        return tryWithRetries(
+            () => this.wrapper.contract.isInitAuthorizationExpired(
+                this.data, this.signatureData
+            )
+        );
+    }
+
     //////////////////////////////
     //// Amounts & fees
 

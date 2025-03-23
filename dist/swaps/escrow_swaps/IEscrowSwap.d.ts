@@ -72,6 +72,10 @@ export declare abstract class IEscrowSwap<T extends ChainType = ChainType, S ext
      */
     isQuoteValid(): Promise<boolean>;
     /**
+     * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
+     */
+    isQuoteDefinitelyExpired(): Promise<boolean>;
+    /**
      * Get the estimated smart chain fee of the commit transaction
      */
     getCommitFee(): Promise<bigint>;

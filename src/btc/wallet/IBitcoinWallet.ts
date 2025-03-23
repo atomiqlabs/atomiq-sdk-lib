@@ -1,6 +1,11 @@
+import {Transaction} from "@scure/btc-signer";
 
 export interface IBitcoinWallet {
     sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string>;
+    fundPsbt(psbt: Transaction, feeRate?: number): Promise<Transaction>;
+    signPsbt(psbt: Transaction, signInputs: number[]): Promise<Transaction>;
+
+    getFeeRate(): Promise<number>;
     getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number>;
     getReceiveAddress(): string;
     getBalance(): Promise<{

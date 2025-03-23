@@ -5,5 +5,6 @@ export enum SwapType {
     TO_BTC=2,
     TO_BTCLN=3,
     TRUSTED_FROM_BTC=4,
-    TRUSTED_FROM_BTCLN=5
-};
+    TRUSTED_FROM_BTCLN=5,
+    SPV_VAULT_FROM_BTC=6
+}

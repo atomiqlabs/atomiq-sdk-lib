@@ -7,6 +7,7 @@ export function accumulative (
     outputs: CoinselectTxOutput[],
     feeRate: number,
     type: CoinselectAddressTypes,
+    requiredInputs?: CoinselectTxInput[]
 ): {
     inputs?: CoinselectTxInput[],
     outputs?: CoinselectTxOutput[],
@@ -14,11 +15,11 @@ export function accumulative (
 } {
     if (!isFinite(utils.uintOrNaN(feeRate))) return null;
 
-    let bytesAccum = utils.transactionBytes([], outputs, type);
+    const inputs = requiredInputs ?? [];
+    let bytesAccum = utils.transactionBytes(inputs, outputs, type);
     let fee = feeRate * bytesAccum;
     let cpfpAddFee = 0;
-    let inAccum = 0;
-    const inputs = [];
+    let inAccum = utils.sumOrNaN(inputs);
     const outAccum = utils.sumOrNaN(outputs);
 
     console.log("CoinSelect: accumulative(): total output: ",outAccum);
