@@ -89,6 +89,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     getSwapPrice(): number;
     getMarketPrice(): number;
     getRealSwapFeePercentagePPM(): bigint;
+    getExpiry(): number;
     isQuoteValid(): Promise<boolean>;
     getEscrowHash(): string;
     getId(): string;

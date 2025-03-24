@@ -227,8 +227,12 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     //////////////////////////////
     //// Getters & utils
 
+    getExpiry(): number {
+        return this.expiry - 20*1000;
+    }
+
     isQuoteValid(): Promise<boolean> {
-        return Promise.resolve((this.expiry<Date.now() && !this.initiated) || this.state===SpvFromBTCSwapState.FAILED);
+        return Promise.resolve(this.expiry<Date.now() && this.state===SpvFromBTCSwapState.CREATED);
     }
 
     getEscrowHash(): string {
@@ -468,6 +472,11 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         //Ensure not expired
         if(this.expiry<Date.now()) {
             throw new Error("Quote expired!");
+        }
+
+        //Ensure valid state
+        if(this.state!==SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED && this.state!==SpvFromBTCSwapState.CREATED) {
+            throw new Error("Invalid swap state!");
         }
 
         //Ensure all inputs except the 1st are finalized
@@ -923,12 +932,8 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             this.state===SpvFromBTCSwapState.SIGNED ||
             this.state===SpvFromBTCSwapState.POSTED
         ) {
-            if(this.expiry<Date.now()) {
-                if(this.state===SpvFromBTCSwapState.CREATED) {
-                    this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
-                } else {
-                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
-                }
+            if(this.getExpiry()<Date.now()) {
+                this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
                 if(save) await this._saveAndEmit();
                 return true;
             }
