@@ -297,6 +297,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                                 additionalParams
                             }, this.options.postRequestTimeout, abortController.signal, retryCount > 0 ? false : null);
                         }, null, e => e instanceof RequestError_1.RequestError, abortController.signal);
+                        this.logger.debug("create(" + lp.url + "): LP response: ", resp);
                         const [pricingInfo, gasPricingInfo, { vault, vaultUtxoValue }] = await Promise.all([
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], false, resp.btcAmountSwap, resp.total, amountData.token, {}, pricePrefetchPromise, abortController.signal),
                             this.verifyReturnedPrice({ ...lp.services[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], swapBaseFee: 0 }, //Base fee should be charged only on the amount, not on gas
