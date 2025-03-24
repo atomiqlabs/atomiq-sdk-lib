@@ -383,14 +383,15 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         const result = await this.wrapper.btcRpc.waitForTransaction(this.data.btcTx.txid, this.vaultRequiredConfirmations, (confirmations, txId, txEtaMs) => {
             if (updateCallback != null)
                 updateCallback(txId, confirmations, this.vaultRequiredConfirmations, txEtaMs);
+            if (txId != null && this.state === SpvFromBTCSwapState.POSTED)
+                this._saveAndEmit(SpvFromBTCSwapState.BROADCASTED);
         }, abortSignal, checkIntervalSeconds);
         if (abortSignal != null)
             abortSignal.throwIfAborted();
         if (this.state !== SpvFromBTCSwapState.FRONTED &&
             this.state !== SpvFromBTCSwapState.CLAIMED) {
-            this.state = SpvFromBTCSwapState.BTC_TX_CONFIRMED;
+            await this._saveAndEmit(SpvFromBTCSwapState.BTC_TX_CONFIRMED);
         }
-        await this._saveAndEmit();
     }
     /**
      * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
