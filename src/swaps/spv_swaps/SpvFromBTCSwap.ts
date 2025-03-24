@@ -490,7 +490,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         const lpOutput = psbt.getOutput(2);
         if(
             lpOutput.amount!==this.btcAmount ||
-            !toOutputScript(this.wrapper.options.bitcoinNetwork, this.btcDestinationAddress).equals(lpOutput.script)
+            !toOutputScript(this.wrapper.options.bitcoinNetwork, this.btcDestinationAddress).equals(Buffer.from(lpOutput.script))
         ) {
             throw new Error("Invalid LP bitcoin output in transaction!");
         }
