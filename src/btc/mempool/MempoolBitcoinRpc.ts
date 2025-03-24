@@ -135,7 +135,12 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
         let strippedRawTx: string;
         if(rawTx!=null) {
             //Strip witness data
-            const btcTx = Transaction.fromRaw(rawTx);
+            const btcTx = Transaction.fromRaw(rawTx, {
+                allowLegacyWitnessUtxo: true,
+                allowUnknownInputs: true,
+                allowUnknownOutputs: true,
+                disableScriptCheck: true
+            });
             strippedRawTx = Buffer.from(btcTx.toBytes(true, false)).toString("hex");
         }
 

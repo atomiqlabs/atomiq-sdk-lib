@@ -124,7 +124,12 @@ class MempoolBitcoinRpc {
         let strippedRawTx;
         if (rawTx != null) {
             //Strip witness data
-            const btcTx = btc_signer_1.Transaction.fromRaw(rawTx);
+            const btcTx = btc_signer_1.Transaction.fromRaw(rawTx, {
+                allowLegacyWitnessUtxo: true,
+                allowUnknownInputs: true,
+                allowUnknownOutputs: true,
+                disableScriptCheck: true
+            });
             strippedRawTx = buffer_1.Buffer.from(btcTx.toBytes(true, false)).toString("hex");
         }
         return {
