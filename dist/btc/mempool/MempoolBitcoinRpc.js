@@ -18,7 +18,7 @@ function bitcoinTxToBtcTx(btcTx) {
         txid: buffer_1.Buffer.from((0, sha2_1.sha256)((0, sha2_1.sha256)(btcTx.toBytes(true, false)))).reverse().toString("hex"),
         hex: buffer_1.Buffer.from(btcTx.toBytes(true, false)).toString("hex"),
         raw: buffer_1.Buffer.from(btcTx.toBytes(true, true)).toString("hex"),
-        vsize: btcTx.vsize,
+        vsize: btcTx.isFinal ? btcTx.vsize : null,
         outs: Array.from({ length: btcTx.outputsLength }, (_, i) => i).map((index) => {
             const output = btcTx.getOutput(index);
             return {
