@@ -553,6 +553,9 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             this.vaultRequiredConfirmations,
             (confirmations: number, txId: string, txEtaMs: number) => {
                 if(updateCallback!=null) updateCallback(txId, confirmations, this.vaultRequiredConfirmations, txEtaMs);
+                if(
+                    txId!=null && this.state===SpvFromBTCSwapState.POSTED
+                ) this._saveAndEmit(SpvFromBTCSwapState.BROADCASTED);
             },
             abortSignal,
             checkIntervalSeconds
@@ -564,10 +567,9 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             (this.state as SpvFromBTCSwapState)!==SpvFromBTCSwapState.FRONTED &&
             (this.state as SpvFromBTCSwapState)!==SpvFromBTCSwapState.CLAIMED
         ) {
-            this.state = SpvFromBTCSwapState.BTC_TX_CONFIRMED;
+            await this._saveAndEmit(SpvFromBTCSwapState.BTC_TX_CONFIRMED);
         }
 
-        await this._saveAndEmit();
     }
 
     /**
