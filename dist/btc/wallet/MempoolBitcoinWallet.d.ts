@@ -63,8 +63,8 @@ export declare abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         totalFee: number;
     }>;
     abstract sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string>;
-    abstract fundPsbt(psbt: Transaction): Promise<Transaction>;
-    abstract signPsbt(psbt: Transaction): Promise<Transaction>;
+    abstract fundPsbt(psbt: Transaction, feeRate?: number): Promise<Transaction>;
+    abstract signPsbt(psbt: Transaction, signInputs: number[]): Promise<Transaction>;
     abstract getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number>;
     abstract getReceiveAddress(): string;
     abstract getBalance(): Promise<{
