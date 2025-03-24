@@ -99,6 +99,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     getInputTxId(): string | null;
     isFinished(): boolean;
     isActionable(): boolean;
+    isClaimable(): boolean;
     isSuccessful(): boolean;
     isFailed(): boolean;
     isQuoteExpired(): boolean;

@@ -160,6 +160,9 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     isActionable() {
         return this.state === SpvFromBTCSwapState.BTC_TX_CONFIRMED;
     }
+    isClaimable() {
+        return this.canClaim();
+    }
     isSuccessful() {
         return this.state === SpvFromBTCSwapState.FRONTED || this.state === SpvFromBTCSwapState.CLAIMED;
     }
@@ -384,7 +387,9 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     async waitForBitcoinTransaction(abortSignal, checkIntervalSeconds, updateCallback) {
-        if (this.state !== SpvFromBTCSwapState.POSTED && this.state !== SpvFromBTCSwapState.BROADCASTED)
+        if (this.state !== SpvFromBTCSwapState.POSTED &&
+            this.state !== SpvFromBTCSwapState.BROADCASTED &&
+            this.state !== SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED)
             throw new Error("Must be in POSTED or BROADCASTED state!");
         const result = await this.wrapper.btcRpc.waitForTransaction(this.data.btcTx.txid, this.vaultRequiredConfirmations, (confirmations, txId, txEtaMs) => {
             if (updateCallback != null)
@@ -690,11 +695,8 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             }
         }
         if (Math.floor(Date.now() / 1000) % 120 === 0) {
-            if (this.state === SpvFromBTCSwapState.SIGNED ||
-                this.state === SpvFromBTCSwapState.POSTED ||
-                this.state === SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED ||
-                this.state === SpvFromBTCSwapState.BROADCASTED ||
-                this.state === SpvFromBTCSwapState.DECLINED) {
+            if (this.state === SpvFromBTCSwapState.POSTED ||
+                this.state === SpvFromBTCSwapState.BROADCASTED) {
                 try {
                     //Check if bitcoin payment was confirmed
                     return await this.syncStateFromBitcoin(save);
