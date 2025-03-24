@@ -7,7 +7,7 @@ const utils_1 = require("./utils");
 function accumulative(utxos, outputs, feeRate, type, requiredInputs) {
     if (!isFinite(utils_1.utils.uintOrNaN(feeRate)))
         return null;
-    const inputs = requiredInputs ?? [];
+    const inputs = requiredInputs == null ? [] : [...requiredInputs];
     let bytesAccum = utils_1.utils.transactionBytes(inputs, outputs, type);
     let fee = feeRate * bytesAccum;
     let cpfpAddFee = 0;

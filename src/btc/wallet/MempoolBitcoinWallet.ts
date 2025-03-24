@@ -118,7 +118,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
 
         const utxoPool: BitcoinWalletUtxo[] = (await Promise.all(sendingAccounts.map(acc => this._getUtxoPool(acc.address, acc.addressType)))).flat();
 
-        console.log("Utxo pool: ", utxoPool);
+        console.log("_fundPsbt(): fee rate: "+feeRate+" utxo pool: ", utxoPool);
 
         const accountPubkeys = {};
         sendingAccounts.forEach(acc => accountPubkeys[acc.address] = acc.pubkey);

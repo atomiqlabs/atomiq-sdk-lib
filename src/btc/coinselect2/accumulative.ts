@@ -15,7 +15,7 @@ export function accumulative (
 } {
     if (!isFinite(utils.uintOrNaN(feeRate))) return null;
 
-    const inputs = requiredInputs ?? [];
+    const inputs = requiredInputs==null ? [] : [...requiredInputs];
     let bytesAccum = utils.transactionBytes(inputs, outputs, type);
     let fee = feeRate * bytesAccum;
     let cpfpAddFee = 0;

@@ -15,7 +15,7 @@ export function blackjack (
 } {
     if (!isFinite(utils.uintOrNaN(feeRate))) return null;
 
-    const inputs = requiredInputs ?? [];
+    const inputs = requiredInputs==null ? [] : [...requiredInputs];
     let bytesAccum = utils.transactionBytes(inputs, outputs, type);
     let inAccum = utils.sumOrNaN(inputs);
     let cpfpAddFee = 0;
