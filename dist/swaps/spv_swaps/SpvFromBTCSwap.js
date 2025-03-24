@@ -336,7 +336,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         //Verify correct LP output
         const lpOutput = psbt.getOutput(2);
         if (lpOutput.amount !== this.btcAmount ||
-            !(0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.btcDestinationAddress).equals(lpOutput.script)) {
+            !(0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.btcDestinationAddress).equals(buffer_1.Buffer.from(lpOutput.script))) {
             throw new Error("Invalid LP bitcoin output in transaction!");
         }
         //Verify vault utxo not spent yet
