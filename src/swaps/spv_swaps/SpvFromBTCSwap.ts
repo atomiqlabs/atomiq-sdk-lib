@@ -468,6 +468,8 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         const btcTx = await this.wrapper.btcRpc.parseTransaction(Buffer.from(psbt.toBytes(true)).toString("hex"));
         const data = await this.wrapper.contract.getWithdrawalData(btcTx);
 
+        this.logger.debug("submitPsbt(): parsed withdrawal data: ", data);
+
         //Verify correct withdrawal data
         if(
             !data.isRecipient(this.recipient) ||
@@ -478,7 +480,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             data.executionFeeRate!==this.executionFeeShare ||
             data.getSpentVaultUtxo()!==this.vaultUtxo ||
             BigInt(data.getNewVaultBtcAmount())!==this.vaultUtxoValue ||
-            data.getNewVaultScript()!==toOutputScript(this.wrapper.options.bitcoinNetwork, this.vaultBtcAddress) ||
+            !data.getNewVaultScript().equals(toOutputScript(this.wrapper.options.bitcoinNetwork, this.vaultBtcAddress)) ||
             data.getExecutionData()!=null
         ) {
             throw new Error("Invalid withdrawal tx data submitted!");
