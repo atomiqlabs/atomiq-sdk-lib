@@ -383,6 +383,8 @@ export class SpvFromBTCWrapper<
                             );
                         }, null, e => e instanceof RequestError, abortController.signal);
 
+                        this.logger.debug("create("+lp.url+"): LP response: ", resp)
+
                         const [
                             pricingInfo,
                             gasPricingInfo,
