@@ -174,7 +174,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Returns the transaction fee paid on the smart chain
      */
-    getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
+    abstract getSmartChainNetworkFee?(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
     /**
      * Checks if the initiator/sender has enough balance to cover the transaction fee for processing the swap
      */

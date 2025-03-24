@@ -45,6 +45,7 @@ export function isOnchainForGasSwapInit(obj: any): obj is OnchainForGasSwapInit 
 }
 
 export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> {
+    getSmartChainNetworkFee = null;
     protected readonly TYPE: SwapType = SwapType.TRUSTED_FROM_BTC;
 
     //State: PR_CREATED

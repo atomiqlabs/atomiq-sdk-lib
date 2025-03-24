@@ -316,13 +316,7 @@ export abstract class ISwap<
     /**
      * Returns the transaction fee paid on the smart chain
      */
-    async getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>> {
-        return toTokenAmount(
-            0n,
-            this.wrapper.getNativeToken(),
-            this.wrapper.prices
-        );
-    }
+    abstract getSmartChainNetworkFee?(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
 
     /**
      * Checks if the initiator/sender has enough balance to cover the transaction fee for processing the swap
