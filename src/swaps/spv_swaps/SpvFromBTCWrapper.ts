@@ -108,9 +108,7 @@ export class SpvFromBTCWrapper<
         SpvFromBTCSwapState.CREATED,
         SpvFromBTCSwapState.SIGNED,
         SpvFromBTCSwapState.POSTED,
-        SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED,
-        SpvFromBTCSwapState.BROADCASTED,
-        SpvFromBTCSwapState.DECLINED
+        SpvFromBTCSwapState.BROADCASTED
     ];
 
     protected processEventFront(event: SpvVaultFrontEvent, swap: SpvFromBTCSwap<T>): boolean {

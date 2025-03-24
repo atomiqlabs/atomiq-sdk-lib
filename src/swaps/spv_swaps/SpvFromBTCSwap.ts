@@ -267,6 +267,10 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         return this.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED;
     }
 
+    isClaimable(): boolean {
+        return this.canClaim();
+    }
+
     isSuccessful(): boolean {
         return this.state===SpvFromBTCSwapState.FRONTED || this.state===SpvFromBTCSwapState.CLAIMED;
     }
@@ -553,7 +557,11 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         checkIntervalSeconds?: number,
         updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
     ): Promise<void> {
-        if(this.state!==SpvFromBTCSwapState.POSTED && this.state!==SpvFromBTCSwapState.BROADCASTED) throw new Error("Must be in POSTED or BROADCASTED state!");
+        if(
+            this.state!==SpvFromBTCSwapState.POSTED &&
+            this.state!==SpvFromBTCSwapState.BROADCASTED &&
+            this.state!==SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED
+        ) throw new Error("Must be in POSTED or BROADCASTED state!");
 
         const result = await this.wrapper.btcRpc.waitForTransaction(
             this.data.btcTx.txid,
@@ -913,11 +921,8 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
 
         if(Math.floor(Date.now()/1000)%120===0) {
             if (
-                this.state === SpvFromBTCSwapState.SIGNED ||
                 this.state === SpvFromBTCSwapState.POSTED ||
-                this.state === SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED ||
-                this.state === SpvFromBTCSwapState.BROADCASTED ||
-                this.state === SpvFromBTCSwapState.DECLINED
+                this.state === SpvFromBTCSwapState.BROADCASTED
             ) {
                 try {
                     //Check if bitcoin payment was confirmed
