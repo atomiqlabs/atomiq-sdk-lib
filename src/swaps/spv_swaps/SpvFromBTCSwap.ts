@@ -808,8 +808,18 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             //Check inputs double-spent
             for(let input of this.data.btcTx.ins) {
                 if(await this.wrapper.btcRpc.isSpent(input.txid+":"+input.vout, true)) {
-                    //One of the inputs was double-spent
-                    this.state = SpvFromBTCSwapState.FAILED;
+                    if(
+                        this.state===SpvFromBTCSwapState.SIGNED ||
+                        this.state===SpvFromBTCSwapState.POSTED ||
+                        this.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED ||
+                        this.state===SpvFromBTCSwapState.DECLINED
+                    ) {
+                        //One of the inputs was double-spent
+                        this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
+                    } else {
+                        //One of the inputs was double-spent
+                        this.state = SpvFromBTCSwapState.FAILED;
+                    }
                     if(save) await this._saveAndEmit();
                     return true;
                 }
