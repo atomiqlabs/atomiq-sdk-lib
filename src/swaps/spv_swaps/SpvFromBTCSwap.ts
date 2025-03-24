@@ -582,7 +582,8 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             (confirmations: number, txId: string, txEtaMs: number) => {
                 if(updateCallback!=null) updateCallback(txId, confirmations, this.vaultRequiredConfirmations, txEtaMs);
                 if(
-                    txId!=null && this.state===SpvFromBTCSwapState.POSTED
+                    txId!=null &&
+                    (this.state===SpvFromBTCSwapState.POSTED || this.state==SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED)
                 ) this._saveAndEmit(SpvFromBTCSwapState.BROADCASTED);
             },
             abortSignal,
@@ -929,8 +930,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     async _tick(save?: boolean): Promise<boolean> {
         if(
             this.state===SpvFromBTCSwapState.CREATED ||
-            this.state===SpvFromBTCSwapState.SIGNED ||
-            this.state===SpvFromBTCSwapState.POSTED
+            this.state===SpvFromBTCSwapState.SIGNED
         ) {
             if(this.getExpiry()<Date.now()) {
                 this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
