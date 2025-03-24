@@ -227,7 +227,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Bitcoin tx
-    getTransactionDetails() {
+    async getTransactionDetails() {
         const [txId, voutStr] = this.vaultUtxo.split(":");
         const vaultScript = (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.vaultBtcAddress);
         const out2script = (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.btcDestinationAddress);
@@ -247,6 +247,10 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             throw new Error("Execution fee out of bounds!");
         const nSequence0 = (this.callerFeeShare & 0xfffffn) | (this.frontingFeeShare & 1047552n) << 10n;
         const nSequence1 = (this.executionFeeShare & 0xfffffn) | (this.frontingFeeShare & 1023n) << 20n;
+        if (!this.initiated) {
+            this.initiated = true;
+            await this._saveAndEmit();
+        }
         return {
             in0txid: txId,
             in0vout: parseInt(voutStr),
@@ -260,8 +264,8 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             locktime: 0
         };
     }
-    getPsbt() {
-        const res = this.getTransactionDetails();
+    async getPsbt() {
+        const res = await this.getTransactionDetails();
         const psbt = new btc_signer_1.Transaction({
             allowUnknownOutputs: true,
             allowLegacyWitnessUtxo: true,
@@ -301,7 +305,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         else {
             feeRate = Math.max(this.minimumBtcFeeRate, await wallet.getFeeRate());
         }
-        let { psbt, in1sequence } = this.getPsbt();
+        let { psbt, in1sequence } = await this.getPsbt();
         psbt = await wallet.fundPsbt(psbt, feeRate);
         psbt.updateInput(1, { sequence: in1sequence });
         //Sign every input except the first one
@@ -357,7 +361,6 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         if (this.expiry < Date.now()) {
             throw new Error("Quote expired!");
         }
-        this.initiated = true;
         this.data = data;
         await this._saveAndEmit(SpvFromBTCSwapState.SIGNED);
         try {
@@ -649,6 +652,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         }
         if (this.state === SpvFromBTCSwapState.BROADCASTED || this.state === SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
             const status = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
+            this.logger.debug("syncStateFromChain(): status of " + this.data.btcTx.txid, status);
             switch (status.type) {
                 case base_1.SpvWithdrawalStateType.FRONTED:
                     this.frontTxId = status.txId;
