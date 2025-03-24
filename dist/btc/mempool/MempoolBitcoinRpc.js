@@ -40,7 +40,7 @@ function bitcoinTxToBtcTx(btcTx) {
                     hex: buffer_1.Buffer.from(input.finalScriptSig).toString("hex")
                 },
                 sequence: input.sequence,
-                txinwitness: input.finalScriptWitness.map(witness => buffer_1.Buffer.from(witness).toString("hex"))
+                txinwitness: input.finalScriptWitness == null ? [] : input.finalScriptWitness.map(witness => buffer_1.Buffer.from(witness).toString("hex"))
             };
         })
     };
