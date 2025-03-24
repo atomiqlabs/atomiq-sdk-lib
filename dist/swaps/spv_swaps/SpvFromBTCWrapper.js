@@ -217,6 +217,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         //Require vault UTXO is unspent
         if (await this.btcRpc.isSpent(utxo))
             throw new IntermediaryError_1.IntermediaryError("Returned spv vault UTXO is already spent");
+        this.logger.debug("verifyReturnedData(): Vault UTXO: " + vault.getUtxo() + " current utxo: " + utxo);
         //Trace returned utxo back to what's saved on-chain
         let pendingWithdrawals = [];
         while (vault.getUtxo() !== utxo) {
@@ -227,6 +228,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             const withdrawalData = await this.contract.getWithdrawalData(btcTx);
             pendingWithdrawals.unshift(withdrawalData);
             utxo = pendingWithdrawals[0].getSpentVaultUtxo();
+            this.logger.debug("verifyReturnedData(): Vault UTXO: " + vault.getUtxo() + " current utxo: " + utxo);
             if (pendingWithdrawals.length >= this.options.maxTransactionsDelta)
                 throw new IntermediaryError_1.IntermediaryError("BTC <> SC state difference too deep, maximum: " + this.options.maxTransactionsDelta);
         }
