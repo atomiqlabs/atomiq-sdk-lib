@@ -33,6 +33,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
         if (isOnchainForGasSwapInit(initOrObj))
             initOrObj.url += "/frombtc_trusted";
         super(wrapper, initOrObj);
+        this.getSmartChainNetworkFee = null;
         this.TYPE = SwapType_1.SwapType.TRUSTED_FROM_BTC;
         if (isOnchainForGasSwapInit(initOrObj)) {
             this.state = OnchainForGasSwapState.PR_CREATED;

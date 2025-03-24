@@ -48,6 +48,7 @@ export type SpvFromBTCSwapInit = ISwapInit & {
 };
 export declare function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit;
 export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> {
+    getSmartChainNetworkFee: any;
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
     readonly wrapper: SpvFromBTCWrapper<T>;
     readonly quoteId: string;

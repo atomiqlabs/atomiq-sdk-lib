@@ -57,6 +57,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         if (isSpvFromBTCSwapInit(initOrObject))
             initOrObject.url += "/frombtc_spv";
         super(wrapper, initOrObject);
+        this.getSmartChainNetworkFee = null;
         this.TYPE = SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
         if (isSpvFromBTCSwapInit(initOrObject)) {
             this.state = SpvFromBTCSwapState.CREATED;
@@ -227,9 +228,13 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         const [txId, voutStr] = this.vaultUtxo.split(":");
         const vaultScript = (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.vaultBtcAddress);
         const out2script = (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.btcDestinationAddress);
-        const out1script = this.wrapper.contract.toOpReturnData(this.recipient, [
+        const opReturnData = this.wrapper.contract.toOpReturnData(this.recipient, [
             this.outputTotalSwap / this.vaultTokenMultipliers[0],
             this.outputTotalGas / this.vaultTokenMultipliers[1]
+        ]);
+        const out1script = buffer_1.Buffer.concat([
+            opReturnData.length > 75 ? buffer_1.Buffer.from([0x6a, 0x4c, opReturnData.length]) : buffer_1.Buffer.from([0x6a, opReturnData.length]),
+            opReturnData
         ]);
         if (this.callerFeeShare < 0n || this.callerFeeShare >= 0xfffffn)
             throw new Error("Caller fee out of bounds!");

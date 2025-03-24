@@ -5,7 +5,6 @@ const SwapType_1 = require("./enums/SwapType");
 const events_1 = require("events");
 const ISwapPrice_1 = require("../prices/abstract/ISwapPrice");
 const Utils_1 = require("../utils/Utils");
-const Tokens_1 = require("../Tokens");
 const SwapDirection_1 = require("./enums/SwapDirection");
 function isISwapInit(obj) {
     return typeof obj === 'object' &&
@@ -146,12 +145,6 @@ class ISwap {
      */
     getFee() {
         return this.getSwapFee();
-    }
-    /**
-     * Returns the transaction fee paid on the smart chain
-     */
-    async getSmartChainNetworkFee() {
-        return (0, Tokens_1.toTokenAmount)(0n, this.wrapper.getNativeToken(), this.wrapper.prices);
     }
     //////////////////////////////
     //// Storage

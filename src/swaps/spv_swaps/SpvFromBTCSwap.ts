@@ -88,6 +88,7 @@ export function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit {
 }
 
 export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> {
+    getSmartChainNetworkFee = null;
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
 
     readonly wrapper: SpvFromBTCWrapper<T>;
@@ -370,13 +371,17 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
 
         const out2script = toOutputScript(this.wrapper.options.bitcoinNetwork, this.btcDestinationAddress);
 
-        const out1script = this.wrapper.contract.toOpReturnData(
+        const opReturnData = this.wrapper.contract.toOpReturnData(
             this.recipient,
             [
                 this.outputTotalSwap / this.vaultTokenMultipliers[0],
                 this.outputTotalGas / this.vaultTokenMultipliers[1]
             ]
         );
+        const out1script = Buffer.concat([
+            opReturnData.length > 75 ? Buffer.from([0x6a, 0x4c, opReturnData.length]) : Buffer.from([0x6a, opReturnData.length]),
+            opReturnData
+        ]);
 
         if(this.callerFeeShare<0n || this.callerFeeShare>=0xFFFFFn) throw new Error("Caller fee out of bounds!");
         if(this.frontingFeeShare<0n || this.frontingFeeShare>=0xFFFFFn) throw new Error("Fronting fee out of bounds!");

@@ -25,6 +25,7 @@ export type OnchainForGasSwapInit = ISwapInit & {
 };
 export declare function isOnchainForGasSwapInit(obj: any): obj is OnchainForGasSwapInit;
 export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> {
+    getSmartChainNetworkFee: any;
     protected readonly TYPE: SwapType;
     private readonly paymentHash;
     private readonly sequence;
