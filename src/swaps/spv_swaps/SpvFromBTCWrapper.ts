@@ -394,7 +394,7 @@ export class SpvFromBTCWrapper<
                                 lp.services[SwapType.SPV_VAULT_FROM_BTC], false, resp.btcAmountSwap, resp.total,
                                 amountData.token, {}, pricePrefetchPromise, abortController.signal
                             ),
-                            this.verifyReturnedPrice(
+                            options.gasAmount===0n ? Promise.resolve() : this.verifyReturnedPrice(
                                 {...lp.services[SwapType.SPV_VAULT_FROM_BTC], swapBaseFee: 0}, //Base fee should be charged only on the amount, not on gas
                                 false, resp.btcAmountGas, resp.totalGas,
                                 nativeTokenAddress, {}, gasTokenPricePrefetchPromise, abortController.signal
