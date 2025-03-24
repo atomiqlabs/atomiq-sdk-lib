@@ -674,11 +674,11 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             this.state === SpvFromBTCSwapState.SIGNED ||
             this.state === SpvFromBTCSwapState.POSTED) {
             if (this.expiry < Date.now()) {
-                if (this.initiated) {
-                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
+                if (this.state === SpvFromBTCSwapState.CREATED) {
+                    this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
                 }
                 else {
-                    this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
+                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
                 }
                 changed ||= true;
             }
@@ -696,11 +696,11 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             this.state === SpvFromBTCSwapState.SIGNED ||
             this.state === SpvFromBTCSwapState.POSTED) {
             if (this.expiry < Date.now()) {
-                if (this.initiated) {
-                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
+                if (this.state === SpvFromBTCSwapState.CREATED) {
+                    this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
                 }
                 else {
-                    this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
+                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
                 }
                 if (save)
                     await this._saveAndEmit();

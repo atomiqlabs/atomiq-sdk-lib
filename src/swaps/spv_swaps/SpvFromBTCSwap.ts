@@ -899,10 +899,10 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             this.state===SpvFromBTCSwapState.POSTED
         ) {
             if(this.expiry<Date.now()) {
-                if(this.initiated) {
-                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
-                } else {
+                if(this.state===SpvFromBTCSwapState.CREATED) {
                     this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
+                } else {
+                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
                 }
                 changed ||= true;
             }
@@ -924,10 +924,10 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             this.state===SpvFromBTCSwapState.POSTED
         ) {
             if(this.expiry<Date.now()) {
-                if(this.initiated) {
-                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
-                } else {
+                if(this.state===SpvFromBTCSwapState.CREATED) {
                     this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
+                } else {
+                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
                 }
                 if(save) await this._saveAndEmit();
                 return true;
