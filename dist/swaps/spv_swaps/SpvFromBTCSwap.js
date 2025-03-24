@@ -404,7 +404,8 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         const result = await this.wrapper.btcRpc.waitForTransaction(this.data.btcTx.txid, this.vaultRequiredConfirmations, (confirmations, txId, txEtaMs) => {
             if (updateCallback != null)
                 updateCallback(txId, confirmations, this.vaultRequiredConfirmations, txEtaMs);
-            if (txId != null && this.state === SpvFromBTCSwapState.POSTED)
+            if (txId != null &&
+                (this.state === SpvFromBTCSwapState.POSTED || this.state == SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED))
                 this._saveAndEmit(SpvFromBTCSwapState.BROADCASTED);
         }, abortSignal, checkIntervalSeconds);
         if (abortSignal != null)
@@ -700,8 +701,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     }
     async _tick(save) {
         if (this.state === SpvFromBTCSwapState.CREATED ||
-            this.state === SpvFromBTCSwapState.SIGNED ||
-            this.state === SpvFromBTCSwapState.POSTED) {
+            this.state === SpvFromBTCSwapState.SIGNED) {
             if (this.getExpiry() < Date.now()) {
                 this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
                 if (save)
