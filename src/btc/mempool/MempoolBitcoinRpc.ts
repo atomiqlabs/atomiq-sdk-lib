@@ -17,7 +17,7 @@ function bitcoinTxToBtcTx(btcTx: Transaction): BtcTx {
         version: btcTx.version,
         blockhash: null,
         confirmations: 0,
-        txid: btcTx.id,
+        txid: Buffer.from(sha256(sha256(btcTx.toBytes(true, false)))).reverse().toString("hex"),
         hex: Buffer.from(btcTx.toBytes(true, false)).toString("hex"),
         raw: Buffer.from(btcTx.toBytes(true, true)).toString("hex"),
         vsize: btcTx.vsize,
