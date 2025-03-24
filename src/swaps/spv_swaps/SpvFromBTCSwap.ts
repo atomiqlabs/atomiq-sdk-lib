@@ -357,7 +357,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     //////////////////////////////
     //// Bitcoin tx
 
-    getTransactionDetails(): {
+    async getTransactionDetails(): Promise<{
         in0txid: string,
         in0vout: number,
         in0sequence: number,
@@ -368,7 +368,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         out2amount: bigint,
         out2script: Uint8Array,
         locktime: number
-    } {
+    }> {
         const [txId, voutStr] = this.vaultUtxo.split(":");
 
         const vaultScript = toOutputScript(this.wrapper.options.bitcoinNetwork, this.vaultBtcAddress);
@@ -394,6 +394,11 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         const nSequence0 = (this.callerFeeShare & 0xFFFFFn) | (this.frontingFeeShare & 0b1111_1111_1100_0000_0000n) << 10n;
         const nSequence1 = (this.executionFeeShare & 0xFFFFFn) | (this.frontingFeeShare & 0b0000_0000_0011_1111_1111n) << 20n;
 
+        if(!this.initiated) {
+            this.initiated = true;
+            await this._saveAndEmit();
+        }
+
         return {
             in0txid: txId,
             in0vout: parseInt(voutStr),
@@ -408,8 +413,8 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         };
     }
 
-    getPsbt(): {psbt: Transaction, in1sequence: number} {
-        const res = this.getTransactionDetails();
+    async getPsbt(): Promise<{psbt: Transaction, in1sequence: number}> {
+        const res = await this.getTransactionDetails();
         const psbt = new Transaction({
             allowUnknownOutputs: true,
             allowLegacyWitnessUtxo: true,
@@ -448,7 +453,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         } else {
             feeRate = Math.max(this.minimumBtcFeeRate, await wallet.getFeeRate());
         }
-        let {psbt, in1sequence} = this.getPsbt();
+        let {psbt, in1sequence} = await this.getPsbt();
         psbt = await wallet.fundPsbt(psbt, feeRate);
         psbt.updateInput(1, {sequence: in1sequence});
         //Sign every input except the first one
@@ -516,7 +521,6 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             throw new Error("Quote expired!");
         }
 
-        this.initiated = true;
         this.data = data;
         await this._saveAndEmit(SpvFromBTCSwapState.SIGNED);
 
@@ -870,6 +874,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
 
         if(this.state===SpvFromBTCSwapState.BROADCASTED || this.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
             const status = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
+            this.logger.debug("syncStateFromChain(): status of "+this.data.btcTx.txid, status);
             switch(status.type) {
                 case SpvWithdrawalStateType.FRONTED:
                     this.frontTxId = status.txId;

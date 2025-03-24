@@ -119,7 +119,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     getGasOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>>;
-    getTransactionDetails(): {
+    getTransactionDetails(): Promise<{
         in0txid: string;
         in0vout: number;
         in0sequence: number;
@@ -130,11 +130,11 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         out2amount: bigint;
         out2script: Uint8Array;
         locktime: number;
-    };
-    getPsbt(): {
+    }>;
+    getPsbt(): Promise<{
         psbt: Transaction;
         in1sequence: number;
-    };
+    }>;
     getFundedPsbt(wallet: IBitcoinWallet, feeRate?: number): Promise<{
         psbt: Transaction;
         signInputs: number[];

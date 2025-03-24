@@ -768,6 +768,37 @@ class Swapper extends events_1.EventEmitter {
         }
     }
     async getSwapById(id, chainId, signer) {
+        //Check in pending swaps first
+        if (chainId != null) {
+            for (let key in this.chains[chainId].wrappers) {
+                const wrapper = this.chains[chainId].wrappers[key];
+                const result = wrapper.pendingSwaps.get(id)?.deref();
+                if (signer != null) {
+                    if (result.getInitiator() === signer)
+                        return result;
+                }
+                else {
+                    return result;
+                }
+            }
+        }
+        else {
+            for (let chainId in this.chains) {
+                for (let key in this.chains[chainId].wrappers) {
+                    const wrapper = this.chains[chainId].wrappers[key];
+                    const result = wrapper.pendingSwaps.get(id)?.deref();
+                    if (result != null) {
+                        if (signer != null) {
+                            if (result.getInitiator() === signer)
+                                return result;
+                        }
+                        else {
+                            return result;
+                        }
+                    }
+                }
+            }
+        }
         const queryParams = [];
         if (signer != null)
             queryParams.push({ key: "intiator", value: signer });

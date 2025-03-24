@@ -30,7 +30,7 @@ import {EventEmitter} from "events";
 import {MempoolBitcoinBlock} from "../../btc/mempool/MempoolBitcoinBlock";
 import {Intermediary} from "../../intermediaries/Intermediary";
 import {isLNURLPay, isLNURLWithdraw, LNURL, LNURLPay, LNURLWithdraw} from "../../utils/LNURL";
-import {AmountData, WrapperCtorTokens} from "../ISwapWrapper";
+import {AmountData, ISwapWrapper, WrapperCtorTokens} from "../ISwapWrapper";
 import {bigIntCompare, bigIntMax, bigIntMin, getLogger, objectMap, randomBytes} from "../../utils/Utils";
 import {OutOfBoundsError} from "../../errors/RequestError";
 import {SwapperWithChain} from "./SwapperWithChain";
@@ -1237,6 +1237,33 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
     getSwapById<C extends ChainIds<T>>(id: string, chainId: C, signer?: string): Promise<ISwap<T[C]>>;
 
     async getSwapById<C extends ChainIds<T>>(id: string, chainId?: C, signer?: string): Promise<ISwap> {
+        //Check in pending swaps first
+        if(chainId!=null) {
+            for(let key in this.chains[chainId].wrappers) {
+                const wrapper: ISwapWrapper<any, ISwap> = this.chains[chainId].wrappers[key];
+                const result = wrapper.pendingSwaps.get(id)?.deref();
+                if(signer!=null) {
+                    if(result.getInitiator()===signer) return result;
+                } else {
+                    return result;
+                }
+            }
+        } else {
+            for(let chainId in this.chains) {
+                for(let key in this.chains[chainId].wrappers) {
+                    const wrapper: ISwapWrapper<any, ISwap> = this.chains[chainId].wrappers[key];
+                    const result = wrapper.pendingSwaps.get(id)?.deref();
+                    if(result!=null) {
+                        if(signer!=null) {
+                            if(result.getInitiator()===signer) return result;
+                        } else {
+                            return result;
+                        }
+                    }
+                }
+            }
+        }
+
         const queryParams: QueryParams[] = [];
         if(signer!=null) queryParams.push({key: "intiator", value: signer});
         queryParams.push({key: "id", value: id});
