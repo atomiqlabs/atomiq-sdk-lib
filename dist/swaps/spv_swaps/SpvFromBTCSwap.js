@@ -188,7 +188,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         return {
             amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc + this.gasSwapFeeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices),
             amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee + gasSwapFeeInOutputToken, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.gasSwapFeeBtc, abortSignal, preFetchedUsdPrice)
         };
     }
     getSwapFee() {
@@ -206,11 +206,12 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         };
     }
     getCallerFee() {
-        const gasCallerFeeInOutputToken = this.outputTotalGas * this.callerFeeShare * this.pricingInfo.swapPriceUSatPerToken / 1000000n / 100000n;
+        const gasCallerFeeInOutputToken = this.btcAmountGas * this.callerFeeShare * this.pricingInfo.swapPriceUSatPerToken / 1000000n / 100000n;
+        const feeBtc = this.btcAmount * this.callerFeeShare / 100000n;
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.btcAmount * this.callerFeeShare / 100000n, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices),
+            amountInSrcToken: (0, Tokens_1.toTokenAmount)(feeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices),
             amountInDstToken: (0, Tokens_1.toTokenAmount)((this.outputTotalSwap * this.callerFeeShare / 100000n) + gasCallerFeeInOutputToken, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(feeBtc, abortSignal, preFetchedUsdPrice)
         };
     }
     hasEnoughForTxFees() {
