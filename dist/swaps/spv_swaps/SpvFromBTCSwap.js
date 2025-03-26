@@ -255,8 +255,8 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             throw new Error("Fronting fee out of bounds!");
         if (this.executionFeeShare < 0n || this.executionFeeShare >= 0xfffffn)
             throw new Error("Execution fee out of bounds!");
-        const nSequence0 = (this.callerFeeShare & 0xfffffn) | (this.frontingFeeShare & 1047552n) << 10n;
-        const nSequence1 = (this.executionFeeShare & 0xfffffn) | (this.frontingFeeShare & 1023n) << 20n;
+        const nSequence0 = 0x80000000n | (this.callerFeeShare & 0xfffffn) | (this.frontingFeeShare & 1047552n) << 10n;
+        const nSequence1 = 0x80000000n | (this.executionFeeShare & 0xfffffn) | (this.frontingFeeShare & 1023n) << 20n;
         if (!this.initiated) {
             this.initiated = true;
             await this._saveAndEmit();
