@@ -203,6 +203,8 @@ export type SpvFromBTCPrepare = SwapInit & {
     gasAmount: bigint;
     gasToken: string;
     exactOut: boolean;
+    callerFeeRate: Promise<bigint>;
+    frontingFeeRate: bigint;
 };
 declare const SpvFromBTCInitResponseSchema: {
     readonly txId: FieldTypeEnum.String;

@@ -253,7 +253,9 @@ export type SpvFromBTCPrepare = SwapInit & {
     amount: bigint,
     gasAmount: bigint,
     gasToken: string,
-    exactOut: boolean
+    exactOut: boolean,
+    callerFeeRate: Promise<bigint>,
+    frontingFeeRate: bigint
 }
 
 const SpvFromBTCInitResponseSchema = {
@@ -710,7 +712,9 @@ export class IntermediaryAPI {
             amount: init.amount.toString(10),
             token: init.token,
             gasAmount: init.gasAmount.toString(10),
-            gasToken: init.gasToken
+            gasToken: init.gasToken,
+            frontingFeeRate: init.frontingFeeRate.toString(10),
+            callerFeeRate: init.callerFeeRate.then(val => val.toString(10))
         }, {
             code: FieldTypeEnum.Number,
             msg: FieldTypeEnum.String,

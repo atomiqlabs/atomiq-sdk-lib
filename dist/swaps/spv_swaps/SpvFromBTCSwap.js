@@ -106,7 +106,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             this.swapFeeBtc = this.swapFee * this.btcAmountSwap / this.getOutputWithoutFee().rawAmount;
         }
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.outputTotalSwap, this.outputSwapToken);
+            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount - this.swapFee, this.outputSwapToken);
         }
     }
     //////////////////////////////
@@ -114,7 +114,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     async refreshPriceData() {
         if (this.pricingInfo == null)
             return null;
-        const priceData = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.outputTotalSwap, this.outputSwapToken);
+        const priceData = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount - this.swapFee, this.outputSwapToken);
         this.pricingInfo = priceData;
         return priceData;
     }
@@ -205,25 +205,32 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.gasSwapFeeBtc, abortSignal, preFetchedUsdPrice)
         };
     }
+    getCallerFee() {
+        const gasCallerFeeInOutputToken = this.outputTotalGas * this.callerFeeShare * this.pricingInfo.swapPriceUSatPerToken / 1000000n / 100000n;
+        return {
+            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.btcAmount * this.callerFeeShare / 100000n, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices),
+            amountInDstToken: (0, Tokens_1.toTokenAmount)((this.outputTotalSwap * this.callerFeeShare / 100000n) + gasCallerFeeInOutputToken, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices),
+            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+        };
+    }
     hasEnoughForTxFees() {
         return Promise.resolve({ balance: undefined, enoughBalance: true, required: undefined });
     }
-    //TODO: Also count other fees here: caller, fronting, execution
     getOutputWithoutFee() {
-        return (0, Tokens_1.toTokenAmount)(this.outputTotalSwap + this.swapFee, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)((this.outputTotalSwap * (100000n + this.callerFeeShare + this.frontingFeeShare + this.executionFeeShare) / 100000n) + this.swapFee, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices);
     }
     getOutput() {
         return (0, Tokens_1.toTokenAmount)(this.outputTotalSwap, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices);
     }
-    //TODO: Also count other fees here: caller, fronting
     getGasOutputWithoutFee() {
-        return (0, Tokens_1.toTokenAmount)(this.outputTotalGas + this.gasSwapFee, this.wrapper.tokens[this.outputGasToken], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)((this.outputTotalGas * (100000n + this.callerFeeShare + this.frontingFeeShare) / 100000n) + this.gasSwapFee, this.wrapper.tokens[this.outputGasToken], this.wrapper.prices);
     }
     getGasOutput() {
         return (0, Tokens_1.toTokenAmount)(this.outputTotalGas, this.wrapper.tokens[this.outputGasToken], this.wrapper.prices);
     }
     getInputWithoutFee() {
-        return (0, Tokens_1.toTokenAmount)(this.btcAmount - this.swapFeeBtc - this.gasSwapFeeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
+        //TODO: Once we introduce execution fee, we need to add it here!
+        return (0, Tokens_1.toTokenAmount)((this.btcAmount * 100000n / (100000n + this.callerFeeShare + this.frontingFeeShare)) - this.swapFeeBtc - this.gasSwapFeeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
     }
     getInput() {
         return (0, Tokens_1.toTokenAmount)(this.btcAmount, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
