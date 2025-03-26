@@ -12,6 +12,8 @@ import { EventEmitter } from "events";
 import { Intermediary } from "../../intermediaries/Intermediary";
 export type SpvFromBTCOptions = {
     gasAmount?: bigint;
+    unsafeZeroWatchtowerFee?: boolean;
+    feeSafetyFactor?: number;
 };
 export type SpvFromBTCWrapperOptions = ISwapWrapperOptions & {
     maxConfirmations?: number;
@@ -51,12 +53,26 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
     protected processEventClose(event: SpvVaultCloseEvent, swap: SpvFromBTCSwap<T>): boolean;
     protected processEvent(event: ChainEvent<T["Data"]>, swap: SpvFromBTCSwap<T>): Promise<boolean>;
     /**
+     * Pre-fetches caller (watchtower) bounty data for the swap. Doesn't throw, instead returns null and aborts the
+     *  provided abortController
+     *
+     * @param signer Smartchain signer address initiating the swap
+     * @param amountData
+     * @param options Options as passed to the swap creation function
+     * @param pricePrefetch
+     * @param nativeTokenPricePrefetch
+     * @param abortController
+     * @private
+     */
+    private preFetchCallerFeeShare;
+    /**
      * Verifies response returned from intermediary
      *
      * @param resp Response as returned by the intermediary
      * @param amountData
      * @param lp Intermediary
      * @param options Options as passed to the swap creation function
+     * @param callerFeeShare
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
