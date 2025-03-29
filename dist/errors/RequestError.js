@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OutOfBoundsError = exports.RequestError = void 0;
-const BN = require("bn.js");
 /**
  * An error returned by the intermediary in a http response
  */
@@ -23,7 +22,7 @@ class RequestError extends Error {
             const parsed = JSON.parse(msg);
             msg = parsed.msg;
             if (parsed.code === 20003 || parsed.code === 20004) {
-                return new OutOfBoundsError(parsed.msg, httpCode, new BN(parsed.data.min), new BN(parsed.data.max));
+                return new OutOfBoundsError(parsed.msg, httpCode, BigInt(parsed.data.min), BigInt(parsed.data.max));
             }
         }
         catch (e) { }

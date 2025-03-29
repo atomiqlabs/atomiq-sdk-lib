@@ -2,7 +2,6 @@ import {CoinType, CtorCoinTypes} from "../abstract/IPriceProvider";
 import {ExchangePriceProvider} from "./abstract/ExchangePriceProvider";
 import {httpGet} from "../../utils/Utils";
 import {MultiChain} from "../../swaps/Swapper";
-import * as BN from "bn.js";
 
 export type KrakenResponse = {
     error: string[];
@@ -47,7 +46,7 @@ export class KrakenPriceProvider<T extends MultiChain> extends ExchangePriceProv
         return parseFloat(response.result["XBTUSDC"].c[0])/100000000;
     }
 
-    protected async fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<BN> {
+    protected async fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<bigint> {
         const pairs: string[] = token.coinId.split(";");
 
         const response = await httpGet<KrakenResponse>(
@@ -65,7 +64,7 @@ export class KrakenPriceProvider<T extends MultiChain> extends ExchangePriceProv
 
         const price = prices.reduce((previousValue, currentValue) => previousValue * currentValue, 1);
 
-        return new BN(Math.floor(price*100000000000000).toString(10));
+        return BigInt(Math.floor(price*100000000000000));
     }
 
 }

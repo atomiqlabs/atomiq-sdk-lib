@@ -1,18 +1,17 @@
 import { IToBTCWrapper } from "./IToBTCWrapper";
 import { Fee, ISwap, ISwapInit } from "../ISwap";
-import * as BN from "bn.js";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { PriceInfoType } from "../../prices/abstract/ISwapPrice";
 import { RefundAuthorizationResponse } from "../../intermediaries/IntermediaryAPI";
 import { BtcToken, SCToken, TokenAmount } from "../Tokens";
 export type IToBTCSwapInit<T extends SwapData> = ISwapInit<T> & {
-    networkFee: BN;
-    networkFeeBtc?: BN;
+    networkFee: bigint;
+    networkFeeBtc?: bigint;
 };
 export declare function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T>;
 export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<T, ToBTCSwapState> {
-    protected readonly networkFee: BN;
-    protected networkFeeBtc?: BN;
+    protected readonly networkFee: bigint;
+    protected networkFeeBtc?: bigint;
     protected readonly abstract outputToken: BtcToken;
     protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, serializedObject: any);
     protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, init: IToBTCSwapInit<T["Data"]>);
@@ -22,6 +21,11 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      * @protected
      */
     protected tryCalculateSwapFee(): void;
+    /**
+     * Returns the payment hash identifier to be sent to the LP for getStatus and getRefund
+     * @protected
+     */
+    protected getLpIdentifier(): string;
     /**
      * Sets the payment result for the swap, optionally also checking it (checking that tx exist or swap secret is valid)
      *
@@ -37,7 +41,11 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
     refreshPriceData(): Promise<PriceInfoType>;
     getSwapPrice(): number;
     getMarketPrice(): number;
-    getRealSwapFeePercentagePPM(): BN;
+    getRealSwapFeePercentagePPM(): bigint;
+    getInputTxId(): string | null;
+    abstract getOutputTxId(): string | null;
+    getInputAddress(): string | null;
+    getOutputAddress(): string | null;
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
      */
@@ -69,7 +77,7 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
     /**
      * Get the estimated smart chain transaction fee of the refund transaction
      */
-    getRefundFee(): Promise<BN>;
+    getRefundFee(): Promise<bigint>;
     /**
      * Checks if the intiator/sender has enough balance to go through with the swap
      */
@@ -152,7 +160,7 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      * @throws {SignatureVerificationError} If intermediary returned invalid cooperative refund signature
      * @throws {Error} When state is not refundable
      */
-    txsRefund(): Promise<T["TX"][]>;
+    txsRefund(signer?: string): Promise<T["TX"][]>;
     /**
      * Waits till a swap is refunded, should be called after sending the refund transactions manually
      *
@@ -162,6 +170,15 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      */
     waitTillRefunded(abortSignal?: AbortSignal): Promise<void>;
     serialize(): any;
+    /**
+     * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
+     *  data
+     *
+     * @private
+     */
+    private syncStateFromChain;
+    _sync(save?: boolean): Promise<boolean>;
+    _tick(save?: boolean): Promise<boolean>;
 }
 export declare enum ToBTCSwapState {
     REFUNDED = -3,

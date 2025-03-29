@@ -94,8 +94,7 @@ class SwapperWithChain {
     getSupportedTokens(swapType) {
         const arr = [];
         this.getSupportedTokenAddresses(swapType).forEach(tokenAddress => {
-            var _a, _b;
-            const token = (_b = (_a = this.swapper.tokens) === null || _a === void 0 ? void 0 : _a[this.chainIdentifier]) === null || _b === void 0 ? void 0 : _b[tokenAddress];
+            const token = this.swapper.tokens?.[this.chainIdentifier]?.[tokenAddress];
             if (token != null)
                 arr.push(token);
         });
@@ -109,20 +108,20 @@ class SwapperWithChain {
     getSupportedTokenAddresses(swapType) {
         return this.swapper.getSupportedTokenAddresses(this.chainIdentifier, swapType);
     }
-    createToBTCSwap(signer, tokenAddress, address, amount, confirmationTarget, confirmations, exactIn, additionalParams) {
-        return this.swapper.createToBTCSwap(this.chainIdentifier, signer, tokenAddress, address, amount, confirmationTarget, confirmations, exactIn, additionalParams);
+    createToBTCSwap(signer, tokenAddress, address, amount, exactIn, additionalParams, options) {
+        return this.swapper.createToBTCSwap(this.chainIdentifier, signer, tokenAddress, address, amount, exactIn, additionalParams, options);
     }
-    createToBTCLNSwap(signer, tokenAddress, paymentRequest, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, additionalParams) {
-        return this.swapper.createToBTCLNSwap(this.chainIdentifier, signer, tokenAddress, paymentRequest, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, additionalParams);
+    createToBTCLNSwap(signer, tokenAddress, paymentRequest, additionalParams, options) {
+        return this.swapper.createToBTCLNSwap(this.chainIdentifier, signer, tokenAddress, paymentRequest, additionalParams, options);
     }
-    createToBTCLNSwapViaLNURL(signer, tokenAddress, lnurlPay, amount, comment, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, exactIn, additionalParams) {
-        return this.swapper.createToBTCLNSwapViaLNURL(this.chainIdentifier, signer, tokenAddress, lnurlPay, amount, comment, expirySeconds, maxRoutingBaseFee, maxRoutingPPM, exactIn, additionalParams);
+    createToBTCLNSwapViaLNURL(signer, tokenAddress, lnurlPay, amount, exactIn, additionalParams, options) {
+        return this.swapper.createToBTCLNSwapViaLNURL(this.chainIdentifier, signer, tokenAddress, lnurlPay, amount, exactIn, additionalParams, options);
     }
-    createFromBTCSwap(signer, tokenAddress, amount, exactOut, additionalParams) {
-        return this.swapper.createFromBTCSwap(this.chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams);
+    createFromBTCSwap(signer, tokenAddress, amount, exactOut, additionalParams, options) {
+        return this.swapper.createFromBTCSwap(this.chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams, options);
     }
-    createFromBTCLNSwap(signer, tokenAddress, amount, exactOut, descriptionHash, additionalParams) {
-        return this.swapper.createFromBTCLNSwap(this.chainIdentifier, signer, tokenAddress, amount, exactOut, descriptionHash, additionalParams);
+    createFromBTCLNSwap(signer, tokenAddress, amount, exactOut, additionalParams, options) {
+        return this.swapper.createFromBTCLNSwap(this.chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams, options);
     }
     createFromBTCLNSwapViaLNURL(signer, tokenAddress, lnurl, amount, exactOut, additionalParams) {
         return this.swapper.createFromBTCLNSwapViaLNURL(this.chainIdentifier, signer, tokenAddress, lnurl, amount, exactOut, additionalParams);
@@ -159,16 +158,22 @@ class SwapperWithChain {
         return this.swapper.getActionableSwaps(this.chainIdentifier, signer);
     }
     /**
-     * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
+     * Returns swaps that are refundable for the specific chain, optionally also for a specific signer's address
      */
     getRefundableSwaps(signer) {
         return this.swapper.getRefundableSwaps(this.chainIdentifier, signer);
     }
     /**
-     * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
+     * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
-    getClaimableSwaps(signer) {
-        return this.swapper.getClaimableSwaps(this.chainIdentifier, signer);
+    getSwapById(id, signer) {
+        return this.swapper.getSwapById(id, this.chainIdentifier, signer);
+    }
+    /**
+     * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes
+     */
+    async _syncSwaps(signer) {
+        return this.swapper._syncSwaps(this.chainIdentifier, signer);
     }
     /**
      * Returns the token balance of the wallet

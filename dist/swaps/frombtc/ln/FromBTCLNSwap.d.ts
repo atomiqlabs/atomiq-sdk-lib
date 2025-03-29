@@ -3,7 +3,6 @@
 import { FromBTCLNWrapper } from "./FromBTCLNWrapper";
 import { IFromBTCSwap } from "../IFromBTCSwap";
 import { SwapType } from "../../SwapType";
-import * as BN from "bn.js";
 import { ChainType, SignatureData, SwapData } from "@atomiqlabs/base";
 import { ISwapInit } from "../../ISwap";
 import { Buffer } from "buffer";
@@ -22,6 +21,7 @@ export declare enum FromBTCLNSwapState {
 export type FromBTCLNSwapInit<T extends SwapData> = ISwapInit<T> & {
     pr: string;
     secret: string;
+    initialSwapData: T;
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
@@ -33,13 +33,18 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     protected readonly lnurlFailSignal: AbortController;
     protected readonly pr: string;
     protected readonly secret: string;
+    protected initialSwapData: T["Data"];
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
     prPosted?: boolean;
+    wrapper: FromBTCLNWrapper<T>;
+    protected getSwapData(): T["Data"];
     constructor(wrapper: FromBTCLNWrapper<T>, init: FromBTCLNSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNWrapper<T>, obj: any);
     protected upgradeVersion(): void;
+    getInputTxId(): string | null;
+    getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
     getAddress(): string;
     /**
@@ -51,6 +56,11 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * Returns timeout time (in UNIX milliseconds) when the LN invoice will expire
      */
     getTimeoutTime(): number;
+    /**
+     * Returns timeout time (in UNIX milliseconds) when the on-chain address will expire and no funds should be sent
+     *  to that address anymore
+     */
+    getHtlcTimeoutTime(): number;
     isFinished(): boolean;
     isClaimable(): boolean;
     isSuccessful(): boolean;
@@ -64,7 +74,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     /**
      * Estimated transaction fee for commit & claim txs combined
      */
-    getCommitAndClaimFee(): Promise<BN>;
+    getCommitAndClaimFee(): Promise<bigint>;
     getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
     hasEnoughForTxFees(): Promise<{
         enoughBalance: boolean;
@@ -130,6 +140,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @throws {Error} If the LP refunded sooner than we were able to claim
      */
     waitTillClaimed(abortSignal?: AbortSignal): Promise<void>;
+    canCommitAndClaimInOneShot(): boolean;
     /**
      * Commits and claims the swap, in a way that the transactions can be signed together by the underlying provider and
      *  then sent sequentially
@@ -142,7 +153,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
     commitAndClaim(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string[]>;
-    /**
+    /**==
      * Returns transactions for both commit & claim operation together, such that they can be signed all at once by
      *  the wallet. CAUTION: transactions must be sent sequentially, such that the claim (2nd) transaction is only
      *  sent after the commit (1st) transaction confirms. Failure to do so can reveal the HTLC pre-image too soon,
@@ -167,4 +178,13 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      */
     settleWithLNURLWithdraw(lnurl: string | LNURLWithdraw): Promise<void>;
     serialize(): any;
+    /**
+     * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
+     *  data
+     *
+     * @private
+     */
+    private syncStateFromChain;
+    _sync(save?: boolean): Promise<boolean>;
+    _tick(save?: boolean): Promise<boolean>;
 }

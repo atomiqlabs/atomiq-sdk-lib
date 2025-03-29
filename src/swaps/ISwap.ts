@@ -1,11 +1,10 @@
 import {SwapType} from "./SwapType";
 import {EventEmitter} from "events";
-import * as BN from "bn.js";
 import {Buffer} from "buffer";
 import {ISwapWrapper} from "./ISwapWrapper";
 import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isPriceInfoType, PriceInfoType} from "../prices/abstract/ISwapPrice";
-import {getLogger, LoggerType, timeoutPromise, tryWithRetries} from "../utils/Utils";
+import {LoggerType, randomBytes, timeoutPromise, tryWithRetries} from "../utils/Utils";
 import {SCToken, Token, TokenAmount, toTokenAmount} from "./Tokens";
 import {SwapDirection} from "./SwapDirection";
 
@@ -13,8 +12,8 @@ export type ISwapInit<T extends SwapData> = {
     pricingInfo: PriceInfoType,
     url: string,
     expiry: number,
-    swapFee: BN,
-    swapFeeBtc?: BN,
+    swapFee: bigint,
+    swapFeeBtc?: bigint,
     feeRate: any,
     signatureData?: SignatureData,
     data?: T,
@@ -27,8 +26,8 @@ export function isISwapInit<T extends SwapData>(obj: any): obj is ISwapInit<T> {
         isPriceInfoType(obj.pricingInfo) &&
         typeof obj.url === 'string' &&
         typeof obj.expiry === 'number' &&
-        BN.isBN(obj.swapFee) &&
-        (obj.swapFeeBtc == null || BN.isBN(obj.swapFeeBtc)) &&
+        typeof(obj.swapFee) === "bigint" &&
+        (obj.swapFeeBtc == null || typeof(obj.swapFeeBtc) === "bigint") &&
         obj.feeRate != null &&
         (obj.signatureData == null || (
             typeof(obj.signatureData) === 'object' &&
@@ -75,8 +74,8 @@ export abstract class ISwap<
     signatureData?: SignatureData;
     feeRate?: any;
 
-    protected swapFee: BN;
-    protected swapFeeBtc?: BN;
+    protected swapFee: bigint;
+    protected swapFeeBtc?: bigint;
 
     /**
      * Transaction IDs for the swap on the smart chain side
@@ -84,6 +83,12 @@ export abstract class ISwap<
     commitTxId: string;
     refundTxId?: string;
     claimTxId?: string;
+
+    /**
+     * Random nonce to differentiate the swap from others with the same identifier hash (i.e. when quoting the same swap
+     *  from multiple LPs)
+     */
+    randomNonce: string;
 
     /**
      * Event emitter emitting "swapState" event when swap's state changes
@@ -102,6 +107,7 @@ export abstract class ISwap<
             Object.assign(this, swapInitOrObj);
             this.version = this.currentVersion;
             this.createdAt = Date.now();
+            this.randomNonce = randomBytes(16).toString("hex");
         } else {
             this.expiry = swapInitOrObj.expiry;
             this.url = swapInitOrObj.url;
@@ -110,16 +116,16 @@ export abstract class ISwap<
 
             this.pricingInfo = {
                 isValid: swapInitOrObj._isValid,
-                differencePPM: swapInitOrObj._differencePPM==null ? null : new BN(swapInitOrObj._differencePPM),
-                satsBaseFee: swapInitOrObj._satsBaseFee==null ? null : new BN(swapInitOrObj._satsBaseFee),
-                feePPM: swapInitOrObj._feePPM==null ? null : new BN(swapInitOrObj._feePPM),
-                realPriceUSatPerToken: swapInitOrObj._realPriceUSatPerToken==null ? null : new BN(swapInitOrObj._realPriceUSatPerToken),
-                swapPriceUSatPerToken: swapInitOrObj._swapPriceUSatPerToken==null ? null : new BN(swapInitOrObj._swapPriceUSatPerToken),
+                differencePPM: swapInitOrObj._differencePPM==null ? null : BigInt(swapInitOrObj._differencePPM),
+                satsBaseFee: swapInitOrObj._satsBaseFee==null ? null : BigInt(swapInitOrObj._satsBaseFee),
+                feePPM: swapInitOrObj._feePPM==null ? null : BigInt(swapInitOrObj._feePPM),
+                realPriceUSatPerToken: swapInitOrObj._realPriceUSatPerToken==null ? null : BigInt(swapInitOrObj._realPriceUSatPerToken),
+                swapPriceUSatPerToken: swapInitOrObj._swapPriceUSatPerToken==null ? null : BigInt(swapInitOrObj._swapPriceUSatPerToken),
             };
 
             this.data = swapInitOrObj.data!=null ? new wrapper.swapDataDeserializer(swapInitOrObj.data) : null;
-            this.swapFee = swapInitOrObj.swapFee==null ? null : new BN(swapInitOrObj.swapFee);
-            this.swapFeeBtc = swapInitOrObj.swapFeeBtc==null ? null : new BN(swapInitOrObj.swapFeeBtc);
+            this.swapFee = swapInitOrObj.swapFee==null ? null : BigInt(swapInitOrObj.swapFee);
+            this.swapFeeBtc = swapInitOrObj.swapFeeBtc==null ? null : BigInt(swapInitOrObj.swapFeeBtc);
             this.signatureData = swapInitOrObj.signature==null ? null : {
                 prefix: swapInitOrObj.prefix,
                 timeout: swapInitOrObj.timeout,
@@ -135,8 +141,9 @@ export abstract class ISwap<
             this.initiated = swapInitOrObj.initiated;
             this.exactIn = swapInitOrObj.exactIn;
             this.createdAt = swapInitOrObj.createdAt ?? swapInitOrObj.expiry;
+
+            this.randomNonce = swapInitOrObj.randomNonce;
         }
-        this.logger = getLogger(this.constructor.name+"("+this.getPaymentHashString()+"): ");
         if(this.version!==this.currentVersion) {
             this.upgradeVersion();
         }
@@ -252,7 +259,7 @@ export abstract class ISwap<
     /**
      * Returns the price difference between offered price and current market price in PPM (parts per million)
      */
-    getPriceDifferencePPM(): BN {
+    getPriceDifferencePPM(): bigint {
         return this.pricingInfo==null ? null :this.pricingInfo.differencePPM;
     }
 
@@ -260,7 +267,7 @@ export abstract class ISwap<
      * Returns the price difference between offered price and current market price as a decimal number
      */
     getPriceDifferencePct(): number {
-        return this.pricingInfo==null ? null : this.pricingInfo.differencePPM==null ? null : this.pricingInfo.differencePPM.toNumber()/1000000;
+        return this.pricingInfo==null ? null : this.pricingInfo.differencePPM==null ? null : Number(this.pricingInfo.differencePPM)/1000000;
     }
 
     /**
@@ -281,23 +288,58 @@ export abstract class ISwap<
     /**
      * Returns the real swap fee percentage as PPM (parts per million)
      */
-    abstract getRealSwapFeePercentagePPM(): BN;
+    abstract getRealSwapFeePercentagePPM(): bigint;
 
     //////////////////////////////
     //// Getters & utils
 
-    getPaymentHashString(): string {
-        const paymentHash = this.getPaymentHash();
+    abstract getInputTxId(): string | null;
+
+    abstract getOutputTxId(): string | null;
+
+    abstract getInputAddress(): string | null;
+
+    abstract getOutputAddress(): string | null;
+
+    /**
+     * Returns the escrow hash - i.e. hash of the escrow data
+     */
+    getEscrowHash(): string | null {
+        return this.data?.getEscrowHash();
+    }
+
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
+    getClaimHash(): string {
+        return this.data?.getClaimHash();
+    }
+
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHash(): Buffer {
+        const claimHashBuffer = Buffer.from(this.getClaimHash(), "hex");
+        if(this.randomNonce==null) return claimHashBuffer;
+        return Buffer.concat([claimHashBuffer, Buffer.from(this.randomNonce, "hex")]);
+    }
+
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHashString(): string {
+        const paymentHash = this.getIdentifierHash();
         if(paymentHash==null) return null;
         return paymentHash.toString("hex");
     }
 
     /**
-     * Returns payment hash identifier of the swap
+     * Returns the ID of the swap, as used in the storage and getSwapById function
      */
-    getPaymentHash(): Buffer {
-        if(this.data==null) return null;
-        return Buffer.from(this.data.getHash(), "hex");
+    getId(): string {
+        return this.getIdentifierHashString();
     }
 
     /**
@@ -402,7 +444,7 @@ export abstract class ISwap<
     /**
      * Get the estimated smart chain fee of the commit transaction
      */
-    getCommitFee(): Promise<BN> {
+    getCommitFee(): Promise<bigint> {
         return this.wrapper.contract.getCommitFee(this.data, this.feeRate);
     }
 
@@ -439,7 +481,7 @@ export abstract class ISwap<
      * Returns the transaction fee paid on the smart chain
      */
     async getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>> {
-        const swapContract: T["Contract"] & {getRawCommitFee?: (data: T["Data"], feeRate?: string) => Promise<BN>} = this.wrapper.contract;
+        const swapContract: T["Contract"] & {getRawCommitFee?: (data: T["Data"], feeRate?: string) => Promise<bigint>} = this.wrapper.contract;
         return toTokenAmount(
             await (
                 swapContract.getRawCommitFee!=null ?
@@ -462,6 +504,11 @@ export abstract class ISwap<
     serialize(): any {
         if(this.pricingInfo==null) return {};
         return {
+            id: this.getIdentifierHashString(),
+            type: this.getType(),
+            escrowHash: this.getEscrowHash(),
+            initiator: this.getInitiator(),
+
             _isValid: this.pricingInfo.isValid,
             _differencePPM: this.pricingInfo.differencePPM==null ? null :this.pricingInfo.differencePPM.toString(10),
             _satsBaseFee: this.pricingInfo.satsBaseFee==null ? null :this.pricingInfo.satsBaseFee.toString(10),
@@ -484,19 +531,16 @@ export abstract class ISwap<
             version: this.version,
             initiated: this.initiated,
             exactIn: this.exactIn,
-            createdAt: this.createdAt
+            createdAt: this.createdAt,
+            randomNonce: this.randomNonce
         }
     }
 
     _save(): Promise<void> {
         if(this.isQuoteExpired()) {
-            this.wrapper.swapData.delete(this.getPaymentHashString());
-            if(!this.initiated) return Promise.resolve();
-            return this.wrapper.storage.removeSwapData(this).then(() => {});
+            return this.wrapper.removeSwapData(this);
         } else {
-            this.wrapper.swapData.set(this.getPaymentHashString(), this);
-            if(!this.initiated) return Promise.resolve();
-            return this.wrapper.storage.saveSwapData(this);
+            return this.wrapper.saveSwapData(this);
         }
     }
 
@@ -514,5 +558,27 @@ export abstract class ISwap<
         this.wrapper.events.emit("swapState", this);
         this.events.emit("swapState", this);
     }
+
+
+    //////////////////////////////
+    //// Swap ticks & sync
+
+    /**
+     * Synchronizes swap state from chain and/or LP node, usually ran on startup
+     *
+     * @param save whether to save the new swap state or not
+     *
+     * @returns {boolean} true if the swap changed, false if the swap hasn't changed
+     */
+    abstract _sync(save?: boolean): Promise<boolean>;
+
+    /**
+     * Runs quick checks on the swap, such as checking the expiry, usually ran periodically every few seconds
+     *
+     * @param save whether to save the new swap state or not
+     *
+     * @returns {boolean} true if the swap changed, false if the swap hasn't changed
+     */
+    abstract _tick(save?: boolean): Promise<boolean>;
 
 }

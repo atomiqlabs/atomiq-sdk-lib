@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import { IPriceProvider } from "./abstract/IPriceProvider";
 import { ICachedSwapPrice } from "./abstract/ICachedSwapPrice";
 import { ChainIds, MultiChain } from "../swaps/Swapper";
@@ -7,7 +6,7 @@ import { ChainIds, MultiChain } from "../swaps/Swapper";
  */
 export declare class SingleSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T> {
     priceProvider: IPriceProvider<T>;
-    constructor(maxAllowedFeeDiffPPM: BN, priceProvider: IPriceProvider<T>, cacheTimeout?: number);
+    constructor(maxAllowedFeeDiffPPM: bigint, priceProvider: IPriceProvider<T>, cacheTimeout?: number);
     /**
      * Fetch price in uSats (micro sats) for a given token against BTC
      *
@@ -17,7 +16,7 @@ export declare class SingleSwapPrice<T extends MultiChain> extends ICachedSwapPr
      * @protected
      * @returns token price in uSats (micro sats)
      */
-    protected fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<BN>;
+    protected fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<bigint>;
     /**
      * Returns the decimal places of the specified token, or -1 if token should be ignored, returns null if
      *  token is not found

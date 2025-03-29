@@ -1,14 +1,14 @@
-import {decode as bolt11Decode} from "bolt11";
+import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {ToBTCLNWrapper} from "./ToBTCLNWrapper";
 import {isIToBTCSwapInit, IToBTCSwap, IToBTCSwapInit} from "../IToBTCSwap";
 import {SwapType} from "../../SwapType";
-import * as BN from "bn.js";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
-import * as createHash from "create-hash";
+import {sha256} from "@noble/hashes/sha2";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {LNURL, LNURLDecodedSuccessAction, LNURLPaySuccessAction, isLNURLPaySuccessAction} from "../../../utils/LNURL";
 import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../Tokens";
+import {getLogger} from "../../../utils/Utils";
 
 export type ToBTCLNSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     confidence: number;
@@ -32,6 +32,8 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
     private readonly confidence: number;
     private readonly pr: string;
 
+    readonly paymentHash: string;
+
     lnurl?: string;
     successAction?: LNURLPaySuccessAction;
 
@@ -50,6 +52,9 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
             this.successAction = initOrObj.successAction;
             this.secret = initOrObj.secret;
         }
+
+        this.paymentHash = this.getPaymentHash().toString("hex");
+        this.logger = getLogger("ToBTCLN("+this.getIdentifierHashString()+"): ");
         this.tryCalculateSwapFee();
     }
 
@@ -58,11 +63,9 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
         if(result.secret==null) throw new IntermediaryError("No payment secret returned!");
         if(check) {
             const secretBuffer = Buffer.from(result.secret, "hex");
-            const hash = createHash("sha256").update(secretBuffer).digest();
+            const hash = Buffer.from(sha256(secretBuffer));
 
-            const paymentHashBuffer = Buffer.from(this.data.getHash(), "hex");
-
-            if(!hash.equals(paymentHashBuffer)) throw new IntermediaryError("Invalid payment secret returned");
+            if(!hash.equals(this.getPaymentHash())) throw new IntermediaryError("Invalid payment secret returned");
         }
         this.secret = result.secret;
         return Promise.resolve(true);
@@ -74,13 +77,17 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
 
     getOutput(): TokenAmount<T["ChainId"], BtcToken<true>> {
         const parsedPR = bolt11Decode(this.pr);
-        const amount = new BN(parsedPR.millisatoshis).add(new BN(999)).div(new BN(1000));
+        const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
         return toTokenAmount(amount, this.outputToken, this.wrapper.prices);
     }
 
 
     //////////////////////////////
     //// Getters & utils
+
+    getOutputTxId(): string | null {
+        return this.getLpIdentifier();
+    }
 
     /**
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
@@ -104,10 +111,22 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
         return this.confidence;
     }
 
+    getIdentifierHash(): Buffer {
+        const paymentHashBuffer = this.getPaymentHash();
+        if(this.randomNonce==null) return paymentHashBuffer;
+        return Buffer.concat([paymentHashBuffer, Buffer.from(this.randomNonce, "hex")]);
+    }
+
     getPaymentHash(): Buffer {
         if(this.pr==null) return null;
         const parsed = bolt11Decode(this.pr);
         return Buffer.from(parsed.tagsObject.payment_hash, "hex");
+    }
+
+    protected getLpIdentifier(): string {
+        if(this.pr==null) return null;
+        const parsed = bolt11Decode(this.pr);
+        return parsed.tagsObject.payment_hash;
     }
 
     getRecipient(): string {
@@ -152,6 +171,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
     serialize(): any {
         return {
             ...super.serialize(),
+            paymentHash: this.getPaymentHash().toString("hex"),
             pr: this.pr,
             confidence: this.confidence,
             secret: this.secret,

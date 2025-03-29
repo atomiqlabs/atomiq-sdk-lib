@@ -1,25 +1,21 @@
 /// <reference types="node" />
 import { ToBTCLNSwap } from "./ToBTCLNSwap";
 import { IToBTCWrapper } from "../IToBTCWrapper";
-import * as BN from "bn.js";
-import { ChainType, IStorageManager } from "@atomiqlabs/base";
+import { ChainType } from "@atomiqlabs/base";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
+import { SwapType } from "../../SwapType";
 import { LNURLPayParamsWithUrl } from "../../../utils/LNURL";
-export type AbortControllerTyped<T> = AbortController & {
-    abort: (reason: T) => void;
-    signal: AbortSignal & {
-        reason: T;
-    };
-};
+import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
+import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
 export type ToBTCLNOptions = {
     expirySeconds?: number;
-    maxFee?: BN | Promise<BN>;
-    expiryTimestamp?: BN;
-    maxRoutingPPM?: BN;
-    maxRoutingBaseFee?: BN;
+    maxFee?: bigint | Promise<bigint>;
+    expiryTimestamp?: bigint;
+    maxRoutingPPM?: bigint;
+    maxRoutingBaseFee?: bigint;
 };
 export type ToBTCLNWrapperOptions = ISwapWrapperOptions & {
     lightningBaseFee?: number;
@@ -27,8 +23,10 @@ export type ToBTCLNWrapperOptions = ISwapWrapperOptions & {
     paymentTimeoutSeconds?: number;
 };
 export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCLNSwap<T>, ToBTCLNWrapperOptions> {
-    protected readonly swapDeserializer: typeof ToBTCLNSwap;
-    constructor(chainIdentifier: string, storage: IStorageManager<ToBTCLNSwap<T>>, contract: T["Contract"], chainEvents: T["Events"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options?: ToBTCLNWrapperOptions, events?: EventEmitter);
+    readonly TYPE = SwapType.TO_BTCLN;
+    readonly swapDeserializer: typeof ToBTCLNSwap;
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options?: ToBTCLNWrapperOptions, events?: EventEmitter);
+    private checkPaymentHashWasPaid;
     /**
      * Calculates maximum lightning network routing fee based on amount
      *
@@ -39,14 +37,6 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
      * @returns Maximum lightning routing fee in sats
      */
     private calculateFeeForAmount;
-    /**
-     * Pre-fetches & checks status of the specific lightning BOLT11 invoice
-     *
-     * @param parsedPr Parsed bolt11 invoice
-     * @param abortController Aborts in case the invoice is/was already paid
-     * @private
-     */
-    private preFetchPayStatus;
     /**
      * Verifies returned LP data
      *
@@ -91,12 +81,11 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
      */
     create(signer: string, bolt11PayRequest: string, amountData: Omit<AmountData, "amount">, lps: Intermediary[], options?: ToBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
         feeRatePromise: Promise<any>;
-        pricePreFetchPromise: Promise<BN>;
-        payStatusPromise: Promise<void>;
-    }): {
+        pricePreFetchPromise: Promise<bigint>;
+    }): Promise<{
         quote: Promise<ToBTCLNSwap<T>>;
         intermediary: Intermediary;
-    }[];
+    }[]>;
     /**
      * Parses and fetches lnurl pay params from the specified lnurl
      *

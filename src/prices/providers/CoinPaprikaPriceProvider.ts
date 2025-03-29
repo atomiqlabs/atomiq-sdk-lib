@@ -1,5 +1,4 @@
 import {CoinType, CtorCoinTypes} from "../abstract/IPriceProvider";
-import * as BN from "bn.js";
 import {HttpPriceProvider} from "./abstract/HttpPriceProvider";
 import {httpGet} from "../../utils/Utils";
 import {MultiChain} from "../../swaps/Swapper";
@@ -25,7 +24,7 @@ export class CoinPaprikaPriceProvider<T extends MultiChain> extends HttpPricePro
             abortSignal
         );
 
-        return new BN(response.quotes.BTC.price*100000000000000);
+        return BigInt(Math.floor(response.quotes.BTC.price*100000000000000));
     }
 
     protected async fetchUsdPrice(abortSignal?: AbortSignal): Promise<number> {

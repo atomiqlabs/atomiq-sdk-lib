@@ -1,14 +1,12 @@
-import {initEccLib} from "bitcoinjs-lib";
-import * as tinySecpk256Interface from "@bitcoinerlab/secp256k1";
-initEccLib(tinySecpk256Interface);
-
 export * from "./btc/mempool/synchronizer/MempoolBtcRelaySynchronizer";
 export * from "./btc/mempool/MempoolApi";
 export * from "./btc/mempool/MempoolBitcoinRpc";
 export * from "./btc/mempool/MempoolBitcoinBlock";
-export * from "./btc/BitcoinNetwork";
 export * from "./btc/BitcoinRpcWithTxoListener";
 export * from "./btc/LightningNetworkApi";
+export * from "./btc/wallet/IBitcoinWallet";
+export * from "./btc/wallet/MempoolBitcoinWallet";
+export * from "./btc/coinselect2";
 
 export * from "./errors/IntermediaryError";
 export * from "./errors/PaymentAuthError";
@@ -31,13 +29,12 @@ export * from "./prices/RedundantSwapPrice";
 export * from "./prices/SingleSwapPrice";
 export * from "./prices/SwapPriceWithChain";
 
-export * from "./storage/IndexedDBStorageManager";
-export * from "./storage/LocalStorageManager";
-
 export * from "./swaps/Tokens";
 export * from "./swaps/ISwap";
 export * from "./swaps/ISwapWrapper";
 export * from "./swaps/Swapper";
+export * from "./swaps/SwapperWithSigner";
+export * from "./swaps/SwapperWithChain";
 export * from "./swaps/SwapType";
 export * from "./swaps/SwapDirection";
 export * from "./swaps/tobtc/IToBTCSwap";
@@ -56,3 +53,6 @@ export * from "./swaps/swapforgas/ln/LnForGasSwap";
 export * from "./swaps/swapforgas/ln/LnForGasWrapper";
 
 export * from "./utils/LNURL";
+
+export * from "./storage/IUnifiedStorage";
+export * from "./browser-storage/IndexedDBUnifiedStorage";

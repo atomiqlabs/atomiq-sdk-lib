@@ -1,6 +1,5 @@
 import { HttpPriceProvider } from "./HttpPriceProvider";
 import { CoinType } from "../../abstract/IPriceProvider";
-import * as BN from "bn.js";
 import { MultiChain } from "../../../swaps/Swapper";
 export declare abstract class ExchangePriceProvider<T extends MultiChain> extends HttpPriceProvider<T> {
     /**
@@ -11,5 +10,5 @@ export declare abstract class ExchangePriceProvider<T extends MultiChain> extend
      * @protected
      */
     protected abstract fetchPair(pair: string, abortSignal?: AbortSignal): Promise<number>;
-    protected fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<BN>;
+    protected fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<bigint>;
 }

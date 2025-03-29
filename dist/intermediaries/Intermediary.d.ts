@@ -1,6 +1,5 @@
 import { SwapType } from "../swaps/SwapType";
 import { SwapHandlerInfoType } from "./IntermediaryDiscovery";
-import * as BN from "bn.js";
 import { ChainSwapType, SwapContract } from "@atomiqlabs/base";
 import { LNNodeLiquidity } from "../btc/LightningNetworkApi";
 export type ServicesType = {
@@ -9,17 +8,17 @@ export type ServicesType = {
 export type SingleChainReputationType = {
     [token: string]: {
         [key in ChainSwapType]: {
-            successVolume: BN;
-            successCount: BN;
-            failVolume: BN;
-            failCount: BN;
-            coopCloseVolume: BN;
-            coopCloseCount: BN;
+            successVolume: bigint;
+            successCount: bigint;
+            failVolume: bigint;
+            failCount: bigint;
+            coopCloseVolume: bigint;
+            coopCloseCount: bigint;
         };
     };
 };
 export type SCLiquidity = {
-    [token: string]: BN;
+    [token: string]: bigint;
 };
 export declare class Intermediary {
     readonly url: string;
@@ -64,7 +63,7 @@ export declare class Intermediary {
      * @param token
      * @param abortSignal
      */
-    getLiquidity(chainIdentifier: string, swapContract: SwapContract<any>, token: string, abortSignal?: AbortSignal): Promise<BN>;
+    getLiquidity(chainIdentifier: string, swapContract: SwapContract<any>, token: string, abortSignal?: AbortSignal): Promise<bigint>;
     supportsChain(chainIdentifier: string): boolean;
     getAddress(chainIdentifier: string): string;
 }

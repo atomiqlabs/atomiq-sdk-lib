@@ -1,12 +1,15 @@
 /// <reference types="node" />
 import { ToBTCSwap } from "./ToBTCSwap";
 import { IToBTCWrapper } from "../IToBTCWrapper";
-import { ChainType, IStorageManager, BitcoinRpc } from "@atomiqlabs/base";
+import { ChainType, BitcoinRpc } from "@atomiqlabs/base";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
-import { Network } from "bitcoinjs-lib";
+import { SwapType } from "../../SwapType";
+import { BTC_NETWORK } from "@scure/btc-signer/utils";
+import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
+import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
 export type ToBTCOptions = {
     confirmationTarget?: number;
     confirmations?: number;
@@ -14,27 +17,28 @@ export type ToBTCOptions = {
 export type ToBTCWrapperOptions = ISwapWrapperOptions & {
     safetyFactor?: number;
     maxConfirmations?: number;
-    bitcoinNetwork?: Network;
+    bitcoinNetwork?: BTC_NETWORK;
     bitcoinBlocktime?: number;
     maxExpectedOnchainSendSafetyFactor?: number;
     maxExpectedOnchainSendGracePeriodBlocks?: number;
 };
 export declare class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwap<T>, ToBTCWrapperOptions> {
-    protected readonly swapDeserializer: typeof ToBTCSwap;
+    readonly TYPE = SwapType.TO_BTC;
+    readonly swapDeserializer: typeof ToBTCSwap;
     readonly btcRpc: BitcoinRpc<any>;
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents Smart chain on-chain event listener
      * @param contract Chain specific swap contract
      * @param prices Swap pricing handler
-     * @param chainEvents Smart chain on-chain event listener
      * @param tokens
      * @param swapDataDeserializer Deserializer for chain specific SwapData
      * @param btcRpc Bitcoin RPC api
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, storage: IStorageManager<ToBTCSwap<T>>, contract: T["Contract"], chainEvents: T["Events"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRpc: BitcoinRpc<any>, options?: ToBTCWrapperOptions, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRpc: BitcoinRpc<any>, options?: ToBTCWrapperOptions, events?: EventEmitter);
     /**
      * Returns randomly generated random escrow nonce to be used for to BTC on-chain swaps
      * @private
@@ -59,7 +63,6 @@ export declare class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, 
      * @param options Options as passed to the swap create function
      * @param data LP's returned parsed swap data
      * @param hash Payment hash of the swap
-     * @param nonce Escrow nonce that should be used for the swap
      * @private
      * @throws {IntermediaryError} if returned data are not correct
      */

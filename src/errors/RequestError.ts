@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 
 /**
  * An error returned by the intermediary in a http response
@@ -23,7 +22,7 @@ export class RequestError extends Error {
             const parsed = JSON.parse(msg);
             msg = parsed.msg;
             if(parsed.code===20003 || parsed.code===20004) {
-                return new OutOfBoundsError(parsed.msg, httpCode, new BN(parsed.data.min), new BN(parsed.data.max));
+                return new OutOfBoundsError(parsed.msg, httpCode, BigInt(parsed.data.min), BigInt(parsed.data.max));
             }
         } catch (e) {}
         return new RequestError(msg, httpCode);
@@ -37,10 +36,10 @@ export class RequestError extends Error {
  */
 export class OutOfBoundsError extends RequestError {
 
-    min: BN;
-    max: BN;
+    min: bigint;
+    max: bigint;
 
-    constructor(msg: string, httpCode: number, min: BN, max: BN) {
+    constructor(msg: string, httpCode: number, min: bigint, max: bigint) {
         super(msg, httpCode);
         this.max = max;
         this.min = min;

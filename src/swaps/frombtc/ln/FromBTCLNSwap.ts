@@ -1,8 +1,7 @@
-import {decode as bolt11Decode} from "bolt11";
+import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {FromBTCLNWrapper} from "./FromBTCLNWrapper";
 import {IFromBTCSwap} from "../IFromBTCSwap";
 import {SwapType} from "../../SwapType";
-import * as BN from "bn.js";
 import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isISwapInit, ISwapInit} from "../../ISwap";
 import {Buffer} from "buffer";
@@ -32,6 +31,7 @@ export enum FromBTCLNSwapState {
 export type FromBTCLNSwapInit<T extends SwapData> = ISwapInit<T> & {
     pr: string,
     secret: string,
+    initialSwapData: T,
     lnurl?: string,
     lnurlK1?: string,
     lnurlCallback?: string
@@ -54,11 +54,18 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
 
     protected readonly pr: string;
     protected readonly secret: string;
+    protected initialSwapData: T["Data"];
 
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
     prPosted?: boolean = false;
+
+    wrapper: FromBTCLNWrapper<T>;
+
+    protected getSwapData(): T["Data"] {
+        return this.data ?? this.initialSwapData;
+    }
 
     constructor(wrapper: FromBTCLNWrapper<T>, init: FromBTCLNSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNWrapper<T>, obj: any);
@@ -73,13 +80,21 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         } else {
             this.pr = initOrObject.pr;
             this.secret = initOrObject.secret;
+
+            this.initialSwapData = initOrObject.initialSwapData==null ? null : SwapData.deserialize<T["Data"]>(initOrObject.initialSwapData);
+
             this.lnurl = initOrObject.lnurl;
             this.lnurlK1 = initOrObject.lnurlK1;
             this.lnurlCallback = initOrObject.lnurlCallback;
             this.prPosted = initOrObject.prPosted;
+
+            if(this.state===FromBTCLNSwapState.PR_CREATED && this.data!=null) {
+                this.initialSwapData = this.data;
+                delete this.data;
+            }
         }
         this.tryCalculateSwapFee();
-        this.logger = getLogger(this.constructor.name+"("+this.getPaymentHashString()+"): ");
+        this.logger = getLogger("FromBTCLN("+this.getIdentifierHashString()+"): ");
     }
 
     protected upgradeVersion() {
@@ -111,6 +126,16 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     //////////////////////////////
     //// Getters & utils
 
+    getInputTxId(): string | null {
+        return this.getPaymentHash().toString("hex");
+    }
+
+    getIdentifierHash(): Buffer {
+        const paymentHashBuffer = this.getPaymentHash();
+        if(this.randomNonce==null) return paymentHashBuffer;
+        return Buffer.concat([paymentHashBuffer, Buffer.from(this.randomNonce, "hex")]);
+    }
+
     getPaymentHash(): Buffer {
         if(this.pr==null) return null;
         const decodedPR = bolt11Decode(this.pr);
@@ -141,6 +166,14 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         return (decoded.timeExpireDate*1000);
     }
 
+    /**
+     * Returns timeout time (in UNIX milliseconds) when the on-chain address will expire and no funds should be sent
+     *  to that address anymore
+     */
+    getHtlcTimeoutTime(): number {
+        return Number(this.wrapper.getHtlcTimeout(this.data))*1000;
+    }
+
     isFinished(): boolean {
         return this.state===FromBTCLNSwapState.CLAIM_CLAIMED || this.state===FromBTCLNSwapState.QUOTE_EXPIRED || this.state===FromBTCLNSwapState.FAILED;
     }
@@ -154,7 +187,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     }
 
     isFailed(): boolean {
-        return this.state===FromBTCLNSwapState.FAILED;
+        return this.state===FromBTCLNSwapState.FAILED || this.state===FromBTCLNSwapState.EXPIRED;
     }
 
     isQuoteExpired(): boolean {
@@ -189,32 +222,32 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>> {
         const parsed = bolt11Decode(this.pr);
-        const amount = new BN(parsed.millisatoshis).add(new BN(999)).div(new BN(1000));
+        const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
         return toTokenAmount(amount, this.inputToken, this.wrapper.prices);
     }
 
     /**
      * Estimated transaction fee for commit & claim txs combined
      */
-    async getCommitAndClaimFee(): Promise<BN> {
-        const swapContract: T["Contract"] & {getRawCommitFee?: (data: T["Data"], feeRate?: string) => Promise<BN>} = this.wrapper.contract;
+    async getCommitAndClaimFee(): Promise<bigint> {
+        const swapContract: T["Contract"] = this.wrapper.contract;
         const feeRate = this.feeRate ?? await swapContract.getInitFeeRate(
-            this.data.getOfferer(),
-            this.data.getClaimer(),
-            this.data.getToken(),
-            this.data.getHash()
+            this.getSwapData().getOfferer(),
+            this.getSwapData().getClaimer(),
+            this.getSwapData().getToken(),
+            this.getSwapData().getClaimHash()
         );
         const commitFee = await (
             swapContract.getRawCommitFee!=null ?
-                swapContract.getRawCommitFee(this.data, feeRate) :
-                swapContract.getCommitFee(this.data, feeRate)
+                swapContract.getRawCommitFee(this.getSwapData(), feeRate) :
+                swapContract.getCommitFee(this.getSwapData(), feeRate)
         );
         const claimFee = await (
             swapContract.getRawClaimFee!=null ?
-                swapContract.getRawClaimFee(this.getInitiator(), this.data, feeRate) :
-                swapContract.getClaimFee(this.getInitiator(), this.data, feeRate)
+                swapContract.getRawClaimFee(this.getInitiator(), this.getSwapData(), feeRate) :
+                swapContract.getClaimFee(this.getInitiator(), this.getSwapData(), feeRate)
         );
-        return commitFee.add(claimFee);
+        return commitFee + claimFee;
     }
 
     async getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>> {
@@ -225,17 +258,17 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         const [balance, feeRate] = await Promise.all([
             this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.contract.getNativeCurrencyAddress(), false),
             this.feeRate!=null ? Promise.resolve<string>(this.feeRate) : this.wrapper.contract.getInitFeeRate(
-                this.data.getOfferer(),
-                this.data.getClaimer(),
-                this.data.getToken(),
-                this.data.getHash()
+                this.getSwapData().getOfferer(),
+                this.getSwapData().getClaimer(),
+                this.getSwapData().getToken(),
+                this.getSwapData().getClaimHash()
             )
         ]);
-        const commitFee = await this.wrapper.contract.getCommitFee(this.data, feeRate);
-        const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.data, feeRate);
-        const totalFee = commitFee.add(claimFee).add(this.data.getTotalDeposit());
+        const commitFee = await this.wrapper.contract.getCommitFee(this.getSwapData(), feeRate);
+        const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.getSwapData(), feeRate);
+        const totalFee = commitFee + claimFee + this.getSwapData().getTotalDeposit();
         return {
-            enoughBalance: balance.gte(totalFee),
+            enoughBalance: balance >= totalFee,
             balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
             required: toTokenAmount(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices)
         };
@@ -260,15 +293,22 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         const abortController = new AbortController();
         if(abortSignal!=null) abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
 
+        let save = false;
+
         if(this.lnurl!=null && !this.prPosted) {
             LNURL.postInvoiceToLNURLWithdraw({k1: this.lnurlK1, callback: this.lnurlCallback}, this.pr).catch(e => {
                 this.lnurlFailSignal.abort(e);
             });
             this.prPosted = true;
+            save ||= true;
         }
 
-        this.initiated = true;
-        await this._saveAndEmit();
+        if(!this.initiated) {
+            this.initiated = true;
+            save ||= true;
+        }
+
+        if(save) await this._saveAndEmit();
 
         let lnurlFailListener = () => abortController.abort(this.lnurlFailSignal.signal.reason);
         this.lnurlFailSignal.signal.addEventListener("abort", lnurlFailListener);
@@ -276,7 +316,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
 
         let resp: PaymentAuthorizationResponse = {code: PaymentAuthorizationResponseCodes.PENDING, msg: ""};
         while(!abortController.signal.aborted && resp.code===PaymentAuthorizationResponseCodes.PENDING) {
-            resp = await IntermediaryAPI.getPaymentAuthorization(this.url, this.data.getHash());
+            resp = await IntermediaryAPI.getPaymentAuthorization(this.url, this.getPaymentHash().toString("hex"));
             if(resp.code===PaymentAuthorizationResponseCodes.PENDING)
                 await timeoutPromise(checkIntervalSeconds*1000, abortController.signal);
         }
@@ -291,13 +331,14 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                 swapData,
                 sigData
             ));
-            this.data = swapData;
-            this.signatureData = {
-                prefix: sigData.prefix,
-                timeout: sigData.timeout,
-                signature: sigData.signature
-            };
             if(this.state===FromBTCLNSwapState.PR_CREATED || this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
+                delete this.initialSwapData;
+                this.data = swapData;
+                this.signatureData = {
+                    prefix: sigData.prefix,
+                    timeout: sigData.timeout,
+                    signature: sigData.signature
+                };
                 await this._saveAndEmit(FromBTCLNSwapState.PR_PAID);
             }
             return;
@@ -325,7 +366,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
             this.state===FromBTCLNSwapState.FAILED
         ) return true;
         if(this.state===FromBTCLNSwapState.QUOTE_EXPIRED || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) return false;
-        const resp = await IntermediaryAPI.getPaymentAuthorization(this.url, this.data.getHash());
+        const resp = await IntermediaryAPI.getPaymentAuthorization(this.url, this.getPaymentHash().toString("hex"));
         switch(resp.code) {
             case PaymentAuthorizationResponseCodes.AUTH_DATA:
                 const data = new this.wrapper.swapDataDeserializer(resp.data.data);
@@ -336,6 +377,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                         resp.data
                     ));
                     this.state = FromBTCLNSwapState.PR_PAID;
+                    delete this.initialSwapData;
                     this.data = data;
                     this.signatureData = {
                         prefix: resp.data.prefix,
@@ -371,11 +413,12 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     protected async checkIntermediaryReturnedAuthData(signer: string, data: T["Data"], signature: SignatureData): Promise<void> {
         data.setClaimer(signer);
 
-        if (data.getOfferer() !== this.data.getOfferer()) throw new IntermediaryError("Invalid offerer used");
-        if (!data.isToken(this.data.getToken())) throw new IntermediaryError("Invalid token used");
-        if (data.getSecurityDeposit().gt(this.data.getSecurityDeposit())) throw new IntermediaryError("Invalid security deposit!");
-        if (data.getAmount().lt(this.data.getAmount())) throw new IntermediaryError("Invalid amount received!");
-        if (data.getHash() !== this.data.getHash()) throw new IntermediaryError("Invalid payment hash used!");
+        if (data.getOfferer() !== this.getSwapData().getOfferer()) throw new IntermediaryError("Invalid offerer used");
+        if (!data.isToken(this.getSwapData().getToken())) throw new IntermediaryError("Invalid token used");
+        if (data.getSecurityDeposit() > this.getSwapData().getSecurityDeposit()) throw new IntermediaryError("Invalid security deposit!");
+        if (data.getAmount() < this.getSwapData().getAmount()) throw new IntermediaryError("Invalid amount received!");
+        if (data.getClaimHash() !== this.getSwapData().getClaimHash()) throw new IntermediaryError("Invalid payment hash used!");
+        if (!data.isDepositToken(this.getSwapData().getDepositToken())) throw new IntermediaryError("Invalid deposit token used!");
 
         await Promise.all([
             tryWithRetries(
@@ -384,7 +427,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                 SignatureVerificationError
             ),
             tryWithRetries<SwapCommitStatus>(
-                () => this.wrapper.contract.getPaymentHashStatus(data.getHash())
+                () => this.wrapper.contract.getCommitStatus(data.getClaimer(), data)
             ).then(status => {
                 if (status !== SwapCommitStatus.NOT_COMMITED)
                     throw new Error("Swap already committed on-chain!");
@@ -478,7 +521,9 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         );
 
         this.claimTxId = result[0];
-        await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
+        if(FromBTCLNSwapState.CLAIM_COMMITED || FromBTCLNSwapState.EXPIRED || FromBTCLNSwapState.FAILED) {
+            await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
+        }
         return result[0];
     }
 
@@ -527,6 +572,10 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     //////////////////////////////
     //// Commit & claim
 
+    canCommitAndClaimInOneShot(): boolean {
+        return this.wrapper.contract.initAndClaimWithSecret!=null;
+    }
+
     /**
      * Commits and claims the swap, in a way that the transactions can be signed together by the underlying provider and
      *  then sent sequentially
@@ -539,6 +588,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
     async commitAndClaim(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string[]> {
+        if(!this.canCommitAndClaimInOneShot()) throw new Error("Cannot commitAndClaim in single action, please run commit and claim separately!");
         this.checkSigner(signer);
         if(this.state===FromBTCLNSwapState.CLAIM_COMMITED) return [null, await this.claim(signer)];
 
@@ -548,10 +598,14 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
 
         this.commitTxId = result[0] || this.commitTxId;
         this.claimTxId = result[result.length-1] || this.claimTxId;
-        await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
+        if(this.state!==FromBTCLNSwapState.CLAIM_CLAIMED) {
+            await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
+        }
+
+        return result;
     }
 
-    /**
+    /**==
      * Returns transactions for both commit & claim operation together, such that they can be signed all at once by
      *  the wallet. CAUTION: transactions must be sent sequentially, such that the claim (2nd) transaction is only
      *  sent after the commit (1st) transaction confirms. Failure to do so can reveal the HTLC pre-image too soon,
@@ -624,7 +678,109 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
             lnurl: this.lnurl,
             lnurlK1: this.lnurlK1,
             lnurlCallback: this.lnurlCallback,
-            prPosted: this.prPosted
+            prPosted: this.prPosted,
+            initialSwapData: this.initialSwapData==null ? null : this.initialSwapData.serialize()
         };
     }
+
+
+    //////////////////////////////
+    //// Swap ticks & sync
+
+    /**
+     * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
+     *  data
+     *
+     * @private
+     */
+    private async syncStateFromChain(): Promise<boolean> {
+        if(this.state===FromBTCLNSwapState.PR_PAID || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) {
+            //Check if it's already committed
+            const status = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            switch(status) {
+                case SwapCommitStatus.COMMITED:
+                    this.state = FromBTCLNSwapState.CLAIM_COMMITED;
+                    return true;
+                case SwapCommitStatus.EXPIRED:
+                    this.state = FromBTCLNSwapState.QUOTE_EXPIRED;
+                    return true;
+                case SwapCommitStatus.PAID:
+                    this.state = FromBTCLNSwapState.CLAIM_CLAIMED;
+                    return true;
+            }
+
+            return false;
+        }
+
+        if(this.state===FromBTCLNSwapState.CLAIM_COMMITED || this.state===FromBTCLNSwapState.EXPIRED) {
+            //Check if it's already successfully paid
+            const commitStatus = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            if(commitStatus===SwapCommitStatus.PAID) {
+                this.state = FromBTCLNSwapState.CLAIM_CLAIMED;
+                return true;
+            }
+
+            if(commitStatus===SwapCommitStatus.NOT_COMMITED || commitStatus===SwapCommitStatus.EXPIRED) {
+                this.state = FromBTCLNSwapState.FAILED;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    async _sync(save?: boolean): Promise<boolean> {
+        let changed = false;
+
+        if(this.state===FromBTCLNSwapState.PR_CREATED || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData==null)) {
+            if(this.getTimeoutTime()<Date.now()) {
+                this.state = FromBTCLNSwapState.QUOTE_SOFT_EXPIRED;
+                changed ||= true;
+            }
+
+            const result = await this.checkIntermediaryPaymentReceived(false);
+            if(result!==null) changed ||= true;
+        }
+
+        changed ||= await this.syncStateFromChain();
+
+        if(this.state===FromBTCLNSwapState.PR_PAID || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) {
+            if(!await this.isQuoteValid()) {
+                this.state = FromBTCLNSwapState.QUOTE_EXPIRED;
+                changed ||= true;
+            }
+        }
+
+        if(save && changed) await this._saveAndEmit();
+
+        return changed;
+    }
+
+    async _tick(save?: boolean): Promise<boolean> {
+        switch(this.state) {
+            case FromBTCLNSwapState.PR_CREATED:
+                if(this.getTimeoutTime()<Date.now()) {
+                    this.state = FromBTCLNSwapState.QUOTE_SOFT_EXPIRED;
+                    if(save) await this._saveAndEmit();
+                    return true;
+                }
+                break;
+            case FromBTCLNSwapState.PR_PAID:
+                if(this.expiry<Date.now()) {
+                    this.state = FromBTCLNSwapState.QUOTE_SOFT_EXPIRED;
+                    if(save) await this._saveAndEmit();
+                    return true;
+                }
+                break;
+            case FromBTCLNSwapState.CLAIM_COMMITED:
+                const expired = await this.wrapper.contract.isExpired(this.getInitiator(), this.data);
+                if(expired) {
+                    this.state = FromBTCLNSwapState.EXPIRED;
+                    if(save) await this._saveAndEmit();
+                    return true;
+                }
+                break;
+        }
+    }
+
 }

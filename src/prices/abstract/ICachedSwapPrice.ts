@@ -1,5 +1,4 @@
 import {ISwapPrice} from "./ISwapPrice";
-import BN from "bn.js";
 import {ChainIds, MultiChain} from "../../swaps/Swapper";
 
 const DEFAULT_CACHE_DURATION = 10000;
@@ -9,7 +8,7 @@ export abstract class ICachedSwapPrice<T extends MultiChain> extends ISwapPrice<
     cache: {
         [chainIdentifier in keyof T]?: {
             [tokenAddress: string]: {
-                price: Promise<BN>,
+                price: Promise<bigint>,
                 expiry: number
             }
         }
@@ -20,15 +19,15 @@ export abstract class ICachedSwapPrice<T extends MultiChain> extends ISwapPrice<
     };
     cacheTimeout: number;
 
-    protected constructor(maxAllowedFeeDiffPPM: BN, cacheTimeout?: number) {
+    protected constructor(maxAllowedFeeDiffPPM: bigint, cacheTimeout?: number) {
         super(maxAllowedFeeDiffPPM);
         this.cacheTimeout = cacheTimeout || DEFAULT_CACHE_DURATION;
     }
 
-    protected abstract fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<BN>;
+    protected abstract fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<bigint>;
     protected abstract fetchUsdPrice(abortSignal?: AbortSignal): Promise<number>;
 
-    protected getPrice<C extends ChainIds<T>>(chainIdentifier: C, tokenAddress: string, abortSignal?: AbortSignal): Promise<BN> {
+    protected getPrice<C extends ChainIds<T>>(chainIdentifier: C, tokenAddress: string, abortSignal?: AbortSignal): Promise<bigint> {
         const token = tokenAddress.toString();
 
         const chainCache = this.cache[chainIdentifier];

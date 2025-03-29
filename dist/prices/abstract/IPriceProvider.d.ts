@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import { ChainIds, MultiChain } from "../../swaps/Swapper";
 export type CoinType = {
     coinId: string;
@@ -29,7 +28,7 @@ export declare abstract class IPriceProvider<T extends MultiChain> {
      * @protected
      * @returns Price per token in uSats (micro sats)
      */
-    protected abstract fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<BN>;
+    protected abstract fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<bigint>;
     /**
      * Fetches the USD price of BTC
      *
@@ -45,7 +44,7 @@ export declare abstract class IPriceProvider<T extends MultiChain> {
      * @param abortSignal
      * @throws {Error} if token is not found
      */
-    getPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<BN>;
+    getPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<bigint>;
     /**
      * Returns coin price in uSat (microSat)
      *

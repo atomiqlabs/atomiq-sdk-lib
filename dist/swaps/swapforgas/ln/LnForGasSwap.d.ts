@@ -1,7 +1,6 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import { SwapType } from "../../SwapType";
-import * as BN from "bn.js";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { LnForGasWrapper } from "./LnForGasWrapper";
 import { Buffer } from "buffer";
@@ -17,8 +16,9 @@ export declare enum LnForGasSwapState {
 }
 export type LnForGasSwapInit<T extends SwapData> = ISwapInit<T> & {
     pr: string;
-    outputAmount: BN;
+    outputAmount: bigint;
     recipient: string;
+    token: string;
 };
 export declare function isLnForGasSwapInit<T extends SwapData>(obj: any): obj is LnForGasSwapInit<T>;
 export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> {
@@ -28,6 +28,7 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
     private readonly pr;
     private readonly outputAmount;
     private readonly recipient;
+    private readonly token;
     scTxId: string;
     constructor(wrapper: LnForGasWrapper<T>, init: LnForGasSwapInit<T["Data"]>);
     constructor(wrapper: LnForGasWrapper<T>, obj: any);
@@ -40,8 +41,12 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
     refreshPriceData(): Promise<PriceInfoType>;
     getSwapPrice(): number;
     getMarketPrice(): number;
-    getTxId(): string | null;
+    getInputAddress(): string | null;
+    getOutputAddress(): string | null;
+    getInputTxId(): string | null;
+    getOutputTxId(): string | null;
     getRecipient(): string;
+    getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap
@@ -59,12 +64,12 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
     isSuccessful(): boolean;
     isQuoteValid(): Promise<boolean>;
     isActionable(): boolean;
-    protected getOutAmountWithoutFee(): BN;
+    protected getOutAmountWithoutFee(): bigint;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<true>>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>>;
     getSwapFee(): Fee;
-    getRealSwapFeePercentagePPM(): BN;
+    getRealSwapFeePercentagePPM(): bigint;
     checkInvoicePaid(save?: boolean): Promise<boolean>;
     /**
      * A blocking promise resolving when payment was received by the intermediary and client can continue
@@ -83,4 +88,6 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
         balance: TokenAmount;
         required: TokenAmount;
     }>;
+    _sync(save?: boolean): Promise<boolean>;
+    _tick(save?: boolean): Promise<boolean>;
 }

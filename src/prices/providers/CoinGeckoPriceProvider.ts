@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {CoinType, CtorCoinTypes} from "../abstract/IPriceProvider";
 import {HttpPriceProvider} from "./abstract/HttpPriceProvider";
 import {httpGet} from "../../utils/Utils";
@@ -14,14 +13,14 @@ export class CoinGeckoPriceProvider<T extends MultiChain> extends HttpPriceProvi
         super(coinsMap, url, httpRequestTimeout);
     }
 
-    protected async fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<BN> {
+    protected async fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<bigint> {
         let response = await httpGet<CoinGeckoResponse<"sats">>(
             this.url+"/simple/price?ids="+token.coinId+"&vs_currencies=sats&precision=6",
             this.httpRequestTimeout,
             abortSignal
         );
 
-        return new BN(response[token.coinId].sats*1000000);
+        return BigInt(response[token.coinId].sats*1000000);
     }
 
     protected async fetchUsdPrice(abortSignal?: AbortSignal): Promise<number> {

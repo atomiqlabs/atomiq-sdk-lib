@@ -1,6 +1,5 @@
 import {IToBTCWrapper} from "./IToBTCWrapper";
 import {Fee, isISwapInit, ISwap, ISwapInit} from "../ISwap";
-import * as BN from "bn.js";
 import {
     ChainType,
     SignatureVerificationError,
@@ -15,22 +14,22 @@ import {
 } from "../../intermediaries/IntermediaryAPI";
 import {IntermediaryError} from "../../errors/IntermediaryError";
 import {extendAbortController, timeoutPromise, tryWithRetries} from "../../utils/Utils";
-import {BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../Tokens";
+import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../Tokens";
 
 export type IToBTCSwapInit<T extends SwapData> = ISwapInit<T> & {
-    networkFee: BN,
-    networkFeeBtc?: BN
+    networkFee: bigint,
+    networkFeeBtc?: bigint
 };
 
 export function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T> {
-    return BN.isBN(obj.networkFee) &&
-        (obj.networkFeeBtc==null || BN.isBN(obj.networkFeeBtc)) &&
+    return typeof(obj.networkFee) === "bigint" &&
+        (obj.networkFeeBtc==null || typeof(obj.networkFeeBtc) === "bigint") &&
         isISwapInit<T>(obj);
 }
 
 export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<T, ToBTCSwapState> {
-    protected readonly networkFee: BN;
-    protected networkFeeBtc?: BN;
+    protected readonly networkFee: bigint;
+    protected networkFeeBtc?: bigint;
     protected readonly abstract outputToken: BtcToken;
 
     protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, serializedObject: any);
@@ -43,8 +42,8 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         if(isIToBTCSwapInit<T["Data"]>(initOrObject)) {
             this.state = ToBTCSwapState.CREATED;
         } else {
-            this.networkFee = initOrObject.networkFee==null ? null : new BN(initOrObject.networkFee);
-            this.networkFeeBtc = initOrObject.networkFeeBtc==null ? null : new BN(initOrObject.networkFeeBtc);
+            this.networkFee = initOrObject.networkFee==null ? null : BigInt(initOrObject.networkFee);
+            this.networkFeeBtc = initOrObject.networkFeeBtc==null ? null : BigInt(initOrObject.networkFeeBtc);
         }
     }
 
@@ -80,10 +79,10 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
      */
     protected tryCalculateSwapFee() {
         if(this.swapFeeBtc==null) {
-            this.swapFeeBtc = this.swapFee.mul(this.getOutput().rawAmount).div(this.getInputWithoutFee().rawAmount);
+            this.swapFeeBtc = this.swapFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
         }
         if(this.networkFeeBtc==null) {
-            this.networkFeeBtc = this.networkFee.mul(this.getOutput().rawAmount).div(this.getInputWithoutFee().rawAmount);
+            this.networkFeeBtc = this.networkFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
         }
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoSend(
@@ -95,6 +94,14 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
                 this.data.getToken()
             );
         }
+    }
+
+    /**
+     * Returns the payment hash identifier to be sent to the LP for getStatus and getRefund
+     * @protected
+     */
+    protected getLpIdentifier(): string {
+        return this.getClaimHash();
     }
 
     /**
@@ -119,21 +126,35 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     }
 
     getSwapPrice(): number {
-        return 100000000000000/this.pricingInfo.swapPriceUSatPerToken.toNumber();
+        return 100000000000000/Number(this.pricingInfo.swapPriceUSatPerToken);
     }
 
     getMarketPrice(): number {
-        return 100000000000000/this.pricingInfo.realPriceUSatPerToken.toNumber();
+        return 100000000000000/Number(this.pricingInfo.realPriceUSatPerToken);
     }
 
-    getRealSwapFeePercentagePPM(): BN {
-        const feeWithoutBaseFee = this.swapFeeBtc.sub(this.pricingInfo.satsBaseFee);
-        return feeWithoutBaseFee.mul(new BN(1000000)).div(this.getOutput().rawAmount);
+    getRealSwapFeePercentagePPM(): bigint {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        return feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
     }
 
 
     //////////////////////////////
     //// Getters & utils
+
+    getInputTxId(): string | null {
+        return this.commitTxId;
+    }
+
+    abstract getOutputTxId(): string | null;
+
+    getInputAddress(): string | null {
+        return this.getInitiator();
+    }
+
+    getOutputAddress(): string | null {
+        return this.getRecipient();
+    }
 
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
@@ -147,7 +168,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     }
 
     isRefundable(): boolean {
-        return this.state===ToBTCSwapState.REFUNDABLE || (this.state===ToBTCSwapState.COMMITED && this.wrapper.contract.isExpired(this.getInitiator(), this.data));
+        return this.state===ToBTCSwapState.REFUNDABLE;
     }
 
     isQuoteExpired(): boolean {
@@ -188,10 +209,10 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
 
     getFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken> {
         return {
-            amountInSrcToken: toTokenAmount(this.swapFee.add(this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFeeBtc.add(this.networkFeeBtc), this.outputToken, this.wrapper.prices),
+            amountInSrcToken: toTokenAmount(this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
+            amountInDstToken: toTokenAmount(this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc.add(this.networkFeeBtc), abortSignal, preFetchedUsdPrice)
+                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
         }
     }
 
@@ -218,7 +239,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getAmount().sub(this.swapFee.add(this.networkFee)), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return toTokenAmount(this.data.getAmount() - (this.swapFee + this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
     }
 
     getInput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
@@ -228,7 +249,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     /**
      * Get the estimated smart chain transaction fee of the refund transaction
      */
-    getRefundFee(): Promise<BN> {
+    getRefundFee(): Promise<bigint> {
         return this.wrapper.contract.getRefundFee(this.data);
     }
 
@@ -238,12 +259,12 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     async hasEnoughBalance(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
         const [balance, commitFee] = await Promise.all([
             this.wrapper.contract.getBalance(this.getInitiator(), this.data.getToken(), false),
-            this.data.getToken()===this.wrapper.contract.getNativeCurrencyAddress() ? this.getCommitFee() : Promise.resolve<BN>(null)
+            this.data.getToken()===this.wrapper.contract.getNativeCurrencyAddress() ? this.getCommitFee() : Promise.resolve<bigint>(null)
         ]);
         let required = this.data.getAmount();
-        if(commitFee!=null) required = required.add(commitFee);
+        if(commitFee!=null) required = required + commitFee;
         return {
-            enoughBalance: balance.gte(required),
+            enoughBalance: balance >= required,
             balance: toTokenAmount(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
             required: toTokenAmount(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices)
         };
@@ -258,7 +279,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
             this.getCommitFee()
         ]);
         return {
-            enoughBalance: balance.gte(commitFee),
+            enoughBalance: balance >= commitFee,
             balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
             required: toTokenAmount(commitFee, this.wrapper.getNativeToken(), this.wrapper.prices)
         };
@@ -284,10 +305,8 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         );
 
         this.commitTxId = result[0];
-        if(this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
+        if(this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state===ToBTCSwapState.QUOTE_EXPIRED) {
             await this._saveAndEmit(ToBTCSwapState.COMMITED);
-        } else {
-            await this._save();
         }
         return result[0];
     }
@@ -303,10 +322,12 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
     async txsCommit(skipChecks?: boolean): Promise<T["TX"][]> {
         if(!this.canCommit()) throw new Error("Must be in CREATED state!");
 
-        this.initiated = true;
-        await this._saveAndEmit();
+        if(!this.initiated) {
+            this.initiated = true;
+            await this._saveAndEmit();
+        }
 
-        return await this.wrapper.contract.txsInitPayIn(
+        return await this.wrapper.contract.txsInit(
             this.data, this.signatureData, skipChecks, this.feeRate
         ).catch(e => Promise.reject(e instanceof SignatureVerificationError ? new Error("Request timed out") : e));
     }
@@ -338,7 +359,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
             return;
         }
 
-        if(this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state===ToBTCSwapState.CREATED) {
+        if(this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_EXPIRED) {
             await this._saveAndEmit(ToBTCSwapState.COMMITED);
         }
     }
@@ -380,7 +401,6 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
 
         switch(result.code) {
             case RefundAuthorizationResponseCodes.PAID:
-                await this._saveAndEmit();
                 return true;
             case RefundAuthorizationResponseCodes.REFUND_DATA:
                 await tryWithRetries(
@@ -393,7 +413,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
                 await this._saveAndEmit(ToBTCSwapState.REFUNDABLE);
                 return false;
             case RefundAuthorizationResponseCodes.EXPIRED:
-                if(this.wrapper.contract.isExpired(this.getInitiator(), this.data)) throw new Error("Swap expired");
+                if(await this.wrapper.contract.isExpired(this.getInitiator(), this.data)) throw new Error("Swap expired");
                 throw new IntermediaryError("Swap expired");
             case RefundAuthorizationResponseCodes.NOT_FOUND:
                 if((this.state as ToBTCSwapState)===ToBTCSwapState.CLAIMED) return true;
@@ -409,11 +429,13 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         while(!abortSignal.aborted && (
             resp.code===RefundAuthorizationResponseCodes.PENDING || resp.code===RefundAuthorizationResponseCodes.NOT_FOUND
         )) {
-            resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.data.getHash(), this.data.getSequence());
+            resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             if(resp.code===RefundAuthorizationResponseCodes.PAID) {
                 const validResponse = await this._setPaymentResult(resp.data, true);
                 if(validResponse) {
-                    this.state = ToBTCSwapState.SOFT_CLAIMED;
+                    if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.REFUNDABLE) {
+                        await this._saveAndEmit(ToBTCSwapState.SOFT_CLAIMED);
+                    }
                 } else {
                     resp = {code: RefundAuthorizationResponseCodes.PENDING, msg: ""};
                 }
@@ -439,7 +461,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         if(this.state===ToBTCSwapState.CREATED || this.state==ToBTCSwapState.QUOTE_EXPIRED) return false;
         if(this.isFinished() || this.isRefundable()) return true;
         //Check if that maybe already concluded according to the LP
-        const resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.data.getHash(), this.data.getSequence());
+        const resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
         switch(resp.code) {
             case RefundAuthorizationResponseCodes.PAID:
                 const processed = await this._setPaymentResult(resp.data, true);
@@ -472,12 +494,12 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
     async refund(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string> {
-        this.checkSigner(signer);
-        const result = await this.wrapper.contract.sendAndConfirm(signer, await this.txsRefund(), true, abortSignal)
+        const result = await this.wrapper.contract.sendAndConfirm(signer, await this.txsRefund(signer.getAddress()), true, abortSignal)
 
         this.refundTxId = result[0];
-        await this._saveAndEmit(ToBTCSwapState.REFUNDED);
-
+        if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.REFUNDABLE || this.state===ToBTCSwapState.SOFT_CLAIMED) {
+            await this._saveAndEmit(ToBTCSwapState.REFUNDED);
+        }
         return result[0];
     }
 
@@ -488,15 +510,18 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
      * @throws {SignatureVerificationError} If intermediary returned invalid cooperative refund signature
      * @throws {Error} When state is not refundable
      */
-    async txsRefund(): Promise<T["TX"][]> {
+    async txsRefund(signer?: string): Promise<T["TX"][]> {
         if(!this.isRefundable()) throw new Error("Must be in REFUNDABLE state or expired!");
 
-        if(this.wrapper.contract.isExpired(this.getInitiator(), this.data)) {
-            return await this.wrapper.contract.txsRefund(this.data, true, true);
+        signer ??= this.getInitiator();
+
+        if(await this.wrapper.contract.isExpired(this.getInitiator(), this.data)) {
+            return await this.wrapper.contract.txsRefund(signer, this.data, true, true);
         } else {
-            const res = await IntermediaryAPI.getRefundAuthorization(this.url, this.data.getHash(), this.data.getSequence());
+            const res = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             if(res.code===RefundAuthorizationResponseCodes.REFUND_DATA) {
                 return await this.wrapper.contract.txsRefundWithAuthorization(
+                    signer,
                     this.data,
                     res.data,
                     true,
@@ -559,6 +584,91 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
         };
     }
 
+
+    //////////////////////////////
+    //// Swap ticks & sync
+
+    /**
+     * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
+     *  data
+     *
+     * @private
+     */
+    private async syncStateFromChain(): Promise<boolean> {
+        if(
+            this.state===ToBTCSwapState.CREATED ||
+            this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED ||
+            this.state===ToBTCSwapState.COMMITED ||
+            this.state===ToBTCSwapState.SOFT_CLAIMED ||
+            this.state===ToBTCSwapState.REFUNDABLE
+        ) {
+            const res = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            switch(res) {
+                case SwapCommitStatus.PAID:
+                    this.state = ToBTCSwapState.CLAIMED;
+                    return true;
+                case SwapCommitStatus.REFUNDABLE:
+                    this.state = ToBTCSwapState.REFUNDABLE;
+                    return true;
+                case SwapCommitStatus.EXPIRED:
+                    this.state = ToBTCSwapState.QUOTE_EXPIRED;
+                    return true;
+                case SwapCommitStatus.NOT_COMMITED:
+                    if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.REFUNDABLE) {
+                        this.state = ToBTCSwapState.REFUNDED;
+                        return true;
+                    }
+                    break;
+                case SwapCommitStatus.COMMITED:
+                    if(this.state!==ToBTCSwapState.COMMITED && this.state!==ToBTCSwapState.REFUNDABLE) {
+                        this.state = ToBTCSwapState.COMMITED;
+                        return true;
+                    }
+                    break;
+            }
+        }
+    }
+
+    async _sync(save?: boolean): Promise<boolean> {
+        let changed = await this.syncStateFromChain();
+
+        if((this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) && !await this.isQuoteValid()) {
+            //Check if quote is still valid
+            this.state = ToBTCSwapState.QUOTE_EXPIRED;
+            changed ||= true;
+        }
+
+        if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.SOFT_CLAIMED) {
+            //Check if that maybe already concluded
+            changed ||= await this.checkIntermediarySwapProcessed(false);
+        }
+
+        if(save && changed) await this._saveAndEmit();
+
+        return changed;
+    }
+
+    async _tick(save?: boolean): Promise<boolean> {
+        switch(this.state) {
+            case ToBTCSwapState.CREATED:
+                if(this.expiry<Date.now()) {
+                    this.state = ToBTCSwapState.QUOTE_SOFT_EXPIRED;
+                    if(save) await this._saveAndEmit();
+                    return true;
+                }
+                break;
+            case ToBTCSwapState.COMMITED:
+            case ToBTCSwapState.SOFT_CLAIMED:
+                const expired = await this.wrapper.contract.isExpired(this.getInitiator(), this.data);
+                if(expired) {
+                    this.state = ToBTCSwapState.REFUNDABLE;
+                    if(save) await this._saveAndEmit();
+                    return true;
+                }
+                break;
+        }
+        return false;
+    }
 }
 
 export enum ToBTCSwapState {

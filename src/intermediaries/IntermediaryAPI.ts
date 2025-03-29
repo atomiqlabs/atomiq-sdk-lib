@@ -1,13 +1,11 @@
 import {RequestError} from "../errors/RequestError";
-import * as BN from "bn.js";
 import {
     FieldTypeEnum,
     RequestSchemaResult,
     verifySchema
 } from "../utils/paramcoders/SchemaVerifier";
 import {streamingFetchPromise} from "../utils/paramcoders/client/StreamingFetchPromise";
-import {httpGet, httpPost, tryWithRetries} from "../utils/Utils";
-import * as randomBytes from "randombytes";
+import {httpGet, httpPost, randomBytes, tryWithRetries} from "../utils/Utils";
 
 export type InfoHandlerResponse = {
     address: string,
@@ -89,7 +87,7 @@ export type SwapInit = {
 
 export type BaseFromBTCSwapInit = SwapInit & {
     claimer: string,
-    amount: BN,
+    amount: bigint,
     exactOut: boolean,
     feeRate: Promise<string>
 };
@@ -102,14 +100,14 @@ export type BaseToBTCSwapInit = SwapInit & {
 ///// To BTC
 
 const ToBTCResponseSchema = {
-    amount: FieldTypeEnum.BN,
+    amount: FieldTypeEnum.BigInt,
     address: FieldTypeEnum.String,
-    satsPervByte: FieldTypeEnum.BN,
-    networkFee: FieldTypeEnum.BN,
-    swapFee: FieldTypeEnum.BN,
-    totalFee: FieldTypeEnum.BN,
-    total: FieldTypeEnum.BN,
-    minRequiredExpiry: FieldTypeEnum.BN,
+    satsPervByte: FieldTypeEnum.BigInt,
+    networkFee: FieldTypeEnum.BigInt,
+    swapFee: FieldTypeEnum.BigInt,
+    totalFee: FieldTypeEnum.BigInt,
+    total: FieldTypeEnum.BigInt,
+    minRequiredExpiry: FieldTypeEnum.BigInt,
     ...SwapResponseSchema
 } as const;
 
@@ -118,10 +116,10 @@ export type ToBTCResponseType = RequestSchemaResult<typeof ToBTCResponseSchema>;
 export type ToBTCInit = BaseToBTCSwapInit & {
     btcAddress: string,
     exactIn: boolean,
-    amount: BN,
+    amount: bigint,
     confirmationTarget: number,
     confirmations: number,
-    nonce: BN,
+    nonce: bigint,
     feeRate: Promise<string>
 }
 
@@ -129,13 +127,13 @@ export type ToBTCInit = BaseToBTCSwapInit & {
 ///// To BTCLN
 
 const ToBTCLNResponseSchema = {
-    maxFee: FieldTypeEnum.BN,
-    swapFee: FieldTypeEnum.BN,
-    total: FieldTypeEnum.BN,
+    maxFee: FieldTypeEnum.BigInt,
+    swapFee: FieldTypeEnum.BigInt,
+    total: FieldTypeEnum.BigInt,
     confidence: FieldTypeEnum.Number,
     address: FieldTypeEnum.String,
 
-    routingFeeSats: FieldTypeEnum.BN,
+    routingFeeSats: FieldTypeEnum.BigInt,
     ...SwapResponseSchema
 } as const;
 
@@ -143,13 +141,13 @@ export type ToBTCLNResponseType = RequestSchemaResult<typeof ToBTCLNResponseSche
 
 export type ToBTCLNInit = BaseToBTCSwapInit & {
     pr: string,
-    maxFee: BN,
-    expiryTimestamp: BN,
+    maxFee: bigint,
+    expiryTimestamp: bigint,
     feeRate: Promise<any>
 };
 
 const ToBTCLNPrepareExactInSchema = {
-    amount: FieldTypeEnum.BN,
+    amount: FieldTypeEnum.BigInt,
     reqId: FieldTypeEnum.String
 } as const;
 
@@ -157,9 +155,9 @@ export type ToBTCLNPrepareExactInResponseType = RequestSchemaResult<typeof ToBTC
 
 export type ToBTCLNPrepareExactIn = BaseToBTCSwapInit & {
     pr: string,
-    amount: BN,
-    maxFee: BN,
-    expiryTimestamp: BN
+    amount: bigint,
+    maxFee: bigint,
+    expiryTimestamp: bigint
 }
 
 export type ToBTCLNInitExactIn = {
@@ -173,24 +171,25 @@ export type ToBTCLNInitExactIn = {
 ///// From BTC
 
 const FromBTCResponseSchema = {
-    amount: FieldTypeEnum.BN,
+    amount: FieldTypeEnum.BigInt,
     btcAddress: FieldTypeEnum.String,
     address: FieldTypeEnum.String,
-    swapFee: FieldTypeEnum.BN,
-    total: FieldTypeEnum.BN,
+    swapFee: FieldTypeEnum.BigInt,
+    total: FieldTypeEnum.BigInt,
+    confirmations: FieldTypeEnum.NumberOptional,
     ...SwapResponseSchema
 } as const;
 
 export type FromBTCResponseType = RequestSchemaResult<typeof FromBTCResponseSchema>;
 
 export type FromBTCInit = BaseFromBTCSwapInit & {
-    sequence: BN,
+    sequence: bigint,
     claimerBounty: Promise<{
-        feePerBlock: BN,
+        feePerBlock: bigint,
         safetyFactor: number,
-        startTimestamp: BN,
+        startTimestamp: bigint,
         addBlock: number,
-        addFee: BN
+        addFee: bigint
     }>
 }
 
@@ -199,11 +198,11 @@ export type FromBTCInit = BaseFromBTCSwapInit & {
 
 const FromBTCLNResponseSchema = {
     pr: FieldTypeEnum.String,
-    swapFee: FieldTypeEnum.BN,
-    total: FieldTypeEnum.BN,
+    swapFee: FieldTypeEnum.BigInt,
+    total: FieldTypeEnum.BigInt,
     intermediaryKey: FieldTypeEnum.String,
-    securityDeposit: FieldTypeEnum.BN
-}
+    securityDeposit: FieldTypeEnum.BigInt
+} as const;
 
 export type FromBTCLNResponseType = RequestSchemaResult<typeof FromBTCLNResponseSchema>;
 
@@ -255,7 +254,7 @@ export class IntermediaryAPI {
     static async getRefundAuthorization(
         url: string,
         paymentHash: string,
-        sequence: BN,
+        sequence: bigint,
         timeout?: number,
         abortSignal?: AbortSignal
     ): Promise<RefundAuthorizationResponse> {
@@ -353,6 +352,7 @@ export class IntermediaryAPI {
      *
      * @param chainIdentifier
      * @param baseUrl Base URL of the intermediary
+     * @param depositToken
      * @param init Swap initialization parameters
      * @param timeout Timeout in milliseconds for the HTTP request
      * @param abortSignal
@@ -363,6 +363,7 @@ export class IntermediaryAPI {
     static initFromBTC(
         chainIdentifier: string,
         baseUrl: string,
+        depositToken: string,
         init: FromBTCInit,
         timeout?: number,
         abortSignal?: AbortSignal,
@@ -371,31 +372,36 @@ export class IntermediaryAPI {
         signDataPrefetch: Promise<any>,
         response: Promise<FromBTCResponseType>
     } {
-        const responseBodyPromise = streamingFetchPromise(baseUrl+"/frombtc/getAddress?chain="+encodeURIComponent(chainIdentifier), {
-            ...init.additionalParams,
-            address: init.claimer,
-            amount: init.amount.toString(10),
-            token: init.token,
+        const responseBodyPromise = streamingFetchPromise(
+            baseUrl+"/frombtc/getAddress?chain="+encodeURIComponent(chainIdentifier)+"&depositToken="+encodeURIComponent(depositToken),
+            {
+                ...init.additionalParams,
+                address: init.claimer,
+                amount: init.amount.toString(10),
+                token: init.token,
 
-            exactOut: init.exactOut,
-            sequence: init.sequence.toString(10),
+                exactOut: init.exactOut,
+                sequence: init.sequence.toString(10),
 
-            claimerBounty: init.claimerBounty.then(claimerBounty => {
-                return {
-                    feePerBlock: claimerBounty.feePerBlock.toString(10),
-                    safetyFactor: claimerBounty.safetyFactor,
-                    startTimestamp: claimerBounty.startTimestamp.toString(10),
-                    addBlock: claimerBounty.addBlock,
-                    addFee: claimerBounty.addFee.toString(10)
-                }
-            }),
-            feeRate: init.feeRate
-        }, {
-            code: FieldTypeEnum.Number,
-            msg: FieldTypeEnum.String,
-            data: FieldTypeEnum.AnyOptional,
-            signDataPrefetch: FieldTypeEnum.AnyOptional
-        }, timeout, abortSignal, streamRequest);
+                claimerBounty: init.claimerBounty.then(claimerBounty => {
+                    return {
+                        feePerBlock: claimerBounty.feePerBlock.toString(10),
+                        safetyFactor: claimerBounty.safetyFactor,
+                        startTimestamp: claimerBounty.startTimestamp.toString(10),
+                        addBlock: claimerBounty.addBlock,
+                        addFee: claimerBounty.addFee.toString(10)
+                    }
+                }),
+                feeRate: init.feeRate
+            },
+            {
+                code: FieldTypeEnum.Number,
+                msg: FieldTypeEnum.String,
+                data: FieldTypeEnum.AnyOptional,
+                signDataPrefetch: FieldTypeEnum.AnyOptional
+            },
+            timeout, abortSignal, streamRequest
+        );
 
         return {
             signDataPrefetch: responseBodyPromise.then(responseBody => responseBody.signDataPrefetch),
@@ -417,6 +423,7 @@ export class IntermediaryAPI {
      *
      * @param chainIdentifier
      * @param baseUrl Base URL of the intermediary
+     * @param depositToken
      * @param init Swap initialization parameters
      * @param timeout Timeout in milliseconds for the HTTP request
      * @param abortSignal
@@ -427,6 +434,7 @@ export class IntermediaryAPI {
     static initFromBTCLN(
         chainIdentifier: string,
         baseUrl: string,
+        depositToken: string,
         init: FromBTCLNInit,
         timeout?: number,
         abortSignal?: AbortSignal,
@@ -435,21 +443,26 @@ export class IntermediaryAPI {
         lnPublicKey: Promise<string>,
         response: Promise<FromBTCLNResponseType>
     } {
-        const responseBodyPromise = streamingFetchPromise(baseUrl+"/frombtcln/createInvoice?chain="+encodeURIComponent(chainIdentifier), {
-            ...init.additionalParams,
-            paymentHash: init.paymentHash.toString("hex"),
-            amount: init.amount.toString(),
-            address: init.claimer,
-            token: init.token,
-            descriptionHash: init.descriptionHash==null ? null : init.descriptionHash.toString("hex"),
-            exactOut: init.exactOut,
-            feeRate: init.feeRate
-        }, {
-            code: FieldTypeEnum.Number,
-            msg: FieldTypeEnum.String,
-            data: FieldTypeEnum.AnyOptional,
-            lnPublicKey: FieldTypeEnum.StringOptional
-        }, timeout, abortSignal, streamRequest);
+        const responseBodyPromise = streamingFetchPromise(
+            baseUrl+"/frombtcln/createInvoice?chain="+encodeURIComponent(chainIdentifier)+"&depositToken="+encodeURIComponent(depositToken),
+            {
+                ...init.additionalParams,
+                paymentHash: init.paymentHash.toString("hex"),
+                amount: init.amount.toString(),
+                address: init.claimer,
+                token: init.token,
+                descriptionHash: init.descriptionHash==null ? null : init.descriptionHash.toString("hex"),
+                exactOut: init.exactOut,
+                feeRate: init.feeRate
+            },
+            {
+                code: FieldTypeEnum.Number,
+                msg: FieldTypeEnum.String,
+                data: FieldTypeEnum.AnyOptional,
+                lnPublicKey: FieldTypeEnum.StringOptional
+            },
+            timeout, abortSignal, streamRequest
+        );
 
         return {
             lnPublicKey: responseBodyPromise.then(responseBody => responseBody.lnPublicKey),

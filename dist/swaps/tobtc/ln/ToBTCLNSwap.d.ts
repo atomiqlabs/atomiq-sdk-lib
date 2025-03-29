@@ -19,6 +19,7 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
     protected readonly TYPE = SwapType.TO_BTCLN;
     private readonly confidence;
     private readonly pr;
+    readonly paymentHash: string;
     lnurl?: string;
     successAction?: LNURLPaySuccessAction;
     private secret?;
@@ -29,6 +30,7 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
         txId?: string;
     }, check?: boolean): Promise<boolean>;
     getOutput(): TokenAmount<T["ChainId"], BtcToken<true>>;
+    getOutputTxId(): string | null;
     /**
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
      */
@@ -42,7 +44,9 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
      * Value between 0 and 1, where 0 is not likely and 1 is very likely
      */
     getConfidence(): number;
+    getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
+    protected getLpIdentifier(): string;
     getRecipient(): string;
     /**
      * Is this an LNURL-pay swap?

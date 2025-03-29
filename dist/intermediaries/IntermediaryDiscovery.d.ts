@@ -1,7 +1,6 @@
 /// <reference types="node" />
 import { Intermediary } from "./Intermediary";
 import { SwapType } from "../swaps/SwapType";
-import * as BN from "bn.js";
 import { SwapContract } from "@atomiqlabs/base";
 import { EventEmitter } from "events";
 export declare enum SwapHandlerType {
@@ -25,8 +24,8 @@ export type SwapHandlerInfoType = {
 };
 export type TokenBounds = {
     [token: string]: {
-        min: BN;
-        max: BN;
+        min: bigint;
+        max: bigint;
     };
 };
 export type MultichainTokenBounds = {
@@ -120,7 +119,7 @@ export declare class IntermediaryDiscovery extends EventEmitter {
      * @param amount Amount to be swapped in sats - BTC
      * @param count How many intermediaries to return at most
      */
-    getSwapCandidates(chainIdentifier: string, swapType: SwapType, tokenAddress: any, amount?: BN, count?: number): Intermediary[];
+    getSwapCandidates(chainIdentifier: string, swapType: SwapType, tokenAddress: any, amount?: bigint, count?: number): Intermediary[];
     /**
      * Removes a specific intermediary from the list of active intermediaries (used for blacklisting)
      *

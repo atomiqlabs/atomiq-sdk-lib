@@ -1,15 +1,8 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwapWrapperStorage = void 0;
+const Utils_1 = require("../utils/Utils");
+const logger = (0, Utils_1.getLogger)("SwapWrapperStorage: ");
 class SwapWrapperStorage {
     constructor(storage) {
         this.storage = storage;
@@ -25,31 +18,27 @@ class SwapWrapperStorage {
      *
      * @param swapData Swap to remove
      */
-    removeSwapData(swapData) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const id = swapData.getPaymentHash().toString("hex");
-            if (this.storage.data[id] == null)
-                return false;
-            yield this.storage.removeData(id);
-            return true;
-        });
+    async removeSwapData(swapData) {
+        const id = swapData.getIdentifierHashString();
+        if (this.storage.data[id] == null)
+            return false;
+        await this.storage.removeData(id);
+        return true;
     }
     /**
      * Removes an array of swap data from the underlying storage manager
      *
      * @param arr Array of swaps to remove
      */
-    removeSwapDataArr(arr) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.storage.removeDataArr != null) {
-                yield this.storage.removeDataArr(arr.map(swap => swap.getPaymentHash().toString("hex")));
-                return;
-            }
-            for (let swapData of arr) {
-                const id = swapData.getPaymentHash().toString("hex");
-                yield this.storage.removeData(id);
-            }
-        });
+    async removeSwapDataArr(arr) {
+        if (this.storage.removeDataArr != null) {
+            await this.storage.removeDataArr(arr.map(swap => swap.getIdentifierHashString()));
+            return;
+        }
+        for (let swapData of arr) {
+            const id = swapData.getIdentifierHashString();
+            await this.storage.removeData(id);
+        }
     }
     /**
      * Saves the swap to the underlying storage manager
@@ -57,7 +46,7 @@ class SwapWrapperStorage {
      * @param swapData Swap to save
      */
     saveSwapData(swapData) {
-        const id = swapData.getPaymentHash().toString("hex");
+        const id = swapData.getIdentifierHashString();
         return this.storage.saveData(id, swapData);
     }
     /**
@@ -65,19 +54,17 @@ class SwapWrapperStorage {
      *
      * @param arr Array of swaps to save
      */
-    saveSwapDataArr(arr) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.storage.saveDataArr != null) {
-                yield this.storage.saveDataArr(arr.map(swap => {
-                    return { id: swap.getPaymentHash().toString("hex"), object: swap };
-                }));
-                return;
-            }
-            for (let swapData of arr) {
-                const id = swapData.getPaymentHash().toString("hex");
-                yield this.storage.saveData(id, swapData);
-            }
-        });
+    async saveSwapDataArr(arr) {
+        if (this.storage.saveDataArr != null) {
+            await this.storage.saveDataArr(arr.map(swap => {
+                return { id: swap.getIdentifierHashString(), object: swap };
+            }));
+            return;
+        }
+        for (let swapData of arr) {
+            const id = swapData.getIdentifierHashString();
+            await this.storage.saveData(id, swapData);
+        }
     }
     /**
      * Loads all the swaps from the underlying storage manager
@@ -85,11 +72,22 @@ class SwapWrapperStorage {
      * @param wrapper Swap wrapper
      * @param type Constructor for the swap
      */
-    loadSwapData(wrapper, type) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const res = yield this.storage.loadData(type.bind(null, wrapper));
-            return new Map(res.map(value => [value.getPaymentHashString(), value]));
-        });
+    async loadSwapData(wrapper, type) {
+        const res = await this.storage.loadData(type.bind(null, wrapper));
+        for (let value of res) {
+            if (value.randomNonce == null) {
+                const oldIdentifierHash = value.getIdentifierHashString();
+                //Workaround for old Solana swaps - take the first 32 bytes of the claim hash which should stay the same
+                // for both old and new version of the libs
+                await this.storage.removeData(oldIdentifierHash.slice(0, 64));
+                value.randomNonce = (0, Utils_1.randomBytes)(16).toString("hex");
+                const newIdentifierHash = value.getIdentifierHashString();
+                await this.saveSwapData(value);
+                logger.info("init(): Found older swap version without randomNonce, replacing, old hash: " + oldIdentifierHash +
+                    " new hash: " + newIdentifierHash);
+            }
+        }
+        return new Map(res.map(value => [value.getIdentifierHashString(), value]));
     }
 }
 exports.SwapWrapperStorage = SwapWrapperStorage;

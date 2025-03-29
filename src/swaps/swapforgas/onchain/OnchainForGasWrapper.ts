@@ -1,25 +1,27 @@
-import * as BN from "bn.js";
 import {ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediaryAPI";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
-import {ChainType, IStorageManager} from "@atomiqlabs/base";
+import {ChainType} from "@atomiqlabs/base";
 import {OnchainForGasSwap, OnchainForGasSwapInit, OnchainForGasSwapState} from "./OnchainForGasSwap";
 import {BitcoinRpcWithTxoListener} from "../../../btc/BitcoinRpcWithTxoListener";
 import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {SwapType} from "../../SwapType";
+import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
+import {UnifiedSwapStorage} from "../../UnifiedSwapStorage";
 
 export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
-    protected readonly swapDeserializer = OnchainForGasSwap;
+    public readonly TYPE = SwapType.TRUSTED_FROM_BTC;
+    public readonly swapDeserializer = OnchainForGasSwap;
 
     readonly btcRpc: BitcoinRpcWithTxoListener<any>;
 
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents On-chain event listener
      * @param contract Underlying contract handling the swaps
-     * @param chainEvents On-chain event listener
      * @param prices Pricing to use
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
@@ -29,9 +31,9 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
      */
     constructor(
         chainIdentifier: string,
-        storage: IStorageManager<OnchainForGasSwap<T>>,
+        unifiedStorage: UnifiedSwapStorage<T>,
+        unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
-        chainEvents: T["Events"],
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
         swapDataDeserializer: new (data: any) => T["Data"],
@@ -39,7 +41,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         options?: ISwapWrapperOptions,
         events?: EventEmitter
     ) {
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
         this.btcRpc = btcRpc;
     }
 
@@ -51,18 +53,21 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
      * @param lpOrUrl           Intermediary/Counterparty swap service Intermediary object or raw url
      * @param refundAddress     Bitcoin address to receive refund on in case the counterparty cannot execute the swap
      */
-    async create(signer: string, amount: BN, lpOrUrl: Intermediary | string, refundAddress?: string): Promise<OnchainForGasSwap<T>> {
+    async create(signer: string, amount: bigint, lpOrUrl: Intermediary | string, refundAddress?: string): Promise<OnchainForGasSwap<T>> {
         if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
 
         const lpUrl = typeof(lpOrUrl)==="string" ? lpOrUrl : lpOrUrl.url;
 
+        const token = this.contract.getNativeCurrencyAddress();
+
         const resp = await TrustedIntermediaryAPI.initTrustedFromBTC(this.chainIdentifier, lpUrl, {
             address: signer,
             amount,
-            refundAddress
+            refundAddress,
+            token
         }, this.options.getRequestTimeout);
 
-        if(!resp.total.eq(amount)) throw new IntermediaryError("Invalid total returned");
+        if(resp.total !== amount) throw new IntermediaryError("Invalid total returned");
 
         const pricingInfo = await this.verifyReturnedPrice(
             typeof(lpOrUrl)==="string" ?
@@ -86,24 +91,14 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
             swapFee: resp.swapFee,
             swapFeeBtc: resp.swapFeeSats,
             feeRate: "",
-            exactIn: false
+            exactIn: false,
+            token
         } as OnchainForGasSwapInit<T["Data"]>);
         await quote._save();
         return quote;
     }
 
-    protected async checkPastSwap(swap: OnchainForGasSwap<T>): Promise<boolean> {
-        if(swap.state===OnchainForGasSwapState.PR_CREATED) {
-            //Check if it's maybe already paid
-            return await swap.checkAddress(false);
-        }
-        return false;
-    }
-
-    protected isOurSwap(signer: string, swap: OnchainForGasSwap<T>): boolean {
-        return signer===swap.getRecipient();
-    }
-
-    protected tickSwap(swap: OnchainForGasSwap<T>): void {}
+    public readonly pendingSwapStates = [OnchainForGasSwapState.PR_CREATED];
+    public readonly tickSwapState = null;
 
 }

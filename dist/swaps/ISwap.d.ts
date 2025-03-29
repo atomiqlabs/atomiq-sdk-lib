@@ -3,7 +3,6 @@
 /// <reference types="node" />
 import { SwapType } from "./SwapType";
 import { EventEmitter } from "events";
-import * as BN from "bn.js";
 import { Buffer } from "buffer";
 import { ISwapWrapper } from "./ISwapWrapper";
 import { ChainType, SignatureData, SwapCommitStatus, SwapData } from "@atomiqlabs/base";
@@ -15,8 +14,8 @@ export type ISwapInit<T extends SwapData> = {
     pricingInfo: PriceInfoType;
     url: string;
     expiry: number;
-    swapFee: BN;
-    swapFeeBtc?: BN;
+    swapFee: bigint;
+    swapFeeBtc?: bigint;
     feeRate: any;
     signatureData?: SignatureData;
     data?: T;
@@ -45,14 +44,19 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     data: T["Data"];
     signatureData?: SignatureData;
     feeRate?: any;
-    protected swapFee: BN;
-    protected swapFeeBtc?: BN;
+    protected swapFee: bigint;
+    protected swapFeeBtc?: bigint;
     /**
      * Transaction IDs for the swap on the smart chain side
      */
     commitTxId: string;
     refundTxId?: string;
     claimTxId?: string;
+    /**
+     * Random nonce to differentiate the swap from others with the same identifier hash (i.e. when quoting the same swap
+     *  from multiple LPs)
+     */
+    randomNonce: string;
     /**
      * Event emitter emitting "swapState" event when swap's state changes
      */
@@ -100,7 +104,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Returns the price difference between offered price and current market price in PPM (parts per million)
      */
-    getPriceDifferencePPM(): BN;
+    getPriceDifferencePPM(): bigint;
     /**
      * Returns the price difference between offered price and current market price as a decimal number
      */
@@ -120,12 +124,33 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Returns the real swap fee percentage as PPM (parts per million)
      */
-    abstract getRealSwapFeePercentagePPM(): BN;
-    getPaymentHashString(): string;
+    abstract getRealSwapFeePercentagePPM(): bigint;
+    abstract getInputTxId(): string | null;
+    abstract getOutputTxId(): string | null;
+    abstract getInputAddress(): string | null;
+    abstract getOutputAddress(): string | null;
     /**
-     * Returns payment hash identifier of the swap
+     * Returns the escrow hash - i.e. hash of the escrow data
      */
-    getPaymentHash(): Buffer;
+    getEscrowHash(): string | null;
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
+    getClaimHash(): string;
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHash(): Buffer;
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHashString(): string;
+    /**
+     * Returns the ID of the swap, as used in the storage and getSwapById function
+     */
+    getId(): string;
     /**
      * Returns quote expiry in UNIX millis
      */
@@ -184,7 +209,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Get the estimated smart chain fee of the commit transaction
      */
-    getCommitFee(): Promise<BN>;
+    getCommitFee(): Promise<bigint>;
     /**
      * Returns output amount of the swap, user receives this much
      */
@@ -223,4 +248,20 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     _save(): Promise<void>;
     _saveAndEmit(state?: S): Promise<void>;
     _emitEvent(): void;
+    /**
+     * Synchronizes swap state from chain and/or LP node, usually ran on startup
+     *
+     * @param save whether to save the new swap state or not
+     *
+     * @returns {boolean} true if the swap changed, false if the swap hasn't changed
+     */
+    abstract _sync(save?: boolean): Promise<boolean>;
+    /**
+     * Runs quick checks on the swap, such as checking the expiry, usually ran periodically every few seconds
+     *
+     * @param save whether to save the new swap state or not
+     *
+     * @returns {boolean} true if the swap changed, false if the swap hasn't changed
+     */
+    abstract _tick(save?: boolean): Promise<boolean>;
 }

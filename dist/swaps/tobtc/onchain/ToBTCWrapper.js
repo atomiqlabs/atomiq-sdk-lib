@@ -1,51 +1,40 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToBTCWrapper = void 0;
 const ToBTCSwap_1 = require("./ToBTCSwap");
 const IToBTCWrapper_1 = require("../IToBTCWrapper");
 const base_1 = require("@atomiqlabs/base");
-const bitcoinjs_lib_1 = require("bitcoinjs-lib");
-const BN = require("bn.js");
-const buffer_1 = require("buffer");
-const randomBytes = require("randombytes");
 const UserError_1 = require("../../../errors/UserError");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const SwapType_1 = require("../../SwapType");
 const Utils_1 = require("../../../utils/Utils");
 const IntermediaryAPI_1 = require("../../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../../errors/RequestError");
+const utils_1 = require("@scure/btc-signer/utils");
 class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents Smart chain on-chain event listener
      * @param contract Chain specific swap contract
      * @param prices Swap pricing handler
-     * @param chainEvents Smart chain on-chain event listener
      * @param tokens
      * @param swapDataDeserializer Deserializer for chain specific SwapData
      * @param btcRpc Bitcoin RPC api
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, btcRpc, options, events) {
+    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, btcRpc, options, events) {
         if (options == null)
             options = {};
-        options.bitcoinNetwork = options.bitcoinNetwork || bitcoinjs_lib_1.networks.testnet;
+        options.bitcoinNetwork = options.bitcoinNetwork ?? utils_1.TEST_NETWORK;
         options.safetyFactor = options.safetyFactor || 2;
         options.maxConfirmations = options.maxConfirmations || 6;
         options.bitcoinBlocktime = options.bitcoinBlocktime || (60 * 10);
         options.maxExpectedOnchainSendSafetyFactor = options.maxExpectedOnchainSendSafetyFactor || 4;
         options.maxExpectedOnchainSendGracePeriodBlocks = options.maxExpectedOnchainSendGracePeriodBlocks || 12;
-        super(chainIdentifier, storage, contract, chainEvents, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events);
+        this.TYPE = SwapType_1.SwapType.TO_BTC;
         this.swapDeserializer = ToBTCSwap_1.ToBTCSwap;
         this.btcRpc = btcRpc;
     }
@@ -55,12 +44,8 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @returns Escrow nonce
      */
     getRandomNonce() {
-        const firstPart = new BN(Math.floor((Date.now() / 1000)) - 700000000);
-        const nonceBuffer = buffer_1.Buffer.concat([
-            buffer_1.Buffer.from(firstPart.toArray("be", 5)),
-            randomBytes(3)
-        ]);
-        return new BN(nonceBuffer, "be");
+        const firstPart = BigInt(Math.floor((Date.now() / 1000)) - 700000000);
+        return (firstPart << 24n) | base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(3));
     }
     /**
      * Converts bitcoin address to its corresponding output script
@@ -72,7 +57,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      */
     btcAddressToOutputScript(addr) {
         try {
-            return bitcoinjs_lib_1.address.toOutputScript(addr, this.options.bitcoinNetwork);
+            return (0, Utils_1.toOutputScript)(this.options.bitcoinNetwork, addr);
         }
         catch (e) {
             throw new UserError_1.UserError("Invalid address specified");
@@ -87,36 +72,33 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @param options Options as passed to the swap create function
      * @param data LP's returned parsed swap data
      * @param hash Payment hash of the swap
-     * @param nonce Escrow nonce that should be used for the swap
      * @private
      * @throws {IntermediaryError} if returned data are not correct
      */
-    verifyReturnedData(resp, amountData, lp, options, data, hash, nonce) {
-        if (!resp.totalFee.eq(resp.swapFee.add(resp.networkFee)))
+    verifyReturnedData(resp, amountData, lp, options, data, hash) {
+        if (resp.totalFee !== (resp.swapFee + resp.networkFee))
             throw new IntermediaryError_1.IntermediaryError("Invalid totalFee returned");
         if (amountData.exactIn) {
-            if (!resp.total.eq(amountData.amount))
+            if (resp.total !== amountData.amount)
                 throw new IntermediaryError_1.IntermediaryError("Invalid total returned");
         }
         else {
-            if (!resp.amount.eq(amountData.amount))
+            if (resp.amount !== amountData.amount)
                 throw new IntermediaryError_1.IntermediaryError("Invalid amount returned");
         }
-        const maxAllowedBlockDelta = new BN(options.confirmations +
+        const maxAllowedBlockDelta = BigInt(options.confirmations +
             options.confirmationTarget +
             this.options.maxExpectedOnchainSendGracePeriodBlocks);
         const maxAllowedExpiryDelta = maxAllowedBlockDelta
-            .muln(this.options.maxExpectedOnchainSendSafetyFactor)
-            .muln(this.options.bitcoinBlocktime);
-        const currentTimestamp = new BN(Math.floor(Date.now() / 1000));
-        const maxAllowedExpiryTimestamp = currentTimestamp.add(maxAllowedExpiryDelta);
-        if (data.getExpiry().gt(maxAllowedExpiryTimestamp)) {
+            * BigInt(this.options.maxExpectedOnchainSendSafetyFactor)
+            * BigInt(this.options.bitcoinBlocktime);
+        const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
+        const maxAllowedExpiryTimestamp = currentTimestamp + maxAllowedExpiryDelta;
+        if (data.getExpiry() > maxAllowedExpiryTimestamp) {
             throw new IntermediaryError_1.IntermediaryError("Expiry time returned too high!");
         }
-        if (!data.getAmount().eq(resp.total) ||
-            data.getHash() !== hash ||
-            !data.getEscrowNonce().eq(nonce) ||
-            data.getConfirmations() !== options.confirmations ||
+        if (data.getAmount() !== resp.total ||
+            data.getClaimHash() !== hash ||
             data.getType() !== base_1.ChainSwapType.CHAIN_NONCED ||
             !data.isPayIn() ||
             !data.isToken(amountData.token) ||
@@ -138,13 +120,13 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     create(signer, address, amountData, lps, options, additionalParams, abortSignal) {
         if (!this.isInitialized)
             throw new Error("Not initialized, call init() first!");
-        options !== null && options !== void 0 ? options : (options = {});
-        options.confirmationTarget = 3;
-        options.confirmations = 2;
+        options ??= {};
+        options.confirmationTarget ??= 3;
+        options.confirmations ??= 2;
         const nonce = this.getRandomNonce();
         const outputScript = this.btcAddressToOutputScript(address);
         const _hash = !amountData.exactIn ?
-            this.contract.getHashForOnchain(outputScript, amountData.amount, nonce).toString("hex") :
+            this.contract.getHashForOnchain(outputScript, amountData.amount, options.confirmations, nonce).toString("hex") :
             null;
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePreFetchPromise = this.preFetchPrice(amountData, _abortController.signal);
@@ -152,12 +134,11 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         return lps.map(lp => {
             return {
                 intermediary: lp,
-                quote: (() => __awaiter(this, void 0, void 0, function* () {
-                    var _a;
+                quote: (async () => {
                     const abortController = (0, Utils_1.extendAbortController)(_abortController.signal);
                     const reputationPromise = this.preFetchIntermediaryReputation(amountData, lp, abortController);
                     try {
-                        const { signDataPromise, resp } = yield (0, Utils_1.tryWithRetries)((retryCount) => __awaiter(this, void 0, void 0, function* () {
+                        const { signDataPromise, resp } = await (0, Utils_1.tryWithRetries)(async (retryCount) => {
                             const { signDataPrefetch, response } = IntermediaryAPI_1.IntermediaryAPI.initToBTC(this.chainIdentifier, lp.url, {
                                 btcAddress: address,
                                 amount: amountData.amount,
@@ -172,16 +153,16 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                             }, this.options.postRequestTimeout, abortController.signal, retryCount > 0 ? false : null);
                             return {
                                 signDataPromise: this.preFetchSignData(signDataPrefetch),
-                                resp: yield response
+                                resp: await response
                             };
-                        }), null, RequestError_1.RequestError, abortController.signal);
+                        }, null, RequestError_1.RequestError, abortController.signal);
                         let hash = amountData.exactIn ?
-                            this.contract.getHashForOnchain(outputScript, resp.amount, nonce).toString("hex") :
+                            this.contract.getHashForOnchain(outputScript, resp.amount, options.confirmations, nonce).toString("hex") :
                             _hash;
                         const data = new this.swapDataDeserializer(resp.data);
                         data.setOfferer(signer);
-                        this.verifyReturnedData(resp, amountData, lp, options, data, hash, nonce);
-                        const [pricingInfo, signatureExpiry, reputation] = yield Promise.all([
+                        this.verifyReturnedData(resp, amountData, lp, options, data, hash);
+                        const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTC], true, resp.amount, data.getAmount(), amountData.token, resp, pricePreFetchPromise, abortController.signal),
                             this.verifyReturnedSignature(data, resp, feeRatePromise, signDataPromise, abortController.signal),
                             reputationPromise
@@ -192,24 +173,26 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                             url: lp.url,
                             expiry: signatureExpiry,
                             swapFee: resp.swapFee,
-                            feeRate: yield feeRatePromise,
+                            feeRate: await feeRatePromise,
                             signatureData: resp,
                             data,
                             networkFee: resp.networkFee,
                             address,
                             amount: resp.amount,
                             confirmationTarget: options.confirmationTarget,
-                            satsPerVByte: resp.satsPervByte.toNumber(),
-                            exactIn: (_a = amountData.exactIn) !== null && _a !== void 0 ? _a : false
+                            satsPerVByte: Number(resp.satsPervByte),
+                            exactIn: amountData.exactIn ?? false,
+                            requiredConfirmations: options.confirmations,
+                            nonce
                         });
-                        yield quote._save();
+                        await quote._save();
                         return quote;
                     }
                     catch (e) {
                         abortController.abort(e);
                         throw e;
                     }
-                }))()
+                })()
             };
         });
     }

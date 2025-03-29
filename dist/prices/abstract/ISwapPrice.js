@@ -1,24 +1,14 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ISwapPrice = exports.isPriceInfoType = void 0;
-const BN = require("bn.js");
 function isPriceInfoType(obj) {
     return obj != null &&
         typeof (obj.isValid) === "boolean" &&
-        BN.isBN(obj.differencePPM) &&
-        BN.isBN(obj.satsBaseFee) &&
-        BN.isBN(obj.feePPM) &&
-        BN.isBN(obj.realPriceUSatPerToken) &&
-        BN.isBN(obj.swapPriceUSatPerToken);
+        typeof (obj.differencePPM) === "bigint" &&
+        typeof (obj.satsBaseFee) === "bigint" &&
+        typeof (obj.feePPM) === "bigint" &&
+        typeof (obj.realPriceUSatPerToken) === "bigint" &&
+        typeof (obj.swapPriceUSatPerToken) === "bigint";
 }
 exports.isPriceInfoType = isPriceInfoType;
 class ISwapPrice {
@@ -36,13 +26,13 @@ class ISwapPrice {
      * @param token
      */
     recomputePriceInfoSend(chainIdentifier, amountSats, satsBaseFee, feePPM, paidToken, token) {
-        const totalSats = amountSats.mul(new BN(1000000).add(feePPM)).div(new BN(1000000))
-            .add(satsBaseFee);
-        const totalUSats = totalSats.mul(new BN(1000000));
-        const swapPriceUSatPerToken = totalUSats.mul(new BN(10).pow(new BN(this.getDecimals(chainIdentifier, token)))).div(paidToken);
+        const totalSats = (amountSats * (1000000n + feePPM) / 1000000n)
+            + satsBaseFee;
+        const totalUSats = totalSats * 1000000n;
+        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / paidToken;
         return {
             isValid: true,
-            differencePPM: new BN(0),
+            differencePPM: 0n,
             satsBaseFee,
             feePPM,
             realPriceUSatPerToken: this.shouldIgnore(chainIdentifier, token) ? null : swapPriceUSatPerToken,
@@ -61,34 +51,32 @@ class ISwapPrice {
      * @param abortSignal
      * @param preFetchedPrice Already pre-fetched price
      */
-    isValidAmountSend(chainIdentifier, amountSats, satsBaseFee, feePPM, paidToken, token, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const totalSats = amountSats.mul(new BN(1000000).add(feePPM)).div(new BN(1000000))
-                .add(satsBaseFee);
-            const totalUSats = totalSats.mul(new BN(1000000));
-            const swapPriceUSatPerToken = totalUSats.mul(new BN(10).pow(new BN(this.getDecimals(chainIdentifier, token)))).div(paidToken);
-            if (this.shouldIgnore(chainIdentifier, token))
-                return {
-                    isValid: true,
-                    differencePPM: new BN(0),
-                    satsBaseFee,
-                    feePPM,
-                    realPriceUSatPerToken: null,
-                    swapPriceUSatPerToken
-                };
-            const calculatedAmtInToken = yield this.getFromBtcSwapAmount(chainIdentifier, totalSats, token, abortSignal, preFetchedPrice);
-            const realPriceUSatPerToken = totalUSats.mul(new BN(10).pow(new BN(this.getDecimals(chainIdentifier, token)))).div(calculatedAmtInToken);
-            const difference = paidToken.sub(calculatedAmtInToken); //Will be >0 if we need to pay more than we should've
-            const differencePPM = difference.mul(new BN(1000000)).div(calculatedAmtInToken);
+    async isValidAmountSend(chainIdentifier, amountSats, satsBaseFee, feePPM, paidToken, token, abortSignal, preFetchedPrice) {
+        const totalSats = (amountSats * (1000000n + feePPM) / 1000000n)
+            + satsBaseFee;
+        const totalUSats = totalSats * 1000000n;
+        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / paidToken;
+        if (this.shouldIgnore(chainIdentifier, token))
             return {
-                isValid: differencePPM.lte(this.maxAllowedFeeDifferencePPM),
-                differencePPM,
+                isValid: true,
+                differencePPM: 0n,
                 satsBaseFee,
                 feePPM,
-                realPriceUSatPerToken,
+                realPriceUSatPerToken: null,
                 swapPriceUSatPerToken
             };
-        });
+        const calculatedAmtInToken = await this.getFromBtcSwapAmount(chainIdentifier, totalSats, token, abortSignal, preFetchedPrice);
+        const realPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / calculatedAmtInToken;
+        const difference = paidToken - calculatedAmtInToken; //Will be >0 if we need to pay more than we should've
+        const differencePPM = difference * 1000000n / calculatedAmtInToken;
+        return {
+            isValid: differencePPM <= this.maxAllowedFeeDifferencePPM,
+            differencePPM,
+            satsBaseFee,
+            feePPM,
+            realPriceUSatPerToken,
+            swapPriceUSatPerToken
+        };
     }
     /**
      * Recomputes pricing info without fetching the current price
@@ -101,13 +89,13 @@ class ISwapPrice {
      * @param token
      */
     recomputePriceInfoReceive(chainIdentifier, amountSats, satsBaseFee, feePPM, receiveToken, token) {
-        const totalSats = amountSats.mul(new BN(1000000).sub(feePPM)).div(new BN(1000000))
-            .sub(satsBaseFee);
-        const totalUSats = totalSats.mul(new BN(1000000));
-        const swapPriceUSatPerToken = totalUSats.mul(new BN(10).pow(new BN(this.getDecimals(chainIdentifier, token)))).div(receiveToken);
+        const totalSats = (amountSats * (1000000n - feePPM) / 1000000n)
+            - satsBaseFee;
+        const totalUSats = totalSats * 1000000n;
+        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / receiveToken;
         return {
             isValid: true,
-            differencePPM: new BN(0),
+            differencePPM: 0n,
             satsBaseFee,
             feePPM,
             realPriceUSatPerToken: this.shouldIgnore(chainIdentifier, token) ? null : swapPriceUSatPerToken,
@@ -126,34 +114,32 @@ class ISwapPrice {
      * @param abortSignal
      * @param preFetchedPrice Already pre-fetched price
      */
-    isValidAmountReceive(chainIdentifier, amountSats, satsBaseFee, feePPM, receiveToken, token, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const totalSats = amountSats.mul(new BN(1000000).sub(feePPM)).div(new BN(1000000))
-                .sub(satsBaseFee);
-            const totalUSats = totalSats.mul(new BN(1000000));
-            const swapPriceUSatPerToken = totalUSats.mul(new BN(10).pow(new BN(this.getDecimals(chainIdentifier, token)))).div(receiveToken);
-            if (this.shouldIgnore(chainIdentifier, token))
-                return {
-                    isValid: true,
-                    differencePPM: new BN(0),
-                    satsBaseFee,
-                    feePPM,
-                    realPriceUSatPerToken: null,
-                    swapPriceUSatPerToken
-                };
-            const calculatedAmtInToken = yield this.getFromBtcSwapAmount(chainIdentifier, totalSats, token, abortSignal, preFetchedPrice);
-            const realPriceUSatPerToken = totalUSats.mul(new BN(10).pow(new BN(this.getDecimals(chainIdentifier, token)))).div(calculatedAmtInToken);
-            const difference = calculatedAmtInToken.sub(receiveToken); //Will be >0 if we receive less than we should've
-            const differencePPM = difference.mul(new BN(1000000)).div(calculatedAmtInToken);
+    async isValidAmountReceive(chainIdentifier, amountSats, satsBaseFee, feePPM, receiveToken, token, abortSignal, preFetchedPrice) {
+        const totalSats = (amountSats * (1000000n - feePPM) / 1000000n)
+            - satsBaseFee;
+        const totalUSats = totalSats * 1000000n;
+        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / receiveToken;
+        if (this.shouldIgnore(chainIdentifier, token))
             return {
-                isValid: differencePPM.lte(this.maxAllowedFeeDifferencePPM),
-                differencePPM,
+                isValid: true,
+                differencePPM: 0n,
                 satsBaseFee,
                 feePPM,
-                realPriceUSatPerToken,
+                realPriceUSatPerToken: null,
                 swapPriceUSatPerToken
             };
-        });
+        const calculatedAmtInToken = await this.getFromBtcSwapAmount(chainIdentifier, totalSats, token, abortSignal, preFetchedPrice);
+        const realPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / calculatedAmtInToken;
+        const difference = calculatedAmtInToken - receiveToken; //Will be >0 if we receive less than we should've
+        const differencePPM = difference * 100000n / calculatedAmtInToken;
+        return {
+            isValid: differencePPM <= this.maxAllowedFeeDifferencePPM,
+            differencePPM,
+            satsBaseFee,
+            feePPM,
+            realPriceUSatPerToken,
+            swapPriceUSatPerToken
+        };
     }
     preFetchPrice(chainIdentifier, token, abortSignal) {
         return this.getPrice(chainIdentifier, token, abortSignal);
@@ -171,16 +157,14 @@ class ISwapPrice {
      * @param preFetchedPrice
      * @throws {Error} when token is not found
      */
-    getFromBtcSwapAmount(chainIdentifier, fromAmount, toToken, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.getDecimals(chainIdentifier, toToken.toString()) == null)
-                throw new Error("Token not found!");
-            const price = preFetchedPrice || (yield this.getPrice(chainIdentifier, toToken, abortSignal));
-            return fromAmount
-                .mul(new BN(10).pow(new BN(this.getDecimals(chainIdentifier, toToken.toString()))))
-                .mul(new BN(1000000)) //To usat
-                .div(price);
-        });
+    async getFromBtcSwapAmount(chainIdentifier, fromAmount, toToken, abortSignal, preFetchedPrice) {
+        if (this.getDecimals(chainIdentifier, toToken.toString()) == null)
+            throw new Error("Token not found!");
+        const price = preFetchedPrice || await this.getPrice(chainIdentifier, toToken, abortSignal);
+        return fromAmount
+            * (10n ** BigInt(this.getDecimals(chainIdentifier, toToken.toString())))
+            * (1000000n) //To usat
+            / (price);
     }
     /**
      * Returns amount of satoshis that are equivalent to {fromAmount} of {fromToken}
@@ -192,16 +176,14 @@ class ISwapPrice {
      * @param preFetchedPrice Pre-fetched swap price if available
      * @throws {Error} when token is not found
      */
-    getToBtcSwapAmount(chainIdentifier, fromAmount, fromToken, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.getDecimals(chainIdentifier, fromToken.toString()) == null)
-                throw new Error("Token not found");
-            const price = preFetchedPrice || (yield this.getPrice(chainIdentifier, fromToken, abortSignal));
-            return fromAmount
-                .mul(price)
-                .div(new BN(1000000))
-                .div(new BN(10).pow(new BN(this.getDecimals(chainIdentifier, fromToken.toString()))));
-        });
+    async getToBtcSwapAmount(chainIdentifier, fromAmount, fromToken, abortSignal, preFetchedPrice) {
+        if (this.getDecimals(chainIdentifier, fromToken.toString()) == null)
+            throw new Error("Token not found");
+        const price = preFetchedPrice || await this.getPrice(chainIdentifier, fromToken, abortSignal);
+        return fromAmount
+            * price
+            / 1000000n
+            / (10n ** BigInt(this.getDecimals(chainIdentifier, fromToken.toString())));
     }
     /**
      * Returns whether the token should be ignored and pricing for it not calculated
@@ -215,19 +197,15 @@ class ISwapPrice {
             throw new Error("Token not found");
         return coin === -1;
     }
-    getBtcUsdValue(btcSats, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return btcSats.toNumber() * (preFetchedPrice || (yield this.getUsdPrice(abortSignal)));
-        });
+    async getBtcUsdValue(btcSats, abortSignal, preFetchedPrice) {
+        return Number(btcSats) * (preFetchedPrice || await this.getUsdPrice(abortSignal));
     }
-    getTokenUsdValue(chainId, tokenAmount, token, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [btcAmount, usdPrice] = yield Promise.all([
-                this.getToBtcSwapAmount(chainId, tokenAmount, token, abortSignal),
-                preFetchedPrice == null ? this.preFetchUsdPrice(abortSignal) : Promise.resolve(preFetchedPrice)
-            ]);
-            return btcAmount.toNumber() * usdPrice;
-        });
+    async getTokenUsdValue(chainId, tokenAmount, token, abortSignal, preFetchedPrice) {
+        const [btcAmount, usdPrice] = await Promise.all([
+            this.getToBtcSwapAmount(chainId, tokenAmount, token, abortSignal),
+            preFetchedPrice == null ? this.preFetchUsdPrice(abortSignal) : Promise.resolve(preFetchedPrice)
+        ]);
+        return Number(btcAmount) * usdPrice;
     }
     getUsdValue(amount, token, abortSignal, preFetchedUsdPrice) {
         if (token.chain === "BTC") {

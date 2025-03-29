@@ -1,4 +1,3 @@
-import BN from "bn.js";
 import { FieldTypeEnum, RequestSchemaResult } from "../utils/paramcoders/SchemaVerifier";
 export declare enum AddressStatusResponseCodes {
     EXPIRED = 10001,
@@ -50,17 +49,18 @@ export type AddressStatusResponse = {
 };
 export type TrustedFromBTCInit = {
     address: string;
-    amount: BN;
+    amount: bigint;
+    token: string;
     refundAddress?: string;
 };
 declare const TrustedFromBTCResponseSchema: {
     readonly paymentHash: FieldTypeEnum.String;
-    readonly sequence: FieldTypeEnum.BN;
+    readonly sequence: FieldTypeEnum.BigInt;
     readonly btcAddress: FieldTypeEnum.String;
-    readonly amountSats: FieldTypeEnum.BN;
-    readonly swapFeeSats: FieldTypeEnum.BN;
-    readonly swapFee: FieldTypeEnum.BN;
-    readonly total: FieldTypeEnum.BN;
+    readonly amountSats: FieldTypeEnum.BigInt;
+    readonly swapFeeSats: FieldTypeEnum.BigInt;
+    readonly swapFee: FieldTypeEnum.BigInt;
+    readonly total: FieldTypeEnum.BigInt;
     readonly intermediaryKey: FieldTypeEnum.String;
     readonly recommendedFee: FieldTypeEnum.Number;
     readonly expiresAt: FieldTypeEnum.Number;
@@ -85,12 +85,13 @@ export type InvoiceStatusResponse = {
 };
 export type TrustedFromBTCLNInit = {
     address: string;
-    amount: BN;
+    amount: bigint;
+    token: string;
 };
 declare const TrustedFromBTCLNResponseSchema: {
     readonly pr: FieldTypeEnum.String;
-    readonly swapFee: FieldTypeEnum.BN;
-    readonly total: FieldTypeEnum.BN;
+    readonly swapFee: FieldTypeEnum.BigInt;
+    readonly total: FieldTypeEnum.BigInt;
 };
 export type TrustedFromBTCLNResponseType = RequestSchemaResult<typeof TrustedFromBTCLNResponseSchema>;
 export declare class TrustedIntermediaryAPI {
@@ -125,7 +126,7 @@ export declare class TrustedIntermediaryAPI {
      * @param abortSignal
      * @throws {RequestError} if non-200 http response is returned
      */
-    static getAddressStatus(url: string, paymentHash: string, sequence: BN, timeout?: number, abortSignal?: AbortSignal): Promise<AddressStatusResponse>;
+    static getAddressStatus(url: string, paymentHash: string, sequence: bigint, timeout?: number, abortSignal?: AbortSignal): Promise<AddressStatusResponse>;
     /**
      * Sets the refund address for an on-chain gas swap
      *
@@ -137,7 +138,7 @@ export declare class TrustedIntermediaryAPI {
      * @param abortSignal
      * @throws {RequestError} if non-200 http response is returned
      */
-    static setRefundAddress(url: string, paymentHash: string, sequence: BN, refundAddress: string, timeout?: number, abortSignal?: AbortSignal): Promise<void>;
+    static setRefundAddress(url: string, paymentHash: string, sequence: bigint, refundAddress: string, timeout?: number, abortSignal?: AbortSignal): Promise<void>;
     /**
      * Initiate a trusted swap from BTC to SC native currency, retries!
      *

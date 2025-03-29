@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 /**
  * An error returned by the intermediary in a http response
  */
@@ -11,7 +10,7 @@ export declare class RequestError extends Error {
  * An error indicating out of bounds (amount too high or too low) on swap initialization
  */
 export declare class OutOfBoundsError extends RequestError {
-    min: BN;
-    max: BN;
-    constructor(msg: string, httpCode: number, min: BN, max: BN);
+    min: bigint;
+    max: bigint;
+    constructor(msg: string, httpCode: number, min: bigint, max: bigint);
 }

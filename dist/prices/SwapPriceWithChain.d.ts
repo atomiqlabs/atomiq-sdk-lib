@@ -1,11 +1,10 @@
 import { ISwapPrice, PriceInfoType } from "./abstract/ISwapPrice";
 import { ChainIds, MultiChain } from "../swaps/Swapper";
-import * as BN from "bn.js";
 import { Token } from "../swaps/Tokens";
 export declare class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends ChainIds<T>> {
     swapPrice: ISwapPrice<T>;
     chainIdentifier: ChainIdentifier;
-    maxAllowedFeeDifferencePPM: BN;
+    maxAllowedFeeDifferencePPM: bigint;
     constructor(swapPrice: ISwapPrice<T>, chainIdentifier: ChainIdentifier);
     /**
      * Checks whether the swap amounts are valid given the current market rate for a given pair
@@ -18,7 +17,7 @@ export declare class SwapPriceWithChain<T extends MultiChain, ChainIdentifier ex
      * @param abortSignal
      * @param preFetchedPrice Already pre-fetched price
      */
-    isValidAmountSend(amountSats: BN, satsBaseFee: BN, feePPM: BN, paidToken: BN, token: string, abortSignal?: AbortSignal, preFetchedPrice?: BN): Promise<PriceInfoType>;
+    isValidAmountSend(amountSats: bigint, satsBaseFee: bigint, feePPM: bigint, paidToken: bigint, token: string, abortSignal?: AbortSignal, preFetchedPrice?: bigint): Promise<PriceInfoType>;
     /**
      * Checks whether the swap amounts are valid given the current market rate for a given pair
      *
@@ -30,8 +29,8 @@ export declare class SwapPriceWithChain<T extends MultiChain, ChainIdentifier ex
      * @param abortSignal
      * @param preFetchedPrice Already pre-fetched price
      */
-    isValidAmountReceive(amountSats: BN, satsBaseFee: BN, feePPM: BN, receiveToken: BN, token: string, abortSignal?: AbortSignal, preFetchedPrice?: BN): Promise<PriceInfoType>;
-    preFetchPrice(token: string, abortSignal?: AbortSignal): Promise<BN>;
+    isValidAmountReceive(amountSats: bigint, satsBaseFee: bigint, feePPM: bigint, receiveToken: bigint, token: string, abortSignal?: AbortSignal, preFetchedPrice?: bigint): Promise<PriceInfoType>;
+    preFetchPrice(token: string, abortSignal?: AbortSignal): Promise<bigint>;
     preFetchUsdPrice(abortSignal?: AbortSignal): Promise<number>;
     /**
      * Returns amount of {toToken} that are equivalent to {fromAmount} satoshis
@@ -42,7 +41,7 @@ export declare class SwapPriceWithChain<T extends MultiChain, ChainIdentifier ex
      * @param preFetchedPrice
      * @throws {Error} when token is not found
      */
-    getFromBtcSwapAmount(fromAmount: BN, toToken: string, abortSignal?: AbortSignal, preFetchedPrice?: BN): Promise<BN>;
+    getFromBtcSwapAmount(fromAmount: bigint, toToken: string, abortSignal?: AbortSignal, preFetchedPrice?: bigint): Promise<bigint>;
     /**
      * Returns amount of satoshis that are equivalent to {fromAmount} of {fromToken}
      *
@@ -52,7 +51,7 @@ export declare class SwapPriceWithChain<T extends MultiChain, ChainIdentifier ex
      * @param preFetchedPrice Pre-fetched swap price if available
      * @throws {Error} when token is not found
      */
-    getToBtcSwapAmount(fromAmount: BN, fromToken: string, abortSignal?: AbortSignal, preFetchedPrice?: BN): Promise<BN>;
+    getToBtcSwapAmount(fromAmount: bigint, fromToken: string, abortSignal?: AbortSignal, preFetchedPrice?: bigint): Promise<bigint>;
     /**
      * Returns whether the token should be ignored and pricing for it not calculated
      *
@@ -60,7 +59,7 @@ export declare class SwapPriceWithChain<T extends MultiChain, ChainIdentifier ex
      * @throws {Error} if token is not found
      */
     shouldIgnore(tokenAddress: string): boolean;
-    getBtcUsdValue(btcSats: BN, abortSignal?: AbortSignal, preFetchedPrice?: number): Promise<number>;
-    getTokenUsdValue(tokenAmount: BN, token: string, abortSignal?: AbortSignal, preFetchedPrice?: number): Promise<number>;
-    getUsdValue(amount: BN, token: Token<ChainIdentifier>, abortSignal?: AbortSignal, preFetchedUsdPrice?: number): Promise<number>;
+    getBtcUsdValue(btcSats: bigint, abortSignal?: AbortSignal, preFetchedPrice?: number): Promise<number>;
+    getTokenUsdValue(tokenAmount: bigint, token: string, abortSignal?: AbortSignal, preFetchedPrice?: number): Promise<number>;
+    getUsdValue(amount: bigint, token: Token<ChainIdentifier>, abortSignal?: AbortSignal, preFetchedUsdPrice?: number): Promise<number>;
 }

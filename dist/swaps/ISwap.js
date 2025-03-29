@@ -1,18 +1,8 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ISwap = exports.isISwapInit = void 0;
 const SwapType_1 = require("./SwapType");
 const events_1 = require("events");
-const BN = require("bn.js");
 const buffer_1 = require("buffer");
 const base_1 = require("@atomiqlabs/base");
 const ISwapPrice_1 = require("../prices/abstract/ISwapPrice");
@@ -25,8 +15,8 @@ function isISwapInit(obj) {
         (0, ISwapPrice_1.isPriceInfoType)(obj.pricingInfo) &&
         typeof obj.url === 'string' &&
         typeof obj.expiry === 'number' &&
-        BN.isBN(obj.swapFee) &&
-        (obj.swapFeeBtc == null || BN.isBN(obj.swapFeeBtc)) &&
+        typeof (obj.swapFee) === "bigint" &&
+        (obj.swapFeeBtc == null || typeof (obj.swapFeeBtc) === "bigint") &&
         obj.feeRate != null &&
         (obj.signatureData == null || (typeof (obj.signatureData) === 'object' &&
             typeof (obj.signatureData.prefix) === "string" &&
@@ -38,7 +28,6 @@ function isISwapInit(obj) {
 exports.isISwapInit = isISwapInit;
 class ISwap {
     constructor(wrapper, swapInitOrObj) {
-        var _a;
         this.currentVersion = 1;
         this.initiated = false;
         /**
@@ -51,6 +40,7 @@ class ISwap {
             Object.assign(this, swapInitOrObj);
             this.version = this.currentVersion;
             this.createdAt = Date.now();
+            this.randomNonce = (0, Utils_1.randomBytes)(16).toString("hex");
         }
         else {
             this.expiry = swapInitOrObj.expiry;
@@ -58,15 +48,15 @@ class ISwap {
             this.state = swapInitOrObj.state;
             this.pricingInfo = {
                 isValid: swapInitOrObj._isValid,
-                differencePPM: swapInitOrObj._differencePPM == null ? null : new BN(swapInitOrObj._differencePPM),
-                satsBaseFee: swapInitOrObj._satsBaseFee == null ? null : new BN(swapInitOrObj._satsBaseFee),
-                feePPM: swapInitOrObj._feePPM == null ? null : new BN(swapInitOrObj._feePPM),
-                realPriceUSatPerToken: swapInitOrObj._realPriceUSatPerToken == null ? null : new BN(swapInitOrObj._realPriceUSatPerToken),
-                swapPriceUSatPerToken: swapInitOrObj._swapPriceUSatPerToken == null ? null : new BN(swapInitOrObj._swapPriceUSatPerToken),
+                differencePPM: swapInitOrObj._differencePPM == null ? null : BigInt(swapInitOrObj._differencePPM),
+                satsBaseFee: swapInitOrObj._satsBaseFee == null ? null : BigInt(swapInitOrObj._satsBaseFee),
+                feePPM: swapInitOrObj._feePPM == null ? null : BigInt(swapInitOrObj._feePPM),
+                realPriceUSatPerToken: swapInitOrObj._realPriceUSatPerToken == null ? null : BigInt(swapInitOrObj._realPriceUSatPerToken),
+                swapPriceUSatPerToken: swapInitOrObj._swapPriceUSatPerToken == null ? null : BigInt(swapInitOrObj._swapPriceUSatPerToken),
             };
             this.data = swapInitOrObj.data != null ? new wrapper.swapDataDeserializer(swapInitOrObj.data) : null;
-            this.swapFee = swapInitOrObj.swapFee == null ? null : new BN(swapInitOrObj.swapFee);
-            this.swapFeeBtc = swapInitOrObj.swapFeeBtc == null ? null : new BN(swapInitOrObj.swapFeeBtc);
+            this.swapFee = swapInitOrObj.swapFee == null ? null : BigInt(swapInitOrObj.swapFee);
+            this.swapFeeBtc = swapInitOrObj.swapFeeBtc == null ? null : BigInt(swapInitOrObj.swapFeeBtc);
             this.signatureData = swapInitOrObj.signature == null ? null : {
                 prefix: swapInitOrObj.prefix,
                 timeout: swapInitOrObj.timeout,
@@ -79,9 +69,9 @@ class ISwap {
             this.version = swapInitOrObj.version;
             this.initiated = swapInitOrObj.initiated;
             this.exactIn = swapInitOrObj.exactIn;
-            this.createdAt = (_a = swapInitOrObj.createdAt) !== null && _a !== void 0 ? _a : swapInitOrObj.expiry;
+            this.createdAt = swapInitOrObj.createdAt ?? swapInitOrObj.expiry;
+            this.randomNonce = swapInitOrObj.randomNonce;
         }
-        this.logger = (0, Utils_1.getLogger)(this.constructor.name + "(" + this.getPaymentHashString() + "): ");
         if (this.version !== this.currentVersion) {
             this.upgradeVersion();
         }
@@ -95,21 +85,19 @@ class ISwap {
      * @param interval How often to check (in seconds), default to 5s
      * @protected
      */
-    watchdogWaitTillSignatureExpiry(abortSignal, interval = 5) {
-        return __awaiter(this, void 0, void 0, function* () {
-            let expired = false;
-            while (!expired) {
-                yield (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
-                try {
-                    expired = yield this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData);
-                }
-                catch (e) {
-                    this.logger.error("watchdogWaitTillSignatureExpiry(): Error when checking signature expiry: ", e);
-                }
+    async watchdogWaitTillSignatureExpiry(abortSignal, interval = 5) {
+        let expired = false;
+        while (!expired) {
+            await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
+            try {
+                expired = await this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData);
             }
-            if (abortSignal != null)
-                abortSignal.throwIfAborted();
-        });
+            catch (e) {
+                this.logger.error("watchdogWaitTillSignatureExpiry(): Error when checking signature expiry: ", e);
+            }
+        }
+        if (abortSignal != null)
+            abortSignal.throwIfAborted();
     }
     /**
      * Periodically checks the chain to see whether the swap is committed
@@ -118,25 +106,23 @@ class ISwap {
      * @param interval How often to check (in seconds), default to 5s
      * @protected
      */
-    watchdogWaitTillCommited(abortSignal, interval = 5) {
-        return __awaiter(this, void 0, void 0, function* () {
-            let status = base_1.SwapCommitStatus.NOT_COMMITED;
-            while (status === base_1.SwapCommitStatus.NOT_COMMITED) {
-                yield (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
-                try {
-                    status = yield this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data);
-                    if (status === base_1.SwapCommitStatus.NOT_COMMITED &&
-                        (yield this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData)))
-                        return false;
-                }
-                catch (e) {
-                    this.logger.error("watchdogWaitTillCommited(): Error when fetching commit status or signature expiry: ", e);
-                }
+    async watchdogWaitTillCommited(abortSignal, interval = 5) {
+        let status = base_1.SwapCommitStatus.NOT_COMMITED;
+        while (status === base_1.SwapCommitStatus.NOT_COMMITED) {
+            await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
+            try {
+                status = await this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data);
+                if (status === base_1.SwapCommitStatus.NOT_COMMITED &&
+                    await this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData))
+                    return false;
             }
-            if (abortSignal != null)
-                abortSignal.throwIfAborted();
-            return true;
-        });
+            catch (e) {
+                this.logger.error("watchdogWaitTillCommited(): Error when fetching commit status or signature expiry: ", e);
+            }
+        }
+        if (abortSignal != null)
+            abortSignal.throwIfAborted();
+        return true;
     }
     /**
      * Periodically checks the chain to see whether the swap was finished (claimed or refunded)
@@ -145,22 +131,20 @@ class ISwap {
      * @param interval How often to check (in seconds), default to 5s
      * @protected
      */
-    watchdogWaitTillResult(abortSignal, interval = 5) {
-        return __awaiter(this, void 0, void 0, function* () {
-            let status = base_1.SwapCommitStatus.COMMITED;
-            while (status === base_1.SwapCommitStatus.COMMITED || status === base_1.SwapCommitStatus.REFUNDABLE) {
-                yield (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
-                try {
-                    status = yield this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data);
-                }
-                catch (e) {
-                    this.logger.error("watchdogWaitTillResult(): Error when fetching commit status: ", e);
-                }
+    async watchdogWaitTillResult(abortSignal, interval = 5) {
+        let status = base_1.SwapCommitStatus.COMMITED;
+        while (status === base_1.SwapCommitStatus.COMMITED || status === base_1.SwapCommitStatus.REFUNDABLE) {
+            await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
+            try {
+                status = await this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data);
             }
-            if (abortSignal != null)
-                abortSignal.throwIfAborted();
-            return status;
-        });
+            catch (e) {
+                this.logger.error("watchdogWaitTillResult(): Error when fetching commit status: ", e);
+            }
+        }
+        if (abortSignal != null)
+            abortSignal.throwIfAborted();
+        return status;
     }
     /**
      * Waits till the swap reaches a specific state
@@ -205,23 +189,45 @@ class ISwap {
      * Returns the price difference between offered price and current market price as a decimal number
      */
     getPriceDifferencePct() {
-        return this.pricingInfo == null ? null : this.pricingInfo.differencePPM == null ? null : this.pricingInfo.differencePPM.toNumber() / 1000000;
+        return this.pricingInfo == null ? null : this.pricingInfo.differencePPM == null ? null : Number(this.pricingInfo.differencePPM) / 1000000;
     }
-    //////////////////////////////
-    //// Getters & utils
-    getPaymentHashString() {
-        const paymentHash = this.getPaymentHash();
+    /**
+     * Returns the escrow hash - i.e. hash of the escrow data
+     */
+    getEscrowHash() {
+        return this.data?.getEscrowHash();
+    }
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
+    getClaimHash() {
+        return this.data?.getClaimHash();
+    }
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHash() {
+        const claimHashBuffer = buffer_1.Buffer.from(this.getClaimHash(), "hex");
+        if (this.randomNonce == null)
+            return claimHashBuffer;
+        return buffer_1.Buffer.concat([claimHashBuffer, buffer_1.Buffer.from(this.randomNonce, "hex")]);
+    }
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    getIdentifierHashString() {
+        const paymentHash = this.getIdentifierHash();
         if (paymentHash == null)
             return null;
         return paymentHash.toString("hex");
     }
     /**
-     * Returns payment hash identifier of the swap
+     * Returns the ID of the swap, as used in the storage and getSwapById function
      */
-    getPaymentHash() {
-        if (this.data == null)
-            return null;
-        return buffer_1.Buffer.from(this.data.getHash(), "hex");
+    getId() {
+        return this.getIdentifierHashString();
     }
     /**
      * Returns quote expiry in UNIX millis
@@ -258,18 +264,16 @@ class ISwap {
     /**
      * Checks if the swap's quote is still valid
      */
-    isQuoteValid() {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                yield (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this.data, this.signatureData, this.feeRate), null, base_1.SignatureVerificationError);
-                return true;
+    async isQuoteValid() {
+        try {
+            await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this.data, this.signatureData, this.feeRate), null, base_1.SignatureVerificationError);
+            return true;
+        }
+        catch (e) {
+            if (e instanceof base_1.SignatureVerificationError) {
+                return false;
             }
-            catch (e) {
-                if (e instanceof base_1.SignatureVerificationError) {
-                    return false;
-                }
-            }
-        });
+        }
     }
     isInitiated() {
         return this.initiated;
@@ -292,21 +296,22 @@ class ISwap {
     /**
      * Returns the transaction fee paid on the smart chain
      */
-    getSmartChainNetworkFee() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const swapContract = this.wrapper.contract;
-            return (0, Tokens_1.toTokenAmount)(yield (swapContract.getRawCommitFee != null ?
-                swapContract.getRawCommitFee(this.data, this.feeRate) :
-                swapContract.getCommitFee(this.data, this.feeRate)), this.wrapper.getNativeToken(), this.wrapper.prices);
-        });
+    async getSmartChainNetworkFee() {
+        const swapContract = this.wrapper.contract;
+        return (0, Tokens_1.toTokenAmount)(await (swapContract.getRawCommitFee != null ?
+            swapContract.getRawCommitFee(this.data, this.feeRate) :
+            swapContract.getCommitFee(this.data, this.feeRate)), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
     //////////////////////////////
     //// Storage
     serialize() {
-        var _a, _b, _c;
         if (this.pricingInfo == null)
             return {};
         return {
+            id: this.getIdentifierHashString(),
+            type: this.getType(),
+            escrowHash: this.getEscrowHash(),
+            initiator: this.getInitiator(),
             _isValid: this.pricingInfo.isValid,
             _differencePPM: this.pricingInfo.differencePPM == null ? null : this.pricingInfo.differencePPM.toString(10),
             _satsBaseFee: this.pricingInfo.satsBaseFee == null ? null : this.pricingInfo.satsBaseFee.toString(10),
@@ -318,9 +323,9 @@ class ISwap {
             data: this.data != null ? this.data.serialize() : null,
             swapFee: this.swapFee == null ? null : this.swapFee.toString(10),
             swapFeeBtc: this.swapFeeBtc == null ? null : this.swapFeeBtc.toString(10),
-            prefix: (_a = this.signatureData) === null || _a === void 0 ? void 0 : _a.prefix,
-            timeout: (_b = this.signatureData) === null || _b === void 0 ? void 0 : _b.timeout,
-            signature: (_c = this.signatureData) === null || _c === void 0 ? void 0 : _c.signature,
+            prefix: this.signatureData?.prefix,
+            timeout: this.signatureData?.timeout,
+            signature: this.signatureData?.signature,
             feeRate: this.feeRate == null ? null : this.feeRate.toString(),
             commitTxId: this.commitTxId,
             claimTxId: this.claimTxId,
@@ -329,30 +334,23 @@ class ISwap {
             version: this.version,
             initiated: this.initiated,
             exactIn: this.exactIn,
-            createdAt: this.createdAt
+            createdAt: this.createdAt,
+            randomNonce: this.randomNonce
         };
     }
     _save() {
         if (this.isQuoteExpired()) {
-            this.wrapper.swapData.delete(this.getPaymentHashString());
-            if (!this.initiated)
-                return Promise.resolve();
-            return this.wrapper.storage.removeSwapData(this).then(() => { });
+            return this.wrapper.removeSwapData(this);
         }
         else {
-            this.wrapper.swapData.set(this.getPaymentHashString(), this);
-            if (!this.initiated)
-                return Promise.resolve();
-            return this.wrapper.storage.saveSwapData(this);
+            return this.wrapper.saveSwapData(this);
         }
     }
-    _saveAndEmit(state) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (state != null)
-                this.state = state;
-            yield this._save();
-            this._emitEvent();
-        });
+    async _saveAndEmit(state) {
+        if (state != null)
+            this.state = state;
+        await this._save();
+        this._emitEvent();
     }
     //////////////////////////////
     //// Events

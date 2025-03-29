@@ -1,4 +1,3 @@
-import * as BN from "bn.js";
 import {ChainIds, MultiChain} from "../../swaps/Swapper";
 
 export type CoinType = {
@@ -48,7 +47,7 @@ export abstract class IPriceProvider<T extends MultiChain> {
      * @protected
      * @returns Price per token in uSats (micro sats)
      */
-    protected abstract fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<BN>;
+    protected abstract fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<bigint>;
 
     /**
      * Fetches the USD price of BTC
@@ -66,7 +65,7 @@ export abstract class IPriceProvider<T extends MultiChain> {
      * @param abortSignal
      * @throws {Error} if token is not found
      */
-    getPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<BN> {
+    getPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<bigint> {
         let tokenAddress: string = token.toString();
 
         const chainTokens = this.coinsMap[chainIdentifier];
@@ -76,7 +75,7 @@ export abstract class IPriceProvider<T extends MultiChain> {
 
         if(coin.coinId.startsWith("$fixed-")) {
             const amt: number = parseFloat(coin.coinId.substring(7));
-            return Promise.resolve(new BN(Math.floor(amt*1000000).toString(10)));
+            return Promise.resolve(BigInt(Math.floor(amt*1000000).toString(10)));
         }
 
         return this.fetchPrice(coin, abortSignal);

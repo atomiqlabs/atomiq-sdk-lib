@@ -2,23 +2,23 @@ import {
     ChainType,
     ClaimEvent,
     InitializeEvent,
-    IStorageManager,
     RefundEvent, SignatureData,
     SignatureVerificationError,
     SwapEvent
 } from "@atomiqlabs/base";
 import {EventEmitter} from "events";
 import {ISwap} from "./ISwap";
-import {SwapWrapperStorage} from "./SwapWrapperStorage";
 import {ISwapPrice, PriceInfoType} from "../prices/abstract/ISwapPrice";
-import * as BN from "bn.js";
 import {IntermediaryError} from "../errors/IntermediaryError";
-import {getLogger, mapToArray, tryWithRetries} from "../utils/Utils";
+import {getLogger, tryWithRetries} from "../utils/Utils";
 import {SCToken} from "./Tokens";
 import {ChainIds, MultiChain} from "./Swapper";
+import {UnifiedSwapEventListener} from "../events/UnifiedSwapEventListener";
+import {SwapType} from "./SwapType";
+import {UnifiedSwapStorage} from "./UnifiedSwapStorage";
 
 export type AmountData = {
-    amount: BN,
+    amount: bigint,
     token: string,
     exactIn?: boolean
 }
@@ -33,7 +33,8 @@ export type WrapperCtorTokens<T extends MultiChain = MultiChain> = {
     name: string,
     chains: {[chainId in ChainIds<T>]?: {
         address: string,
-        decimals: number
+        decimals: number,
+        displayDecimals?: number
     }}
 }[];
 
@@ -42,32 +43,34 @@ export abstract class ISwapWrapper<
     S extends ISwap<T>,
     O extends ISwapWrapperOptions = ISwapWrapperOptions
 > {
+    abstract readonly TYPE: SwapType;
     protected readonly logger = getLogger(this.constructor.name+": ");
 
-    protected readonly abstract swapDeserializer: new (wrapper: ISwapWrapper<T, S, O>, data: any) => S;
+    public readonly abstract swapDeserializer: new (wrapper: ISwapWrapper<T, S, O>, data: any) => S;
+
+    readonly unifiedStorage: UnifiedSwapStorage<T>;
+    readonly unifiedChainEvents: UnifiedSwapEventListener<T>;
 
     readonly chainIdentifier: string;
-    readonly storage: SwapWrapperStorage<S>;
     readonly contract: T["Contract"];
     readonly prices: ISwapPrice;
-    readonly chainEvents: T["Events"];
     readonly swapDataDeserializer: new (data: any) => T["Data"];
     readonly events: EventEmitter;
     readonly options: O;
     readonly tokens: {
         [tokenAddress: string]: SCToken<T["ChainId"]>
     };
+    readonly pendingSwaps: Map<string, WeakRef<S>> = new Map();
 
-    swapData: Map<string, S>;
     isInitialized: boolean = false;
     tickInterval: NodeJS.Timeout = null;
 
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage
+     * @param unifiedChainEvents
      * @param contract Underlying contract handling the swaps
      * @param prices Swap pricing handler
-     * @param chainEvents On-chain event listener
      * @param tokens Chain specific token data
      * @param swapDataDeserializer Deserializer for SwapData
      * @param options
@@ -75,20 +78,21 @@ export abstract class ISwapWrapper<
      */
     constructor(
         chainIdentifier: string,
-        storage: IStorageManager<S>,
+        unifiedStorage: UnifiedSwapStorage<T>,
+        unifiedChainEvents: UnifiedSwapEventListener<T>,
         contract: T["Contract"],
-        chainEvents: T["Events"],
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
         swapDataDeserializer: new (data: any) => T["Data"],
         options: O,
         events?: EventEmitter
     ) {
+        this.unifiedStorage = unifiedStorage;
+        this.unifiedChainEvents = unifiedChainEvents;
+
         this.chainIdentifier = chainIdentifier;
-        this.storage = new SwapWrapperStorage<S>(storage);
         this.contract = contract;
         this.prices = prices;
-        this.chainEvents = chainEvents;
         this.swapDataDeserializer = swapDataDeserializer;
         this.events = events || new EventEmitter();
         this.options = options;
@@ -102,7 +106,8 @@ export abstract class ISwapWrapper<
                 address: chainData.address,
                 decimals: chainData.decimals,
                 ticker: tokenData.ticker,
-                name: tokenData.name
+                name: tokenData.name,
+                displayDecimals: chainData.displayDecimals
             };
         }
     }
@@ -115,7 +120,7 @@ export abstract class ISwapWrapper<
      * @protected
      * @returns Price of the token in uSats (micro sats)
      */
-    protected preFetchPrice(amountData: Omit<AmountData, "amount">, abortSignal?: AbortSignal): Promise<BN | null> {
+    protected preFetchPrice(amountData: Omit<AmountData, "amount">, abortSignal?: AbortSignal): Promise<bigint | null> {
         return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
             this.logger.error("preFetchPrice(): Error: ", e);
             return null;
@@ -192,20 +197,20 @@ export abstract class ISwapWrapper<
     protected async verifyReturnedPrice(
         lpServiceData: {swapBaseFee: number, swapFeePPM: number},
         send: boolean,
-        amountSats: BN,
-        amountToken: BN,
+        amountSats: bigint,
+        amountToken: bigint,
         token: string,
         feeData: {
-            swapFee: BN,
-            networkFee?: BN,
-            totalFee?: BN
+            swapFee: bigint,
+            networkFee?: bigint,
+            totalFee?: bigint
         },
-        pricePrefetchPromise: Promise<BN> = Promise.resolve(null),
+        pricePrefetchPromise: Promise<bigint> = Promise.resolve(null),
         abortSignal?: AbortSignal
     ): Promise<PriceInfoType> {
-        const swapBaseFee = new BN(lpServiceData.swapBaseFee);
-        const swapFeePPM = new BN(lpServiceData.swapFeePPM);
-        if(send) amountToken = amountToken.sub(feeData.networkFee);
+        const swapBaseFee = BigInt(lpServiceData.swapBaseFee);
+        const swapFeePPM = BigInt(lpServiceData.swapFeePPM);
+        if(send) amountToken = amountToken - feeData.networkFee;
 
         const isValidAmount = await (
             send ?
@@ -216,15 +221,6 @@ export abstract class ISwapWrapper<
 
         return isValidAmount;
     }
-
-    /**
-     * Checks if the provided swap is belonging to the provided signer's address
-     *
-     * @param signer
-     * @param swap Swap to be checked
-     * @protected
-     */
-    protected abstract isOurSwap(signer: string, swap: S): boolean;
 
     /**
      * Processes InitializeEvent for a given swap
@@ -253,145 +249,161 @@ export abstract class ISwapWrapper<
      */
     protected processEventRefund?(swap: S, event: RefundEvent<T["Data"]>): Promise<boolean>;
 
-    /**
-     * Checks past swap and syncs its state from the chain, this is called on initialization for all unfinished swaps
-     * @param swap
-     * @protected
-     * @returns Whether the swap was updated/changed
-     */
-    protected abstract checkPastSwap(swap: S): Promise<boolean>;
-
-    protected abstract tickSwap(swap: S): void;
+    public abstract readonly pendingSwapStates: Array<S["state"]>;
+    public abstract readonly tickSwapState: Array<S["state"]>;
 
     /**
-     * Processes batch of SC on-chain events
-     * @param events
+     * Processes a single SC on-chain event
      * @private
+     * @param event
+     * @param swap
      */
-    private async processEvents(events: SwapEvent<T["Data"]>[]): Promise<boolean> {
-        for(let event of events) {
-            const paymentHash = event.paymentHash;
-            const swap: S = this.swapData.get(paymentHash);
-            if(swap==null) continue;
+    private async processEvent(event: SwapEvent<T["Data"]>, swap: S): Promise<boolean> {
+        if(swap==null) return;
 
-            let swapChanged: boolean = false;
-            if(event instanceof InitializeEvent) {
-                swapChanged = await this.processEventInitialize(swap, event);
-                if(event.meta?.txId!=null && swap.commitTxId!==event.meta.txId) {
-                    swap.commitTxId = event.meta.txId;
-                    swapChanged ||= true;
-                }
+        let swapChanged: boolean = false;
+        if(event instanceof InitializeEvent) {
+            swapChanged = await this.processEventInitialize(swap, event);
+            if(event.meta?.txId!=null && swap.commitTxId!==event.meta.txId) {
+                swap.commitTxId = event.meta.txId;
+                swapChanged ||= true;
             }
-            if(event instanceof ClaimEvent) {
-                swapChanged = await this.processEventClaim(swap, event);
-                if(event.meta?.txId!=null && swap.claimTxId!==event.meta.txId) {
-                    swap.claimTxId = event.meta.txId;
-                    swapChanged ||= true;
-                }
+        }
+        if(event instanceof ClaimEvent) {
+            swapChanged = await this.processEventClaim(swap, event);
+            if(event.meta?.txId!=null && swap.claimTxId!==event.meta.txId) {
+                swap.claimTxId = event.meta.txId;
+                swapChanged ||= true;
             }
-            if(event instanceof RefundEvent) {
-                swapChanged = await this.processEventRefund(swap, event);
-                if(event.meta?.txId!=null && swap.refundTxId!==event.meta.txId) {
-                    swap.refundTxId = event.meta.txId;
-                    swapChanged ||= true;
-                }
+        }
+        if(event instanceof RefundEvent) {
+            swapChanged = await this.processEventRefund(swap, event);
+            if(event.meta?.txId!=null && swap.refundTxId!==event.meta.txId) {
+                swap.refundTxId = event.meta.txId;
+                swapChanged ||= true;
             }
+        }
 
-            this.logger.info("processEvents(): "+event.constructor.name+" processed for "+swap.getPaymentHashString()+" swap: ", swap);
+        this.logger.info("processEvents(): "+event.constructor.name+" processed for "+swap.getIdentifierHashString()+" swap: ", swap);
 
-            if(swapChanged) {
-                await swap._saveAndEmit();
-            }
+        if(swapChanged) {
+            await swap._saveAndEmit();
         }
         return true;
     }
-    private boundProcessEvents = this.processEvents.bind(this);
 
     /**
      * Initializes the swap wrapper, needs to be called before any other action can be taken
      */
-    public async init(): Promise<void> {
-        await this.storage.init();
+    public async init(noTimers: boolean = false, noCheckPastSwaps: boolean = false): Promise<void> {
         if(this.isInitialized) return;
-        this.swapData = await this.storage.loadSwapData(this, this.swapDeserializer);
 
         const hasEventListener = this.processEventRefund!=null || this.processEventClaim!=null || this.processEventInitialize!=null;
 
         //Save events received in the meantime into the event queue and process them only after we've checked and
         // processed all the past swaps
-        let eventQueue: SwapEvent<T["Data"]>[] = [];
-        const initListener = (events: SwapEvent<T["Data"]>[]) => {
-            eventQueue.push(...events);
-            return Promise.resolve(true);
+        let eventQueue: {
+            event: SwapEvent<T["Data"]>,
+            swap: S
+        }[] = [];
+        const initListener = (event: SwapEvent<T["Data"]>, swap: S) => {
+            eventQueue.push({event, swap});
+            return Promise.resolve();
         }
-        if(hasEventListener) this.chainEvents.registerListener(initListener);
+        if(hasEventListener) this.unifiedChainEvents.registerListener(this.TYPE, initListener, this.swapDeserializer.bind(null, this));
+
+        if(!noCheckPastSwaps) await this.checkPastSwaps();
+
+        if(hasEventListener) {
+            //Process accumulated event queue
+            for(let event of eventQueue) {
+                await this.processEvent(event.event, event.swap);
+            }
+
+            //Register the correct event handler
+            this.unifiedChainEvents.unregisterListener(this.TYPE);
+            this.unifiedChainEvents.registerListener(this.TYPE, this.processEvent.bind(this), this.swapDeserializer.bind(null, this));
+        }
+
+        if(!noTimers) this.startTickInterval();
+
+        this.logger.info("init(): Swap wrapper initialized");
+
+        this.isInitialized = true;
+    }
+
+    protected startTickInterval(): void {
+        if(this.tickSwapState==null || this.tickSwapState.length===0) return;
+        this.tickInterval = setInterval(() => {
+            this.tick();
+        }, 1000);
+    }
+
+    async checkPastSwaps(pastSwaps?: S[]): Promise<void> {
+        if(pastSwaps==null) pastSwaps = await this.unifiedStorage.query<S>(
+            [[{key: "type", value: this.TYPE}, {key: "state", value: this.pendingSwapStates}]],
+            (val: any) => new this.swapDeserializer(this, val)
+        );
 
         //Check past swaps
         const changedSwaps: S[] = [];
         const removeSwaps: S[] = [];
 
-        await Promise.all(
-            mapToArray(this.swapData, (key: string, swap: S) =>
-                this.checkPastSwap(swap).then(changed => {
-                    if(swap.isQuoteExpired()) {
-                        removeSwaps.push(swap);
-                    } else {
-                        if(changed) changedSwaps.push(swap);
-                    }
-                }).catch(e => this.logger.error("init(): Error when checking swap "+swap.getPaymentHashString()+": ", e))
-            )
+        await Promise.all(pastSwaps.map((swap: S) =>
+            swap._sync(false).then(changed => {
+                if(swap.isQuoteExpired()) {
+                    removeSwaps.push(swap);
+                } else {
+                    if(changed) changedSwaps.push(swap);
+                }
+            }).catch(e => this.logger.error("init(): Error when checking swap "+swap.getIdentifierHashString()+": ", e))
+        ));
+
+        await this.unifiedStorage.removeAll(removeSwaps);
+        await this.unifiedStorage.saveAll(changedSwaps);
+    }
+
+    async tick(swaps?: S[]): Promise<void> {
+        if(swaps==null) swaps = await this.unifiedStorage.query<S>(
+            [[{key: "type", value: this.TYPE}, {key: "state", value: this.tickSwapState}]],
+            (val: any) => new this.swapDeserializer(this, val)
         );
 
-        await this.storage.removeSwapDataArr(removeSwaps);
-        await this.storage.saveSwapDataArr(changedSwaps);
-
-        if(hasEventListener) {
-            //Process accumulated event queue
-            await this.processEvents(eventQueue);
-
-            //Register the correct event handler
-            this.chainEvents.unregisterListener(initListener);
-            this.chainEvents.registerListener(this.boundProcessEvents);
+        for(let pendingSwap of this.pendingSwaps.values()) {
+            const value = pendingSwap.deref();
+            if(value != null) value._tick(true);
         }
 
-        this.tickInterval = setInterval(() => {
-            this.swapData.forEach(value => {
-                this.tickSwap(value);
-            })
-        }, 1000);
+        swaps.forEach(value => {
+            value._tick(true)
+        });
+    }
 
-        this.logger.info("init(): Swap wrapper initialized, num swaps: "+this.swapData.size);
+    saveSwapData(swap: S): Promise<void> {
+        if(!swap.isInitiated()) {
+            this.logger.debug("saveSwapData(): Swap "+swap.getId()+" not initiated, saving to pending swaps");
+            this.pendingSwaps.set(swap.getId(), new WeakRef<S>(swap));
+            return Promise.resolve();
+        } else {
+            this.pendingSwaps.delete(swap.getId());
+        }
+        return this.unifiedStorage.save(swap);
+    }
 
-        this.isInitialized = true;
+    removeSwapData(swap: S): Promise<void> {
+        this.pendingSwaps.delete(swap.getId());
+        if(!swap.isInitiated) return Promise.resolve();
+        return this.unifiedStorage.remove(swap);
     }
 
     /**
      * Un-subscribes from event listeners on Solana
      */
     public async stop() {
-        this.swapData = null;
         this.isInitialized = false;
-        this.chainEvents.unregisterListener(this.boundProcessEvents);
+        this.unifiedChainEvents.unregisterListener(this.TYPE);
         this.logger.info("stop(): Swap wrapper stopped");
         if(this.tickInterval!=null) clearInterval(this.tickInterval);
-    }
-
-    /**
-     * Returns all swaps, optionally only those which were intiated by as specific signer's address
-     */
-    public getAllSwaps(signer?: string): Promise<S[]> {
-        return Promise.resolve(this.getAllSwapsSync(signer));
-    }
-
-    /**
-     * Returns all swaps, optionally only those which were intiated by as specific signer's address
-     */
-    public getAllSwapsSync(signer?: string): S[] {
-        if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
-
-        const array = mapToArray(this.swapData, (key, value: S) => value);
-        if(signer!=null) return array.filter((swap) => this.isOurSwap(signer, swap));
-        return array;
     }
 
     /**
@@ -399,20 +411,6 @@ export abstract class ISwapWrapper<
      */
     public getNativeToken(): SCToken<T["ChainId"]> {
         return this.tokens[this.contract.getNativeCurrencyAddress()];
-    }
-
-    /**
-     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
-     */
-    public getActionableSwaps(signer?: string): Promise<S[]> {
-        return Promise.resolve(this.getActionableSwapsSync(signer));
-    }
-
-    /**
-     * Returns all swaps that are refundable, and optionally only those initiated with signer's address
-     */
-    public getActionableSwapsSync(signer?: string): S[] {
-        return this.getAllSwapsSync(signer).filter(swap => swap.isActionable());
     }
 
 }

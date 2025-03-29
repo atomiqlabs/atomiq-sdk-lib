@@ -1,18 +1,11 @@
 /// <reference types="node" />
-/// <reference types="node" />
-/// <reference types="node" />
-import { BitcoinNetwork } from "../btc/BitcoinNetwork";
 import { ISwapPrice } from "../prices/abstract/ISwapPrice";
-import { BtcRelay, ChainType, IStorageManager, RelaySynchronizer } from "@atomiqlabs/base";
-import { ToBTCLNWrapper } from "./tobtc/ln/ToBTCLNWrapper";
-import { ToBTCWrapper } from "./tobtc/onchain/ToBTCWrapper";
-import { FromBTCLNWrapper } from "./frombtc/ln/FromBTCLNWrapper";
-import { FromBTCWrapper } from "./frombtc/onchain/FromBTCWrapper";
+import { BitcoinNetwork, BtcRelay, ChainData, ChainType, RelaySynchronizer } from "@atomiqlabs/base";
+import { ToBTCLNOptions, ToBTCLNWrapper } from "./tobtc/ln/ToBTCLNWrapper";
+import { ToBTCOptions, ToBTCWrapper } from "./tobtc/onchain/ToBTCWrapper";
+import { FromBTCLNOptions, FromBTCLNWrapper } from "./frombtc/ln/FromBTCLNWrapper";
+import { FromBTCOptions, FromBTCWrapper } from "./frombtc/onchain/FromBTCWrapper";
 import { IntermediaryDiscovery, MultichainSwapBounds, SwapBounds } from "../intermediaries/IntermediaryDiscovery";
-import { Network } from "bitcoinjs-lib";
-import * as BN from "bn.js";
-import { IFromBTCSwap } from "./frombtc/IFromBTCSwap";
-import { IToBTCSwap } from "./tobtc/IToBTCSwap";
 import { ISwap } from "./ISwap";
 import { SwapType } from "./SwapType";
 import { FromBTCLNSwap } from "./frombtc/ln/FromBTCLNSwap";
@@ -24,7 +17,6 @@ import { MempoolBitcoinRpc } from "../btc/mempool/MempoolBitcoinRpc";
 import { LnForGasWrapper } from "./swapforgas/ln/LnForGasWrapper";
 import { LnForGasSwap } from "./swapforgas/ln/LnForGasSwap";
 import { EventEmitter } from "events";
-import { Buffer } from "buffer";
 import { MempoolBitcoinBlock } from "../btc/mempool/MempoolBitcoinBlock";
 import { Intermediary } from "../intermediaries/Intermediary";
 import { LNURLPay, LNURLWithdraw } from "../utils/LNURL";
@@ -33,6 +25,11 @@ import { SwapperWithChain } from "./SwapperWithChain";
 import { BtcToken, SCToken, Token } from "./Tokens";
 import { OnchainForGasSwap } from "./swapforgas/onchain/OnchainForGasSwap";
 import { OnchainForGasWrapper } from "./swapforgas/onchain/OnchainForGasWrapper";
+import { BTC_NETWORK } from "@scure/btc-signer/utils";
+import { IUnifiedStorage } from "../storage/IUnifiedStorage";
+import { UnifiedSwapStorage } from "./UnifiedSwapStorage";
+import { UnifiedSwapEventListener } from "../events/UnifiedSwapEventListener";
+import { IToBTCSwap } from "./tobtc/IToBTCSwap";
 export type SwapperOptions = {
     intermediaryUrl?: string | string[];
     registryUrl?: string;
@@ -44,41 +41,37 @@ export type SwapperOptions = {
     };
     storagePrefix?: string;
     defaultTrustedIntermediaryUrl?: string;
+    swapStorage?: <T extends ChainType>(chainId: T["ChainId"]) => IUnifiedStorage;
+    noTimers?: boolean;
+    noEvents?: boolean;
+    dontCheckPastSwaps?: boolean;
+    dontFetchLPs?: boolean;
 };
 export type MultiChain = {
     [chainIdentifier in string]: ChainType;
 };
 export type ChainSpecificData<T extends ChainType> = {
-    tobtcln: ToBTCLNWrapper<T>;
-    tobtc: ToBTCWrapper<T>;
-    frombtcln: FromBTCLNWrapper<T>;
-    frombtc: FromBTCWrapper<T>;
-    lnforgas: LnForGasWrapper<T>;
-    onchainforgas: OnchainForGasWrapper<T>;
+    wrappers: {
+        [SwapType.TO_BTCLN]: ToBTCLNWrapper<T>;
+        [SwapType.TO_BTC]: ToBTCWrapper<T>;
+        [SwapType.FROM_BTCLN]: FromBTCLNWrapper<T>;
+        [SwapType.FROM_BTC]: FromBTCWrapper<T>;
+        [SwapType.TRUSTED_FROM_BTCLN]: LnForGasWrapper<T>;
+        [SwapType.TRUSTED_FROM_BTC]: OnchainForGasWrapper<T>;
+    };
     chainEvents: T["Events"];
     swapContract: T["Contract"];
     btcRelay: BtcRelay<any, T["TX"], MempoolBitcoinBlock, T["Signer"]>;
     synchronizer: RelaySynchronizer<any, T["TX"], MempoolBitcoinBlock>;
+    unifiedChainEvents: UnifiedSwapEventListener<T>;
+    unifiedSwapStorage: UnifiedSwapStorage<T>;
+    reviver: (val: any) => ISwap<T>;
 };
 export type MultiChainData<T extends MultiChain> = {
     [chainIdentifier in keyof T]: ChainSpecificData<T[chainIdentifier]>;
 };
-export type CtorChainData<T extends ChainType> = {
-    btcRelay: BtcRelay<any, T["TX"], MempoolBitcoinBlock>;
-    swapContract: T["Contract"];
-    chainEvents: T["Events"];
-    swapDataConstructor: new (data: any) => T["Data"];
-    storage?: {
-        toBtc?: IStorageManager<ToBTCSwap<T>>;
-        fromBtc?: IStorageManager<FromBTCSwap<T>>;
-        toBtcLn?: IStorageManager<ToBTCLNSwap<T>>;
-        fromBtcLn?: IStorageManager<FromBTCLNSwap<T>>;
-        lnForGas?: IStorageManager<LnForGasSwap<T>>;
-        onchainForGas?: IStorageManager<OnchainForGasSwap<T>>;
-    };
-};
 export type CtorMultiChainData<T extends MultiChain> = {
-    [chainIdentifier in keyof T]: CtorChainData<T[chainIdentifier]>;
+    [chainIdentifier in keyof T]: ChainData<T[chainIdentifier]>;
 };
 export type ChainIds<T extends MultiChain> = keyof T & string;
 export interface SwapperBtcUtils {
@@ -112,7 +105,7 @@ export interface SwapperBtcUtils {
      *
      * @param lnpr
      */
-    getLightningInvoiceValue(lnpr: string): BN;
+    getLightningInvoiceValue(lnpr: string): bigint;
 }
 export declare class Swapper<T extends MultiChain> extends EventEmitter implements SwapperBtcUtils {
     protected readonly logger: import("../utils/Utils").LoggerType;
@@ -124,7 +117,8 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
     readonly options: SwapperOptions;
     readonly mempoolApi: MempoolApi;
     readonly bitcoinRpc: MempoolBitcoinRpc;
-    readonly bitcoinNetwork: Network;
+    readonly bitcoinNetwork: BTC_NETWORK;
+    private readonly _bitcoinNetwork;
     readonly tokens: {
         [chainId: string]: {
             [tokenAddress: string]: SCToken;
@@ -167,8 +161,8 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      *
      * @param lnpr
      */
-    getLightningInvoiceValue(lnpr: string): BN;
-    getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string): SwapBounds;
+    getLightningInvoiceValue(lnpr: string): bigint;
+    getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SwapBounds;
     getSwapBounds(): MultichainSwapBounds;
     /**
      * Returns maximum possible swap amount
@@ -177,7 +171,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param type      Type of the swap
      * @param token     Token of the swap
      */
-    getMaximum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, type: SwapType, token: string): BN;
+    getMaximum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, type: SwapType, token: string): bigint;
     /**
      * Returns minimum possible swap amount
      *
@@ -185,7 +179,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param type      Type of swap
      * @param token     Token of the swap
      */
-    getMinimum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, type: SwapType, token: string): BN;
+    getMinimum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, type: SwapType, token: string): bigint;
     /**
      * Initializes the swap storage and loads existing swaps, needs to be called before any other action
      */
@@ -206,7 +200,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param chainIdentifier
      * @param swapType Specific swap type for which to obtain supported tokens
      */
-    getSupportedTokenAddresses<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, swapType: SwapType): Set<string>;
+    getSupportedTokenAddresses<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, swapType: SwapType): Set<string>;
     /**
      * Creates swap & handles intermediary, quote selection
      *
@@ -228,12 +222,11 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param tokenAddress          Token address to pay with
      * @param address               Recipient's bitcoin address
      * @param amount                Amount to send in satoshis (bitcoin's smallest denomination)
-     * @param confirmationTarget    How soon should the transaction be confirmed (determines the fee)
-     * @param confirmations         How many confirmations must the intermediary wait to claim the funds
      * @param exactIn               Whether to use exact in instead of exact out
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createToBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, tokenAddress: string, address: string, amount: BN, confirmationTarget?: number, confirmations?: number, exactIn?: boolean, additionalParams?: Record<string, any>): Promise<ToBTCSwap<T[ChainIdentifier]>>;
+    createToBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, address: string, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCOptions): Promise<ToBTCSwap<T[ChainIdentifier]>>;
     /**
      * Creates To BTCLN swap
      *
@@ -241,12 +234,10 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param signer
      * @param tokenAddress          Token address to pay with
      * @param paymentRequest        BOLT11 lightning network invoice to be paid (needs to have a fixed amount)
-     * @param expirySeconds         For how long to lock your funds (higher expiry means higher probability of payment success)
-     * @param maxRoutingBaseFee     Maximum routing fee to use - base fee (higher routing fee means higher probability of payment success)
-     * @param maxRoutingPPM         Maximum routing fee to use - proportional fee in PPM (higher routing fee means higher probability of payment success)
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createToBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, tokenAddress: string, paymentRequest: string, expirySeconds?: number, maxRoutingBaseFee?: BN, maxRoutingPPM?: BN, additionalParams?: Record<string, any>): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    createToBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, paymentRequest: string, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates To BTCLN swap via LNURL-pay
      *
@@ -255,14 +246,11 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param tokenAddress          Token address to pay with
      * @param lnurlPay              LNURL-pay link to use for the payment
      * @param amount                Amount to be paid in sats
-     * @param comment               Optional comment for the payment
-     * @param expirySeconds         For how long to lock your funds (higher expiry means higher probability of payment success)
-     * @param maxRoutingBaseFee     Maximum routing fee to use - base fee (higher routing fee means higher probability of payment success)
-     * @param maxRoutingPPM         Maximum routing fee to use - proportional fee in PPM (higher routing fee means higher probability of payment success)
      * @param exactIn               Whether to do an exact in swap instead of exact out
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createToBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, tokenAddress: string, lnurlPay: string | LNURLPay, amount: BN, comment: string, expirySeconds?: number, maxRoutingBaseFee?: BN, maxRoutingPPM?: BN, exactIn?: boolean, additionalParams?: Record<string, any>): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    createToBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurlPay: string | LNURLPay, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTC swap
      *
@@ -272,8 +260,9 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param amount                Amount to receive, in satoshis (bitcoin's smallest denomination)
      * @param exactOut              Whether to use a exact out instead of exact in
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createFromBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, tokenAddress: string, amount: BN, exactOut?: boolean, additionalParams?: Record<string, any>): Promise<FromBTCSwap<T[ChainIdentifier]>>;
+    createFromBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCOptions): Promise<FromBTCSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTCLN swap
      *
@@ -282,10 +271,10 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param tokenAddress      Token address to receive
      * @param amount            Amount to receive, in satoshis (bitcoin's smallest denomination)
      * @param exactOut          Whether to use exact out instead of exact in
-     * @param descriptionHash   Description hash for ln invoice
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
+     * @param options
      */
-    createFromBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, tokenAddress: string, amount: BN, exactOut?: boolean, descriptionHash?: Buffer, additionalParams?: Record<string, any>): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
+    createFromBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNOptions): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTCLN swap, withdrawing from LNURL-withdraw
      *
@@ -297,13 +286,13 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param exactOut          Whether to use exact out instead of exact in
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
      */
-    createFromBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, tokenAddress: string, lnurl: string | LNURLWithdraw, amount: BN, exactOut?: boolean, additionalParams?: Record<string, any>): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
-    create<C extends ChainIds<T>>(signer: string, srcToken: BtcToken<true>, dstToken: SCToken<C>, amount: BN, exactIn: boolean, lnurlWithdraw?: string | LNURLWithdraw): Promise<FromBTCLNSwap<T[C]>>;
-    create<C extends ChainIds<T>>(signer: string, srcToken: BtcToken<false>, dstToken: SCToken<C>, amount: BN, exactIn: boolean): Promise<FromBTCSwap<T[C]>>;
-    create<C extends ChainIds<T>>(signer: string, srcToken: SCToken<C>, dstToken: BtcToken<false>, amount: BN, exactIn: boolean, address: string): Promise<ToBTCSwap<T[C]>>;
-    create<C extends ChainIds<T>>(signer: string, srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: BN, exactIn: boolean, lnurlPay: string | LNURLPay): Promise<ToBTCLNSwap<T[C]>>;
-    create<C extends ChainIds<T>>(signer: string, srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: BN, exactIn: false, lightningInvoice: string): Promise<ToBTCLNSwap<T[C]>>;
-    create<C extends ChainIds<T>>(signer: string, srcToken: Token<C>, dstToken: Token<C>, amount: BN, exactIn: boolean, addressLnurlLightningInvoice?: string | LNURLWithdraw | LNURLPay): Promise<ISwap<T[C]>>;
+    createFromBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurl: string | LNURLWithdraw, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
+    create<C extends ChainIds<T>>(signer: string, srcToken: BtcToken<true>, dstToken: SCToken<C>, amount: bigint, exactIn: boolean, lnurlWithdraw?: string | LNURLWithdraw): Promise<FromBTCLNSwap<T[C]>>;
+    create<C extends ChainIds<T>>(signer: string, srcToken: BtcToken<false>, dstToken: SCToken<C>, amount: bigint, exactIn: boolean): Promise<FromBTCSwap<T[C]>>;
+    create<C extends ChainIds<T>>(signer: string, srcToken: SCToken<C>, dstToken: BtcToken<false>, amount: bigint, exactIn: boolean, address: string): Promise<ToBTCSwap<T[C]>>;
+    create<C extends ChainIds<T>>(signer: string, srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: bigint, exactIn: boolean, lnurlPay: string | LNURLPay): Promise<ToBTCLNSwap<T[C]>>;
+    create<C extends ChainIds<T>>(signer: string, srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: bigint, exactIn: false, lightningInvoice: string): Promise<ToBTCLNSwap<T[C]>>;
+    create<C extends ChainIds<T>>(signer: string, srcToken: Token<C>, dstToken: Token<C>, amount: bigint, exactIn: boolean, addressLnurlLightningInvoice?: string | LNURLWithdraw | LNURLPay): Promise<ISwap<T[C]>>;
     /**
      * Creates trusted LN for Gas swap
      *
@@ -313,7 +302,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param trustedIntermediaryOrUrl  URL or Intermediary object of the trusted intermediary to use, otherwise uses default
      * @throws {Error}                  If no trusted intermediary specified
      */
-    createTrustedLNForGasSwap<C extends ChainIds<T>>(chainId: C | string, signer: string, amount: BN, trustedIntermediaryOrUrl?: Intermediary | string): Promise<LnForGasSwap<T[C]>>;
+    createTrustedLNForGasSwap<C extends ChainIds<T>>(chainId: C, signer: string, amount: bigint, trustedIntermediaryOrUrl?: Intermediary | string): Promise<LnForGasSwap<T[C]>>;
     /**
      * Creates trusted BTC on-chain for Gas swap
      *
@@ -324,7 +313,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param trustedIntermediaryOrUrl  URL or Intermediary object of the trusted intermediary to use, otherwise uses default
      * @throws {Error}                  If no trusted intermediary specified
      */
-    createTrustedOnchainForGasSwap<C extends ChainIds<T>>(chainId: C | string, signer: string, amount: BN, refundAddress?: string, trustedIntermediaryOrUrl?: Intermediary | string): Promise<OnchainForGasSwap<T[C]>>;
+    createTrustedOnchainForGasSwap<C extends ChainIds<T>>(chainId: C, signer: string, amount: bigint, refundAddress?: string, trustedIntermediaryOrUrl?: Intermediary | string): Promise<OnchainForGasSwap<T[C]>>;
     /**
      * Returns all swaps
      */
@@ -332,7 +321,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
     /**
      * Returns all swaps for the specific chain, and optionally also for a specific signer's address
      */
-    getAllSwaps<C extends ChainIds<T>>(chainId: C | string, signer?: string): Promise<ISwap<T[C]>[]>;
+    getAllSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
     /**
      * Returns all swaps where an action is required (either claim or refund)
      */
@@ -340,40 +329,47 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
     /**
      * Returns swaps where an action is required (either claim or refund) for the specific chain, and optionally also for a specific signer's address
      */
-    getActionableSwaps<C extends ChainIds<T>>(chainId: C | string, signer?: string): Promise<ISwap<T[C]>[]>;
+    getActionableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
     /**
      * Returns all swaps that are refundable
      */
     getRefundableSwaps(): Promise<IToBTCSwap[]>;
     /**
-     * Returns swaps that are refundable for the specific chain, and optionally also for a specific signer's address
+     * Returns swaps which are refundable for the specific chain, and optionally also for a specific signer's address
      */
-    getRefundableSwaps<C extends ChainIds<T>>(chainId: C | string, signer?: string): Promise<IToBTCSwap<T[C]>[]>;
+    getRefundableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IToBTCSwap<T[C]>[]>;
     /**
-     * Returns all swaps that are in-progress and are claimable
+     * Returns swap with a specific id (identifier)
      */
-    getClaimableSwaps(): Promise<IFromBTCSwap[]>;
+    getSwapById(id: string): Promise<ISwap>;
     /**
-     * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
+     * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
-    getClaimableSwaps<C extends ChainIds<T>>(chainId: C | string, signer?: string): Promise<IFromBTCSwap<T[C]>[]>;
-    getBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier | string>): Promise<BN>;
-    getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, token: string): Promise<BN>;
-    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier | string>, feeMultiplier?: number): Promise<BN>;
-    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string, token: string, feeMultiplier?: number): Promise<BN>;
+    getSwapById<C extends ChainIds<T>>(id: string, chainId: C, signer?: string): Promise<ISwap<T[C]>>;
+    /**
+     * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes
+     *
+     * @param chainId
+     * @param signer
+     */
+    _syncSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<void>;
+    getBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>): Promise<bigint>;
+    getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string): Promise<bigint>;
+    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<bigint>;
+    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string, feeMultiplier?: number): Promise<bigint>;
     /**
      * Returns the native token balance of the wallet
      */
-    getNativeBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string, signer: string): Promise<BN>;
+    getNativeBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string): Promise<bigint>;
     /**
      * Returns the address of the native token's address of the chain
      */
-    getNativeTokenAddress<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string): string;
+    getNativeTokenAddress<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): string;
     /**
      * Returns the address of the native currency of the chain
      */
-    getNativeToken<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string): SCToken<ChainIdentifier>;
-    withChain<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string): SwapperWithChain<T, ChainIdentifier>;
-    randomSigner<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier | string): T[ChainIdentifier]["Signer"];
+    getNativeToken<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SCToken<ChainIdentifier>;
+    withChain<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SwapperWithChain<T, ChainIdentifier>;
+    randomSigner<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): T[ChainIdentifier]["Signer"];
     getChains(): ChainIds<T>[];
 }

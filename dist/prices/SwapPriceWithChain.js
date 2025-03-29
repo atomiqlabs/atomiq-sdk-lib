@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwapPriceWithChain = void 0;
 class SwapPriceWithChain {
@@ -26,10 +17,8 @@ class SwapPriceWithChain {
      * @param abortSignal
      * @param preFetchedPrice Already pre-fetched price
      */
-    isValidAmountSend(amountSats, satsBaseFee, feePPM, paidToken, token, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.swapPrice.isValidAmountSend(this.chainIdentifier, amountSats, satsBaseFee, feePPM, paidToken, token, abortSignal, preFetchedPrice);
-        });
+    async isValidAmountSend(amountSats, satsBaseFee, feePPM, paidToken, token, abortSignal, preFetchedPrice) {
+        return this.swapPrice.isValidAmountSend(this.chainIdentifier, amountSats, satsBaseFee, feePPM, paidToken, token, abortSignal, preFetchedPrice);
     }
     /**
      * Checks whether the swap amounts are valid given the current market rate for a given pair
@@ -42,10 +31,8 @@ class SwapPriceWithChain {
      * @param abortSignal
      * @param preFetchedPrice Already pre-fetched price
      */
-    isValidAmountReceive(amountSats, satsBaseFee, feePPM, receiveToken, token, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.swapPrice.isValidAmountReceive(this.chainIdentifier, amountSats, satsBaseFee, feePPM, receiveToken, token, abortSignal, preFetchedPrice);
-        });
+    async isValidAmountReceive(amountSats, satsBaseFee, feePPM, receiveToken, token, abortSignal, preFetchedPrice) {
+        return this.swapPrice.isValidAmountReceive(this.chainIdentifier, amountSats, satsBaseFee, feePPM, receiveToken, token, abortSignal, preFetchedPrice);
     }
     preFetchPrice(token, abortSignal) {
         return this.swapPrice.preFetchPrice(this.chainIdentifier, token, abortSignal);
@@ -62,10 +49,8 @@ class SwapPriceWithChain {
      * @param preFetchedPrice
      * @throws {Error} when token is not found
      */
-    getFromBtcSwapAmount(fromAmount, toToken, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.swapPrice.getFromBtcSwapAmount(this.chainIdentifier, fromAmount, toToken, abortSignal, preFetchedPrice);
-        });
+    async getFromBtcSwapAmount(fromAmount, toToken, abortSignal, preFetchedPrice) {
+        return this.swapPrice.getFromBtcSwapAmount(this.chainIdentifier, fromAmount, toToken, abortSignal, preFetchedPrice);
     }
     /**
      * Returns amount of satoshis that are equivalent to {fromAmount} of {fromToken}
@@ -76,10 +61,8 @@ class SwapPriceWithChain {
      * @param preFetchedPrice Pre-fetched swap price if available
      * @throws {Error} when token is not found
      */
-    getToBtcSwapAmount(fromAmount, fromToken, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.swapPrice.getToBtcSwapAmount(this.chainIdentifier, fromAmount, fromToken, abortSignal, preFetchedPrice);
-        });
+    async getToBtcSwapAmount(fromAmount, fromToken, abortSignal, preFetchedPrice) {
+        return this.swapPrice.getToBtcSwapAmount(this.chainIdentifier, fromAmount, fromToken, abortSignal, preFetchedPrice);
     }
     /**
      * Returns whether the token should be ignored and pricing for it not calculated
@@ -90,15 +73,11 @@ class SwapPriceWithChain {
     shouldIgnore(tokenAddress) {
         return this.swapPrice.shouldIgnore(this.chainIdentifier, tokenAddress);
     }
-    getBtcUsdValue(btcSats, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.swapPrice.getBtcUsdValue(btcSats, abortSignal, preFetchedPrice);
-        });
+    async getBtcUsdValue(btcSats, abortSignal, preFetchedPrice) {
+        return this.swapPrice.getBtcUsdValue(btcSats, abortSignal, preFetchedPrice);
     }
-    getTokenUsdValue(tokenAmount, token, abortSignal, preFetchedPrice) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return this.swapPrice.getTokenUsdValue(this.chainIdentifier, tokenAmount, token, abortSignal, preFetchedPrice);
-        });
+    async getTokenUsdValue(tokenAmount, token, abortSignal, preFetchedPrice) {
+        return this.swapPrice.getTokenUsdValue(this.chainIdentifier, tokenAmount, token, abortSignal, preFetchedPrice);
     }
     getUsdValue(amount, token, abortSignal, preFetchedUsdPrice) {
         return this.swapPrice.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice);

@@ -1,6 +1,5 @@
 import {HttpPriceProvider} from "./HttpPriceProvider";
 import {CoinType} from "../../abstract/IPriceProvider";
-import * as BN from "bn.js";
 import {MultiChain} from "../../../swaps/Swapper";
 
 export abstract class ExchangePriceProvider<T extends MultiChain> extends HttpPriceProvider<T> {
@@ -14,7 +13,7 @@ export abstract class ExchangePriceProvider<T extends MultiChain> extends HttpPr
      */
     protected abstract fetchPair(pair: string, abortSignal?: AbortSignal): Promise<number>;
 
-    protected async fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<BN> {
+    protected async fetchPrice(token: CoinType, abortSignal?: AbortSignal): Promise<bigint> {
         const pairs: string[] = token.coinId.split(";");
         const prices: number[] = await Promise.all(pairs.map(pair => {
             let invert = pair.startsWith("!");
@@ -24,7 +23,7 @@ export abstract class ExchangePriceProvider<T extends MultiChain> extends HttpPr
 
         const price = prices.reduce((previousValue, currentValue) => previousValue * currentValue, 1);
 
-        return new BN(Math.floor(price*100000000000000).toString(10));
+        return BigInt(Math.floor(price*100000000000000));
     }
 
 }

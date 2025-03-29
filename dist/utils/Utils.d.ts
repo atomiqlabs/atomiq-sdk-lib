@@ -1,3 +1,7 @@
+/// <reference types="node" />
+/// <reference types="node" />
+import { BTC_NETWORK } from "@scure/btc-signer/utils";
+import { Buffer } from "buffer";
 type Constructor<T = any> = new (...args: any[]) => T;
 export type LoggerType = {
     debug: (msg: string, ...args: any[]) => void;
@@ -100,4 +104,9 @@ export declare function timeoutPromise(timeout: number, abortSignal?: AbortSigna
  * @param abortSignal Abort signal to extend
  */
 export declare function timeoutSignal(timeout: number, abortReason?: any, abortSignal?: AbortSignal): AbortSignal;
+export declare function bigIntMin(a: bigint, b: bigint): bigint;
+export declare function bigIntMax(a: bigint, b: bigint): bigint;
+export declare function bigIntCompare(a: bigint, b: bigint): -1 | 0 | 1;
+export declare function toOutputScript(network: BTC_NETWORK, address: string): Buffer;
+export declare function randomBytes(bytesLength: number): Buffer;
 export {};

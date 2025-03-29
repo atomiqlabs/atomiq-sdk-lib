@@ -1,41 +1,50 @@
 /// <reference types="node" />
 /// <reference types="node" />
 /// <reference types="node" />
-import { FromBTCLNSwap } from "./FromBTCLNSwap";
+import { FromBTCLNSwap, FromBTCLNSwapState } from "./FromBTCLNSwap";
 import { IFromBTCWrapper } from "../IFromBTCWrapper";
-import * as BN from "bn.js";
-import { ChainType, ClaimEvent, InitializeEvent, IStorageManager, RefundEvent } from "@atomiqlabs/base";
+import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { Buffer } from "buffer";
+import { SwapType } from "../../SwapType";
 import { LightningNetworkApi } from "../../../btc/LightningNetworkApi";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { LNURLWithdrawParamsWithUrl } from "../../../utils/LNURL";
+import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
+import { UnifiedSwapStorage } from "../../UnifiedSwapStorage";
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer;
 };
 export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapper<T, FromBTCLNSwap<T>> {
-    protected readonly swapDeserializer: typeof FromBTCLNSwap;
+    readonly TYPE = SwapType.FROM_BTCLN;
+    readonly swapDeserializer: typeof FromBTCLNSwap;
     protected readonly lnApi: LightningNetworkApi;
     /**
      * @param chainIdentifier
-     * @param storage Storage interface for the current environment
+     * @param unifiedStorage Storage interface for the current environment
+     * @param unifiedChainEvents On-chain event listener
      * @param contract Underlying contract handling the swaps
      * @param prices Swap pricing handler
-     * @param chainEvents On-chain event listener
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
      * @param lnApi
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, storage: IStorageManager<FromBTCLNSwap<T>>, contract: T["Contract"], chainEvents: T["Events"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: ISwapWrapperOptions, events?: EventEmitter);
-    protected checkPastSwap(swap: FromBTCLNSwap<T>): Promise<boolean>;
-    protected tickSwap(swap: FromBTCLNSwap<T>): void;
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: ISwapWrapperOptions, events?: EventEmitter);
+    readonly pendingSwapStates: FromBTCLNSwapState[];
+    readonly tickSwapState: FromBTCLNSwapState[];
     protected processEventInitialize(swap: FromBTCLNSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean>;
     protected processEventClaim(swap: FromBTCLNSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean>;
     protected processEventRefund(swap: FromBTCLNSwap<T>, event: RefundEvent<T["Data"]>): Promise<boolean>;
+    /**
+     * Returns the swap expiry, leaving enough time for the user to claim the HTLC
+     *
+     * @param data Parsed swap data
+     */
+    getHtlcTimeout(data: SwapData): bigint;
     /**
      * Generates a new 32-byte secret to be used as pre-image for lightning network invoice & HTLC swap\
      *
@@ -91,7 +100,7 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
      * @param preFetches
      */
     create(signer: string, amountData: AmountData, lps: Intermediary[], options: FromBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
-        pricePrefetchPromise?: Promise<BN>;
+        pricePrefetchPromise?: Promise<bigint>;
         feeRatePromise?: Promise<any>;
     }): {
         quote: Promise<FromBTCLNSwap<T>>;

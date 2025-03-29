@@ -1,13 +1,12 @@
-import {BtcBlockWithTxs, BtcSyncInfo, BtcTx} from "@atomiqlabs/base";
+import {BigIntBufferUtils, BtcBlockWithTxs, BtcSyncInfo, BtcTx} from "@atomiqlabs/base";
 import {MempoolBitcoinBlock} from "./MempoolBitcoinBlock";
 import {BitcoinTransaction, MempoolApi, TxVout} from "./MempoolApi";
 import {Buffer} from "buffer";
-import * as createHash from "create-hash";
-import * as BN from "bn.js";
 import {BitcoinRpcWithTxoListener, BtcTxWithBlockheight} from "../BitcoinRpcWithTxoListener";
 import {LightningNetworkApi, LNNodeLiquidity} from "../LightningNetworkApi";
 import {timeoutPromise} from "../../utils/Utils";
-import {Transaction} from "bitcoinjs-lib";
+import {Transaction} from "@scure/btc-signer";
+import {sha256} from "@noble/hashes/sha2";
 
 const BITCOIN_BLOCKTIME = 600 * 1000;
 const BITCOIN_BLOCKSIZE = 1024*1024;
@@ -27,10 +26,10 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
      * @private
      */
     private static getTxoHash(vout: TxVout): Buffer {
-        return createHash("sha256").update(Buffer.concat([
-            Buffer.from(new BN(vout.value).toArray("le", 8)),
+        return Buffer.from(sha256(Buffer.concat([
+            BigIntBufferUtils.toBuffer(BigInt(vout.value), "le", 8),
             Buffer.from(vout.scriptpubkey, "hex")
-        ])).digest();
+        ])));
     }
 
     /**
@@ -98,9 +97,8 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
         let strippedRawTx: string;
         if(rawTx!=null) {
             //Strip witness data
-            const btcTx = Transaction.fromBuffer(rawTx);
-            btcTx.ins.forEach(txIn => txIn.witness = []);
-            strippedRawTx = btcTx.toHex();
+            const btcTx = Transaction.fromRaw(rawTx);
+            strippedRawTx = Buffer.from(btcTx.toBytes(true, false)).toString("hex");
         }
 
         return {
@@ -273,7 +271,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
         const nodeInfo = await this.api.getLNNodeInfo(pubkey);
         return {
             publicKey: nodeInfo.public_key,
-            capacity: new BN(nodeInfo.capacity),
+            capacity: BigInt(nodeInfo.capacity),
             numChannels: nodeInfo.active_channel_count
         }
     }

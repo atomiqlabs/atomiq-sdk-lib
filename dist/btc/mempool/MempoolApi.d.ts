@@ -1,6 +1,5 @@
 /// <reference types="node" />
 /// <reference types="node" />
-import * as BN from "bn.js";
 import { Buffer } from "buffer";
 export type TxVout = {
     scriptpubkey: string;
@@ -228,8 +227,8 @@ export declare class MempoolApi {
      * @param address
      */
     getAddressBalances(address: string): Promise<{
-        confirmedBalance: BN;
-        unconfirmedBalance: BN;
+        confirmedBalance: bigint;
+        unconfirmedBalance: bigint;
     }>;
     /**
      * Returns CPFP (children pays for parent) data for a given transaction
@@ -251,7 +250,7 @@ export declare class MempoolApi {
             block_hash: string;
             block_time: number;
         };
-        value: BN;
+        value: bigint;
     }[]>;
     /**
      * Returns current on-chain bitcoin fees
