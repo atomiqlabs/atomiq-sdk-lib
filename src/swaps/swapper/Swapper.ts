@@ -114,13 +114,15 @@ export type ChainIds<T extends MultiChain> = keyof T & string;
             (T[ChainIdentifier]["Contract"] extends SwapContract ? true : false)
  */
 
+type NotNever<T> = [T] extends [never] ? false : true;
+
 export type SupportsSwapType<
     C extends ChainType,
     Type extends SwapType
 > = Type extends SwapType.SPV_VAULT_FROM_BTC ?
-    (C["SpvVaultContract"] extends SpvVaultContract ? true : false) :
+        NotNever<C["SpvVaultContract"]> :
     Type extends (SwapType.TRUSTED_FROM_BTCLN | SwapType.TRUSTED_FROM_BTC) ? true :
-        (C["Contract"] extends SwapContract ? true : false);
+        NotNever<C["Contract"]>;
 
 export interface SwapperBtcUtils {
     /**

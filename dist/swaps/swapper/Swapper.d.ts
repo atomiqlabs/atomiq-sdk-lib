@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { ISwapPrice } from "../../prices/abstract/ISwapPrice";
-import { BitcoinNetwork, BtcRelay, ChainData, ChainType, RelaySynchronizer, SpvVaultContract, SwapContract } from "@atomiqlabs/base";
+import { BitcoinNetwork, BtcRelay, ChainData, ChainType, RelaySynchronizer } from "@atomiqlabs/base";
 import { ToBTCLNOptions, ToBTCLNWrapper } from "../escrow_swaps/tobtc/ln/ToBTCLNWrapper";
 import { ToBTCOptions, ToBTCWrapper } from "../escrow_swaps/tobtc/onchain/ToBTCWrapper";
 import { FromBTCLNOptions, FromBTCLNWrapper } from "../escrow_swaps/frombtc/ln/FromBTCLNWrapper";
@@ -80,7 +80,8 @@ export type CtorMultiChainData<T extends MultiChain> = {
     [chainIdentifier in keyof T]: ChainData<T[chainIdentifier]>;
 };
 export type ChainIds<T extends MultiChain> = keyof T & string;
-export type SupportsSwapType<C extends ChainType, Type extends SwapType> = Type extends SwapType.SPV_VAULT_FROM_BTC ? (C["SpvVaultContract"] extends SpvVaultContract ? true : false) : Type extends (SwapType.TRUSTED_FROM_BTCLN | SwapType.TRUSTED_FROM_BTC) ? true : (C["Contract"] extends SwapContract ? true : false);
+type NotNever<T> = [T] extends [never] ? false : true;
+export type SupportsSwapType<C extends ChainType, Type extends SwapType> = Type extends SwapType.SPV_VAULT_FROM_BTC ? NotNever<C["SpvVaultContract"]> : Type extends (SwapType.TRUSTED_FROM_BTCLN | SwapType.TRUSTED_FROM_BTC) ? true : NotNever<C["Contract"]>;
 export interface SwapperBtcUtils {
     /**
      * Returns true if string is a valid bitcoin address
@@ -393,3 +394,4 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
     getChains(): ChainIds<T>[];
     supportsSwapType<ChainIdentifier extends ChainIds<T>, Type extends SwapType>(chainId: ChainIdentifier, swapType: Type): SupportsSwapType<T[ChainIdentifier], Type>;
 }
+export {};
