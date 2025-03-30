@@ -21,7 +21,8 @@ export class MempoolBtcRelaySynchronizer<B extends BtcStoredHeader<any>, TX> imp
         targetCommitedHeader: B,
         computedHeaderMap: {[blockheight: number]: B},
         blockHeaderMap: {[blockheight: number]: MempoolBitcoinBlock},
-        btcRelayTipBlockHash: string,
+        btcRelayTipCommitedHeader: B,
+        btcRelayTipBlockHeader: MempoolBitcoinBlock,
         latestBlockHeader: MempoolBitcoinBlock,
         startForkId: number
     }> {
@@ -116,7 +117,9 @@ export class MempoolBtcRelaySynchronizer<B extends BtcStoredHeader<any>, TX> imp
             blockHeaderMap,
             computedHeaderMap,
 
-            btcRelayTipBlockHash: btcRelayTipBlockHash,
+            btcRelayTipCommitedHeader: resultStoredHeader,
+            btcRelayTipBlockHeader: resultBitcoinHeader,
+
             latestBlockHeader: spvTipBlockHeader,
             startForkId
         };
