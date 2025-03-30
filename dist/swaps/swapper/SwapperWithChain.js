@@ -229,5 +229,8 @@ class SwapperWithChain {
     randomSigner() {
         return this.swapper.randomSigner(this.chainIdentifier);
     }
+    supportsSwapType(swapType) {
+        return this.swapper.supportsSwapType(this.chainIdentifier, swapType);
+    }
 }
 exports.SwapperWithChain = SwapperWithChain;

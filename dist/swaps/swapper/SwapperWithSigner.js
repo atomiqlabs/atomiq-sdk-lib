@@ -206,5 +206,8 @@ class SwapperWithSigner {
     getNativeTokenAddress() {
         return this.swapper.getNativeTokenAddress();
     }
+    supportsSwapType(swapType) {
+        return this.swapper.supportsSwapType(swapType);
+    }
 }
 exports.SwapperWithSigner = SwapperWithSigner;

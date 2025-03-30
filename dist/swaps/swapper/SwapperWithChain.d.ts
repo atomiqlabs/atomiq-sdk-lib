@@ -4,7 +4,7 @@ import { SwapType } from "../enums/SwapType";
 import { LnForGasSwap } from "../trusted/ln/LnForGasSwap";
 import { ISwap } from "../ISwap";
 import { IToBTCSwap } from "../escrow_swaps/tobtc/IToBTCSwap";
-import { ChainIds, MultiChain, Swapper, SwapperBtcUtils } from "./Swapper";
+import { ChainIds, MultiChain, SupportsSwapType, Swapper, SwapperBtcUtils } from "./Swapper";
 import { FromBTCLNSwap } from "../escrow_swaps/frombtc/ln/FromBTCLNSwap";
 import { FromBTCSwap } from "../escrow_swaps/frombtc/onchain/FromBTCSwap";
 import { ToBTCLNSwap } from "../escrow_swaps/tobtc/ln/ToBTCLNSwap";
@@ -143,4 +143,5 @@ export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier exte
     getNativeTokenAddress(): string;
     withSigner(signer: T[ChainIdentifier]["Signer"]): SwapperWithSigner<T, ChainIdentifier>;
     randomSigner(): T[ChainIdentifier]["Signer"];
+    supportsSwapType<Type extends SwapType>(swapType: Type): SupportsSwapType<T[ChainIdentifier], Type>;
 }

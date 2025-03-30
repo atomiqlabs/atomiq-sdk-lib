@@ -979,5 +979,8 @@ class Swapper extends events_1.EventEmitter {
     getChains() {
         return Object.keys(this.chains);
     }
+    supportsSwapType(chainId, swapType) {
+        return (this.chains[chainId]?.wrappers[swapType] != null);
+    }
 }
 exports.Swapper = Swapper;
