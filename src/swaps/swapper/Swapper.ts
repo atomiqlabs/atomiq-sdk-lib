@@ -6,7 +6,7 @@ import {
     ChainData,
     ChainSwapType,
     ChainType,
-    RelaySynchronizer
+    RelaySynchronizer, SpvVaultContract, SwapContract
 } from "@atomiqlabs/base";
 import {ToBTCLNOptions, ToBTCLNWrapper} from "../escrow_swaps/tobtc/ln/ToBTCLNWrapper";
 import {ToBTCOptions, ToBTCWrapper} from "../escrow_swaps/tobtc/onchain/ToBTCWrapper";
@@ -102,6 +102,25 @@ export type CtorMultiChainData<T extends MultiChain> = {
 };
 
 export type ChainIds<T extends MultiChain> = keyof T & string;
+
+/*
+
+        ChainIdentifier extends ChainIds<T>,
+        Type extends SwapType
+    >(chainId: ChainIdentifier, swapType: Type):
+        Type extends SwapType.SPV_VAULT_FROM_BTC ?
+            (T[ChainIdentifier]["SpvVaultContract"] extends SpvVaultContract ? true : false) :
+        Type extends (SwapType.TRUSTED_FROM_BTCLN | SwapType.TRUSTED_FROM_BTC) ? true :
+            (T[ChainIdentifier]["Contract"] extends SwapContract ? true : false)
+ */
+
+export type SupportsSwapType<
+    C extends ChainType,
+    Type extends SwapType
+> = Type extends SwapType.SPV_VAULT_FROM_BTC ?
+    (C["SpvVaultContract"] extends SpvVaultContract ? true : false) :
+    Type extends (SwapType.TRUSTED_FROM_BTCLN | SwapType.TRUSTED_FROM_BTC) ? true :
+        (C["Contract"] extends SwapContract ? true : false);
 
 export interface SwapperBtcUtils {
     /**
@@ -1460,6 +1479,13 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
 
     getChains(): ChainIds<T>[] {
         return Object.keys(this.chains);
+    }
+
+    supportsSwapType<
+        ChainIdentifier extends ChainIds<T>,
+        Type extends SwapType
+    >(chainId: ChainIdentifier, swapType: Type): SupportsSwapType<T[ChainIdentifier], Type> {
+        return (this.chains[chainId]?.wrappers[swapType] != null) as any;
     }
 
 }
