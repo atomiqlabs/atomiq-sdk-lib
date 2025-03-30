@@ -14,7 +14,8 @@ export declare class MempoolBtcRelaySynchronizer<B extends BtcStoredHeader<any>,
         blockHeaderMap: {
             [blockheight: number]: MempoolBitcoinBlock;
         };
-        btcRelayTipBlockHash: string;
+        btcRelayTipCommitedHeader: B;
+        btcRelayTipBlockHeader: MempoolBitcoinBlock;
         latestBlockHeader: MempoolBitcoinBlock;
         startForkId: number;
     }>;

@@ -85,7 +85,8 @@ class MempoolBtcRelaySynchronizer {
             targetCommitedHeader: cacheData.lastStoredHeader,
             blockHeaderMap,
             computedHeaderMap,
-            btcRelayTipBlockHash: btcRelayTipBlockHash,
+            btcRelayTipCommitedHeader: resultStoredHeader,
+            btcRelayTipBlockHeader: resultBitcoinHeader,
             latestBlockHeader: spvTipBlockHeader,
             startForkId
         };
