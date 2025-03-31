@@ -125,9 +125,10 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
      * @private
      */
     async preFetchCallerFeeShare(signer, amountData, options, pricePrefetch, nativeTokenPricePrefetch, abortController) {
-        if (options.unsafeZeroWatchtowerFee) {
+        if (options.unsafeZeroWatchtowerFee)
             return 0n;
-        }
+        if (amountData.amount === 0n)
+            return 0n;
         try {
             const [feePerBlock, btcRelayData, currentBtcBlock, claimFeeRate, nativeTokenPrice] = await Promise.all([
                 (0, Utils_1.tryWithRetries)(() => this.btcRelay.getFeePerBlock(), null, null, abortController.signal),
@@ -158,8 +159,12 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                     amountInNativeToken = await this.prices.getFromBtcSwapAmount(this.chainIdentifier, btcAmount, this.chain.getNativeCurrencyAddress(), abortController.signal, nativeTokenPrice);
                 }
             }
-            //Calculate caller fee share
-            return totalFeeInNativeToken * 100000n / (amountInNativeToken - totalFeeInNativeToken);
+            const callerFeeShare = totalFeeInNativeToken * 100000n / (amountInNativeToken - totalFeeInNativeToken);
+            if (callerFeeShare < 0n)
+                return 0n;
+            if (callerFeeShare >= 2n ** 20n)
+                throw new Error("Amount too low to pay for watchtower fee!");
+            return callerFeeShare;
         }
         catch (e) {
             abortController.abort(e);
