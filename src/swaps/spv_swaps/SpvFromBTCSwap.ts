@@ -183,7 +183,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
                 this.chainIdentifier,
-                this.getInputSwapAmountWithoutFee(),
+                this.btcAmountSwap,
                 this.pricingInfo.satsBaseFee,
                 this.pricingInfo.feePPM,
                 this.getOutputWithoutFee().rawAmount - this.swapFee,
@@ -200,7 +200,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         if(this.pricingInfo==null) return null;
         const priceData = await this.wrapper.prices.isValidAmountReceive(
             this.chainIdentifier,
-            this.getInputSwapAmountWithoutFee(),
+            this.btcAmountSwap,
             this.pricingInfo.satsBaseFee,
             this.pricingInfo.feePPM,
             this.getOutputWithoutFee().rawAmount - this.swapFee,

@@ -106,7 +106,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             this.swapFeeBtc = this.swapFee * this.btcAmountSwap / this.getOutputWithoutFee().rawAmount;
         }
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInputSwapAmountWithoutFee(), this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount - this.swapFee, this.outputSwapToken);
+            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount - this.swapFee, this.outputSwapToken);
         }
     }
     //////////////////////////////
@@ -114,7 +114,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     async refreshPriceData() {
         if (this.pricingInfo == null)
             return null;
-        const priceData = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.getInputSwapAmountWithoutFee(), this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount - this.swapFee, this.outputSwapToken);
+        const priceData = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount - this.swapFee, this.outputSwapToken);
         this.pricingInfo = priceData;
         return priceData;
     }
