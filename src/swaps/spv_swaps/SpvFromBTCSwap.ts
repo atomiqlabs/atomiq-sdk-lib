@@ -183,7 +183,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
                 this.chainIdentifier,
-                this.btcAmountSwap,
+                this.getInputSwapAmountWithoutFee(),
                 this.pricingInfo.satsBaseFee,
                 this.pricingInfo.feePPM,
                 this.getOutputWithoutFee().rawAmount - this.swapFee,
@@ -200,7 +200,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         if(this.pricingInfo==null) return null;
         const priceData = await this.wrapper.prices.isValidAmountReceive(
             this.chainIdentifier,
-            this.btcAmountSwap,
+            this.getInputSwapAmountWithoutFee(),
             this.pricingInfo.satsBaseFee,
             this.pricingInfo.feePPM,
             this.getOutputWithoutFee().rawAmount - this.swapFee,
@@ -328,8 +328,8 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     }
 
     getCallerFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>> {
-        const gasCallerFeeInOutputToken = this.btcAmountGas * this.callerFeeShare * this.pricingInfo.swapPriceUSatPerToken / 1_000_000n / 100_000n;
-        const feeBtc = this.btcAmount * this.callerFeeShare / 100_000n;
+        const gasCallerFeeInOutputToken = this.getInputGasAmountWithoutFee() * this.callerFeeShare * this.pricingInfo.swapPriceUSatPerToken / 1_000_000n / 100_000n;
+        const feeBtc = this.getInputAmountWithoutFee() * this.callerFeeShare / 100_000n;
         return {
             amountInSrcToken: toTokenAmount(feeBtc, BitcoinTokens.BTC, this.wrapper.prices),
             amountInDstToken: toTokenAmount((this.outputTotalSwap * this.callerFeeShare / 100_000n) + gasCallerFeeInOutputToken, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices),
@@ -364,9 +364,21 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         return toTokenAmount(this.outputTotalGas, this.wrapper.tokens[this.outputGasToken], this.wrapper.prices);
     }
 
+    getInputAmountWithoutFee(): bigint {
+        return (this.btcAmount - this.swapFeeBtc - this.gasSwapFeeBtc) * 100_000n / (100_000n + this.callerFeeShare + this.frontingFeeShare);
+    }
+
+    getInputSwapAmountWithoutFee(): bigint {
+        return (this.btcAmountSwap - this.swapFeeBtc) * 100_000n / (100_000n + this.callerFeeShare + this.frontingFeeShare);
+    }
+
+    getInputGasAmountWithoutFee(): bigint {
+        return (this.btcAmountGas - this.gasSwapFeeBtc) * 100_000n / (100_000n + this.callerFeeShare + this.frontingFeeShare);
+    }
+
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>> {
         //TODO: Once we introduce execution fee, we need to add it here!
-        return toTokenAmount((this.btcAmount * 100_000n / (100_000n + this.callerFeeShare + this.frontingFeeShare)) - this.swapFeeBtc - this.gasSwapFeeBtc, BitcoinTokens.BTC, this.wrapper.prices);
+        return toTokenAmount(this.getInputAmountWithoutFee(), BitcoinTokens.BTC, this.wrapper.prices);
     }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>> {

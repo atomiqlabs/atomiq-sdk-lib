@@ -106,7 +106,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             this.swapFeeBtc = this.swapFee * this.btcAmountSwap / this.getOutputWithoutFee().rawAmount;
         }
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount - this.swapFee, this.outputSwapToken);
+            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInputSwapAmountWithoutFee(), this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount - this.swapFee, this.outputSwapToken);
         }
     }
     //////////////////////////////
@@ -114,7 +114,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     async refreshPriceData() {
         if (this.pricingInfo == null)
             return null;
-        const priceData = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount - this.swapFee, this.outputSwapToken);
+        const priceData = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.getInputSwapAmountWithoutFee(), this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount - this.swapFee, this.outputSwapToken);
         this.pricingInfo = priceData;
         return priceData;
     }
@@ -206,8 +206,8 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         };
     }
     getCallerFee() {
-        const gasCallerFeeInOutputToken = this.btcAmountGas * this.callerFeeShare * this.pricingInfo.swapPriceUSatPerToken / 1000000n / 100000n;
-        const feeBtc = this.btcAmount * this.callerFeeShare / 100000n;
+        const gasCallerFeeInOutputToken = this.getInputGasAmountWithoutFee() * this.callerFeeShare * this.pricingInfo.swapPriceUSatPerToken / 1000000n / 100000n;
+        const feeBtc = this.getInputAmountWithoutFee() * this.callerFeeShare / 100000n;
         return {
             amountInSrcToken: (0, Tokens_1.toTokenAmount)(feeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices),
             amountInDstToken: (0, Tokens_1.toTokenAmount)((this.outputTotalSwap * this.callerFeeShare / 100000n) + gasCallerFeeInOutputToken, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices),
@@ -229,9 +229,18 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     getGasOutput() {
         return (0, Tokens_1.toTokenAmount)(this.outputTotalGas, this.wrapper.tokens[this.outputGasToken], this.wrapper.prices);
     }
+    getInputAmountWithoutFee() {
+        return (this.btcAmount - this.swapFeeBtc - this.gasSwapFeeBtc) * 100000n / (100000n + this.callerFeeShare + this.frontingFeeShare);
+    }
+    getInputSwapAmountWithoutFee() {
+        return (this.btcAmountSwap - this.swapFeeBtc) * 100000n / (100000n + this.callerFeeShare + this.frontingFeeShare);
+    }
+    getInputGasAmountWithoutFee() {
+        return (this.btcAmountGas - this.gasSwapFeeBtc) * 100000n / (100000n + this.callerFeeShare + this.frontingFeeShare);
+    }
     getInputWithoutFee() {
         //TODO: Once we introduce execution fee, we need to add it here!
-        return (0, Tokens_1.toTokenAmount)((this.btcAmount * 100000n / (100000n + this.callerFeeShare + this.frontingFeeShare)) - this.swapFeeBtc - this.gasSwapFeeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getInputAmountWithoutFee(), Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
     }
     getInput() {
         return (0, Tokens_1.toTokenAmount)(this.btcAmount, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
