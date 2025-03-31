@@ -205,9 +205,8 @@ export class SpvFromBTCWrapper<
         nativeTokenPricePrefetch: Promise<bigint>,
         abortController: AbortController
     ): Promise<bigint> {
-        if(options.unsafeZeroWatchtowerFee) {
-            return 0n;
-        }
+        if(options.unsafeZeroWatchtowerFee) return 0n;
+        if(amountData.amount===0n) return 0n;
 
         try {
             const [
@@ -249,8 +248,10 @@ export class SpvFromBTCWrapper<
                 }
             }
 
-            //Calculate caller fee share
-            return totalFeeInNativeToken * 100_000n / (amountInNativeToken - totalFeeInNativeToken);
+            const callerFeeShare = totalFeeInNativeToken * 100_000n / (amountInNativeToken - totalFeeInNativeToken);
+            if(callerFeeShare < 0n) return 0n;
+            if(callerFeeShare >= 2n**20n) throw new Error("Amount too low to pay for watchtower fee!");
+            return callerFeeShare;
         } catch (e) {
             abortController.abort(e);
             return null;
