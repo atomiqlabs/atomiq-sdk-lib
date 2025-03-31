@@ -163,7 +163,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             if (callerFeeShare < 0n)
                 return 0n;
             if (callerFeeShare >= 2n ** 20n)
-                throw new Error("Amount too low to pay for watchtower fee!");
+                return 2n ** 20n - 1n;
             return callerFeeShare;
         }
         catch (e) {
