@@ -640,7 +640,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
 
         if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.SOFT_CLAIMED) {
             //Check if that maybe already concluded
-            changed ||= await this.checkIntermediarySwapProcessed(false);
+            if(await this.checkIntermediarySwapProcessed(false)) changed = true;
         }
 
         if(save && changed) await this._saveAndEmit();

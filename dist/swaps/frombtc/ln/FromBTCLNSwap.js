@@ -613,7 +613,8 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             if (result !== null)
                 changed ||= true;
         }
-        changed ||= await this.syncStateFromChain();
+        if (await this.syncStateFromChain())
+            changed = true;
         if (this.state === FromBTCLNSwapState.PR_PAID || (this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData != null)) {
             if (!await this.isQuoteValid()) {
                 this.state = FromBTCLNSwapState.QUOTE_EXPIRED;
