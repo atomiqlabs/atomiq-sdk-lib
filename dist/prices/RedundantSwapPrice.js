@@ -130,17 +130,20 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
      * @private
      */
     fetchPrice(chainIdentifier, token, abortSignal) {
-        return (0, Utils_1.tryWithRetries)(() => {
+        return (0, Utils_1.tryWithRetries)(async () => {
             const operationalPriceApi = this.getOperationalPriceApi();
             if (operationalPriceApi != null) {
-                return operationalPriceApi.priceApi.getPrice(chainIdentifier, token, abortSignal).catch(err => {
+                try {
+                    return await operationalPriceApi.priceApi.getPrice(chainIdentifier, token, abortSignal);
+                }
+                catch (err) {
                     if (abortSignal != null)
                         abortSignal.throwIfAborted();
                     operationalPriceApi.operational = false;
-                    return this.fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal);
-                });
+                    return await this.fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal);
+                }
             }
-            return this.fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal);
+            return await this.fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal);
         }, null, RequestError_1.RequestError, abortSignal);
     }
     getDecimals(chainIdentifier, token) {

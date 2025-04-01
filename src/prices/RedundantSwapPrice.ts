@@ -170,16 +170,19 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
      * @private
      */
     protected fetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<bigint> {
-        return tryWithRetries(() => {
+        return tryWithRetries(async () => {
             const operationalPriceApi = this.getOperationalPriceApi();
-            if(operationalPriceApi!=null) {
-                return operationalPriceApi.priceApi.getPrice(chainIdentifier, token, abortSignal).catch(err => {
-                    if(abortSignal!=null) abortSignal.throwIfAborted();
+            if (operationalPriceApi != null) {
+                try {
+                    return await operationalPriceApi.priceApi.getPrice(chainIdentifier, token, abortSignal);
+                } catch (err) {
+                    if (abortSignal != null)
+                        abortSignal.throwIfAborted();
                     operationalPriceApi.operational = false;
-                    return this.fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal);
-                });
+                    return await this.fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal);
+                }
             }
-            return this.fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal);
+            return await this.fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal);
         }, null, RequestError, abortSignal);
     }
 
