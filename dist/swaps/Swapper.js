@@ -777,7 +777,9 @@ class Swapper extends events_1.EventEmitter {
                 const swaps = await unifiedSwapStorage.query(queryParams, reviver);
                 const changedSwaps = [];
                 for (let swap of swaps) {
+                    this.logger.debug("_syncSwaps(): Syncing swap: " + swap.getId());
                     const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: " + swap.getIdentifierHashString(), e));
+                    this.logger.debug("_syncSwaps(): Synced swap: " + swap.getId());
                     if (swapChanged)
                         changedSwaps.push(swap);
                 }
@@ -798,7 +800,9 @@ class Swapper extends events_1.EventEmitter {
             const swaps = await unifiedSwapStorage.query(queryParams, reviver);
             const changedSwaps = [];
             for (let swap of swaps) {
+                this.logger.debug("_syncSwaps(): Syncing swap: " + swap.getId());
                 const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: " + swap.getIdentifierHashString(), e));
+                this.logger.debug("_syncSwaps(): Synced swap: " + swap.getId());
                 if (swapChanged)
                     changedSwaps.push(swap);
             }

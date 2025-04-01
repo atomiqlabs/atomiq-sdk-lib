@@ -1201,7 +1201,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
 
                 const changedSwaps: ISwap<T[string]>[] = [];
                 for(let swap of swaps) {
+                    this.logger.debug("_syncSwaps(): Syncing swap: "+swap.getId());
                     const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
+                    this.logger.debug("_syncSwaps(): Synced swap: "+swap.getId());
                     if(swapChanged) changedSwaps.push(swap);
                 }
 
@@ -1221,7 +1223,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
 
             const changedSwaps: ISwap<T[C]>[] = [];
             for(let swap of swaps) {
+                this.logger.debug("_syncSwaps(): Syncing swap: "+swap.getId());
                 const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
+                this.logger.debug("_syncSwaps(): Synced swap: "+swap.getId());
                 if(swapChanged) changedSwaps.push(swap);
             }
 
