@@ -38,6 +38,7 @@ __exportStar(require("./prices/providers/BinancePriceProvider"), exports);
 __exportStar(require("./prices/providers/CoinGeckoPriceProvider"), exports);
 __exportStar(require("./prices/providers/CoinPaprikaPriceProvider"), exports);
 __exportStar(require("./prices/providers/OKXPriceProvider"), exports);
+__exportStar(require("./prices/providers/CustomPriceProvider"), exports);
 __exportStar(require("./prices/RedundantSwapPrice"), exports);
 __exportStar(require("./prices/SingleSwapPrice"), exports);
 __exportStar(require("./prices/SwapPriceWithChain"), exports);

@@ -25,6 +25,7 @@ export * from "./prices/providers/BinancePriceProvider";
 export * from "./prices/providers/CoinGeckoPriceProvider";
 export * from "./prices/providers/CoinPaprikaPriceProvider";
 export * from "./prices/providers/OKXPriceProvider";
+export * from "./prices/providers/CustomPriceProvider";
 export * from "./prices/RedundantSwapPrice";
 export * from "./prices/SingleSwapPrice";
 export * from "./prices/SwapPriceWithChain";
