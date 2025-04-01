@@ -27,6 +27,7 @@ export declare abstract class IToBTCWrapper<T extends ChainType, S extends IToBT
     protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, claimHash: string | null, abortController: AbortController): Promise<any | null>;
     readonly pendingSwapStates: ToBTCSwapState[];
     readonly tickSwapState: ToBTCSwapState[];
+    readonly refundableSwapStates: ToBTCSwapState[];
     protected processEventInitialize(swap: S, event: InitializeEvent<T["Data"]>): Promise<boolean>;
     protected processEventClaim(swap: S, event: ClaimEvent<T["Data"]>): Promise<boolean>;
     protected processEventRefund(swap: S, event: RefundEvent<T["Data"]>): Promise<boolean>;

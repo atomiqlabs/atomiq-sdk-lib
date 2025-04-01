@@ -66,6 +66,7 @@ export abstract class IToBTCWrapper<
         ToBTCSwapState.REFUNDABLE
     ];
     public readonly tickSwapState = [ToBTCSwapState.CREATED, ToBTCSwapState.COMMITED, ToBTCSwapState.SOFT_CLAIMED];
+    public readonly refundableSwapStates = [ToBTCSwapState.REFUNDABLE];
 
     protected async processEventInitialize(swap: S, event: InitializeEvent<T["Data"]>): Promise<boolean> {
         if(swap.state===ToBTCSwapState.CREATED || swap.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) {

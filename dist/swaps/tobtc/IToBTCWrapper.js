@@ -16,6 +16,7 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             IToBTCSwap_1.ToBTCSwapState.REFUNDABLE
         ];
         this.tickSwapState = [IToBTCSwap_1.ToBTCSwapState.CREATED, IToBTCSwap_1.ToBTCSwapState.COMMITED, IToBTCSwap_1.ToBTCSwapState.SOFT_CLAIMED];
+        this.refundableSwapStates = [IToBTCSwap_1.ToBTCSwapState.REFUNDABLE];
     }
     /**
      * Pre-fetches intermediary's reputation, doesn't throw, instead aborts via abortController and returns null

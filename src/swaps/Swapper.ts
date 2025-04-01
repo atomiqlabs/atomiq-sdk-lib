@@ -1133,7 +1133,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 for(let wrapper of [wrappers[SwapType.TO_BTCLN], wrappers[SwapType.TO_BTC]]) {
                     const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
                     if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
-                    swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
+                    swapTypeQueryParams.push({key: "state", value: wrapper.refundableSwapStates});
                     queryParams.push(swapTypeQueryParams);
                 }
                 return unifiedSwapStorage.query<IToBTCSwap<T[C]>>(queryParams, reviver as (val: any) => IToBTCSwap<T[C]>);
@@ -1145,7 +1145,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             for(let wrapper of [wrappers[SwapType.TO_BTCLN], wrappers[SwapType.TO_BTC]]) {
                 const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
                 if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
-                swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
+                swapTypeQueryParams.push({key: "state", value: wrapper.refundableSwapStates});
                 queryParams.push(swapTypeQueryParams);
             }
             const result = await unifiedSwapStorage.query<IToBTCSwap<T[C]>>(queryParams, reviver as (val: any) => IToBTCSwap<T[C]>);
@@ -1197,17 +1197,26 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                     swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
                     queryParams.push(swapTypeQueryParams);
                 }
+                this.logger.debug("_syncSwaps(): Querying swaps swaps for chain "+chainId+"!");
                 const swaps = await unifiedSwapStorage.query(queryParams, reviver);
+                this.logger.debug("_syncSwaps(): Syncing "+swaps.length+" swaps!");
 
                 const changedSwaps: ISwap<T[string]>[] = [];
+                const removeSwaps: ISwap<T[string]>[] = [];
                 for(let swap of swaps) {
                     this.logger.debug("_syncSwaps(): Syncing swap: "+swap.getId());
                     const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
                     this.logger.debug("_syncSwaps(): Synced swap: "+swap.getId());
-                    if(swapChanged) changedSwaps.push(swap);
+                    if(swap.isQuoteExpired()) {
+                        removeSwaps.push(swap);
+                    } else {
+                        if(swapChanged) changedSwaps.push(swap);
+                    }
                 }
 
+                this.logger.debug("_syncSwaps(): Done syncing "+swaps.length+" swaps, saving "+changedSwaps.length+" changed swaps, removing "+removeSwaps.length+" swaps!");
                 await unifiedSwapStorage.saveAll(changedSwaps);
+                await unifiedSwapStorage.removeAll(removeSwaps);
             }));
         } else {
             const {unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
@@ -1219,17 +1228,26 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
                 queryParams.push(swapTypeQueryParams);
             }
+            this.logger.debug("_syncSwaps(): Querying swaps swaps for chain "+chainId+"!");
             const swaps = await unifiedSwapStorage.query(queryParams, reviver);
+            this.logger.debug("_syncSwaps(): Syncing "+swaps.length+" swaps!");
 
             const changedSwaps: ISwap<T[C]>[] = [];
+            const removeSwaps: ISwap<T[C]>[] = [];
             for(let swap of swaps) {
                 this.logger.debug("_syncSwaps(): Syncing swap: "+swap.getId());
                 const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
                 this.logger.debug("_syncSwaps(): Synced swap: "+swap.getId());
-                if(swapChanged) changedSwaps.push(swap);
+                if(swap.isQuoteExpired()) {
+                    removeSwaps.push(swap);
+                } else {
+                    if(swapChanged) changedSwaps.push(swap);
+                }
             }
 
+            this.logger.debug("_syncSwaps(): Done syncing "+swaps.length+" swaps, saving "+changedSwaps.length+" changed swaps, removing "+removeSwaps.length+" swaps!");
             await unifiedSwapStorage.saveAll(changedSwaps);
+            await unifiedSwapStorage.removeAll(removeSwaps);
         }
     }
 
