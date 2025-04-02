@@ -10,7 +10,7 @@ import {
 import {SwapType} from "../enums/SwapType";
 import {SpvFromBTCWrapper} from "./SpvFromBTCWrapper";
 import {getLogger, timeoutPromise, toCoinselectAddressType, toOutputScript} from "../../utils/Utils";
-import {Transaction} from "@scure/btc-signer";
+import {getInputType, Transaction} from "@scure/btc-signer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
 import {Buffer} from "buffer";
 import {PriceInfoType} from "../../prices/abstract/ISwapPrice";
@@ -510,6 +510,8 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         //Ensure all inputs except the 1st are finalized
         for(let i=1;i<psbt.inputsLength;i++) {
             psbt.finalizeIdx(i);
+            if(getInputType(psbt.getInput(i)).txType==="legacy")
+                throw new Error("Legacy (non-segwit) inputs are not allowed in the transaction!");
         }
         const btcTx = await this.wrapper.btcRpc.parseTransaction(Buffer.from(psbt.toBytes(true)).toString("hex"));
         const data = await this.wrapper.contract.getWithdrawalData(btcTx);
