@@ -8,7 +8,8 @@ export type QueryParams = {
 export declare class UnifiedSwapStorage<T extends ChainType> {
     readonly storage: IUnifiedStorage;
     readonly weakRefCache: Map<string, WeakRef<ISwap<T>>>;
-    constructor(storage: IUnifiedStorage);
+    readonly noWeakRefMap: boolean;
+    constructor(storage: IUnifiedStorage, noWeakRefMap?: boolean);
     init(): Promise<void>;
     /**
      * Params are specified in the following way:

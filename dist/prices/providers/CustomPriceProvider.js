@@ -14,7 +14,7 @@ class CustomPriceProvider extends IPriceProvider_1.IPriceProvider {
     }
     async fetchUsdPrice(abortSignal) {
         const [btcPrice] = await this.getUsdPriceFn(["BTC"], abortSignal);
-        return btcPrice;
+        return btcPrice / 100000000;
     }
 }
 exports.CustomPriceProvider = CustomPriceProvider;

@@ -62,8 +62,9 @@ export type SwapperOptions = {
 
     noTimers?: boolean,
     noEvents?: boolean,
+    noSwapCache?: boolean,
     dontCheckPastSwaps?: boolean,
-    dontFetchLPs?: boolean
+    dontFetchLPs?: boolean,
 };
 
 export type MultiChain = {
@@ -206,7 +207,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             const synchronizer = new MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
 
             const storageHandler = options.swapStorage(storagePrefix + chainData.chainId);
-            const unifiedSwapStorage = new UnifiedSwapStorage<T[InputKey]>(storageHandler);
+            const unifiedSwapStorage = new UnifiedSwapStorage<T[InputKey]>(storageHandler, this.options.noSwapCache);
             const unifiedChainEvents = new UnifiedSwapEventListener<T[InputKey]>(unifiedSwapStorage, chainEvents);
 
             const wrappers: any = {};

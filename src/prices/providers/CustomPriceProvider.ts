@@ -20,7 +20,7 @@ export class CustomPriceProvider<T extends MultiChain> extends IPriceProvider<T>
 
     protected async fetchUsdPrice(abortSignal?: AbortSignal): Promise<number> {
         const [btcPrice] = await this.getUsdPriceFn(["BTC"], abortSignal);
-        return btcPrice;
+        return btcPrice / 100_000_000;
     }
 
 }

@@ -4,9 +4,10 @@ exports.UnifiedSwapStorage = void 0;
 const Utils_1 = require("../utils/Utils");
 const logger = (0, Utils_1.getLogger)("UnifiedSwapStorage: ");
 class UnifiedSwapStorage {
-    constructor(storage) {
+    constructor(storage, noWeakRefMap) {
         this.weakRefCache = new Map();
         this.storage = storage;
+        this.noWeakRefMap = noWeakRefMap;
     }
     init() {
         return this.storage.init();
@@ -22,30 +23,36 @@ class UnifiedSwapStorage {
     async query(params, reviver) {
         const rawSwaps = await this.storage.query(params);
         return rawSwaps.map(rawObj => {
-            const savedRef = this.weakRefCache.get(rawObj.id)?.deref();
-            if (savedRef != null) {
-                return savedRef;
+            if (!this.noWeakRefMap) {
+                const savedRef = this.weakRefCache.get(rawObj.id)?.deref();
+                if (savedRef != null)
+                    return savedRef;
+                logger.debug("query(): Reviving new swap instance: " + rawObj.id);
             }
-            logger.debug("query(): Reviving new swap instance: " + rawObj.id);
             const value = reviver(rawObj);
-            this.weakRefCache.set(rawObj.id, new WeakRef(value));
+            if (!this.noWeakRefMap)
+                this.weakRefCache.set(rawObj.id, new WeakRef(value));
             return value;
         });
     }
     save(value) {
-        this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef(value));
+        if (!this.noWeakRefMap)
+            this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef(value));
         return this.storage.save(value.serialize());
     }
     saveAll(values) {
-        values.forEach(value => this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef(value)));
+        if (!this.noWeakRefMap)
+            values.forEach(value => this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef(value)));
         return this.storage.saveAll(values.map(obj => obj.serialize()));
     }
     remove(value) {
-        this.weakRefCache.delete(value.getIdentifierHashString());
+        if (!this.noWeakRefMap)
+            this.weakRefCache.delete(value.getIdentifierHashString());
         return this.storage.remove(value.serialize());
     }
     removeAll(values) {
-        values.forEach(value => this.weakRefCache.delete(value.getIdentifierHashString()));
+        if (!this.noWeakRefMap)
+            values.forEach(value => this.weakRefCache.delete(value.getIdentifierHashString()));
         return this.storage.removeAll(values.map(obj => obj.serialize()));
     }
 }

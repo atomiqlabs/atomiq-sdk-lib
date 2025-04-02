@@ -14,9 +14,11 @@ export class UnifiedSwapStorage<T extends ChainType> {
 
     readonly storage: IUnifiedStorage;
     readonly weakRefCache: Map<string, WeakRef<ISwap<T>>> = new Map();
+    readonly noWeakRefMap: boolean;
 
-    constructor(storage: IUnifiedStorage) {
+    constructor(storage: IUnifiedStorage, noWeakRefMap?: boolean) {
         this.storage = storage;
+        this.noWeakRefMap = noWeakRefMap;
     }
 
     init(): Promise<void> {
@@ -35,34 +37,34 @@ export class UnifiedSwapStorage<T extends ChainType> {
         const rawSwaps = await this.storage.query(params);
 
         return rawSwaps.map(rawObj => {
-            const savedRef = this.weakRefCache.get(rawObj.id)?.deref();
-            if(savedRef!=null) {
-                return savedRef as S;
+            if(!this.noWeakRefMap) {
+                const savedRef = this.weakRefCache.get(rawObj.id)?.deref();
+                if(savedRef!=null) return savedRef as S;
+                logger.debug("query(): Reviving new swap instance: "+rawObj.id);
             }
-            logger.debug("query(): Reviving new swap instance: "+rawObj.id);
             const value = reviver(rawObj);
-            this.weakRefCache.set(rawObj.id, new WeakRef<ISwap<T>>(value));
+            if(!this.noWeakRefMap) this.weakRefCache.set(rawObj.id, new WeakRef<ISwap<T>>(value));
             return value;
         });
     }
 
     save<S extends ISwap<T>>(value: S): Promise<void> {
-        this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef<ISwap<T>>(value));
+        if(!this.noWeakRefMap) this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef<ISwap<T>>(value));
         return this.storage.save(value.serialize());
     }
 
     saveAll<S extends ISwap<T>>(values: S[]): Promise<void> {
-        values.forEach(value => this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef<ISwap<T>>(value)));
+        if(!this.noWeakRefMap) values.forEach(value => this.weakRefCache.set(value.getIdentifierHashString(), new WeakRef<ISwap<T>>(value)));
         return this.storage.saveAll(values.map(obj => obj.serialize()));
     }
 
     remove<S extends ISwap<T>>(value: S): Promise<void> {
-        this.weakRefCache.delete(value.getIdentifierHashString());
+        if(!this.noWeakRefMap) this.weakRefCache.delete(value.getIdentifierHashString());
         return this.storage.remove(value.serialize());
     }
 
     removeAll<S extends ISwap<T>>(values: S[]): Promise<void> {
-        values.forEach(value => this.weakRefCache.delete(value.getIdentifierHashString()));
+        if(!this.noWeakRefMap) values.forEach(value => this.weakRefCache.delete(value.getIdentifierHashString()));
         return this.storage.removeAll(values.map(obj => obj.serialize()));
     }
 

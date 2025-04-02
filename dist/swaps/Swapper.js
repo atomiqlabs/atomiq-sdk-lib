@@ -58,7 +58,7 @@ class Swapper extends events_1.EventEmitter {
             const { swapContract, chainEvents, btcRelay } = chainData;
             const synchronizer = new MempoolBtcRelaySynchronizer_1.MempoolBtcRelaySynchronizer(btcRelay, bitcoinRpc);
             const storageHandler = options.swapStorage(storagePrefix + chainData.chainId);
-            const unifiedSwapStorage = new UnifiedSwapStorage_1.UnifiedSwapStorage(storageHandler);
+            const unifiedSwapStorage = new UnifiedSwapStorage_1.UnifiedSwapStorage(storageHandler, this.options.noSwapCache);
             const unifiedChainEvents = new UnifiedSwapEventListener_1.UnifiedSwapEventListener(unifiedSwapStorage, chainEvents);
             const wrappers = {};
             wrappers[SwapType_1.SwapType.TO_BTCLN] = new ToBTCLNWrapper_1.ToBTCLNWrapper(key, unifiedSwapStorage, unifiedChainEvents, swapContract, pricing, tokens, chainData.swapDataConstructor, {

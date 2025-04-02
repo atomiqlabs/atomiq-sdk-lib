@@ -44,6 +44,7 @@ export type SwapperOptions = {
     swapStorage?: <T extends ChainType>(chainId: T["ChainId"]) => IUnifiedStorage;
     noTimers?: boolean;
     noEvents?: boolean;
+    noSwapCache?: boolean;
     dontCheckPastSwaps?: boolean;
     dontFetchLPs?: boolean;
 };
