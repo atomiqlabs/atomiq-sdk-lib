@@ -619,6 +619,8 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     //////////////////////////////
     //// Swap ticks & sync
     async syncStateFromBitcoin(save) {
+        if (this.data?.btcTx == null)
+            return false;
         //Check if bitcoin payment was confirmed
         const res = await this.getBitcoinPayment();
         if (res == null) {
@@ -678,7 +680,8 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             this.state === SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED ||
             this.state === SpvFromBTCSwapState.DECLINED) {
             //Check BTC transaction
-            changed ||= await this.syncStateFromBitcoin(false);
+            if (await this.syncStateFromBitcoin(false))
+                changed ||= true;
         }
         if (this.state === SpvFromBTCSwapState.BROADCASTED || this.state === SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
             const status = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
@@ -725,7 +728,12 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         if (this.state === SpvFromBTCSwapState.CREATED ||
             this.state === SpvFromBTCSwapState.SIGNED) {
             if (this.getExpiry() < Date.now()) {
-                this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
+                if (this.state === SpvFromBTCSwapState.CREATED) {
+                    this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
+                }
+                else {
+                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
+                }
                 if (save)
                     await this._saveAndEmit();
                 return true;
