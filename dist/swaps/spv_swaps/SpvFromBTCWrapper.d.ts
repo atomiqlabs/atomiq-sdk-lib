@@ -10,6 +10,7 @@ import { UnifiedSwapEventListener } from "../../events/UnifiedSwapEventListener"
 import { ISwapPrice } from "../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { Intermediary } from "../../intermediaries/Intermediary";
+import { Transaction } from "@scure/btc-signer";
 export type SpvFromBTCOptions = {
     gasAmount?: bigint;
     unsafeZeroWatchtowerFee?: boolean;
@@ -91,4 +92,11 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
         quote: Promise<SpvFromBTCSwap<T>>;
         intermediary: Intermediary;
     }[];
+    /**
+     * Returns a random dummy PSBT that can be used for fee estimation, the last output (the LP output) is omitted
+     *  to allow for coinselection algorithm to determine maximum sendable amount there
+     *
+     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
+     */
+    getDummySwapPsbt(includeGasToken?: boolean): Transaction;
 }

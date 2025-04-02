@@ -335,6 +335,9 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         }
         return { psbt, signInputs };
     }
+    async estimateBitcoinFee(wallet, feeRate) {
+        return wallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
+    }
     async submitPsbt(psbt) {
         //Ensure not expired
         if (this.expiry < Date.now()) {

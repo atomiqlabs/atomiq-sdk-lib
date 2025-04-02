@@ -200,6 +200,19 @@ class Swapper extends events_1.EventEmitter {
         return null;
     }
     /**
+     * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
+     *  to allow for coinselection algorithm to determine maximum sendable amount there
+     *
+     * @param chainIdentifier
+     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
+     */
+    getRandomSpvVaultPsbt(chainIdentifier, includeGasToken) {
+        const wrapper = this.chains[chainIdentifier].wrappers[SwapType_1.SwapType.SPV_VAULT_FROM_BTC];
+        if (wrapper == null)
+            throw new Error("Chain doesn't support spv vault swaps!");
+        return wrapper.getDummySwapPsbt(includeGasToken);
+    }
+    /**
      * Returns swap bounds (minimums & maximums) for different swap types & tokens
      */
     getSwapBounds(chainIdentifier) {

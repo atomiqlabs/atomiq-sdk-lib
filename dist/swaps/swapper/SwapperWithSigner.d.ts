@@ -20,6 +20,7 @@ import { FromBTCLNOptions } from "../escrow_swaps/frombtc/ln/FromBTCLNWrapper";
 import { FromBTCOptions } from "../escrow_swaps/frombtc/onchain/FromBTCWrapper";
 import { ToBTCLNOptions } from "../escrow_swaps/tobtc/ln/ToBTCLNWrapper";
 import { ToBTCOptions } from "../escrow_swaps/tobtc/onchain/ToBTCWrapper";
+import { Transaction } from "@scure/btc-signer";
 export declare class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends ChainIds<T>> implements SwapperBtcUtils {
     swapper: SwapperWithChain<T, ChainIdentifier>;
     signer: T[ChainIdentifier]["Signer"];
@@ -60,6 +61,13 @@ export declare class SwapperWithSigner<T extends MultiChain, ChainIdentifier ext
      * @param lnpr
      */
     getLightningInvoiceValue(lnpr: string): bigint;
+    /**
+     * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
+     *  to allow for coinselection algorithm to determine maximum sendable amount there
+     *
+     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
+     */
+    getRandomSpvVaultPsbt(includeGasToken?: boolean): Transaction;
     /**
      * Returns swap bounds (minimums & maximums) for different swap types & tokens
      */

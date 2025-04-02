@@ -496,6 +496,10 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         return {psbt, signInputs};
     }
 
+    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
+        return wallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
+    }
+
     async submitPsbt(psbt: Transaction): Promise<string> {
         //Ensure not expired
         if(this.expiry<Date.now()) {

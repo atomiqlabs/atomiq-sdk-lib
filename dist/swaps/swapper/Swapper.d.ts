@@ -26,6 +26,7 @@ import { BtcToken, SCToken, Token } from "../../Tokens";
 import { OnchainForGasSwap } from "../trusted/onchain/OnchainForGasSwap";
 import { OnchainForGasWrapper } from "../trusted/onchain/OnchainForGasWrapper";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
+import { Transaction } from "@scure/btc-signer";
 import { IUnifiedStorage } from "../../storage/IUnifiedStorage";
 import { UnifiedSwapStorage } from "../../storage/UnifiedSwapStorage";
 import { UnifiedSwapEventListener } from "../../events/UnifiedSwapEventListener";
@@ -170,6 +171,14 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter implemen
      * @param lnpr
      */
     getLightningInvoiceValue(lnpr: string): bigint;
+    /**
+     * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
+     *  to allow for coinselection algorithm to determine maximum sendable amount there
+     *
+     * @param chainIdentifier
+     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
+     */
+    getRandomSpvVaultPsbt<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, includeGasToken?: boolean): Transaction;
     getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SwapBounds;
     getSwapBounds(): MultichainSwapBounds;
     /**
