@@ -36,6 +36,7 @@ class Swapper extends events_1.EventEmitter {
         this.prices = pricing;
         this.bitcoinRpc = bitcoinRpc;
         this.mempoolApi = bitcoinRpc.api;
+        this.options = options;
         this.tokens = {};
         for (let tokenData of tokens) {
             for (let chainId in tokenData.chains) {
@@ -118,7 +119,6 @@ class Swapper extends events_1.EventEmitter {
         this.intermediaryDiscovery.on("added", (intermediaries) => {
             this.emit("lpsAdded", intermediaries);
         });
-        this.options = options;
     }
     /**
      * Returns true if string is a valid BOLT11 bitcoin lightning invoice

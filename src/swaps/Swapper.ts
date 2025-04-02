@@ -182,6 +182,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         this.bitcoinRpc = bitcoinRpc;
         this.mempoolApi = bitcoinRpc.api;
 
+        this.options = options;
+
         this.tokens = {};
         for(let tokenData of tokens) {
             for(let chainId in tokenData.chains) {
@@ -336,8 +338,6 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         this.intermediaryDiscovery.on("added", (intermediaries: Intermediary[]) => {
             this.emit("lpsAdded", intermediaries);
         });
-
-        this.options = options;
     }
 
     /**
