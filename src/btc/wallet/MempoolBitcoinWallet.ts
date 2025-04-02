@@ -244,6 +244,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
             address: string,
             addressType: CoinselectAddressTypes,
         }[],
+        psbt?: Transaction
     ): Promise<{
         balance: bigint,
         feeRate: number,
@@ -255,12 +256,36 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
 
         console.log("Utxo pool: ", utxoPool);
 
+        const requiredInputs: CoinselectTxInput[] = [];
+        if(psbt!=null) for(let i=0;i<psbt.inputsLength;i++) {
+            const input = psbt.getInput(i);
+            let amount: bigint = input.witnessUtxo!=null ? input.witnessUtxo.amount : input.nonWitnessUtxo.outputs[input.index].amount;
+            let script: Uint8Array = input.witnessUtxo!=null ? input.witnessUtxo.script : input.nonWitnessUtxo.outputs[input.index].script;
+            requiredInputs.push({
+                txId: Buffer.from(input.txid).toString('hex'),
+                vout: input.index,
+                value: Number(amount),
+                type: toCoinselectAddressType(script)
+            })
+        }
+        console.log("Coinselect requiredInputs: ", requiredInputs);
+
+        const additionalOutputs: {value: number, script: Buffer}[] = [];
+        if(psbt!=null) for(let i=0;i<psbt.outputsLength;i++) {
+            const output = psbt.getOutput(i);
+            additionalOutputs.push({
+                value: Number(output.amount),
+                script: Buffer.from(output.script)
+            })
+        }
+        console.log("Coinselect additionalOutputs: ", additionalOutputs);
+
         const target = OutScript.encode({
             type: "wsh",
             hash: randomBytes(32)
         });
 
-        let coinselectResult = maxSendable(utxoPool, {script: Buffer.from(target), type: "p2wsh"}, useFeeRate);
+        let coinselectResult = maxSendable(utxoPool, {script: Buffer.from(target), type: "p2wsh"}, useFeeRate, requiredInputs, additionalOutputs);
 
         console.log("Max spendable result: ", coinselectResult);
 
