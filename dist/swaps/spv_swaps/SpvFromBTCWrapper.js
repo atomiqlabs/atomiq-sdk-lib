@@ -426,7 +426,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             allowUnknownOutputs: true,
             allowUnknown: true
         });
-        const randomVaultOutScript = btc_signer_1.OutScript.encode({ type: "tr", pubkey: Buffer.concat([Buffer.from([0]), (0, Utils_1.randomBytes)(31)]) });
+        const randomVaultOutScript = btc_signer_1.OutScript.encode({ type: "tr", pubkey: Buffer.from("0101010101010101010101010101010101010101010101010101010101010101", "hex") });
         psbt.addInput({
             txid: (0, Utils_1.randomBytes)(32),
             index: 0,

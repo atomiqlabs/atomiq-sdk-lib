@@ -561,7 +561,7 @@ export class SpvFromBTCWrapper<
             allowUnknown: true
         });
 
-        const randomVaultOutScript = OutScript.encode({type: "tr", pubkey: Buffer.concat([Buffer.from([0]), randomBytes(31)])});
+        const randomVaultOutScript = OutScript.encode({type: "tr", pubkey: Buffer.from("0101010101010101010101010101010101010101010101010101010101010101", "hex")});
 
         psbt.addInput({
             txid: randomBytes(32),
