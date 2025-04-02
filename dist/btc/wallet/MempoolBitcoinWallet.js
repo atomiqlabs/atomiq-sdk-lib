@@ -174,15 +174,39 @@ class MempoolBitcoinWallet {
             inputAddressIndexes
         };
     }
-    async _getSpendableBalance(sendingAccounts) {
+    async _getSpendableBalance(sendingAccounts, psbt) {
         const useFeeRate = await this.getFeeRate();
         const utxoPool = (await Promise.all(sendingAccounts.map(acc => this._getUtxoPool(acc.address, acc.addressType)))).flat();
         console.log("Utxo pool: ", utxoPool);
+        const requiredInputs = [];
+        if (psbt != null)
+            for (let i = 0; i < psbt.inputsLength; i++) {
+                const input = psbt.getInput(i);
+                let amount = input.witnessUtxo != null ? input.witnessUtxo.amount : input.nonWitnessUtxo.outputs[input.index].amount;
+                let script = input.witnessUtxo != null ? input.witnessUtxo.script : input.nonWitnessUtxo.outputs[input.index].script;
+                requiredInputs.push({
+                    txId: buffer_1.Buffer.from(input.txid).toString('hex'),
+                    vout: input.index,
+                    value: Number(amount),
+                    type: (0, Utils_1.toCoinselectAddressType)(script)
+                });
+            }
+        console.log("Coinselect requiredInputs: ", requiredInputs);
+        const additionalOutputs = [];
+        if (psbt != null)
+            for (let i = 0; i < psbt.outputsLength; i++) {
+                const output = psbt.getOutput(i);
+                additionalOutputs.push({
+                    value: Number(output.amount),
+                    script: buffer_1.Buffer.from(output.script)
+                });
+            }
+        console.log("Coinselect additionalOutputs: ", additionalOutputs);
         const target = btc_signer_1.OutScript.encode({
             type: "wsh",
             hash: (0, Utils_1.randomBytes)(32)
         });
-        let coinselectResult = (0, coinselect2_1.maxSendable)(utxoPool, { script: buffer_1.Buffer.from(target), type: "p2wsh" }, useFeeRate);
+        let coinselectResult = (0, coinselect2_1.maxSendable)(utxoPool, { script: buffer_1.Buffer.from(target), type: "p2wsh" }, useFeeRate, requiredInputs, additionalOutputs);
         console.log("Max spendable result: ", coinselectResult);
         return {
             feeRate: useFeeRate,
