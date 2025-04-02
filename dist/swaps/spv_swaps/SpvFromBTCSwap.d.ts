@@ -144,6 +144,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         psbt: Transaction;
         signInputs: number[];
     }>;
+    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
     submitPsbt(psbt: Transaction): Promise<string>;
     signAndSubmit(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     /**

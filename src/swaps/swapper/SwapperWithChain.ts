@@ -19,6 +19,7 @@ import {ToBTCOptions} from "../escrow_swaps/tobtc/onchain/ToBTCWrapper";
 import {ToBTCLNOptions} from "../escrow_swaps/tobtc/ln/ToBTCLNWrapper";
 import {FromBTCOptions} from "../escrow_swaps/frombtc/onchain/FromBTCWrapper";
 import {FromBTCLNOptions} from "../escrow_swaps/frombtc/ln/FromBTCLNWrapper";
+import {Transaction} from "@scure/btc-signer";
 
 export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends ChainIds<T>> implements SwapperBtcUtils {
 
@@ -90,6 +91,16 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
      */
     getLightningInvoiceValue(lnpr: string): bigint {
         return this.swapper.getLightningInvoiceValue(lnpr);
+    }
+
+    /**
+     * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
+     *  to allow for coinselection algorithm to determine maximum sendable amount there
+     *
+     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
+     */
+    getRandomSpvVaultPsbt(includeGasToken?: boolean): Transaction {
+        return this.swapper.getRandomSpvVaultPsbt(this.chainIdentifier, includeGasToken);
     }
 
     /**

@@ -64,6 +64,15 @@ class SwapperWithSigner {
         return this.swapper.getLightningInvoiceValue(lnpr);
     }
     /**
+     * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
+     *  to allow for coinselection algorithm to determine maximum sendable amount there
+     *
+     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
+     */
+    getRandomSpvVaultPsbt(includeGasToken) {
+        return this.swapper.getRandomSpvVaultPsbt(includeGasToken);
+    }
+    /**
      * Returns swap bounds (minimums & maximums) for different swap types & tokens
      */
     getSwapBounds() {

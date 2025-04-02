@@ -6,7 +6,7 @@ import {
     ChainData,
     ChainSwapType,
     ChainType,
-    RelaySynchronizer, SpvVaultContract, SwapContract
+    RelaySynchronizer
 } from "@atomiqlabs/base";
 import {ToBTCLNOptions, ToBTCLNWrapper} from "../escrow_swaps/tobtc/ln/ToBTCLNWrapper";
 import {ToBTCOptions, ToBTCWrapper} from "../escrow_swaps/tobtc/onchain/ToBTCWrapper";
@@ -38,7 +38,7 @@ import {BtcToken, SCToken, Token} from "../../Tokens";
 import {OnchainForGasSwap} from "../trusted/onchain/OnchainForGasSwap";
 import {OnchainForGasWrapper} from "../trusted/onchain/OnchainForGasWrapper";
 import {BTC_NETWORK, NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
-import {Address} from "@scure/btc-signer";
+import {Address, Transaction} from "@scure/btc-signer";
 import {IUnifiedStorage, QueryParams} from "../../storage/IUnifiedStorage";
 import {IndexedDBUnifiedStorage} from "../../browser-storage/IndexedDBUnifiedStorage";
 import {UnifiedSwapStorage} from "../../storage/UnifiedSwapStorage";
@@ -461,6 +461,19 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
         const parsed = bolt11Decode(lnpr);
         if(parsed.millisatoshis!=null) return (BigInt(parsed.millisatoshis) + 999n) / 1000n;
         return null;
+    }
+
+    /**
+     * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
+     *  to allow for coinselection algorithm to determine maximum sendable amount there
+     *
+     * @param chainIdentifier
+     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
+     */
+    getRandomSpvVaultPsbt<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, includeGasToken?: boolean): Transaction {
+        const wrapper = this.chains[chainIdentifier].wrappers[SwapType.SPV_VAULT_FROM_BTC];
+        if(wrapper==null) throw new Error("Chain doesn't support spv vault swaps!");
+        return wrapper.getDummySwapPsbt(includeGasToken);
     }
 
     getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SwapBounds;

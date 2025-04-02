@@ -6,13 +6,16 @@ export interface IBitcoinWallet {
     signPsbt(psbt: Transaction, signInputs: number[]): Promise<Transaction>;
 
     getFeeRate(): Promise<number>;
+
     getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number>;
+    getFundedPsbtFee(psbt: Transaction, feeRate?: number): Promise<number>;
+
     getReceiveAddress(): string;
     getBalance(): Promise<{
         confirmedBalance: bigint,
         unconfirmedBalance: bigint
     }>;
-    getSpendableBalance(): Promise<{
+    getSpendableBalance(psbt?: Transaction): Promise<{
         balance: bigint,
         feeRate: number,
         totalFee: number

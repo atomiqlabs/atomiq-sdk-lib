@@ -31,6 +31,8 @@ import {
 import {RequestError} from "../../errors/RequestError";
 import {IntermediaryError} from "../../errors/IntermediaryError";
 import {CoinselectAddressTypes} from "../../btc/coinselect2";
+import {IBitcoinWallet} from "../../btc/wallet/IBitcoinWallet";
+import {OutScript, Transaction} from "@scure/btc-signer";
 
 export type SpvFromBTCOptions = {
     gasAmount?: bigint,
@@ -49,6 +51,7 @@ export type SpvFromBTCWrapperOptions = ISwapWrapperOptions & {
 export class SpvFromBTCWrapper<
     T extends ChainType
 > extends ISwapWrapper<T, SpvFromBTCSwap<T>, SpvFromBTCWrapperOptions> {
+
     public readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
     public readonly swapDeserializer = SpvFromBTCSwap;
 
@@ -541,6 +544,53 @@ export class SpvFromBTCWrapper<
                 })()
             }
         });
+    }
+
+    /**
+     * Returns a random dummy PSBT that can be used for fee estimation, the last output (the LP output) is omitted
+     *  to allow for coinselection algorithm to determine maximum sendable amount there
+     *
+     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
+     */
+    public getDummySwapPsbt(includeGasToken = false): Transaction {
+        //Construct dummy swap psbt
+        const psbt = new Transaction({
+            allowUnknownInputs: true,
+            allowLegacyWitnessUtxo: true,
+            allowUnknownOutputs: true,
+            allowUnknown: true
+        });
+
+        const randomVaultOutScript = OutScript.encode({type: "tr", pubkey: Buffer.concat([Buffer.from([0]), randomBytes(31)])});
+
+        psbt.addInput({
+            txid: randomBytes(32),
+            index: 0,
+            witnessUtxo: {
+                script: randomVaultOutScript,
+                amount: 600n
+            }
+        });
+
+        psbt.addOutput({
+            script: randomVaultOutScript,
+            amount: 600n
+        });
+
+        const opReturnData = this.contract.toOpReturnData(
+            this.chain.randomAddress(),
+            includeGasToken ? [0xFFFFFFFFFFFFFFFFn, 0xFFFFFFFFFFFFFFFFn] : [0xFFFFFFFFFFFFFFFFn]
+        );
+
+        psbt.addOutput({
+            script: Buffer.concat([
+                opReturnData.length <= 75 ? Buffer.from([0x6a, opReturnData.length]) : Buffer.from([0x6a, 0x4c, opReturnData.length]),
+                opReturnData
+            ]),
+            amount: 0n
+        });
+
+        return psbt;
     }
 
 }

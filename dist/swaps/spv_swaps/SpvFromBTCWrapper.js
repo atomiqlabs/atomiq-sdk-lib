@@ -10,6 +10,7 @@ const Utils_1 = require("../../utils/Utils");
 const IntermediaryAPI_1 = require("../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../errors/RequestError");
 const IntermediaryError_1 = require("../../errors/IntermediaryError");
+const btc_signer_1 = require("@scure/btc-signer");
 class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
     /**
      * @param chainIdentifier
@@ -410,6 +411,43 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                 })()
             };
         });
+    }
+    /**
+     * Returns a random dummy PSBT that can be used for fee estimation, the last output (the LP output) is omitted
+     *  to allow for coinselection algorithm to determine maximum sendable amount there
+     *
+     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
+     */
+    getDummySwapPsbt(includeGasToken = false) {
+        //Construct dummy swap psbt
+        const psbt = new btc_signer_1.Transaction({
+            allowUnknownInputs: true,
+            allowLegacyWitnessUtxo: true,
+            allowUnknownOutputs: true,
+            allowUnknown: true
+        });
+        const randomVaultOutScript = btc_signer_1.OutScript.encode({ type: "tr", pubkey: Buffer.concat([Buffer.from([0]), (0, Utils_1.randomBytes)(31)]) });
+        psbt.addInput({
+            txid: (0, Utils_1.randomBytes)(32),
+            index: 0,
+            witnessUtxo: {
+                script: randomVaultOutScript,
+                amount: 600n
+            }
+        });
+        psbt.addOutput({
+            script: randomVaultOutScript,
+            amount: 600n
+        });
+        const opReturnData = this.contract.toOpReturnData(this.chain.randomAddress(), includeGasToken ? [0xffffffffffffffffn, 0xffffffffffffffffn] : [0xffffffffffffffffn]);
+        psbt.addOutput({
+            script: Buffer.concat([
+                opReturnData.length <= 75 ? Buffer.from([0x6a, opReturnData.length]) : Buffer.from([0x6a, 0x4c, opReturnData.length]),
+                opReturnData
+            ]),
+            amount: 0n
+        });
+        return psbt;
     }
 }
 exports.SpvFromBTCWrapper = SpvFromBTCWrapper;
