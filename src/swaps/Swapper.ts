@@ -1133,7 +1133,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 const queryParams: Array<QueryParams[]> = [];
                 for(let wrapper of [wrappers[SwapType.TO_BTCLN], wrappers[SwapType.TO_BTC]]) {
                     const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
-                    if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+                    if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
                     swapTypeQueryParams.push({key: "state", value: wrapper.refundableSwapStates});
                     queryParams.push(swapTypeQueryParams);
                 }
@@ -1145,7 +1145,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             const queryParams: Array<QueryParams[]> = [];
             for(let wrapper of [wrappers[SwapType.TO_BTCLN], wrappers[SwapType.TO_BTC]]) {
                 const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
-                if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+                if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
                 swapTypeQueryParams.push({key: "state", value: wrapper.refundableSwapStates});
                 queryParams.push(swapTypeQueryParams);
             }

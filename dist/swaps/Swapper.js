@@ -716,7 +716,7 @@ class Swapper extends events_1.EventEmitter {
                 for (let wrapper of [wrappers[SwapType_1.SwapType.TO_BTCLN], wrappers[SwapType_1.SwapType.TO_BTC]]) {
                     const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
                     if (signer != null)
-                        swapTypeQueryParams.push({ key: "intiator", value: signer });
+                        swapTypeQueryParams.push({ key: "initiator", value: signer });
                     swapTypeQueryParams.push({ key: "state", value: wrapper.refundableSwapStates });
                     queryParams.push(swapTypeQueryParams);
                 }
@@ -730,7 +730,7 @@ class Swapper extends events_1.EventEmitter {
             for (let wrapper of [wrappers[SwapType_1.SwapType.TO_BTCLN], wrappers[SwapType_1.SwapType.TO_BTC]]) {
                 const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
                 if (signer != null)
-                    swapTypeQueryParams.push({ key: "intiator", value: signer });
+                    swapTypeQueryParams.push({ key: "initiator", value: signer });
                 swapTypeQueryParams.push({ key: "state", value: wrapper.refundableSwapStates });
                 queryParams.push(swapTypeQueryParams);
             }
