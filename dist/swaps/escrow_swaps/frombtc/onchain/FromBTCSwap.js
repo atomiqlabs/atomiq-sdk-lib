@@ -181,6 +181,9 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             targetConfirmations: this.requiredConfirmations
         };
     }
+    async estimateBitcoinFee(wallet, feeRate) {
+        return wallet.getTransactionFee(this.address, this.amount, feeRate);
+    }
     //////////////////////////////
     //// Commit
     /**

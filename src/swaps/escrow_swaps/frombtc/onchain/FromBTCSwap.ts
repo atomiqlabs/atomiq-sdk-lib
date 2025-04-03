@@ -7,6 +7,7 @@ import {Buffer} from "buffer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../../Tokens";
 import {extendAbortController, getLogger, tryWithRetries} from "../../../../utils/Utils";
 import {IEscrowSwapInit, isIEscrowSwapInit} from "../../IEscrowSwap";
+import {IBitcoinWallet} from "../../../../btc/wallet/IBitcoinWallet";
 
 export enum FromBTCSwapState {
     FAILED = -4,
@@ -237,6 +238,10 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
             confirmations: result.tx.confirmations,
             targetConfirmations: this.requiredConfirmations
         }
+    }
+
+    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
+        return wallet.getTransactionFee(this.address, this.amount, feeRate);
     }
 
 

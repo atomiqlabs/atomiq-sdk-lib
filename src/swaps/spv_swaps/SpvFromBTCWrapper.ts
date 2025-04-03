@@ -1,7 +1,7 @@
 import {AmountData, ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens} from "../ISwapWrapper";
 import {
     BtcRelay,
-    ChainEvent, ChainSwapType,
+    ChainEvent,
     ChainType,
     RelaySynchronizer,
     SpvVaultClaimEvent,
@@ -31,13 +31,13 @@ import {
 import {RequestError} from "../../errors/RequestError";
 import {IntermediaryError} from "../../errors/IntermediaryError";
 import {CoinselectAddressTypes} from "../../btc/coinselect2";
-import {IBitcoinWallet} from "../../btc/wallet/IBitcoinWallet";
 import {OutScript, Transaction} from "@scure/btc-signer";
 
 export type SpvFromBTCOptions = {
     gasAmount?: bigint,
     unsafeZeroWatchtowerFee?: boolean,
-    feeSafetyFactor?: number
+    feeSafetyFactor?: number,
+    maxAllowedNetworkFeeRate?: number
 };
 
 export type SpvFromBTCWrapperOptions = ISwapWrapperOptions & {
@@ -283,6 +283,10 @@ export class SpvFromBTCWrapper<
         vault: T["SpvVaultData"],
         vaultUtxoValue: number
     }> {
+        if(options.maxAllowedNetworkFeeRate!=null) {
+            if(options.maxAllowedNetworkFeeRate > resp.btcFeeRate) throw new IntermediaryError("Bitcoin fee rate returned too high!")
+        }
+
         //Vault related
         let vaultScript: Uint8Array;
         let vaultAddressType: CoinselectAddressTypes;
