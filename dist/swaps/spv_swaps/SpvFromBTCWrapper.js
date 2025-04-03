@@ -185,7 +185,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
      */
     async verifyReturnedData(resp, amountData, lp, options, callerFeeShare) {
         if (options.maxAllowedNetworkFeeRate != null) {
-            if (options.maxAllowedNetworkFeeRate > resp.btcFeeRate)
+            if (resp.btcFeeRate > options.maxAllowedNetworkFeeRate)
                 throw new IntermediaryError_1.IntermediaryError("Bitcoin fee rate returned too high!");
         }
         //Vault related
