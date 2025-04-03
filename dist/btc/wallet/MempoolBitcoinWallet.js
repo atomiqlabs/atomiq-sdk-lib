@@ -174,8 +174,8 @@ class MempoolBitcoinWallet {
             inputAddressIndexes
         };
     }
-    async _getSpendableBalance(sendingAccounts, psbt) {
-        const useFeeRate = await this.getFeeRate();
+    async _getSpendableBalance(sendingAccounts, psbt, feeRate) {
+        feeRate ??= await this.getFeeRate();
         const utxoPool = (await Promise.all(sendingAccounts.map(acc => this._getUtxoPool(acc.address, acc.addressType)))).flat();
         console.log("Utxo pool: ", utxoPool);
         const requiredInputs = [];
@@ -206,10 +206,10 @@ class MempoolBitcoinWallet {
             type: "wsh",
             hash: (0, Utils_1.randomBytes)(32)
         });
-        let coinselectResult = (0, coinselect2_1.maxSendable)(utxoPool, { script: buffer_1.Buffer.from(target), type: "p2wsh" }, useFeeRate, requiredInputs, additionalOutputs);
+        let coinselectResult = (0, coinselect2_1.maxSendable)(utxoPool, { script: buffer_1.Buffer.from(target), type: "p2wsh" }, feeRate, requiredInputs, additionalOutputs);
         console.log("Max spendable result: ", coinselectResult);
         return {
-            feeRate: useFeeRate,
+            feeRate: feeRate,
             balance: BigInt(Math.floor(coinselectResult.value)),
             totalFee: coinselectResult.fee
         };

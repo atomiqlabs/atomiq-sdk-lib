@@ -244,13 +244,14 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
             address: string,
             addressType: CoinselectAddressTypes,
         }[],
-        psbt?: Transaction
+        psbt?: Transaction,
+        feeRate?: number
     ): Promise<{
         balance: bigint,
         feeRate: number,
         totalFee: number
     }> {
-        const useFeeRate = await this.getFeeRate();
+        feeRate ??= await this.getFeeRate();
 
         const utxoPool: BitcoinWalletUtxo[] = (await Promise.all(sendingAccounts.map(acc => this._getUtxoPool(acc.address, acc.addressType)))).flat();
 
@@ -285,12 +286,12 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
             hash: randomBytes(32)
         });
 
-        let coinselectResult = maxSendable(utxoPool, {script: Buffer.from(target), type: "p2wsh"}, useFeeRate, requiredInputs, additionalOutputs);
+        let coinselectResult = maxSendable(utxoPool, {script: Buffer.from(target), type: "p2wsh"}, feeRate, requiredInputs, additionalOutputs);
 
         console.log("Max spendable result: ", coinselectResult);
 
         return {
-            feeRate: useFeeRate,
+            feeRate: feeRate,
             balance: BigInt(Math.floor(coinselectResult.value)),
             totalFee: coinselectResult.fee
         }
@@ -308,7 +309,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         confirmedBalance: bigint,
         unconfirmedBalance: bigint
     }>;
-    abstract getSpendableBalance(psbt?: Transaction): Promise<{
+    abstract getSpendableBalance(psbt?: Transaction, feeRate?: number): Promise<{
         balance: bigint,
         feeRate: number,
         totalFee: number
