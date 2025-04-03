@@ -57,7 +57,7 @@ export declare abstract class MempoolBitcoinWallet implements IBitcoinWallet {
     protected _getSpendableBalance(sendingAccounts: {
         address: string;
         addressType: CoinselectAddressTypes;
-    }[], psbt?: Transaction): Promise<{
+    }[], psbt?: Transaction, feeRate?: number): Promise<{
         balance: bigint;
         feeRate: number;
         totalFee: number;
@@ -72,7 +72,7 @@ export declare abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         confirmedBalance: bigint;
         unconfirmedBalance: bigint;
     }>;
-    abstract getSpendableBalance(psbt?: Transaction): Promise<{
+    abstract getSpendableBalance(psbt?: Transaction, feeRate?: number): Promise<{
         balance: bigint;
         feeRate: number;
         totalFee: number;

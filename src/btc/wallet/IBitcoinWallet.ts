@@ -15,7 +15,7 @@ export interface IBitcoinWallet {
         confirmedBalance: bigint,
         unconfirmedBalance: bigint
     }>;
-    getSpendableBalance(psbt?: Transaction): Promise<{
+    getSpendableBalance(psbt?: Transaction, feeRate?: number): Promise<{
         balance: bigint,
         feeRate: number,
         totalFee: number
