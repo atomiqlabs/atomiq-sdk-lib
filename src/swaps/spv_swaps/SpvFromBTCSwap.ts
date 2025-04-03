@@ -426,11 +426,6 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         const nSequence0 = 0x80000000n | (this.callerFeeShare & 0xFFFFFn) | (this.frontingFeeShare & 0b1111_1111_1100_0000_0000n) << 10n;
         const nSequence1 = 0x80000000n | (this.executionFeeShare & 0xFFFFFn) | (this.frontingFeeShare & 0b0000_0000_0011_1111_1111n) << 20n;
 
-        if(!this.initiated) {
-            this.initiated = true;
-            await this._saveAndEmit();
-        }
-
         return {
             in0txid: txId,
             in0vout: parseInt(voutStr),
@@ -565,6 +560,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         }
 
         this.data = data;
+        this.initiated = true;
         await this._saveAndEmit(SpvFromBTCSwapState.SIGNED);
 
         try {

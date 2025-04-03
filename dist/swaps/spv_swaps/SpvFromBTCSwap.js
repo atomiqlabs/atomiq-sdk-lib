@@ -267,10 +267,6 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             throw new Error("Execution fee out of bounds!");
         const nSequence0 = 0x80000000n | (this.callerFeeShare & 0xfffffn) | (this.frontingFeeShare & 1047552n) << 10n;
         const nSequence1 = 0x80000000n | (this.executionFeeShare & 0xfffffn) | (this.frontingFeeShare & 1023n) << 20n;
-        if (!this.initiated) {
-            this.initiated = true;
-            await this._saveAndEmit();
-        }
         return {
             in0txid: txId,
             in0vout: parseInt(voutStr),
@@ -391,6 +387,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             throw new Error("Quote expired!");
         }
         this.data = data;
+        this.initiated = true;
         await this._saveAndEmit(SpvFromBTCSwapState.SIGNED);
         try {
             await IntermediaryAPI_1.IntermediaryAPI.initSpvFromBTC(this.chainIdentifier, this.url, {
