@@ -284,7 +284,7 @@ export class SpvFromBTCWrapper<
         vaultUtxoValue: number
     }> {
         if(options.maxAllowedNetworkFeeRate!=null) {
-            if(options.maxAllowedNetworkFeeRate > resp.btcFeeRate) throw new IntermediaryError("Bitcoin fee rate returned too high!")
+            if(resp.btcFeeRate > options.maxAllowedNetworkFeeRate) throw new IntermediaryError("Bitcoin fee rate returned too high!")
         }
 
         //Vault related
