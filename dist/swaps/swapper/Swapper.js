@@ -387,6 +387,16 @@ class Swapper extends events_1.EventEmitter {
             }
             else {
                 candidates = this.intermediaryDiscovery.getSwapCandidates(chainIdentifier, swapType, amountData.token, amountData.amount);
+                if (candidates.length === 0) {
+                    const min = this.intermediaryDiscovery.getSwapMinimum(chainIdentifier, swapType, amountData.token);
+                    const max = this.intermediaryDiscovery.getSwapMaximum(chainIdentifier, swapType, amountData.token);
+                    if (min != null && max != null) {
+                        if (amountData.amount < BigInt(min))
+                            throw new RequestError_1.OutOfBoundsError("Amount too low!", 200, BigInt(min), BigInt(max));
+                        if (amountData.amount > BigInt(max))
+                            throw new RequestError_1.OutOfBoundsError("Amount too high!", 200, BigInt(min), BigInt(max));
+                    }
+                }
             }
             if (candidates.length === 0)
                 throw new Error("No intermediary found!");
