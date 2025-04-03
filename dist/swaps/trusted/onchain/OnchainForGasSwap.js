@@ -173,6 +173,9 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Payment
+    async estimateBitcoinFee(wallet, feeRate) {
+        return wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
+    }
     async checkAddress(save = true) {
         if (this.state === OnchainForGasSwapState.FAILED ||
             this.state === OnchainForGasSwapState.EXPIRED ||

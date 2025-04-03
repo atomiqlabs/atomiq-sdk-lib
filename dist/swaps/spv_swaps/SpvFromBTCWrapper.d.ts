@@ -15,6 +15,7 @@ export type SpvFromBTCOptions = {
     gasAmount?: bigint;
     unsafeZeroWatchtowerFee?: boolean;
     feeSafetyFactor?: number;
+    maxAllowedNetworkFeeRate?: number;
 };
 export type SpvFromBTCWrapperOptions = ISwapWrapperOptions & {
     maxConfirmations?: number;

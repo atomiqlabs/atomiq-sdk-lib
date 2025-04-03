@@ -11,6 +11,7 @@ import {
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {OnchainForGasWrapper} from "./OnchainForGasWrapper";
 import {Fee} from "../../fee/Fee";
+import {IBitcoinWallet} from "../../../btc/wallet/IBitcoinWallet";
 
 export enum OnchainForGasSwapState {
     EXPIRED = -3,
@@ -263,6 +264,10 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
 
     //////////////////////////////
     //// Payment
+
+    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
+        return wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
+    }
 
     async checkAddress(save: boolean = true): Promise<boolean> {
         if(

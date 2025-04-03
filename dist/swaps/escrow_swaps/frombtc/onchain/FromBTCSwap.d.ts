@@ -4,6 +4,7 @@ import { FromBTCWrapper } from "./FromBTCWrapper";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { BtcToken, SCToken, TokenAmount } from "../../../../Tokens";
 import { IEscrowSwapInit } from "../../IEscrowSwap";
+import { IBitcoinWallet } from "../../../../btc/wallet/IBitcoinWallet";
 export declare enum FromBTCSwapState {
     FAILED = -4,
     EXPIRED = -3,
@@ -76,6 +77,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
         confirmations: number;
         targetConfirmations: number;
     } | null>;
+    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in a PTLC
      *

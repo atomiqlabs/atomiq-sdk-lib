@@ -5,6 +5,7 @@ import { PriceInfoType } from "../../../prices/abstract/ISwapPrice";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
 import { OnchainForGasWrapper } from "./OnchainForGasWrapper";
 import { Fee } from "../../fee/Fee";
+import { IBitcoinWallet } from "../../../btc/wallet/IBitcoinWallet";
 export declare enum OnchainForGasSwapState {
     EXPIRED = -3,
     FAILED = -2,
@@ -77,6 +78,7 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>>;
     getSwapFee(): Fee;
     getRealSwapFeePercentagePPM(): bigint;
+    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
     checkAddress(save?: boolean): Promise<boolean>;
     /**
      * A blocking promise resolving when payment was received by the intermediary and client can continue
