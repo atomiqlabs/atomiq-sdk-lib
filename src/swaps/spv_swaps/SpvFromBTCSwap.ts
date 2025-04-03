@@ -220,7 +220,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
 
     getRealSwapFeePercentagePPM(): bigint {
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
+        return feeWithoutBaseFee * 1000000n / (this.btcAmount - this.swapFeeBtc - this.gasSwapFeeBtc);
     }
 
 
