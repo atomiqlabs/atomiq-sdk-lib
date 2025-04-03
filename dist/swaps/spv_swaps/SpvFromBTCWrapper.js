@@ -160,6 +160,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                     amountInNativeToken = await this.prices.getFromBtcSwapAmount(this.chainIdentifier, btcAmount, this.chain.getNativeCurrencyAddress(), abortController.signal, nativeTokenPrice);
                 }
             }
+            this.logger.debug("preFetchCallerFeeShare(): Caller fee in native token: " + totalFeeInNativeToken.toString(10) + " total swap amount in native token: " + amountInNativeToken.toString(10));
             const callerFeeShare = totalFeeInNativeToken * 100000n / (amountInNativeToken - totalFeeInNativeToken);
             if (callerFeeShare < 0n)
                 return 0n;

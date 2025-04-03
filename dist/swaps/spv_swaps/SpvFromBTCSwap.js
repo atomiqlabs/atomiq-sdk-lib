@@ -126,7 +126,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     }
     getRealSwapFeePercentagePPM() {
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
+        return feeWithoutBaseFee * 1000000n / (this.btcAmount - this.swapFeeBtc - this.gasSwapFeeBtc);
     }
     //////////////////////////////
     //// Getters & utils
