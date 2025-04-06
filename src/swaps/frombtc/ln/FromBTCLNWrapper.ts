@@ -136,7 +136,7 @@ export class FromBTCLNWrapper<
             if(pubkey==null) return null;
             return this.lnApi.getLNNodeLiquidity(pubkey)
         }).catch(e => {
-            this.logger.error("preFetchLnCapacity(): Error: ", e);
+            this.logger.warn("preFetchLnCapacity(): Error: ", e);
             return null;
         })
     }

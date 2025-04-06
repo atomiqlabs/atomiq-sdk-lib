@@ -412,7 +412,7 @@ class Swapper extends events_1.EventEmitter {
                             max = (0, Utils_1.bigIntMax)(max, e.max);
                         }
                     }
-                    this.logger.error("createSwap(): Intermediary " + data.intermediary.url + " error: ", e);
+                    this.logger.warn("createSwap(): Intermediary " + data.intermediary.url + " error: ", e);
                     error = e;
                     if (numResolved === quotePromises.length) {
                         if (timeout != null)
@@ -781,7 +781,7 @@ class Swapper extends events_1.EventEmitter {
                 const removeSwaps = [];
                 for (let swap of swaps) {
                     this.logger.debug("_syncSwaps(): Syncing swap: " + swap.getId());
-                    const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: " + swap.getIdentifierHashString(), e));
+                    const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: " + swap.getIdentifierHashString(), e));
                     this.logger.debug("_syncSwaps(): Synced swap: " + swap.getId());
                     if (swap.isQuoteExpired()) {
                         removeSwaps.push(swap);
@@ -814,7 +814,7 @@ class Swapper extends events_1.EventEmitter {
             const removeSwaps = [];
             for (let swap of swaps) {
                 this.logger.debug("_syncSwaps(): Syncing swap: " + swap.getId());
-                const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: " + swap.getIdentifierHashString(), e));
+                const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: " + swap.getIdentifierHashString(), e));
                 this.logger.debug("_syncSwaps(): Synced swap: " + swap.getId());
                 if (swap.isQuoteExpired()) {
                     removeSwaps.push(swap);

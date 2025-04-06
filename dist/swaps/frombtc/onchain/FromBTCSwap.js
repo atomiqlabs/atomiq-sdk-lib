@@ -418,7 +418,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
                         }
                     }
                     catch (e) {
-                        this.logger.error("tickSwap(" + this.getIdentifierHashString() + "): ", e);
+                        this.logger.warn("tickSwap(" + this.getIdentifierHashString() + "): ", e);
                     }
                 }
                 break;

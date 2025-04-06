@@ -34,7 +34,7 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                 throw new IntermediaryError_1.IntermediaryError("Invalid data returned - invalid LP vault");
             return res;
         }).catch(e => {
-            this.logger.error("preFetchIntermediaryReputation(): Error: ", e);
+            this.logger.warn("preFetchIntermediaryReputation(): Error: ", e);
             abortController.abort(e);
             return null;
         });
@@ -51,7 +51,7 @@ class IToBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
      */
     preFetchFeeRate(signer, amountData, claimHash, abortController) {
         return (0, Utils_1.tryWithRetries)(() => this.contract.getInitPayInFeeRate(signer, null, amountData.token, claimHash), null, null, abortController.signal).catch(e => {
-            this.logger.error("preFetchFeeRate(): Error: ", e);
+            this.logger.warn("preFetchFeeRate(): Error: ", e);
             abortController.abort(e);
             return null;
         });

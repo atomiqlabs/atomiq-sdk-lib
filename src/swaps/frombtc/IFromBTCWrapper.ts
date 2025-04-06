@@ -41,7 +41,7 @@ export abstract class IFromBTCWrapper<
             () => this.contract.getInitFeeRate(null, signer, amountData.token, claimHash),
             null, null, abortController.signal
         ).catch(e => {
-            this.logger.error("preFetchFeeRate(): Error: ", e);
+            this.logger.warn("preFetchFeeRate(): Error: ", e);
             abortController.abort(e);
             return null;
         });
@@ -57,7 +57,7 @@ export abstract class IFromBTCWrapper<
      */
     protected preFetchIntermediaryLiquidity(amountData: AmountData, lp: Intermediary, abortController: AbortController): Promise<bigint | null> {
         return lp.getLiquidity(this.chainIdentifier, this.contract, amountData.token.toString(), abortController.signal).catch(e => {
-            this.logger.error("preFetchIntermediaryLiquidity(): Error: ", e);
+            this.logger.warn("preFetchIntermediaryLiquidity(): Error: ", e);
             abortController.abort(e);
             return null;
         })

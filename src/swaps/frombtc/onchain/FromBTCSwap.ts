@@ -496,7 +496,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
                             return true;
                         }
                     } catch (e) {
-                        this.logger.error("tickSwap("+this.getIdentifierHashString()+"): ", e);
+                        this.logger.warn("tickSwap("+this.getIdentifierHashString()+"): ", e);
                     }
                 }
                 break;

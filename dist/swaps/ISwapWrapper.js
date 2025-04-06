@@ -56,7 +56,7 @@ class ISwapWrapper {
      */
     preFetchPrice(amountData, abortSignal) {
         return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
-            this.logger.error("preFetchPrice(): Error: ", e);
+            this.logger.warn("preFetchPrice(): Error: ", e);
             return null;
         });
     }
@@ -75,7 +75,7 @@ class ISwapWrapper {
                 return null;
             return this.contract.preFetchForInitSignatureVerification(obj);
         }).catch(e => {
-            this.logger.error("preFetchSignData(): Error: ", e);
+            this.logger.warn("preFetchSignData(): Error: ", e);
             return null;
         });
     }
@@ -213,7 +213,7 @@ class ISwapWrapper {
                 if (changed)
                     changedSwaps.push(swap);
             }
-        }).catch(e => this.logger.error("init(): Error when checking swap " + swap.getIdentifierHashString() + ": ", e))));
+        }).catch(e => this.logger.warn("init(): Error when checking swap " + swap.getIdentifierHashString() + ": ", e))));
         await this.unifiedStorage.removeAll(removeSwaps);
         await this.unifiedStorage.saveAll(changedSwaps);
     }

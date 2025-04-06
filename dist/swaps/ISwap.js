@@ -93,7 +93,7 @@ class ISwap {
                 expired = await this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData);
             }
             catch (e) {
-                this.logger.error("watchdogWaitTillSignatureExpiry(): Error when checking signature expiry: ", e);
+                this.logger.warn("watchdogWaitTillSignatureExpiry(): Error when checking signature expiry: ", e);
             }
         }
         if (abortSignal != null)
@@ -117,7 +117,7 @@ class ISwap {
                     return false;
             }
             catch (e) {
-                this.logger.error("watchdogWaitTillCommited(): Error when fetching commit status or signature expiry: ", e);
+                this.logger.warn("watchdogWaitTillCommited(): Error when fetching commit status or signature expiry: ", e);
             }
         }
         if (abortSignal != null)
@@ -139,7 +139,7 @@ class ISwap {
                 status = await this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data);
             }
             catch (e) {
-                this.logger.error("watchdogWaitTillResult(): Error when fetching commit status: ", e);
+                this.logger.warn("watchdogWaitTillResult(): Error when fetching commit status: ", e);
             }
         }
         if (abortSignal != null)

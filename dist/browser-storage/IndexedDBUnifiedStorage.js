@@ -60,7 +60,7 @@ class IndexedDBUnifiedStorage {
             data = JSON.parse(txt);
         }
         catch (e) {
-            this.logger.error("tryMigrate(" + storageKey + "): Tried to migrate the database, but cannot parse old local storage!");
+            this.logger.warn("tryMigrate(" + storageKey + "): Tried to migrate the database, but cannot parse old local storage!");
             return false;
         }
         let swaps = Object.keys(data).map(id => {
@@ -90,7 +90,7 @@ class IndexedDBUnifiedStorage {
             });
         }
         catch (e) {
-            this.logger.error("tryMigrateOldIndexedDB(" + storageKey + "): Error opening old IndexedDB!", e);
+            this.logger.warn("tryMigrateOldIndexedDB(" + storageKey + "): Error opening old IndexedDB!", e);
             return false;
         }
         this.logger.debug("tryMigrateOldIndexedDB(" + storageKey + "): Connection opened!");
@@ -122,7 +122,7 @@ class IndexedDBUnifiedStorage {
             return true;
         }
         catch (e) {
-            this.logger.error("tryMigrateOldIndexedDB(" + storageKey + "): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
+            this.logger.warn("tryMigrateOldIndexedDB(" + storageKey + "): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
             return false;
         }
     }

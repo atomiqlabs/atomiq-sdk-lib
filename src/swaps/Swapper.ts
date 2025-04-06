@@ -669,7 +669,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                             max = bigIntMax(max, e.max);
                         }
                     }
-                    this.logger.error("createSwap(): Intermediary "+data.intermediary.url+" error: ", e);
+                    this.logger.warn("createSwap(): Intermediary "+data.intermediary.url+" error: ", e);
                     error = e;
 
                     if(numResolved===quotePromises.length) {
@@ -1206,7 +1206,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 const removeSwaps: ISwap<T[string]>[] = [];
                 for(let swap of swaps) {
                     this.logger.debug("_syncSwaps(): Syncing swap: "+swap.getId());
-                    const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
+                    const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
                     this.logger.debug("_syncSwaps(): Synced swap: "+swap.getId());
                     if(swap.isQuoteExpired()) {
                         removeSwaps.push(swap);
@@ -1237,7 +1237,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
             const removeSwaps: ISwap<T[C]>[] = [];
             for(let swap of swaps) {
                 this.logger.debug("_syncSwaps(): Syncing swap: "+swap.getId());
-                const swapChanged = await swap._sync(false).catch(e => this.logger.error("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
+                const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: "+swap.getIdentifierHashString(), e));
                 this.logger.debug("_syncSwaps(): Synced swap: "+swap.getId());
                 if(swap.isQuoteExpired()) {
                     removeSwaps.push(swap);

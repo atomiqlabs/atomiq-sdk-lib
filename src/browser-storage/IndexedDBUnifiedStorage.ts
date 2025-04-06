@@ -73,7 +73,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
         try {
             data = JSON.parse(txt);
         } catch (e) {
-            this.logger.error("tryMigrate("+storageKey+"): Tried to migrate the database, but cannot parse old local storage!");
+            this.logger.warn("tryMigrate("+storageKey+"): Tried to migrate the database, but cannot parse old local storage!");
             return false;
         }
 
@@ -109,7 +109,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
                 request.onsuccess = (e: any) => resolve(e.target.result);
             });
         } catch (e) {
-            this.logger.error("tryMigrateOldIndexedDB("+storageKey+"): Error opening old IndexedDB!", e);
+            this.logger.warn("tryMigrateOldIndexedDB("+storageKey+"): Error opening old IndexedDB!", e);
             return false;
         }
 
@@ -151,7 +151,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage {
             this.logger.info("tryMigrateOldIndexedDB("+storageKey+"): Database successfully migrated from oldIndexedDB to unifiedIndexedDB!");
             return true;
         } catch (e) {
-            this.logger.error("tryMigrateOldIndexedDB("+storageKey+"): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
+            this.logger.warn("tryMigrateOldIndexedDB("+storageKey+"): Tried to migrate the database, but cannot parse oldIndexedDB!", e);
             return false;
         }
     }

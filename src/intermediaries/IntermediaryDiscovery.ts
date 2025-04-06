@@ -196,7 +196,7 @@ export class IntermediaryDiscovery extends EventEmitter {
             }
             return new Intermediary(url, nodeInfo.addresses, services);
         } catch (e) {
-            logger.error("fetchIntermediaries(): Error contacting intermediary "+url+": ", e);
+            logger.warn("fetchIntermediaries(): Error contacting intermediary "+url+": ", e);
             return null;
         }
     }

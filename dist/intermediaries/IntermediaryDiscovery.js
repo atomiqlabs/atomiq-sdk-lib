@@ -133,7 +133,7 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
             return new Intermediary_1.Intermediary(url, nodeInfo.addresses, services);
         }
         catch (e) {
-            logger.error("fetchIntermediaries(): Error contacting intermediary " + url + ": ", e);
+            logger.warn("fetchIntermediaries(): Error contacting intermediary " + url + ": ", e);
             return null;
         }
     }

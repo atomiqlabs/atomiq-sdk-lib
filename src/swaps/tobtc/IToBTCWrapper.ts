@@ -31,7 +31,7 @@ export abstract class IToBTCWrapper<
             if(res==null) throw new IntermediaryError("Invalid data returned - invalid LP vault");
             return res;
         }).catch(e => {
-            this.logger.error("preFetchIntermediaryReputation(): Error: ", e);
+            this.logger.warn("preFetchIntermediaryReputation(): Error: ", e);
             abortController.abort(e);
             return null;
         });
@@ -52,7 +52,7 @@ export abstract class IToBTCWrapper<
             () => this.contract.getInitPayInFeeRate(signer, null, amountData.token, claimHash),
             null, null, abortController.signal
         ).catch(e => {
-            this.logger.error("preFetchFeeRate(): Error: ", e);
+            this.logger.warn("preFetchFeeRate(): Error: ", e);
             abortController.abort(e);
             return null;
         });
