@@ -595,6 +595,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
      * @private
      */
     private async syncStateFromChain(): Promise<boolean> {
+
         if(
             this.state===ToBTCSwapState.CREATED ||
             this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED ||
@@ -602,6 +603,12 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
             this.state===ToBTCSwapState.SOFT_CLAIMED ||
             this.state===ToBTCSwapState.REFUNDABLE
         ) {
+            let quoteExpired: boolean = false;
+            if((this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED)) {
+                //Check if quote is still valid
+                quoteExpired = await this.isQuoteDefinitelyExpired();
+            }
+
             const res = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
             switch(res) {
                 case SwapCommitStatus.PAID:
@@ -626,17 +633,18 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends ISwap<
                     }
                     break;
             }
+
+            if((this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED)) {
+                if(quoteExpired) {
+                    this.state = ToBTCSwapState.QUOTE_EXPIRED;
+                    return true;
+                }
+            }
         }
     }
 
     async _sync(save?: boolean): Promise<boolean> {
         let changed = await this.syncStateFromChain();
-
-        if((this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) && !await this.isQuoteValid()) {
-            //Check if quote is still valid
-            this.state = ToBTCSwapState.QUOTE_EXPIRED;
-            changed ||= true;
-        }
 
         if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.SOFT_CLAIMED) {
             //Check if that maybe already concluded

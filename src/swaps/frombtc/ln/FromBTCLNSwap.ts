@@ -16,6 +16,7 @@ import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
 import {extendAbortController, getLogger, timeoutPromise, tryWithRetries} from "../../../utils/Utils";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
+import exp from "node:constants";
 
 export enum FromBTCLNSwapState {
     FAILED = -4,
@@ -694,22 +695,11 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * @private
      */
     private async syncStateFromChain(): Promise<boolean> {
-        if(this.state===FromBTCLNSwapState.PR_PAID || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) {
-            //Check if it's already committed
-            const status = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
-            switch(status) {
-                case SwapCommitStatus.COMMITED:
-                    this.state = FromBTCLNSwapState.CLAIM_COMMITED;
-                    return true;
-                case SwapCommitStatus.EXPIRED:
-                    this.state = FromBTCLNSwapState.QUOTE_EXPIRED;
-                    return true;
-                case SwapCommitStatus.PAID:
-                    this.state = FromBTCLNSwapState.CLAIM_CLAIMED;
-                    return true;
-            }
 
-            return false;
+        //Check for expiry before the getCommitStatus to prevent race conditions
+        let quoteExpired: boolean = false;
+        if(this.state===FromBTCLNSwapState.PR_PAID || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) {
+            quoteExpired = await this.isQuoteDefinitelyExpired();
         }
 
         if(this.state===FromBTCLNSwapState.CLAIM_COMMITED || this.state===FromBTCLNSwapState.EXPIRED) {
@@ -724,8 +714,30 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                 this.state = FromBTCLNSwapState.FAILED;
                 return true;
             }
+        }
 
-            return false;
+        if(this.state===FromBTCLNSwapState.PR_PAID || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) {
+            //Check if it's already committed
+            const status = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            switch(status) {
+                case SwapCommitStatus.COMMITED:
+                    this.state = FromBTCLNSwapState.CLAIM_COMMITED;
+                    return true;
+                case SwapCommitStatus.EXPIRED:
+                    this.state = FromBTCLNSwapState.QUOTE_EXPIRED;
+                    return true;
+                case SwapCommitStatus.PAID:
+                    this.state = FromBTCLNSwapState.CLAIM_CLAIMED;
+                    return true;
+            }
+        }
+
+        //Set the state on expiry here
+        if(this.state===FromBTCLNSwapState.PR_PAID || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) {
+            if(quoteExpired) {
+                this.state = FromBTCLNSwapState.QUOTE_EXPIRED;
+                return true;
+            }
         }
     }
 
@@ -743,13 +755,6 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
         }
 
         if(await this.syncStateFromChain()) changed = true;
-
-        if(this.state===FromBTCLNSwapState.PR_PAID || (this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData!=null)) {
-            if(!await this.isQuoteValid()) {
-                this.state = FromBTCLNSwapState.QUOTE_EXPIRED;
-                changed ||= true;
-            }
-        }
 
         if(save && changed) await this._saveAndEmit();
 

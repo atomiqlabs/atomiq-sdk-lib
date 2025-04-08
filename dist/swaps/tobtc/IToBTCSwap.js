@@ -480,6 +480,11 @@ class IToBTCSwap extends ISwap_1.ISwap {
             this.state === ToBTCSwapState.COMMITED ||
             this.state === ToBTCSwapState.SOFT_CLAIMED ||
             this.state === ToBTCSwapState.REFUNDABLE) {
+            let quoteExpired = false;
+            if ((this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED)) {
+                //Check if quote is still valid
+                quoteExpired = await this.isQuoteDefinitelyExpired();
+            }
             const res = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
             switch (res) {
                 case base_1.SwapCommitStatus.PAID:
@@ -504,15 +509,16 @@ class IToBTCSwap extends ISwap_1.ISwap {
                     }
                     break;
             }
+            if ((this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED)) {
+                if (quoteExpired) {
+                    this.state = ToBTCSwapState.QUOTE_EXPIRED;
+                    return true;
+                }
+            }
         }
     }
     async _sync(save) {
         let changed = await this.syncStateFromChain();
-        if ((this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED) && !await this.isQuoteValid()) {
-            //Check if quote is still valid
-            this.state = ToBTCSwapState.QUOTE_EXPIRED;
-            changed ||= true;
-        }
         if (this.state === ToBTCSwapState.COMMITED || this.state === ToBTCSwapState.SOFT_CLAIMED) {
             //Check if that maybe already concluded
             if (await this.checkIntermediarySwapProcessed(false))

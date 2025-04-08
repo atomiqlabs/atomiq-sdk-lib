@@ -426,6 +426,28 @@ export abstract class ISwap<
             if(e instanceof SignatureVerificationError) {
                 return false;
             }
+            throw e;
+        }
+    }
+
+    /**
+     * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
+     */
+    async isQuoteDefinitelyExpired(): Promise<boolean> {
+        try {
+            await tryWithRetries(
+                () => this.wrapper.contract.isInitAuthorizationExpired(
+                    this.data, this.signatureData
+                ),
+                null,
+                SignatureVerificationError
+            );
+            return true;
+        } catch (e) {
+            if(e instanceof SignatureVerificationError) {
+                return false;
+            }
+            throw e;
         }
     }
 

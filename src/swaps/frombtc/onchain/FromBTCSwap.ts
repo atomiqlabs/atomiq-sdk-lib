@@ -418,6 +418,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
      */
     private async syncStateFromChain(): Promise<boolean> {
         if(this.state===FromBTCSwapState.PR_CREATED || this.state===FromBTCSwapState.QUOTE_SOFT_EXPIRED) {
+            const quoteExpired = await this.isQuoteDefinitelyExpired(); //Make sure we check for expiry here, to prevent race conditions
             const status = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
             switch(status) {
                 case SwapCommitStatus.COMMITED:
@@ -431,7 +432,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
                     return true;
             }
 
-            if(!await this.isQuoteValid()) {
+            if(quoteExpired) {
                 this.state = FromBTCSwapState.QUOTE_EXPIRED;
                 return true;
             }

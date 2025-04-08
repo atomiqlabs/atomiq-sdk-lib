@@ -201,6 +201,10 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      * Checks if the swap's quote is still valid
      */
     isQuoteValid(): Promise<boolean>;
+    /**
+     * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
+     */
+    isQuoteDefinitelyExpired(): Promise<boolean>;
     isInitiated(): boolean;
     /**
      * Checks whether there is some action required from the user for this swap - can mean either refundable or claimable
