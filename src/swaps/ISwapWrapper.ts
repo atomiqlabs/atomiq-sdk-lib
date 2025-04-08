@@ -353,6 +353,7 @@ export abstract class ISwapWrapper<
             swap._sync(false).then(changed => {
                 if(swap.isQuoteExpired()) {
                     removeSwaps.push(swap);
+                    this.logger.debug("init(): Removing expired swap: "+swap.getId());
                 } else {
                     if(changed) changedSwaps.push(swap);
                 }

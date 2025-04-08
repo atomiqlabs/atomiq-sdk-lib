@@ -208,6 +208,7 @@ class ISwapWrapper {
         await Promise.all(pastSwaps.map((swap) => swap._sync(false).then(changed => {
             if (swap.isQuoteExpired()) {
                 removeSwaps.push(swap);
+                this.logger.debug("init(): Removing expired swap: " + swap.getId());
             }
             else {
                 if (changed)
