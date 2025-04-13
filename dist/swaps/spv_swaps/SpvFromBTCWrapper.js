@@ -428,8 +428,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         const psbt = new btc_signer_1.Transaction({
             allowUnknownInputs: true,
             allowLegacyWitnessUtxo: true,
-            allowUnknownOutputs: true,
-            allowUnknown: true
+            allowUnknownOutputs: true
         });
         const randomVaultOutScript = btc_signer_1.OutScript.encode({ type: "tr", pubkey: Buffer.from("0101010101010101010101010101010101010101010101010101010101010101", "hex") });
         psbt.addInput({

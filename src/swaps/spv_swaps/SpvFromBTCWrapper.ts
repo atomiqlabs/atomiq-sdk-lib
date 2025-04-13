@@ -563,8 +563,7 @@ export class SpvFromBTCWrapper<
         const psbt = new Transaction({
             allowUnknownInputs: true,
             allowLegacyWitnessUtxo: true,
-            allowUnknownOutputs: true,
-            allowUnknown: true
+            allowUnknownOutputs: true
         });
 
         const randomVaultOutScript = OutScript.encode({type: "tr", pubkey: Buffer.from("0101010101010101010101010101010101010101010101010101010101010101", "hex")});

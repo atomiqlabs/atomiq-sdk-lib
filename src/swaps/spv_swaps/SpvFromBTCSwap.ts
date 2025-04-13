@@ -300,10 +300,14 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     //// Amounts & fees
 
     getFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>> {
-        const gasSwapFeeInOutputToken = this.gasSwapFeeBtc * this.pricingInfo.swapPriceUSatPerToken / 1_000_000n;
+        const outputToken = this.wrapper.tokens[this.outputSwapToken];
+        const gasSwapFeeInOutputToken = this.gasSwapFeeBtc
+            * (10n ** BigInt(outputToken.decimals))
+            * 1_000_000n
+            / this.pricingInfo.swapPriceUSatPerToken;
         return {
             amountInSrcToken: toTokenAmount(this.swapFeeBtc + this.gasSwapFeeBtc, BitcoinTokens.BTC, this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFee + gasSwapFeeInOutputToken, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices),
+            amountInDstToken: toTokenAmount(this.swapFee + gasSwapFeeInOutputToken, outputToken, this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
                 this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.gasSwapFeeBtc, abortSignal, preFetchedUsdPrice)
         };
@@ -328,11 +332,16 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     }
 
     getCallerFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>> {
-        const gasCallerFeeInOutputToken = this.getInputGasAmountWithoutFee() * this.callerFeeShare * this.pricingInfo.swapPriceUSatPerToken / 1_000_000n / 100_000n;
+        const outputToken = this.wrapper.tokens[this.outputSwapToken];
+        const gasCallerFeeInOutputToken = this.getInputGasAmountWithoutFee() * this.callerFeeShare
+            * (10n ** BigInt(outputToken.decimals))
+            * 1_000_000n
+            / this.pricingInfo.swapPriceUSatPerToken
+            / 100_000n;
         const feeBtc = this.getInputAmountWithoutFee() * this.callerFeeShare / 100_000n;
         return {
             amountInSrcToken: toTokenAmount(feeBtc, BitcoinTokens.BTC, this.wrapper.prices),
-            amountInDstToken: toTokenAmount((this.outputTotalSwap * this.callerFeeShare / 100_000n) + gasCallerFeeInOutputToken, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices),
+            amountInDstToken: toTokenAmount((this.outputTotalSwap * this.callerFeeShare / 100_000n) + gasCallerFeeInOutputToken, outputToken, this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
                 this.wrapper.prices.getBtcUsdValue(feeBtc, abortSignal, preFetchedUsdPrice)
         };
