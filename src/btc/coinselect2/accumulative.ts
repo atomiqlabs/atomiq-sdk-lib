@@ -31,7 +31,7 @@ export function accumulative (
         const utxoValue = utils.uintOrNaN(utxo.value);
 
         let cpfpFee = 0;
-        if(utxo.cpfp!=null && utxo.cpfp.txEffectiveFeeRate<feeRate) cpfpFee = utxo.cpfp.txVsize * (feeRate - utxo.cpfp.txEffectiveFeeRate);
+        if(utxo.cpfp!=null && utxo.cpfp.txEffectiveFeeRate<feeRate) cpfpFee = Math.ceil(utxo.cpfp.txVsize * (feeRate - utxo.cpfp.txEffectiveFeeRate));
 
         // skip detrimental input
         if (utxoFee + cpfpFee > utxo.value) {
@@ -45,7 +45,7 @@ export function accumulative (
         cpfpAddFee += cpfpFee;
         inputs.push(utxo);
 
-        fee = (feeRate * bytesAccum) + cpfpAddFee;
+        fee = Math.ceil((feeRate * bytesAccum) + cpfpAddFee);
 
         console.log("CoinSelect: accumulative("+i+"): total fee: ", fee);
         console.log("CoinSelect: accumulative("+i+"): input value: ", inAccum);
@@ -54,6 +54,9 @@ export function accumulative (
         // go again?
         if (inAccum < outAccum + fee) continue;
 
+        console.log("CoinSelect: accumulative("+i+"): Finalizing transaction, inputs: ", inputs);
+        console.log("CoinSelect: accumulative("+i+"): Finalizing transaction, outputs: ", outputs);
+        console.log("CoinSelect: accumulative("+i+"): Finalizing transaction, feeRate: ", feeRate);
         return utils.finalize(inputs, outputs, feeRate, type, cpfpAddFee);
     }
 

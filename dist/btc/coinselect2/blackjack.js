@@ -18,8 +18,8 @@ function blackjack(utxos, outputs, feeRate, type, requiredInputs) {
         const inputBytes = utils_1.utils.inputBytes(input);
         let cpfpFee = 0;
         if (input.cpfp != null && input.cpfp.txEffectiveFeeRate < feeRate)
-            cpfpFee = input.cpfp.txVsize * (feeRate - input.cpfp.txEffectiveFeeRate);
-        const fee = (feeRate * (bytesAccum + inputBytes)) + cpfpAddFee + cpfpFee;
+            cpfpFee = Math.ceil(input.cpfp.txVsize * (feeRate - input.cpfp.txEffectiveFeeRate));
+        const fee = Math.ceil((feeRate * (bytesAccum + inputBytes)) + cpfpAddFee + cpfpFee);
         const inputValue = utils_1.utils.uintOrNaN(input.value);
         // would it waste value?
         if ((inAccum + inputValue) > (outAccum + fee + threshold))

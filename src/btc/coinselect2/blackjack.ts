@@ -26,9 +26,9 @@ export function blackjack (
         const input = utxos[i];
         const inputBytes = utils.inputBytes(input);
         let cpfpFee = 0;
-        if(input.cpfp!=null && input.cpfp.txEffectiveFeeRate<feeRate) cpfpFee = input.cpfp.txVsize * (feeRate - input.cpfp.txEffectiveFeeRate);
+        if(input.cpfp!=null && input.cpfp.txEffectiveFeeRate<feeRate) cpfpFee = Math.ceil(input.cpfp.txVsize * (feeRate - input.cpfp.txEffectiveFeeRate));
 
-        const fee = (feeRate * (bytesAccum + inputBytes)) + cpfpAddFee + cpfpFee;
+        const fee = Math.ceil((feeRate * (bytesAccum + inputBytes)) + cpfpAddFee + cpfpFee);
         const inputValue = utils.uintOrNaN(input.value);
 
         // would it waste value?
