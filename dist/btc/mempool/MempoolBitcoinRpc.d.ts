@@ -81,4 +81,9 @@ export declare class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<Memp
     sendRawPackage(rawTx: string[]): Promise<string[]>;
     isSpent(utxo: string, confirmed?: boolean): Promise<boolean>;
     parseTransaction(rawTx: string): Promise<BtcTx>;
+    getEffectiveFeeRate(btcTx: BtcTx): Promise<{
+        vsize: number;
+        fee: number;
+        feeRate: number;
+    }>;
 }

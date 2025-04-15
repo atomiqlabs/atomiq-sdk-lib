@@ -319,5 +319,8 @@ class MempoolBitcoinRpc {
         });
         return Promise.resolve(bitcoinTxToBtcTx(btcTx));
     }
+    getEffectiveFeeRate(btcTx) {
+        throw new Error("Unsupported.");
+    }
 }
 exports.MempoolBitcoinRpc = MempoolBitcoinRpc;

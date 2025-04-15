@@ -382,4 +382,8 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
         return Promise.resolve(bitcoinTxToBtcTx(btcTx));
     }
 
+    getEffectiveFeeRate(btcTx: BtcTx): Promise<{ vsize: number; fee: number; feeRate: number }> {
+        throw new Error("Unsupported.");
+    }
+
 }
