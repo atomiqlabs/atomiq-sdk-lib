@@ -161,7 +161,8 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                 }
             }
             this.logger.debug("preFetchCallerFeeShare(): Caller fee in native token: " + totalFeeInNativeToken.toString(10) + " total swap amount in native token: " + amountInNativeToken.toString(10));
-            const callerFeeShare = totalFeeInNativeToken * 100000n / (amountInNativeToken - totalFeeInNativeToken);
+            const payoutAmount = amountInNativeToken - totalFeeInNativeToken;
+            const callerFeeShare = ((totalFeeInNativeToken * 100000n) + payoutAmount - 1n) / payoutAmount; //Make sure to round up here
             if (callerFeeShare < 0n)
                 return 0n;
             if (callerFeeShare >= 2n ** 20n)
