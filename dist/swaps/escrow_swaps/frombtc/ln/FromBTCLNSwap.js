@@ -62,7 +62,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                 delete this.data;
             }
         }
-        this.tryCalculateSwapFee();
+        this.tryRecomputeSwapPrice();
         this.logger = (0, Utils_1.getLogger)("FromBTCLN(" + this.getIdentifierHashString() + "): ");
     }
     upgradeVersion() {
@@ -92,9 +92,6 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     }
     //////////////////////////////
     //// Getters & utils
-    getInputTxId() {
-        return this.getPaymentHash().toString("hex");
-    }
     getIdentifierHash() {
         const paymentHashBuffer = this.getPaymentHash();
         if (this.randomNonce == null)
@@ -107,17 +104,20 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         const decodedPR = (0, bolt11_1.decode)(this.pr);
         return buffer_1.Buffer.from(decodedPR.tagsObject.payment_hash, "hex");
     }
-    getAddress() {
-        return this.pr;
+    canCommit() {
+        return this.state === FromBTCLNSwapState.PR_PAID;
+    }
+    getInputTxId() {
+        return this.getPaymentHash().toString("hex");
     }
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap
      */
-    getLightningInvoice() {
+    getAddress() {
         return this.pr;
     }
-    getQrData() {
-        return "lightning:" + this.getLightningInvoice().toUpperCase();
+    getHyperlink() {
+        return "lightning:" + this.pr.toUpperCase();
     }
     /**
      * Returns timeout time (in UNIX milliseconds) when the LN invoice will expire
@@ -129,8 +129,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         return (decoded.timeExpireDate * 1000);
     }
     /**
-     * Returns timeout time (in UNIX milliseconds) when the on-chain address will expire and no funds should be sent
-     *  to that address anymore
+     * Returns timeout time (in UNIX milliseconds) when the swap htlc will expire
      */
     getHtlcTimeoutTime() {
         return Number(this.wrapper.getHtlcTimeout(this.data)) * 1000;
@@ -153,18 +152,12 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     isQuoteSoftExpired() {
         return this.state === FromBTCLNSwapState.QUOTE_EXPIRED || this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED;
     }
-    isQuoteValid() {
+    verifyQuoteValid() {
         if (this.state === FromBTCLNSwapState.PR_CREATED ||
             (this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData == null)) {
             return Promise.resolve(this.getTimeoutTime() > Date.now());
         }
-        return super.isQuoteValid();
-    }
-    canCommit() {
-        return this.state === FromBTCLNSwapState.PR_PAID;
-    }
-    canClaim() {
-        return this.state === FromBTCLNSwapState.CLAIM_COMMITED;
+        return super.verifyQuoteValid();
     }
     //////////////////////////////
     //// Amounts & fees
@@ -173,30 +166,16 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
         return (0, Tokens_1.toTokenAmount)(amount, this.inputToken, this.wrapper.prices);
     }
-    /**
-     * Estimated transaction fee for commit & claim txs combined
-     */
-    async getCommitAndClaimFee() {
-        const swapContract = this.wrapper.contract;
-        const feeRate = this.feeRate ?? await swapContract.getInitFeeRate(this.getSwapData().getOfferer(), this.getSwapData().getClaimer(), this.getSwapData().getToken(), this.getSwapData().getClaimHash());
-        const commitFee = await (swapContract.getRawCommitFee != null ?
-            swapContract.getRawCommitFee(this.getSwapData(), feeRate) :
-            swapContract.getCommitFee(this.getSwapData(), feeRate));
-        const claimFee = await (swapContract.getRawClaimFee != null ?
-            swapContract.getRawClaimFee(this.getInitiator(), this.getSwapData(), feeRate) :
-            swapContract.getClaimFee(this.getInitiator(), this.getSwapData(), feeRate));
-        return commitFee + claimFee;
-    }
     async getSmartChainNetworkFee() {
         return (0, Tokens_1.toTokenAmount)(await this.getCommitAndClaimFee(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
     async hasEnoughForTxFees() {
         const [balance, feeRate] = await Promise.all([
-            this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.chain.getNativeCurrencyAddress(), false),
+            this.wrapper.contract.getBalance(this._getInitiator(), this.wrapper.chain.getNativeCurrencyAddress(), false),
             this.feeRate != null ? Promise.resolve(this.feeRate) : this.wrapper.contract.getInitFeeRate(this.getSwapData().getOfferer(), this.getSwapData().getClaimer(), this.getSwapData().getToken(), this.getSwapData().getClaimHash())
         ]);
         const commitFee = await this.wrapper.contract.getCommitFee(this.getSwapData(), feeRate);
-        const claimFee = await this.wrapper.contract.getClaimFee(this.getInitiator(), this.getSwapData(), feeRate);
+        const claimFee = await this.wrapper.contract.getClaimFee(this._getInitiator(), this.getSwapData(), feeRate);
         const totalFee = commitFee + claimFee + this.getSwapData().getTotalDeposit();
         return {
             enoughBalance: balance >= totalFee,
@@ -206,68 +185,6 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     }
     //////////////////////////////
     //// Payment
-    /**
-     * Waits till an LN payment is received by the intermediary and client can continue commiting & claiming the HTLC
-     *
-     * @param abortSignal Abort signal to stop waiting for payment
-     * @param checkIntervalSeconds How often to poll the intermediary for answer
-     */
-    async waitForPayment(abortSignal, checkIntervalSeconds = 5) {
-        if (this.state !== FromBTCLNSwapState.PR_CREATED &&
-            (this.state !== FromBTCLNSwapState.QUOTE_SOFT_EXPIRED || this.signatureData != null))
-            throw new Error("Must be in PR_CREATED state!");
-        const abortController = new AbortController();
-        if (abortSignal != null)
-            abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
-        let save = false;
-        if (this.lnurl != null && !this.prPosted) {
-            LNURL_1.LNURL.postInvoiceToLNURLWithdraw({ k1: this.lnurlK1, callback: this.lnurlCallback }, this.pr).catch(e => {
-                this.lnurlFailSignal.abort(e);
-            });
-            this.prPosted = true;
-            save ||= true;
-        }
-        if (!this.initiated) {
-            this.initiated = true;
-            save ||= true;
-        }
-        if (save)
-            await this._saveAndEmit();
-        let lnurlFailListener = () => abortController.abort(this.lnurlFailSignal.signal.reason);
-        this.lnurlFailSignal.signal.addEventListener("abort", lnurlFailListener);
-        this.lnurlFailSignal.signal.throwIfAborted();
-        let resp = { code: IntermediaryAPI_1.PaymentAuthorizationResponseCodes.PENDING, msg: "" };
-        while (!abortController.signal.aborted && resp.code === IntermediaryAPI_1.PaymentAuthorizationResponseCodes.PENDING) {
-            resp = await IntermediaryAPI_1.IntermediaryAPI.getPaymentAuthorization(this.url, this.getPaymentHash().toString("hex"));
-            if (resp.code === IntermediaryAPI_1.PaymentAuthorizationResponseCodes.PENDING)
-                await (0, Utils_1.timeoutPromise)(checkIntervalSeconds * 1000, abortController.signal);
-        }
-        this.lnurlFailSignal.signal.removeEventListener("abort", lnurlFailListener);
-        abortController.signal.throwIfAborted();
-        if (resp.code === IntermediaryAPI_1.PaymentAuthorizationResponseCodes.AUTH_DATA) {
-            const sigData = resp.data;
-            const swapData = new this.wrapper.swapDataDeserializer(resp.data.data);
-            await this.checkIntermediaryReturnedAuthData(this.getInitiator(), swapData, sigData);
-            this.expiry = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getInitAuthorizationExpiry(swapData, sigData));
-            if (this.state === FromBTCLNSwapState.PR_CREATED || this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-                delete this.initialSwapData;
-                this.data = swapData;
-                this.signatureData = {
-                    prefix: sigData.prefix,
-                    timeout: sigData.timeout,
-                    signature: sigData.signature
-                };
-                await this._saveAndEmit(FromBTCLNSwapState.PR_PAID);
-            }
-            return;
-        }
-        if (this.state === FromBTCLNSwapState.PR_CREATED || this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-            if (resp.code === IntermediaryAPI_1.PaymentAuthorizationResponseCodes.EXPIRED) {
-                await this._saveAndEmit(FromBTCLNSwapState.QUOTE_EXPIRED);
-            }
-            throw new PaymentAuthError_1.PaymentAuthError(resp.msg, resp.code, resp.data);
-        }
-    }
     /**
      * Checks whether the LP received the LN payment and we can continue by committing & claiming the HTLC on-chain
      *
@@ -286,7 +203,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             case IntermediaryAPI_1.PaymentAuthorizationResponseCodes.AUTH_DATA:
                 const data = new this.wrapper.swapDataDeserializer(resp.data.data);
                 try {
-                    await this.checkIntermediaryReturnedAuthData(this.getInitiator(), data, resp.data);
+                    await this.checkIntermediaryReturnedAuthData(this._getInitiator(), data, resp.data);
                     this.expiry = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getInitAuthorizationExpiry(data, resp.data));
                     this.state = FromBTCLNSwapState.PR_PAID;
                     delete this.initialSwapData;
@@ -345,6 +262,68 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                     throw new Error("Swap already committed on-chain!");
             })
         ]);
+    }
+    /**
+     * Waits till an LN payment is received by the intermediary and client can continue commiting & claiming the HTLC
+     *
+     * @param abortSignal Abort signal to stop waiting for payment
+     * @param checkIntervalSeconds How often to poll the intermediary for answer
+     */
+    async waitForPayment(abortSignal, checkIntervalSeconds = 5) {
+        if (this.state !== FromBTCLNSwapState.PR_CREATED &&
+            (this.state !== FromBTCLNSwapState.QUOTE_SOFT_EXPIRED || this.signatureData != null))
+            throw new Error("Must be in PR_CREATED state!");
+        const abortController = new AbortController();
+        if (abortSignal != null)
+            abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
+        let save = false;
+        if (this.lnurl != null && !this.prPosted) {
+            LNURL_1.LNURL.postInvoiceToLNURLWithdraw({ k1: this.lnurlK1, callback: this.lnurlCallback }, this.pr).catch(e => {
+                this.lnurlFailSignal.abort(e);
+            });
+            this.prPosted = true;
+            save ||= true;
+        }
+        if (!this.initiated) {
+            this.initiated = true;
+            save ||= true;
+        }
+        if (save)
+            await this._saveAndEmit();
+        let lnurlFailListener = () => abortController.abort(this.lnurlFailSignal.signal.reason);
+        this.lnurlFailSignal.signal.addEventListener("abort", lnurlFailListener);
+        this.lnurlFailSignal.signal.throwIfAborted();
+        let resp = { code: IntermediaryAPI_1.PaymentAuthorizationResponseCodes.PENDING, msg: "" };
+        while (!abortController.signal.aborted && resp.code === IntermediaryAPI_1.PaymentAuthorizationResponseCodes.PENDING) {
+            resp = await IntermediaryAPI_1.IntermediaryAPI.getPaymentAuthorization(this.url, this.getPaymentHash().toString("hex"));
+            if (resp.code === IntermediaryAPI_1.PaymentAuthorizationResponseCodes.PENDING)
+                await (0, Utils_1.timeoutPromise)(checkIntervalSeconds * 1000, abortController.signal);
+        }
+        this.lnurlFailSignal.signal.removeEventListener("abort", lnurlFailListener);
+        abortController.signal.throwIfAborted();
+        if (resp.code === IntermediaryAPI_1.PaymentAuthorizationResponseCodes.AUTH_DATA) {
+            const sigData = resp.data;
+            const swapData = new this.wrapper.swapDataDeserializer(resp.data.data);
+            await this.checkIntermediaryReturnedAuthData(this._getInitiator(), swapData, sigData);
+            this.expiry = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getInitAuthorizationExpiry(swapData, sigData));
+            if (this.state === FromBTCLNSwapState.PR_CREATED || this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
+                delete this.initialSwapData;
+                this.data = swapData;
+                this.signatureData = {
+                    prefix: sigData.prefix,
+                    timeout: sigData.timeout,
+                    signature: sigData.signature
+                };
+                await this._saveAndEmit(FromBTCLNSwapState.PR_PAID);
+            }
+            return;
+        }
+        if (this.state === FromBTCLNSwapState.PR_CREATED || this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
+            if (resp.code === IntermediaryAPI_1.PaymentAuthorizationResponseCodes.EXPIRED) {
+                await this._saveAndEmit(FromBTCLNSwapState.QUOTE_EXPIRED);
+            }
+            throw new PaymentAuthError_1.PaymentAuthError(resp.msg, resp.code, resp.data);
+        }
     }
     //////////////////////////////
     //// Commit
@@ -406,7 +385,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     txsClaim(signer) {
         if (this.state !== FromBTCLNSwapState.CLAIM_COMMITED)
             throw new Error("Must be in CLAIM_COMMITED state!");
-        return this.wrapper.contract.txsClaimWithSecret(signer ?? this.getInitiator(), this.data, this.secret, true, true);
+        return this.wrapper.contract.txsClaimWithSecret(signer ?? this._getInitiator(), this.data, this.secret, true, true);
     }
     /**
      * Claims and finishes the swap
@@ -464,8 +443,42 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     }
     //////////////////////////////
     //// Commit & claim
+    /**
+     * Estimated transaction fee for commit & claim txs combined
+     */
+    async getCommitAndClaimFee() {
+        const swapContract = this.wrapper.contract;
+        const feeRate = this.feeRate ?? await swapContract.getInitFeeRate(this.getSwapData().getOfferer(), this.getSwapData().getClaimer(), this.getSwapData().getToken(), this.getSwapData().getClaimHash());
+        const commitFee = await (swapContract.getRawCommitFee != null ?
+            swapContract.getRawCommitFee(this.getSwapData(), feeRate) :
+            swapContract.getCommitFee(this.getSwapData(), feeRate));
+        const claimFee = await (swapContract.getRawClaimFee != null ?
+            swapContract.getRawClaimFee(this._getInitiator(), this.getSwapData(), feeRate) :
+            swapContract.getClaimFee(this._getInitiator(), this.getSwapData(), feeRate));
+        return commitFee + claimFee;
+    }
     canCommitAndClaimInOneShot() {
         return this.wrapper.contract.initAndClaimWithSecret != null;
+    }
+    /**
+     * Returns transactions for both commit & claim operation together, such that they can be signed all at once by
+     *  the wallet. CAUTION: transactions must be sent sequentially, such that the claim (2nd) transaction is only
+     *  sent after the commit (1st) transaction confirms. Failure to do so can reveal the HTLC pre-image too soon,
+     *  opening a possibility for the LP to steal funds.
+     *
+     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
+     *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
+     *
+     * @throws {Error} If in invalid state (must be PR_PAID or CLAIM_COMMITED)
+     */
+    async txsCommitAndClaim(skipChecks) {
+        if (this.state === FromBTCLNSwapState.CLAIM_COMMITED)
+            return await this.txsClaim();
+        if (this.state !== FromBTCLNSwapState.PR_PAID && (this.state !== FromBTCLNSwapState.QUOTE_SOFT_EXPIRED || this.signatureData == null))
+            throw new Error("Must be in PR_PAID state!");
+        const initTxs = await this.txsCommit(skipChecks);
+        const claimTxs = await this.wrapper.contract.txsClaimWithSecret(this._getInitiator(), this.data, this.secret, true, true, null, true);
+        return initTxs.concat(claimTxs);
     }
     /**
      * Commits and claims the swap, in a way that the transactions can be signed together by the underlying provider and
@@ -491,26 +504,6 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
         }
         return result;
-    }
-    /**==
-     * Returns transactions for both commit & claim operation together, such that they can be signed all at once by
-     *  the wallet. CAUTION: transactions must be sent sequentially, such that the claim (2nd) transaction is only
-     *  sent after the commit (1st) transaction confirms. Failure to do so can reveal the HTLC pre-image too soon,
-     *  opening a possibility for the LP to steal funds.
-     *
-     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
-     *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
-     *
-     * @throws {Error} If in invalid state (must be PR_PAID or CLAIM_COMMITED)
-     */
-    async txsCommitAndClaim(skipChecks) {
-        if (this.state === FromBTCLNSwapState.CLAIM_COMMITED)
-            return await this.txsClaim();
-        if (this.state !== FromBTCLNSwapState.PR_PAID && (this.state !== FromBTCLNSwapState.QUOTE_SOFT_EXPIRED || this.signatureData == null))
-            throw new Error("Must be in PR_PAID state!");
-        const initTxs = await this.txsCommit(skipChecks);
-        const claimTxs = await this.wrapper.contract.txsClaimWithSecret(this.getInitiator(), this.data, this.secret, true, true, null, true);
-        return initTxs.concat(claimTxs);
     }
     //////////////////////////////
     //// LNURL
@@ -575,11 +568,11 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         //Check for expiry before the getCommitStatus to prevent race conditions
         let quoteExpired = false;
         if (this.state === FromBTCLNSwapState.PR_PAID || (this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData != null)) {
-            quoteExpired = await this.isQuoteDefinitelyExpired();
+            quoteExpired = await this.verifyQuoteDefinitelyExpired();
         }
         if (this.state === FromBTCLNSwapState.CLAIM_COMMITED || this.state === FromBTCLNSwapState.EXPIRED) {
             //Check if it's already successfully paid
-            const commitStatus = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            const commitStatus = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
             if (commitStatus === base_1.SwapCommitStatus.PAID) {
                 this.state = FromBTCLNSwapState.CLAIM_CLAIMED;
                 return true;
@@ -591,7 +584,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         }
         if (this.state === FromBTCLNSwapState.PR_PAID || (this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData != null)) {
             //Check if it's already committed
-            const status = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            const status = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
             switch (status) {
                 case base_1.SwapCommitStatus.COMMITED:
                     this.state = FromBTCLNSwapState.CLAIM_COMMITED;
@@ -648,7 +641,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                 }
                 break;
             case FromBTCLNSwapState.CLAIM_COMMITED:
-                const expired = await this.wrapper.contract.isExpired(this.getInitiator(), this.data);
+                const expired = await this.wrapper.contract.isExpired(this._getInitiator(), this.data);
                 if (expired) {
                     this.state = FromBTCLNSwapState.EXPIRED;
                     if (save)

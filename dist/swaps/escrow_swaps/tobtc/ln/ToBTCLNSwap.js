@@ -34,7 +34,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
         }
         this.paymentHash = this.getPaymentHash().toString("hex");
         this.logger = (0, Utils_1.getLogger)("ToBTCLN(" + this.getIdentifierHashString() + "): ");
-        this.tryCalculateSwapFee();
+        this.tryRecomputeSwapPrice();
     }
     _setPaymentResult(result, check = false) {
         if (result == null)
@@ -65,8 +65,8 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     /**
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
      */
-    getLightningInvoice() {
-        return this.pr;
+    getOutputAddress() {
+        return this.lnurl ?? this.pr;
     }
     /**
      * Returns payment secret (pre-image) as a proof of payment
@@ -98,9 +98,6 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
             return null;
         const parsed = (0, bolt11_1.decode)(this.pr);
         return parsed.tagsObject.payment_hash;
-    }
-    getRecipient() {
-        return this.lnurl ?? this.pr;
     }
     //////////////////////////////
     //// LNURL-pay

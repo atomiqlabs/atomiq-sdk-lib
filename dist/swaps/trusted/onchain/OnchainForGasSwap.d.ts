@@ -1,11 +1,11 @@
 import { SwapType } from "../../enums/SwapType";
 import { ChainType } from "@atomiqlabs/base";
 import { ISwap, ISwapInit } from "../../ISwap";
-import { PriceInfoType } from "../../../prices/abstract/ISwapPrice";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
 import { OnchainForGasWrapper } from "./OnchainForGasWrapper";
-import { Fee } from "../../fee/Fee";
+import { Fee, FeeType } from "../../fee/Fee";
 import { IBitcoinWallet } from "../../../btc/wallet/IBitcoinWallet";
+import { IAddressSwap } from "../../IAddressSwap";
 export declare enum OnchainForGasSwapState {
     EXPIRED = -3,
     FAILED = -2,
@@ -25,7 +25,7 @@ export type OnchainForGasSwapInit = ISwapInit & {
     refundAddress?: string;
 };
 export declare function isOnchainForGasSwapInit(obj: any): obj is OnchainForGasSwapInit;
-export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> {
+export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> implements IAddressSwap {
     getSmartChainNetworkFee: any;
     protected readonly TYPE: SwapType;
     private readonly paymentHash;
@@ -47,39 +47,35 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
      * In case swapFee in BTC is not supplied it recalculates it based on swap price
      * @protected
      */
-    protected tryCalculateSwapFee(): void;
-    refreshPriceData(): Promise<PriceInfoType>;
-    getSwapPrice(): number;
-    getMarketPrice(): number;
-    getInputAddress(): string | null;
+    protected tryRecomputeSwapPrice(): void;
+    _getEscrowHash(): string;
     getOutputAddress(): string | null;
     getInputTxId(): string | null;
     getOutputTxId(): string | null;
-    getRecipient(): string;
-    getEscrowHash(): string;
     getId(): string;
     getAddress(): string;
-    /**
-     * Returns bitcoin address where the on-chain BTC should be sent to
-     */
-    getBitcoinAddress(): string;
-    getQrData(): string;
-    getTimeoutTime(): number;
+    getHyperlink(): string;
+    requiresAction(): boolean;
     isFinished(): boolean;
     isQuoteExpired(): boolean;
     isQuoteSoftExpired(): boolean;
     isFailed(): boolean;
     isSuccessful(): boolean;
-    isQuoteValid(): Promise<boolean>;
-    isActionable(): boolean;
+    verifyQuoteValid(): Promise<boolean>;
     protected getOutAmountWithoutFee(): bigint;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
-    getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>>;
-    getSwapFee(): Fee;
+    getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>>;
+    protected getSwapFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
+    getFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
+    getFeeBreakdown(): [{
+        type: FeeType.SWAP;
+        fee: Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
+    }];
     getRealSwapFeePercentagePPM(): bigint;
     estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
-    checkAddress(save?: boolean): Promise<boolean>;
+    protected checkAddress(save?: boolean): Promise<boolean>;
+    protected setRefundAddress(refundAddress: string): Promise<void>;
     /**
      * A blocking promise resolving when payment was received by the intermediary and client can continue
      * rejecting in case of failure
@@ -92,15 +88,9 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
      */
     waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, txEtaMs: number) => void): Promise<boolean>;
     waitTillRefunded(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void>;
-    setRefundAddress(refundAddress: string): Promise<void>;
     requestRefund(refundAddress?: string, abortSignal?: AbortSignal): Promise<void>;
     serialize(): any;
-    getInitiator(): string;
-    hasEnoughForTxFees(): Promise<{
-        enoughBalance: boolean;
-        balance: TokenAmount;
-        required: TokenAmount;
-    }>;
+    _getInitiator(): string;
     _sync(save?: boolean): Promise<boolean>;
     _tick(save?: boolean): Promise<boolean>;
 }

@@ -2,9 +2,9 @@ import { SwapType } from "../../enums/SwapType";
 import { ChainType } from "@atomiqlabs/base";
 import { LnForGasWrapper } from "./LnForGasWrapper";
 import { ISwap, ISwapInit } from "../../ISwap";
-import { PriceInfoType } from "../../../prices/abstract/ISwapPrice";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
-import { Fee } from "../../fee/Fee";
+import { Fee, FeeType } from "../../fee/Fee";
+import { IAddressSwap } from "../../IAddressSwap";
 export declare enum LnForGasSwapState {
     EXPIRED = -2,
     FAILED = -1,
@@ -19,8 +19,7 @@ export type LnForGasSwapInit = ISwapInit & {
     token: string;
 };
 export declare function isLnForGasSwapInit(obj: any): obj is LnForGasSwapInit;
-export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> {
-    getSmartChainNetworkFee: any;
+export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> implements IAddressSwap {
     protected readonly currentVersion: number;
     protected readonly TYPE: SwapType;
     private readonly pr;
@@ -35,40 +34,39 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
      * In case swapFee in BTC is not supplied it recalculates it based on swap price
      * @protected
      */
-    protected tryCalculateSwapFee(): void;
-    refreshPriceData(): Promise<PriceInfoType>;
-    getSwapPrice(): number;
-    getMarketPrice(): number;
-    getInputAddress(): string | null;
+    protected tryRecomputeSwapPrice(): void;
+    _getEscrowHash(): string;
     getOutputAddress(): string | null;
     getInputTxId(): string | null;
     getOutputTxId(): string | null;
-    getRecipient(): string;
-    getEscrowHash(): string;
     getId(): string;
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap
      */
-    getLightningInvoice(): string;
+    getAddress(): string;
     /**
      * Returns a string that can be displayed as QR code representation of the lightning invoice (with lightning: prefix)
      */
-    getQrData(): string;
-    getTimeoutTime(): number;
+    getHyperlink(): string;
+    requiresAction(): boolean;
     isFinished(): boolean;
     isQuoteExpired(): boolean;
     isQuoteSoftExpired(): boolean;
     isFailed(): boolean;
     isSuccessful(): boolean;
-    isQuoteValid(): Promise<boolean>;
-    isActionable(): boolean;
+    verifyQuoteValid(): Promise<boolean>;
     protected getOutAmountWithoutFee(): bigint;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
-    getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<true>>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>>;
-    getSwapFee(): Fee;
+    getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<true>>;
+    protected getSwapFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>>;
+    getFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>>;
+    getFeeBreakdown(): [{
+        type: FeeType.SWAP;
+        fee: Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>>;
+    }];
     getRealSwapFeePercentagePPM(): bigint;
-    checkInvoicePaid(save?: boolean): Promise<boolean>;
+    protected checkInvoicePaid(save?: boolean): Promise<boolean>;
     /**
      * A blocking promise resolving when payment was received by the intermediary and client can continue
      * rejecting in case of failure
@@ -80,12 +78,7 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
      */
     waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void>;
     serialize(): any;
-    getInitiator(): string;
-    hasEnoughForTxFees(): Promise<{
-        enoughBalance: boolean;
-        balance: TokenAmount;
-        required: TokenAmount;
-    }>;
+    _getInitiator(): string;
     _sync(save?: boolean): Promise<boolean>;
     _tick(save?: boolean): Promise<boolean>;
 }

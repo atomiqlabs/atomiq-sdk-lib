@@ -157,7 +157,7 @@ export abstract class IEscrowSwapWrapper<
             }
         }
 
-        this.logger.info("processEvents(): "+event.constructor.name+" processed for "+swap.getIdentifierHashString()+" swap: ", swap);
+        this.logger.info("processEvents(): "+event.constructor.name+" processed for "+swap.getId()+" swap: ", swap);
 
         if(swapChanged) {
             await swap._saveAndEmit();

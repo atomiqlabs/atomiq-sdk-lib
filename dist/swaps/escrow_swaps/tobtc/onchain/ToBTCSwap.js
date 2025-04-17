@@ -32,7 +32,7 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
             this.nonce = (initOrObject.nonce == null ? null : BigInt(initOrObject.nonce)) ?? this.data.getNonceHint();
         }
         this.logger = (0, Utils_1.getLogger)("ToBTC(" + this.getIdentifierHashString() + "): ");
-        this.tryCalculateSwapFee();
+        this.tryRecomputeSwapPrice();
     }
     async _setPaymentResult(result, check = false) {
         if (result == null)
@@ -57,6 +57,12 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
     }
     //////////////////////////////
     //// Getters & utils
+    /**
+     * Returns the bitcoin address where the BTC will be sent to
+     */
+    getOutputAddress() {
+        return this.address;
+    }
     getOutputTxId() {
         return this.txId;
     }
@@ -65,21 +71,6 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
      */
     getBitcoinFeeRate() {
         return this.satsPerVByte;
-    }
-    /**
-     * Returns the bitcoin address where the BTC will be sent to
-     */
-    getBitcoinAddress() {
-        return this.address;
-    }
-    /**
-     * Returns the transaction ID of the transaction sending the BTC
-     */
-    getBitcoinTxId() {
-        return this.txId;
-    }
-    getRecipient() {
-        return this.address;
     }
     //////////////////////////////
     //// Storage

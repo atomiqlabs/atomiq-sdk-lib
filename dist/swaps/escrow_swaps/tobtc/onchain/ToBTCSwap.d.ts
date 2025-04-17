@@ -30,19 +30,14 @@ export declare class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSw
         txId?: string;
     }, check?: boolean): Promise<boolean>;
     getOutput(): TokenAmount<T["ChainId"], BtcToken<false>>;
+    /**
+     * Returns the bitcoin address where the BTC will be sent to
+     */
+    getOutputAddress(): string;
     getOutputTxId(): string | null;
     /**
      * Returns fee rate of the bitcoin transaction in sats/vB
      */
     getBitcoinFeeRate(): number;
-    /**
-     * Returns the bitcoin address where the BTC will be sent to
-     */
-    getBitcoinAddress(): string;
-    /**
-     * Returns the transaction ID of the transaction sending the BTC
-     */
-    getBitcoinTxId(): string | null;
-    getRecipient(): string;
     serialize(): any;
 }

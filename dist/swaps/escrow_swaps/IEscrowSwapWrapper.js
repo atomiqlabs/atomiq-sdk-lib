@@ -77,7 +77,7 @@ class IEscrowSwapWrapper extends ISwapWrapper_1.ISwapWrapper {
                 swapChanged ||= true;
             }
         }
-        this.logger.info("processEvents(): " + event.constructor.name + " processed for " + swap.getIdentifierHashString() + " swap: ", swap);
+        this.logger.info("processEvents(): " + event.constructor.name + " processed for " + swap.getId() + " swap: ", swap);
         if (swapChanged) {
             await swap._saveAndEmit();
         }

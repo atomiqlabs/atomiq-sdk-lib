@@ -9,3 +9,14 @@ export type Fee<
     amountInDstToken: TokenAmount<ChainIdentifier, TDst>;
     usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) => Promise<number>;
 }
+
+export enum FeeType {
+    SWAP = 0,
+    NETWORK_OUTPUT = 1,
+    WATCHTOWER = 2
+}
+
+export type FeeBreakdown<ChainIdentifier extends string = string> = {
+    type: FeeType,
+    fee: Fee<ChainIdentifier>
+}[];

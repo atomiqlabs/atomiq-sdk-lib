@@ -4,8 +4,7 @@ import { SwapType } from "../enums/SwapType";
 import { SpvFromBTCWrapper } from "./SpvFromBTCWrapper";
 import { Transaction } from "@scure/btc-signer";
 import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
-import { PriceInfoType } from "../../prices/abstract/ISwapPrice";
-import { Fee } from "../fee/Fee";
+import { Fee, FeeType } from "../fee/Fee";
 import { IBitcoinWallet } from "../../btc/wallet/IBitcoinWallet";
 export declare enum SpvFromBTCSwapState {
     CLOSED = -5,
@@ -48,7 +47,6 @@ export type SpvFromBTCSwapInit = ISwapInit & {
 };
 export declare function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit;
 export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> {
-    getSmartChainNetworkFee: any;
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
     readonly wrapper: SpvFromBTCWrapper<T>;
     readonly quoteId: string;
@@ -85,43 +83,42 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * @protected
      */
     protected tryCalculateSwapFee(): void;
-    refreshPriceData(): Promise<PriceInfoType>;
-    getSwapPrice(): number;
-    getMarketPrice(): number;
+    refreshPriceData(): Promise<void>;
     getRealSwapFeePercentagePPM(): bigint;
-    getExpiry(): number;
-    isQuoteValid(): Promise<boolean>;
-    getEscrowHash(): string;
+    _getInitiator(): string;
+    _getEscrowHash(): string;
     getId(): string;
-    getInitiator(): string;
-    getInputAddress(): string | null;
+    getQuoteExpiry(): number;
+    verifyQuoteValid(): Promise<boolean>;
     getOutputAddress(): string | null;
     getOutputTxId(): string | null;
     getInputTxId(): string | null;
+    requiresAction(): boolean;
     isFinished(): boolean;
-    isActionable(): boolean;
     isClaimable(): boolean;
     isSuccessful(): boolean;
     isFailed(): boolean;
     isQuoteExpired(): boolean;
     isQuoteSoftExpired(): boolean;
-    canClaim(): boolean;
+    protected getInputSwapAmountWithoutFee(): bigint;
+    protected getInputGasAmountWithoutFee(): bigint;
+    protected getInputAmountWithoutFee(): bigint;
+    protected getOutputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+    protected getSwapFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
+    protected getWatchtowerFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
     getFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
-    getSwapFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
-    getGasSwapFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
-    getCallerFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
-    hasEnoughForTxFees(): Promise<{
-        enoughBalance: boolean;
-        balance: TokenAmount;
-        required: TokenAmount;
-    }>;
-    getOutputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+    getFeeBreakdown(): [
+        {
+            type: FeeType.SWAP;
+            fee: Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
+        },
+        {
+            type: FeeType.NETWORK_OUTPUT;
+            fee: Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
+        }
+    ];
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
-    getGasOutputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
-    getGasOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
-    getInputAmountWithoutFee(): bigint;
-    getInputSwapAmountWithoutFee(): bigint;
-    getInputGasAmountWithoutFee(): bigint;
+    getGasDropOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>>;
     getTransactionDetails(): Promise<{
@@ -148,6 +145,14 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     submitPsbt(psbt: Transaction): Promise<string>;
     signAndSubmit(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     /**
+     * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
+     */
+    protected getBitcoinPayment(): Promise<{
+        txId: string;
+        confirmations: number;
+        targetConfirmations: number;
+    } | null>;
+    /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
      *
      * @param abortSignal Abort signal
@@ -156,14 +161,6 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<void>;
-    /**
-     * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
-     */
-    getBitcoinPayment(): Promise<{
-        txId: string;
-        confirmations: number;
-        targetConfirmations: number;
-    } | null>;
     /**
      * Returns transactions required to claim the swap on-chain (and possibly also sync the bitcoin light client)
      *  after a bitcoin transaction was sent and confirmed
@@ -187,13 +184,22 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      */
     protected watchdogWaitTillResult(abortSignal?: AbortSignal, interval?: number): Promise<SpvWithdrawalClaimedState | SpvWithdrawalFrontedState | SpvWithdrawalClosedState>;
     /**
-     * Waits till the swap is successfully claimed
+     * Waits till the swap is successfully executed
      *
      * @param abortSignal AbortSignal
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
      */
     waitTillClaimedOrFronted(abortSignal?: AbortSignal): Promise<void>;
+    /**
+     * Waits till the bitcoin transaction confirms and swap is claimed
+     *
+     * @param abortSignal Abort signal
+     * @param checkIntervalSeconds How often to check the bitcoin transaction
+     * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
+     * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
+     */
+    waitTillExecuted(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<void>;
     serialize(): any;
     private syncStateFromBitcoin;
     /**

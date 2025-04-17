@@ -4,9 +4,9 @@ import {ISwapWrapper} from "./ISwapWrapper";
 import {ChainType} from "@atomiqlabs/base";
 import {isPriceInfoType, PriceInfoType} from "../prices/abstract/ISwapPrice";
 import {LoggerType, randomBytes} from "../utils/Utils";
-import {SCToken, TokenAmount, toTokenAmount} from "../Tokens";
+import {SCToken, TokenAmount} from "../Tokens";
 import {SwapDirection} from "./enums/SwapDirection";
-import {Fee} from "./fee/Fee";
+import {Fee, FeeBreakdown} from "./fee/Fee";
 
 export type ISwapInit = {
     pricingInfo: PriceInfoType,
@@ -28,25 +28,40 @@ export function isISwapInit(obj: any): obj is ISwapInit {
         (typeof obj.exactIn === 'boolean');
 }
 
+export type PercentagePPM = {
+    ppm: bigint,
+    decimal: number,
+    percentage: number
+};
+
+export function ppmToPercentage(ppm: bigint): PercentagePPM {
+    if(ppm==null) return null;
+    return {
+        ppm,
+        decimal: Number(ppm)/1_000_000,
+        percentage: Number(ppm)/10_000
+    }
+}
+
 export abstract class ISwap<
     T extends ChainType = ChainType,
     S extends number = number
 > {
+    protected readonly abstract TYPE: SwapType;
+    protected readonly currentVersion: number = 1;
+    protected readonly wrapper: ISwapWrapper<T, ISwap<T, S>>;
+    readonly url: string;
+
     readonly chainIdentifier: string;
     readonly exactIn: boolean;
     readonly createdAt: number;
 
-    protected readonly currentVersion: number = 1;
     protected version: number;
     protected initiated: boolean = false;
     protected logger: LoggerType;
-    protected readonly abstract TYPE: SwapType;
-    protected readonly wrapper: ISwapWrapper<T, ISwap<T, S>>;
+
     expiry?: number;
-    readonly url: string;
-
     state: S;
-
     pricingInfo: PriceInfoType;
 
     protected swapFee: bigint;
@@ -138,6 +153,60 @@ export abstract class ISwap<
     //////////////////////////////
     //// Pricing
 
+    protected tryRecomputeSwapPrice(): void {
+        if(this.pricingInfo.swapPriceUSatPerToken==null) {
+            if(this.getDirection()===SwapDirection.TO_BTC) {
+                const input = this.getInput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+                this.pricingInfo = this.wrapper.prices.recomputePriceInfoSend(
+                    this.chainIdentifier,
+                    this.getOutput().rawAmount,
+                    this.pricingInfo.satsBaseFee,
+                    this.pricingInfo.feePPM,
+                    input.rawAmount,
+                    input.token.address
+                );
+            } else {
+                const output = this.getOutput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+                this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
+                    this.chainIdentifier,
+                    this.getInput().rawAmount,
+                    this.pricingInfo.satsBaseFee,
+                    this.pricingInfo.feePPM,
+                    output.rawAmount,
+                    output.token.address
+                );
+            }
+        }
+    }
+
+    /**
+     * Re-fetches & revalidates the price data
+     */
+    async refreshPriceData(): Promise<void> {
+        if(this.pricingInfo==null) return null;
+        if(this.getDirection()===SwapDirection.TO_BTC) {
+            const input = this.getInput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+            this.pricingInfo = await this.wrapper.prices.isValidAmountSend(
+                this.chainIdentifier,
+                this.getOutput().rawAmount,
+                this.pricingInfo.satsBaseFee,
+                this.pricingInfo.feePPM,
+                input.rawAmount,
+                input.token.address
+            );
+        } else {
+            const output = this.getOutput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+            this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(
+                this.chainIdentifier,
+                this.getInput().rawAmount,
+                this.pricingInfo.satsBaseFee,
+                this.pricingInfo.feePPM,
+                output.rawAmount,
+                output.token.address
+            );
+        }
+    }
+
     /**
      * Checks if the pricing for the swap is valid, according to max allowed price difference set in the ISwapPrice
      */
@@ -146,49 +215,55 @@ export abstract class ISwap<
     }
 
     /**
-     * Returns the price difference between offered price and current market price in PPM (parts per million)
+     * Returns pricing info about the swap
      */
-    getPriceDifferencePPM(): bigint {
-        return this.pricingInfo==null ? null :this.pricingInfo.differencePPM;
+    getPriceInfo(): {
+        marketPrice: number,
+        swapPrice: number,
+        difference: PercentagePPM
+    } {
+        const swapPrice = this.getDirection()===SwapDirection.TO_BTC ?
+            100_000_000_000_000/Number(this.pricingInfo.swapPriceUSatPerToken) :
+            Number(this.pricingInfo.swapPriceUSatPerToken)/100_000_000_000_000;
+        const marketPrice = this.getDirection()===SwapDirection.TO_BTC ?
+            100_000_000_000_000/Number(this.pricingInfo.realPriceUSatPerToken) :
+            Number(this.pricingInfo.swapPriceUSatPerToken)/100_000_000_000_000;
+
+        return {
+            marketPrice,
+            swapPrice,
+            difference: ppmToPercentage(this.pricingInfo.differencePPM)
+        }
     }
-
-    /**
-     * Returns the price difference between offered price and current market price as a decimal number
-     */
-    getPriceDifferencePct(): number {
-        return this.pricingInfo==null ? null : this.pricingInfo.differencePPM==null ? null : Number(this.pricingInfo.differencePPM)/1000000;
-    }
-
-    /**
-     * Re-fetches & revalidates the price data
-     */
-    abstract refreshPriceData(): Promise<PriceInfoType>;
-
-    /**
-     * Returns the offered swap quote price
-     */
-    abstract getSwapPrice(): number;
-
-    /**
-     * Returns the real current market price fetched from reputable exchanges
-     */
-    abstract getMarketPrice(): number;
 
     /**
      * Returns the real swap fee percentage as PPM (parts per million)
      */
     abstract getRealSwapFeePercentagePPM(): bigint;
 
+
     //////////////////////////////
     //// Getters & utils
 
-    abstract getInputTxId(): string | null;
+    abstract _getEscrowHash(): string;
 
-    abstract getOutputTxId(): string | null;
+    /**
+     * @param signer Signer to check with this swap's initiator
+     * @throws {Error} When signer's address doesn't match with the swap's initiator one
+     */
+    protected checkSigner(signer: T["Signer"] | string): void {
+        if((typeof(signer)==="string" ? signer : signer.getAddress())!==this._getInitiator()) throw new Error("Invalid signer provided!");
+    }
 
-    abstract getInputAddress(): string | null;
+    /**
+     * Checks if the swap's quote is still valid
+     */
+    abstract verifyQuoteValid(): Promise<boolean>;
 
     abstract getOutputAddress(): string | null;
+
+    abstract getInputTxId(): string | null;
+    abstract getOutputTxId(): string | null;
 
     /**
      * Returns the ID of the swap, as used in the storage and getSwapById function
@@ -196,37 +271,9 @@ export abstract class ISwap<
     abstract getId(): string;
 
     /**
-     * Returns the hash of the on-chain escrow for escrow swaps & bitcoin transaction ID for SPV vault swaps
+     * Checks whether there is some action required from the user for this swap - can mean either refundable or claimable
      */
-    abstract getEscrowHash(): string;
-
-    /**
-     * Returns quote expiry in UNIX millis
-     */
-    getExpiry(): number {
-        return this.expiry;
-    }
-
-    /**
-     * Returns the type of the swap
-     */
-    getType(): SwapType {
-        return this.TYPE;
-    }
-
-    /**
-     * Returns the direction of the swap
-     */
-    getDirection(): SwapDirection {
-        return this.TYPE===SwapType.TO_BTC || this.TYPE===SwapType.TO_BTCLN ? SwapDirection.TO_BTC : SwapDirection.FROM_BTC;
-    }
-
-    /**
-     * Returns the current state of the swap
-     */
-    getState(): S {
-        return this.state;
-    }
+    abstract requiresAction(): boolean;
 
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
@@ -257,29 +304,39 @@ export abstract class ISwap<
     /**
      * Returns the intiator address of the swap - address that created this swap
      */
-    abstract getInitiator(): string;
-
-    /**
-     * @param signer Signer to check with this swap's initiator
-     * @throws {Error} When signer's address doesn't match with the swap's initiator one
-     */
-    checkSigner(signer: T["Signer"] | string): void {
-        if((typeof(signer)==="string" ? signer : signer.getAddress())!==this.getInitiator()) throw new Error("Invalid signer provided!");
-    }
-
-    /**
-     * Checks if the swap's quote is still valid
-     */
-    abstract isQuoteValid(): Promise<boolean>;
+    abstract _getInitiator(): string;
 
     isInitiated(): boolean {
         return this.initiated;
     }
 
     /**
-     * Checks whether there is some action required from the user for this swap - can mean either refundable or claimable
+     * Returns quote expiry in UNIX millis
      */
-    abstract isActionable(): boolean;
+    getQuoteExpiry(): number {
+        return this.expiry;
+    }
+
+    /**
+     * Returns the type of the swap
+     */
+    getType(): SwapType {
+        return this.TYPE;
+    }
+
+    /**
+     * Returns the direction of the swap
+     */
+    getDirection(): SwapDirection {
+        return this.TYPE===SwapType.TO_BTC || this.TYPE===SwapType.TO_BTCLN ? SwapDirection.TO_BTC : SwapDirection.FROM_BTC;
+    }
+
+    /**
+     * Returns the current state of the swap
+     */
+    getState(): S {
+        return this.state;
+    }
 
     //////////////////////////////
     //// Amounts & fees
@@ -303,25 +360,13 @@ export abstract class ISwap<
      * Returns total fee for the swap, the fee is represented in source currency & destination currency, but is
      *  paid only once
      */
-    getFee(): Fee {
-        return this.getSwapFee();
-    }
+    abstract getFee(): Fee;
 
     /**
-     * Returns swap fee for the swap, the fee is represented in source currency & destination currency, but is
-     *  paid only once
+     * Returns the breakdown of all the fees paid
      */
-    abstract getSwapFee(): Fee;
+    abstract getFeeBreakdown(): FeeBreakdown<T["ChainId"]>;
 
-    /**
-     * Returns the transaction fee paid on the smart chain
-     */
-    abstract getSmartChainNetworkFee?(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
-
-    /**
-     * Checks if the initiator/sender has enough balance to cover the transaction fee for processing the swap
-     */
-    abstract hasEnoughForTxFees(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}>;
 
     //////////////////////////////
     //// Storage
@@ -331,8 +376,8 @@ export abstract class ISwap<
         return {
             id: this.getId(),
             type: this.getType(),
-            escrowHash: this.getEscrowHash(),
-            initiator: this.getInitiator(),
+            escrowHash: this._getEscrowHash(),
+            initiator: this._getInitiator(),
 
             _isValid: this.pricingInfo.isValid,
             _differencePPM: this.pricingInfo.differencePPM==null ? null :this.pricingInfo.differencePPM.toString(10),
@@ -371,7 +416,7 @@ export abstract class ISwap<
     //////////////////////////////
     //// Events
 
-    _emitEvent() {
+    protected _emitEvent() {
         this.wrapper.events.emit("swapState", this);
         this.events.emit("swapState", this);
     }

@@ -8,6 +8,7 @@ const Utils_1 = require("../../../utils/Utils");
 const ISwap_1 = require("../../ISwap");
 const TrustedIntermediaryAPI_1 = require("../../../intermediaries/TrustedIntermediaryAPI");
 const Tokens_1 = require("../../../Tokens");
+const Fee_1 = require("../../fee/Fee");
 var LnForGasSwapState;
 (function (LnForGasSwapState) {
     LnForGasSwapState[LnForGasSwapState["EXPIRED"] = -2] = "EXPIRED";
@@ -29,7 +30,6 @@ class LnForGasSwap extends ISwap_1.ISwap {
         if (isLnForGasSwapInit(initOrObj))
             initOrObj.url += "/lnforgas";
         super(wrapper, initOrObj);
-        this.getSmartChainNetworkFee = null;
         this.currentVersion = 2;
         this.TYPE = SwapType_1.SwapType.TRUSTED_FROM_BTCLN;
         if (isLnForGasSwapInit(initOrObj)) {
@@ -42,11 +42,12 @@ class LnForGasSwap extends ISwap_1.ISwap {
             this.token = initOrObj.token;
             this.scTxId = initOrObj.scTxId;
         }
-        this.tryCalculateSwapFee();
-        this.logger = (0, Utils_1.getLogger)("LnForGas(" + this.getId() + "): ");
-        if (this.pricingInfo.swapPriceUSatPerToken == null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee ?? 10n, this.pricingInfo.feePPM ?? 10000n, this.outputAmount, this.token ?? this.wrapper.getNativeToken().address);
+        this.tryRecomputeSwapPrice();
+        if (this.pr != null) {
+            const decoded = (0, bolt11_1.decode)(this.pr);
+            this.expiry = decoded.timeExpireDate * 1000;
         }
+        this.logger = (0, Utils_1.getLogger)("LnForGas(" + this.getId() + "): ");
     }
     upgradeVersion() {
         if (this.version == 1) {
@@ -63,30 +64,16 @@ class LnForGasSwap extends ISwap_1.ISwap {
      * In case swapFee in BTC is not supplied it recalculates it based on swap price
      * @protected
      */
-    tryCalculateSwapFee() {
+    tryRecomputeSwapPrice() {
         if (this.swapFeeBtc == null) {
             this.swapFeeBtc = this.swapFee * this.getInput().rawAmount / this.getOutAmountWithoutFee();
         }
-    }
-    //////////////////////////////
-    //// Pricing
-    async refreshPriceData() {
-        if (this.pricingInfo == null)
-            return null;
-        const priceData = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee ?? 10n, this.pricingInfo.feePPM ?? 10000n, this.outputAmount, this.token ?? this.wrapper.getNativeToken().address);
-        this.pricingInfo = priceData;
-        return priceData;
-    }
-    getSwapPrice() {
-        return Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
-    }
-    getMarketPrice() {
-        return Number(this.pricingInfo.realPriceUSatPerToken) / 100000000000000;
+        super.tryRecomputeSwapPrice();
     }
     //////////////////////////////
     //// Getters & utils
-    getInputAddress() {
-        return this.pr;
+    _getEscrowHash() {
+        return this.getId();
     }
     getOutputAddress() {
         return this.recipient;
@@ -97,12 +84,6 @@ class LnForGasSwap extends ISwap_1.ISwap {
     getOutputTxId() {
         return this.scTxId;
     }
-    getRecipient() {
-        return this.recipient;
-    }
-    getEscrowHash() {
-        return this.getId();
-    }
     getId() {
         if (this.pr == null)
             return null;
@@ -112,20 +93,17 @@ class LnForGasSwap extends ISwap_1.ISwap {
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap
      */
-    getLightningInvoice() {
+    getAddress() {
         return this.pr;
     }
     /**
      * Returns a string that can be displayed as QR code representation of the lightning invoice (with lightning: prefix)
      */
-    getQrData() {
+    getHyperlink() {
         return "lightning:" + this.pr.toUpperCase();
     }
-    getTimeoutTime() {
-        if (this.pr == null)
-            return null;
-        const decoded = (0, bolt11_1.decode)(this.pr);
-        return (decoded.timeExpireDate * 1000);
+    requiresAction() {
+        return false;
     }
     isFinished() {
         return this.state === LnForGasSwapState.FINISHED || this.state === LnForGasSwapState.FAILED || this.state === LnForGasSwapState.EXPIRED;
@@ -134,7 +112,7 @@ class LnForGasSwap extends ISwap_1.ISwap {
         return this.state === LnForGasSwapState.EXPIRED;
     }
     isQuoteSoftExpired() {
-        return this.getTimeoutTime() < Date.now();
+        return this.expiry < Date.now();
     }
     isFailed() {
         return this.state === LnForGasSwapState.FAILED;
@@ -142,11 +120,8 @@ class LnForGasSwap extends ISwap_1.ISwap {
     isSuccessful() {
         return this.state === LnForGasSwapState.FINISHED;
     }
-    isQuoteValid() {
-        return Promise.resolve(this.getTimeoutTime() > Date.now());
-    }
-    isActionable() {
-        return false;
+    verifyQuoteValid() {
+        return Promise.resolve(this.expiry > Date.now());
     }
     //////////////////////////////
     //// Amounts & fees
@@ -156,15 +131,15 @@ class LnForGasSwap extends ISwap_1.ISwap {
     getOutput() {
         return (0, Tokens_1.toTokenAmount)(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices);
     }
-    getInputWithoutFee() {
-        const parsed = (0, bolt11_1.decode)(this.pr);
-        const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
-        return (0, Tokens_1.toTokenAmount)(amount - this.swapFeeBtc, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices);
-    }
     getInput() {
         const parsed = (0, bolt11_1.decode)(this.pr);
         const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
         return (0, Tokens_1.toTokenAmount)(amount, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices);
+    }
+    getInputWithoutFee() {
+        const parsed = (0, bolt11_1.decode)(this.pr);
+        const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
+        return (0, Tokens_1.toTokenAmount)(amount - this.swapFeeBtc, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices);
     }
     getSwapFee() {
         return {
@@ -172,6 +147,15 @@ class LnForGasSwap extends ISwap_1.ISwap {
             amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
             usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
         };
+    }
+    getFee() {
+        return this.getSwapFee();
+    }
+    getFeeBreakdown() {
+        return [{
+                type: Fee_1.FeeType.SWAP,
+                fee: this.getSwapFee()
+            }];
     }
     getRealSwapFeePercentagePPM() {
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
@@ -271,15 +255,8 @@ class LnForGasSwap extends ISwap_1.ISwap {
             scTxId: this.scTxId
         };
     }
-    getInitiator() {
+    _getInitiator() {
         return this.recipient;
-    }
-    hasEnoughForTxFees() {
-        return Promise.resolve({
-            balance: (0, Tokens_1.toTokenAmount)(0n, this.wrapper.getNativeToken(), this.wrapper.prices),
-            enoughBalance: true,
-            required: (0, Tokens_1.toTokenAmount)(0n, this.wrapper.getNativeToken(), this.wrapper.prices)
-        });
     }
     //////////////////////////////
     //// Swap ticks & sync

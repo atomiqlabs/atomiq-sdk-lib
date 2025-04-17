@@ -5,13 +5,10 @@ import {LnForGasWrapper} from "./LnForGasWrapper";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
 import {getLogger, timeoutPromise} from "../../../utils/Utils";
 import {isISwapInit, ISwap, ISwapInit} from "../../ISwap";
-import {PriceInfoType} from "../../../prices/abstract/ISwapPrice";
-import {
-    InvoiceStatusResponseCodes,
-    TrustedIntermediaryAPI
-} from "../../../intermediaries/TrustedIntermediaryAPI";
+import {InvoiceStatusResponseCodes, TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediaryAPI";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
-import {Fee} from "../../fee/Fee";
+import {Fee, FeeBreakdown, FeeType} from "../../fee/Fee";
+import {IAddressSwap} from "../../IAddressSwap";
 
 export enum LnForGasSwapState {
     EXPIRED = -2,
@@ -36,8 +33,7 @@ export function isLnForGasSwapInit(obj: any): obj is LnForGasSwapInit {
         isISwapInit(obj);
 }
 
-export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> {
-    getSmartChainNetworkFee = null;
+export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> implements IAddressSwap {
     protected readonly currentVersion: number = 2;
     protected readonly TYPE: SwapType = SwapType.TRUSTED_FROM_BTCLN;
 
@@ -67,19 +63,12 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
             this.token = initOrObj.token;
             this.scTxId = initOrObj.scTxId;
         }
-        this.tryCalculateSwapFee();
-        this.logger = getLogger("LnForGas("+this.getId()+"): ");
-
-        if(this.pricingInfo.swapPriceUSatPerToken==null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
-                this.chainIdentifier,
-                this.getInput().rawAmount,
-                this.pricingInfo.satsBaseFee ?? 10n,
-                this.pricingInfo.feePPM ?? 10000n,
-                this.outputAmount,
-                this.token ?? this.wrapper.getNativeToken().address
-            );
+        this.tryRecomputeSwapPrice();
+        if(this.pr!=null) {
+            const decoded = bolt11Decode(this.pr);
+            this.expiry = decoded.timeExpireDate*1000;
         }
+        this.logger = getLogger("LnForGas("+this.getId()+"): ");
     }
 
     protected upgradeVersion() {
@@ -97,44 +86,19 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
      * In case swapFee in BTC is not supplied it recalculates it based on swap price
      * @protected
      */
-    protected tryCalculateSwapFee() {
+    protected tryRecomputeSwapPrice() {
         if(this.swapFeeBtc==null) {
             this.swapFeeBtc = this.swapFee * this.getInput().rawAmount / this.getOutAmountWithoutFee();
         }
-    }
-
-
-    //////////////////////////////
-    //// Pricing
-
-    async refreshPriceData(): Promise<PriceInfoType> {
-        if(this.pricingInfo==null) return null;
-        const priceData = await this.wrapper.prices.isValidAmountReceive(
-            this.chainIdentifier,
-            this.getInput().rawAmount,
-            this.pricingInfo.satsBaseFee ?? 10n,
-            this.pricingInfo.feePPM ?? 10000n,
-            this.outputAmount,
-            this.token ?? this.wrapper.getNativeToken().address
-        );
-        this.pricingInfo = priceData;
-        return priceData;
-    }
-
-    getSwapPrice(): number {
-        return Number(this.pricingInfo.swapPriceUSatPerToken)/100000000000000;
-    }
-
-    getMarketPrice(): number {
-        return Number(this.pricingInfo.realPriceUSatPerToken)/100000000000000;
+        super.tryRecomputeSwapPrice();
     }
 
 
     //////////////////////////////
     //// Getters & utils
 
-    getInputAddress(): string | null {
-        return this.pr;
+    _getEscrowHash(): string {
+        return this.getId();
     }
 
     getOutputAddress(): string | null {
@@ -149,14 +113,6 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         return this.scTxId;
     }
 
-    getRecipient(): string {
-        return this.recipient;
-    }
-
-    getEscrowHash(): string {
-        return this.getId();
-    }
-
     getId(): string {
         if(this.pr==null) return null;
         const decodedPR = bolt11Decode(this.pr);
@@ -166,21 +122,19 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap
      */
-    getLightningInvoice(): string {
+    getAddress(): string {
         return this.pr;
     }
 
     /**
      * Returns a string that can be displayed as QR code representation of the lightning invoice (with lightning: prefix)
      */
-    getQrData(): string {
+    getHyperlink(): string {
         return "lightning:"+this.pr.toUpperCase();
     }
 
-    getTimeoutTime(): number {
-        if(this.pr==null) return null;
-        const decoded = bolt11Decode(this.pr);
-        return (decoded.timeExpireDate*1000);
+    requiresAction(): boolean {
+        return false;
     }
 
     isFinished(): boolean {
@@ -192,7 +146,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     }
 
     isQuoteSoftExpired(): boolean {
-        return this.getTimeoutTime()<Date.now();
+        return this.expiry<Date.now();
     }
 
     isFailed(): boolean {
@@ -203,12 +157,8 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         return this.state===LnForGasSwapState.FINISHED;
     }
 
-    isQuoteValid(): Promise<boolean> {
-        return Promise.resolve(this.getTimeoutTime()>Date.now());
-    }
-
-    isActionable(): boolean {
-        return false;
+    verifyQuoteValid(): Promise<boolean> {
+        return Promise.resolve(this.expiry>Date.now());
     }
 
     //////////////////////////////
@@ -222,25 +172,36 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         return toTokenAmount(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices);
     }
 
-    getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<true>> {
-        const parsed = bolt11Decode(this.pr);
-        const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
-        return toTokenAmount(amount - this.swapFeeBtc, BitcoinTokens.BTCLN, this.wrapper.prices);
-    }
-
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>> {
         const parsed = bolt11Decode(this.pr);
         const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
         return toTokenAmount(amount, BitcoinTokens.BTCLN, this.wrapper.prices);
     }
 
-    getSwapFee(): Fee {
+    getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<true>> {
+        const parsed = bolt11Decode(this.pr);
+        const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
+        return toTokenAmount(amount - this.swapFeeBtc, BitcoinTokens.BTCLN, this.wrapper.prices);
+    }
+
+    protected getSwapFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>> {
         return {
             amountInSrcToken: toTokenAmount(this.swapFeeBtc, BitcoinTokens.BTCLN, this.wrapper.prices),
             amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
                 this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
         };
+    }
+
+    getFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>> {
+        return this.getSwapFee();
+    }
+
+    getFeeBreakdown(): [{type: FeeType.SWAP, fee: Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>>}] {
+        return [{
+            type: FeeType.SWAP,
+            fee: this.getSwapFee()
+        }];
     }
 
     getRealSwapFeePercentagePPM(): bigint {
@@ -252,7 +213,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     //////////////////////////////
     //// Payment
 
-    async checkInvoicePaid(save: boolean = true): Promise<boolean> {
+    protected async checkInvoicePaid(save: boolean = true): Promise<boolean> {
         if(this.state===LnForGasSwapState.FAILED || this.state===LnForGasSwapState.EXPIRED) return false;
         if(this.state===LnForGasSwapState.FINISHED) return true;
 
@@ -344,16 +305,8 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         };
     }
 
-    getInitiator(): string {
+    _getInitiator(): string {
         return this.recipient;
-    }
-
-    hasEnoughForTxFees(): Promise<{ enoughBalance: boolean; balance: TokenAmount; required: TokenAmount }> {
-        return Promise.resolve({
-            balance: toTokenAmount(0n, this.wrapper.getNativeToken(), this.wrapper.prices),
-            enoughBalance: true,
-            required: toTokenAmount(0n, this.wrapper.getNativeToken(), this.wrapper.prices)
-        });
     }
 
 

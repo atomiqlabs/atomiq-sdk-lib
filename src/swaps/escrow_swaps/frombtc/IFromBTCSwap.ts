@@ -7,13 +7,14 @@ import {
 import {PriceInfoType} from "../../../prices/abstract/ISwapPrice";
 import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {IEscrowSwap, IEscrowSwapInit} from "../IEscrowSwap";
-import {Fee} from "../../fee/Fee";
+import {Fee, FeeType} from "../../fee/Fee";
+import {IAddressSwap} from "../../IAddressSwap";
 
 
 export abstract class IFromBTCSwap<
     T extends ChainType = ChainType,
     S extends number = number
-> extends IEscrowSwap<T, S> {
+> extends IEscrowSwap<T, S> implements IAddressSwap {
     protected abstract readonly inputToken: BtcToken;
 
     protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, init: IEscrowSwapInit<T["Data"]>);
@@ -29,51 +30,20 @@ export abstract class IFromBTCSwap<
      * In case swapFee in BTC is not supplied it recalculates it based on swap price
      * @protected
      */
-    protected tryCalculateSwapFee() {
+    protected tryRecomputeSwapPrice() {
         if(this.swapFeeBtc==null) {
             this.swapFeeBtc = this.swapFee * this.getInput().rawAmount / this.getOutAmountWithoutFee();
         }
-
-        if(this.pricingInfo.swapPriceUSatPerToken==null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
-                this.chainIdentifier,
-                this.getInput().rawAmount,
-                this.pricingInfo.satsBaseFee,
-                this.pricingInfo.feePPM,
-                this.getSwapData().getAmount(),
-                this.getSwapData().getToken()
-            );
-        }
+        super.tryRecomputeSwapPrice();
     }
 
     protected getSwapData(): T["Data"] {
         return this.data;
     }
 
+
     //////////////////////////////
     //// Pricing
-
-    async refreshPriceData(): Promise<PriceInfoType> {
-        if(this.pricingInfo==null) return null;
-        const priceData = await this.wrapper.prices.isValidAmountReceive(
-            this.chainIdentifier,
-            this.getInput().rawAmount,
-            this.pricingInfo.satsBaseFee,
-            this.pricingInfo.feePPM,
-            this.getSwapData().getAmount(),
-            this.getSwapData().getToken()
-        );
-        this.pricingInfo = priceData;
-        return priceData;
-    }
-
-    getSwapPrice(): number {
-        return Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
-    }
-
-    getMarketPrice(): number {
-        return Number(this.pricingInfo.realPriceUSatPerToken) / 100000000000000;
-    }
 
     getRealSwapFeePercentagePPM(): bigint {
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
@@ -84,20 +54,6 @@ export abstract class IFromBTCSwap<
     //////////////////////////////
     //// Getters & utils
 
-    abstract getInputTxId(): string | null;
-
-    getOutputTxId(): string | null {
-        return this.claimTxId;
-    }
-
-    getInputAddress(): string | null {
-        return this.getAddress();
-    }
-
-    getOutputAddress(): string | null {
-        return this.getInitiator();
-    }
-
     /**
      * Returns the bitcoin address or lightning invoice to be paid for the swap
      */
@@ -107,18 +63,30 @@ export abstract class IFromBTCSwap<
      * Returns a string that can be displayed as QR code representation of the address or lightning invoice
      *  (with bitcoin: or lightning: prefix)
      */
-    abstract getQrData(): string;
+    abstract getHyperlink(): string;
 
     abstract isClaimable(): boolean;
-
-    isActionable(): boolean {
-        return this.isClaimable();
-    }
 
     /**
      * Returns if the swap can be committed
      */
-    abstract canCommit(): boolean;
+    protected abstract canCommit(): boolean;
+
+    _getInitiator(): string {
+        return this.getSwapData().getClaimer();
+    }
+
+    getOutputTxId(): string | null {
+        return this.claimTxId;
+    }
+
+    getOutputAddress(): string | null {
+        return this._getInitiator();
+    }
+
+    requiresAction(): boolean {
+        return this.isClaimable();
+    }
 
 
     //////////////////////////////
@@ -128,8 +96,24 @@ export abstract class IFromBTCSwap<
         return this.getSwapData().getAmount() + this.swapFee;
     }
 
-    getOutputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.getSwapData().getAmount() + this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices);
+    protected getSwapFee(): Fee<T["ChainId"], BtcToken, SCToken<T["ChainId"]>> {
+        return {
+            amountInSrcToken: toTokenAmount(this.swapFeeBtc, this.inputToken, this.wrapper.prices),
+            amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices),
+            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
+                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+        };
+    }
+
+    getFee(): Fee {
+        return this.getSwapFee();
+    }
+
+    getFeeBreakdown(): [{type: FeeType.SWAP, fee: Fee<T["ChainId"], BtcToken, SCToken<T["ChainId"]>>}] {
+        return [{
+            type: FeeType.SWAP,
+            fee: this.getSwapFee()
+        }];
     }
 
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
@@ -140,15 +124,6 @@ export abstract class IFromBTCSwap<
         return toTokenAmount(this.getInput().rawAmount - this.swapFeeBtc, this.inputToken, this.wrapper.prices);
     }
 
-    getSwapFee(): Fee {
-        return {
-            amountInSrcToken: toTokenAmount(this.swapFeeBtc, this.inputToken, this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
-        };
-    }
-
     getSecurityDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
         return toTokenAmount(this.getSwapData().getSecurityDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
@@ -157,17 +132,9 @@ export abstract class IFromBTCSwap<
         return toTokenAmount(this.getSwapData().getTotalDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
 
-    getInitiator(): string {
-        return this.getSwapData().getClaimer();
-    }
-
-    getClaimFee(): Promise<bigint> {
-        return this.wrapper.contract.getClaimFee(this.getInitiator(), this.getSwapData());
-    }
-
     async hasEnoughForTxFees(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
         const [balance, commitFee] = await Promise.all([
-            this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.chain.getNativeCurrencyAddress(), false),
+            this.wrapper.contract.getBalance(this._getInitiator(), this.wrapper.chain.getNativeCurrencyAddress(), false),
             this.getCommitFee()
         ]);
         const totalFee = commitFee + this.getSwapData().getTotalDeposit();
@@ -181,17 +148,6 @@ export abstract class IFromBTCSwap<
 
     //////////////////////////////
     //// Commit
-
-    /**
-     * Commits the swap on-chain, locking the tokens from the intermediary in an HTLC or PTLC
-     *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
-     * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
-     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
-     *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
-     * @throws {Error} If invalid signer is provided that doesn't match the swap data
-     */
-    abstract commit(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
 
     /**
      * Returns the transactions required for committing the swap on-chain, locking the tokens from the intermediary
@@ -214,11 +170,28 @@ export abstract class IFromBTCSwap<
         ).catch(e => Promise.reject(e instanceof SignatureVerificationError ? new Error("Request timed out") : e));
     }
 
+    /**
+     * Commits the swap on-chain, locking the tokens from the intermediary in an HTLC or PTLC
+     *
+     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
+     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
+     *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
+     * @throws {Error} If invalid signer is provided that doesn't match the swap data
+     */
+    abstract commit(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
+
     abstract waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
 
 
     //////////////////////////////
     //// Claim
+
+    getClaimFee(): Promise<bigint> {
+        return this.wrapper.contract.getClaimFee(this._getInitiator(), this.getSwapData());
+    }
+
+    abstract txsClaim(signer?: T["Signer"]): Promise<T["TX"][]>;
 
     /**
      * Claims and finishes the swap
@@ -227,8 +200,6 @@ export abstract class IFromBTCSwap<
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
     abstract claim(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
-
-    abstract txsClaim(signer?: T["Signer"]): Promise<T["TX"][]>;
 
     /**
      * Waits till the swap is successfully claimed

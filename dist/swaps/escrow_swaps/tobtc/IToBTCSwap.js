@@ -7,6 +7,7 @@ const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const Utils_1 = require("../../../utils/Utils");
 const Tokens_1 = require("../../../Tokens");
 const IEscrowSwap_1 = require("../IEscrowSwap");
+const Fee_1 = require("../../fee/Fee");
 function isIToBTCSwapInit(obj) {
     return typeof (obj.networkFee) === "bigint" &&
         (obj.networkFeeBtc == null || typeof (obj.networkFeeBtc) === "bigint") &&
@@ -53,16 +54,14 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
      * In case swapFee in BTC is not supplied it recalculates it based on swap price
      * @protected
      */
-    tryCalculateSwapFee() {
+    tryRecomputeSwapPrice() {
         if (this.swapFeeBtc == null) {
             this.swapFeeBtc = this.swapFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
         }
         if (this.networkFeeBtc == null) {
             this.networkFeeBtc = this.networkFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
         }
-        if (this.pricingInfo.swapPriceUSatPerToken == null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoSend(this.chainIdentifier, this.getOutput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
-        }
+        super.tryRecomputeSwapPrice();
     }
     /**
      * Returns the payment hash identifier to be sent to the LP for getStatus and getRefund
@@ -73,19 +72,6 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
     }
     //////////////////////////////
     //// Pricing
-    async refreshPriceData() {
-        if (this.pricingInfo == null)
-            return null;
-        const priceData = await this.wrapper.prices.isValidAmountSend(this.chainIdentifier, this.getOutput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.data.getAmount(), this.data.getToken());
-        this.pricingInfo = priceData;
-        return priceData;
-    }
-    getSwapPrice() {
-        return 100000000000000 / Number(this.pricingInfo.swapPriceUSatPerToken);
-    }
-    getMarketPrice() {
-        return 100000000000000 / Number(this.pricingInfo.realPriceUSatPerToken);
-    }
     getRealSwapFeePercentagePPM() {
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         return feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
@@ -95,20 +81,14 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
     getInputTxId() {
         return this.commitTxId;
     }
-    getInputAddress() {
-        return this.getInitiator();
-    }
-    getOutputAddress() {
-        return this.getRecipient();
+    requiresAction() {
+        return this.isRefundable();
     }
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
      */
     isFinished() {
         return this.state === ToBTCSwapState.CLAIMED || this.state === ToBTCSwapState.REFUNDED || this.state === ToBTCSwapState.QUOTE_EXPIRED;
-    }
-    isActionable() {
-        return this.isRefundable();
     }
     isRefundable() {
         return this.state === ToBTCSwapState.REFUNDABLE;
@@ -125,24 +105,11 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
     isFailed() {
         return this.state === ToBTCSwapState.REFUNDED;
     }
-    /**
-     * Checks if the swap can be committed/started
-     */
-    canCommit() {
-        return this.state === ToBTCSwapState.CREATED;
-    }
-    getInitiator() {
+    _getInitiator() {
         return this.data.getOfferer();
     }
     //////////////////////////////
     //// Amounts & fees
-    getFee() {
-        return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
-        };
-    }
     getSwapFee() {
         return {
             amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
@@ -161,24 +128,37 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
             usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
         };
     }
-    getInputWithoutFee() {
-        return (0, Tokens_1.toTokenAmount)(this.data.getAmount() - (this.swapFee + this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+    getFee() {
+        return {
+            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
+            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices),
+            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
+        };
+    }
+    getFeeBreakdown() {
+        return [
+            {
+                type: Fee_1.FeeType.SWAP,
+                fee: this.getSwapFee()
+            },
+            {
+                type: Fee_1.FeeType.NETWORK_OUTPUT,
+                fee: this.getNetworkFee()
+            }
+        ];
     }
     getInput() {
         return (0, Tokens_1.toTokenAmount)(this.data.getAmount(), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
     }
-    /**
-     * Get the estimated smart chain transaction fee of the refund transaction
-     */
-    getRefundFee() {
-        return this.wrapper.contract.getRefundFee(this.data);
+    getInputWithoutFee() {
+        return (0, Tokens_1.toTokenAmount)(this.data.getAmount() - (this.swapFee + this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
     }
     /**
      * Checks if the intiator/sender has enough balance to go through with the swap
      */
     async hasEnoughBalance() {
         const [balance, commitFee] = await Promise.all([
-            this.wrapper.contract.getBalance(this.getInitiator(), this.data.getToken(), false),
+            this.wrapper.contract.getBalance(this._getInitiator(), this.data.getToken(), false),
             this.data.getToken() === this.wrapper.chain.getNativeCurrencyAddress() ? this.getCommitFee() : Promise.resolve(null)
         ]);
         let required = this.data.getAmount();
@@ -195,7 +175,7 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
      */
     async hasEnoughForTxFees() {
         const [balance, commitFee] = await Promise.all([
-            this.wrapper.contract.getBalance(this.getInitiator(), this.wrapper.chain.getNativeCurrencyAddress(), false),
+            this.wrapper.contract.getBalance(this._getInitiator(), this.wrapper.chain.getNativeCurrencyAddress(), false),
             this.getCommitFee()
         ]);
         return {
@@ -206,6 +186,23 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
     }
     //////////////////////////////
     //// Commit
+    /**
+     * Returns transactions for committing the swap on-chain, initiating the swap
+     *
+     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
+     *  (this is handled on swap creation, if you commit right after quoting, you can use skipChecks=true)
+     *
+     * @throws {Error} When in invalid state (not PR_CREATED)
+     */
+    async txsCommit(skipChecks) {
+        if (this.state !== ToBTCSwapState.CREATED)
+            throw new Error("Must be in CREATED state!");
+        if (!this.initiated) {
+            this.initiated = true;
+            await this._saveAndEmit();
+        }
+        return await this.wrapper.contract.txsInit(this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
+    }
     /**
      * Commits the swap on-chain, initiating the swap
      *
@@ -223,23 +220,6 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
             await this._saveAndEmit(ToBTCSwapState.COMMITED);
         }
         return result[0];
-    }
-    /**
-     * Returns transactions for committing the swap on-chain, initiating the swap
-     *
-     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
-     *  (this is handled on swap creation, if you commit right after quoting, you can use skipChecks=true)
-     *
-     * @throws {Error} When in invalid state (not PR_CREATED)
-     */
-    async txsCommit(skipChecks) {
-        if (!this.canCommit())
-            throw new Error("Must be in CREATED state!");
-        if (!this.initiated) {
-            this.initiated = true;
-            await this._saveAndEmit();
-        }
-        return await this.wrapper.contract.txsInit(this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
     }
     /**
      * Waits till a swap is committed, should be called after sending the commit transactions manually
@@ -275,54 +255,6 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
     }
     //////////////////////////////
     //// Payment
-    /**
-     * A blocking promise resolving when swap was concluded by the intermediary,
-     *  rejecting in case of failure
-     *
-     * @param abortSignal           Abort signal
-     * @param checkIntervalSeconds  How often to poll the intermediary for answer
-     *
-     * @returns {Promise<boolean>}  Was the payment successful? If not we can refund.
-     * @throws {IntermediaryError} If a swap is determined expired by the intermediary, but it is actually still valid
-     * @throws {SignatureVerificationError} If the swap should be cooperatively refundable but the intermediary returned
-     *  invalid refund signature
-     * @throws {Error} When swap expires or if the swap has invalid state (must be COMMITED)
-     */
-    async waitForPayment(abortSignal, checkIntervalSeconds) {
-        if (this.state === ToBTCSwapState.CLAIMED)
-            return Promise.resolve(true);
-        if (this.state !== ToBTCSwapState.COMMITED && this.state !== ToBTCSwapState.SOFT_CLAIMED)
-            throw new Error("Invalid state (not COMMITED)");
-        const abortController = (0, Utils_1.extendAbortController)(abortSignal);
-        const result = await Promise.race([
-            this.waitTillState(ToBTCSwapState.CLAIMED, "gte", abortController.signal),
-            this.waitTillIntermediarySwapProcessed(abortController.signal, checkIntervalSeconds)
-        ]);
-        abortController.abort();
-        if (typeof result !== "object") {
-            if (this.state === ToBTCSwapState.REFUNDABLE)
-                throw new Error("Swap expired");
-            this.logger.debug("waitTillRefunded(): Resolved from state change");
-            return true;
-        }
-        this.logger.debug("waitTillRefunded(): Resolved from intermediary response");
-        switch (result.code) {
-            case IntermediaryAPI_1.RefundAuthorizationResponseCodes.PAID:
-                return true;
-            case IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA:
-                await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidRefundAuthorization(this.data, result.data), null, base_1.SignatureVerificationError, abortSignal);
-                await this._saveAndEmit(ToBTCSwapState.REFUNDABLE);
-                return false;
-            case IntermediaryAPI_1.RefundAuthorizationResponseCodes.EXPIRED:
-                if (await this.wrapper.contract.isExpired(this.getInitiator(), this.data))
-                    throw new Error("Swap expired");
-                throw new IntermediaryError_1.IntermediaryError("Swap expired");
-            case IntermediaryAPI_1.RefundAuthorizationResponseCodes.NOT_FOUND:
-                if (this.state === ToBTCSwapState.CLAIMED)
-                    return true;
-                throw new Error("Intermediary swap not found");
-        }
-    }
     async waitTillIntermediarySwapProcessed(abortSignal, checkIntervalSeconds = 5) {
         let resp = { code: IntermediaryAPI_1.RefundAuthorizationResponseCodes.PENDING, msg: "" };
         while (!abortSignal.aborted && (resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.PENDING || resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.NOT_FOUND)) {
@@ -379,8 +311,84 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
                 return false;
         }
     }
+    /**
+     * A blocking promise resolving when swap was concluded by the intermediary,
+     *  rejecting in case of failure
+     *
+     * @param abortSignal           Abort signal
+     * @param checkIntervalSeconds  How often to poll the intermediary for answer
+     *
+     * @returns {Promise<boolean>}  Was the payment successful? If not we can refund.
+     * @throws {IntermediaryError} If a swap is determined expired by the intermediary, but it is actually still valid
+     * @throws {SignatureVerificationError} If the swap should be cooperatively refundable but the intermediary returned
+     *  invalid refund signature
+     * @throws {Error} When swap expires or if the swap has invalid state (must be COMMITED)
+     */
+    async waitForPayment(abortSignal, checkIntervalSeconds) {
+        if (this.state === ToBTCSwapState.CLAIMED)
+            return Promise.resolve(true);
+        if (this.state !== ToBTCSwapState.COMMITED && this.state !== ToBTCSwapState.SOFT_CLAIMED)
+            throw new Error("Invalid state (not COMMITED)");
+        const abortController = (0, Utils_1.extendAbortController)(abortSignal);
+        const result = await Promise.race([
+            this.waitTillState(ToBTCSwapState.CLAIMED, "gte", abortController.signal),
+            this.waitTillIntermediarySwapProcessed(abortController.signal, checkIntervalSeconds)
+        ]);
+        abortController.abort();
+        if (typeof result !== "object") {
+            if (this.state === ToBTCSwapState.REFUNDABLE)
+                throw new Error("Swap expired");
+            this.logger.debug("waitTillRefunded(): Resolved from state change");
+            return true;
+        }
+        this.logger.debug("waitTillRefunded(): Resolved from intermediary response");
+        switch (result.code) {
+            case IntermediaryAPI_1.RefundAuthorizationResponseCodes.PAID:
+                return true;
+            case IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA:
+                await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidRefundAuthorization(this.data, result.data), null, base_1.SignatureVerificationError, abortSignal);
+                await this._saveAndEmit(ToBTCSwapState.REFUNDABLE);
+                return false;
+            case IntermediaryAPI_1.RefundAuthorizationResponseCodes.EXPIRED:
+                if (await this.wrapper.contract.isExpired(this._getInitiator(), this.data))
+                    throw new Error("Swap expired");
+                throw new IntermediaryError_1.IntermediaryError("Swap expired");
+            case IntermediaryAPI_1.RefundAuthorizationResponseCodes.NOT_FOUND:
+                if (this.state === ToBTCSwapState.CLAIMED)
+                    return true;
+                throw new Error("Intermediary swap not found");
+        }
+    }
     //////////////////////////////
     //// Refund
+    /**
+     * Get the estimated smart chain transaction fee of the refund transaction
+     */
+    getRefundFee() {
+        return this.wrapper.contract.getRefundFee(this.data);
+    }
+    /**
+     * Returns transactions for refunding the swap if the swap is in refundable state, you can check so with isRefundable()
+     *
+     * @throws {IntermediaryError} If intermediary returns invalid response in case cooperative refund should be used
+     * @throws {SignatureVerificationError} If intermediary returned invalid cooperative refund signature
+     * @throws {Error} When state is not refundable
+     */
+    async txsRefund(signer) {
+        if (!this.isRefundable())
+            throw new Error("Must be in REFUNDABLE state or expired!");
+        signer ??= this._getInitiator();
+        if (await this.wrapper.contract.isExpired(this._getInitiator(), this.data)) {
+            return await this.wrapper.contract.txsRefund(signer, this.data, true, true);
+        }
+        else {
+            const res = await IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
+            if (res.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA) {
+                return await this.wrapper.contract.txsRefundWithAuthorization(signer, this.data, res.data, true, true);
+            }
+            throw new IntermediaryError_1.IntermediaryError("Invalid intermediary cooperative message returned");
+        }
+    }
     /**
      * Refunds the swap if the swap is in refundable state, you can check so with isRefundable()
      *
@@ -395,28 +403,6 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
             await this._saveAndEmit(ToBTCSwapState.REFUNDED);
         }
         return result[0];
-    }
-    /**
-     * Returns transactions for refunding the swap if the swap is in refundable state, you can check so with isRefundable()
-     *
-     * @throws {IntermediaryError} If intermediary returns invalid response in case cooperative refund should be used
-     * @throws {SignatureVerificationError} If intermediary returned invalid cooperative refund signature
-     * @throws {Error} When state is not refundable
-     */
-    async txsRefund(signer) {
-        if (!this.isRefundable())
-            throw new Error("Must be in REFUNDABLE state or expired!");
-        signer ??= this.getInitiator();
-        if (await this.wrapper.contract.isExpired(this.getInitiator(), this.data)) {
-            return await this.wrapper.contract.txsRefund(signer, this.data, true, true);
-        }
-        else {
-            const res = await IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
-            if (res.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA) {
-                return await this.wrapper.contract.txsRefundWithAuthorization(signer, this.data, res.data, true, true);
-            }
-            throw new IntermediaryError_1.IntermediaryError("Invalid intermediary cooperative message returned");
-        }
     }
     /**
      * Waits till a swap is refunded, should be called after sending the refund transactions manually
@@ -483,9 +469,9 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
             let quoteExpired = false;
             if ((this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED)) {
                 //Check if quote is still valid
-                quoteExpired = await this.isQuoteDefinitelyExpired();
+                quoteExpired = await this.verifyQuoteDefinitelyExpired();
             }
-            const res = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data));
+            const res = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
             switch (res) {
                 case base_1.SwapCommitStatus.PAID:
                     this.state = ToBTCSwapState.CLAIMED;
@@ -540,7 +526,7 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
                 break;
             case ToBTCSwapState.COMMITED:
             case ToBTCSwapState.SOFT_CLAIMED:
-                const expired = await this.wrapper.contract.isExpired(this.getInitiator(), this.data);
+                const expired = await this.wrapper.contract.isExpired(this._getInitiator(), this.data);
                 if (expired) {
                     this.state = ToBTCSwapState.REFUNDABLE;
                     if (save)

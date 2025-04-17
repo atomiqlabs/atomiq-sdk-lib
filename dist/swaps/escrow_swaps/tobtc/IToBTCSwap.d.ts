@@ -1,10 +1,9 @@
 import { IToBTCWrapper } from "./IToBTCWrapper";
 import { ChainType, SwapData } from "@atomiqlabs/base";
-import { PriceInfoType } from "../../../prices/abstract/ISwapPrice";
 import { RefundAuthorizationResponse } from "../../../intermediaries/IntermediaryAPI";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
 import { IEscrowSwap, IEscrowSwapInit } from "../IEscrowSwap";
-import { Fee } from "../../fee/Fee";
+import { Fee, FeeType } from "../../fee/Fee";
 export type IToBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
     networkFee: bigint;
     networkFeeBtc?: bigint;
@@ -21,7 +20,7 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      * In case swapFee in BTC is not supplied it recalculates it based on swap price
      * @protected
      */
-    protected tryCalculateSwapFee(): void;
+    protected tryRecomputeSwapPrice(): void;
     /**
      * Returns the payment hash identifier to be sent to the LP for getStatus and getRefund
      * @protected
@@ -39,46 +38,38 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
         secret?: string;
         txId?: string;
     }, check?: boolean): Promise<boolean>;
-    refreshPriceData(): Promise<PriceInfoType>;
-    getSwapPrice(): number;
-    getMarketPrice(): number;
     getRealSwapFeePercentagePPM(): bigint;
     getInputTxId(): string | null;
-    abstract getOutputTxId(): string | null;
-    getInputAddress(): string | null;
-    getOutputAddress(): string | null;
+    requiresAction(): boolean;
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
      */
     isFinished(): boolean;
-    isActionable(): boolean;
     isRefundable(): boolean;
     isQuoteExpired(): boolean;
     isQuoteSoftExpired(): boolean;
     isSuccessful(): boolean;
     isFailed(): boolean;
-    /**
-     * Checks if the swap can be committed/started
-     */
-    canCommit(): boolean;
-    getInitiator(): string;
-    /**
-     * Returns the recipient address/lnurl/lightning invoice for the swap
-     */
-    abstract getRecipient(): string;
-    getFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken>;
-    getSwapFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken>;
+    _getInitiator(): string;
+    protected getSwapFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken>;
     /**
      * Returns network fee for the swap, the fee is represented in source currency & destination currency, but is
      *  paid only once
      */
-    getNetworkFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken>;
-    getInputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+    protected getNetworkFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken>;
+    getFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken>;
+    getFeeBreakdown(): [
+        {
+            type: FeeType.SWAP;
+            fee: Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken>;
+        },
+        {
+            type: FeeType.NETWORK_OUTPUT;
+            fee: Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken>;
+        }
+    ];
     getInput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
-    /**
-     * Get the estimated smart chain transaction fee of the refund transaction
-     */
-    getRefundFee(): Promise<bigint>;
+    getInputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     /**
      * Checks if the intiator/sender has enough balance to go through with the swap
      */
@@ -96,6 +87,15 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
         required: TokenAmount;
     }>;
     /**
+     * Returns transactions for committing the swap on-chain, initiating the swap
+     *
+     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
+     *  (this is handled on swap creation, if you commit right after quoting, you can use skipChecks=true)
+     *
+     * @throws {Error} When in invalid state (not PR_CREATED)
+     */
+    txsCommit(skipChecks?: boolean): Promise<T["TX"][]>;
+    /**
      * Commits the swap on-chain, initiating the swap
      *
      * @param signer Signer to sign the transactions with, must be the same as used in the initialization
@@ -106,21 +106,23 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      */
     commit(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
     /**
-     * Returns transactions for committing the swap on-chain, initiating the swap
-     *
-     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
-     *  (this is handled on swap creation, if you commit right after quoting, you can use skipChecks=true)
-     *
-     * @throws {Error} When in invalid state (not PR_CREATED)
-     */
-    txsCommit(skipChecks?: boolean): Promise<T["TX"][]>;
-    /**
      * Waits till a swap is committed, should be called after sending the commit transactions manually
      *
      * @param abortSignal   AbortSignal
      * @throws {Error} If swap is not in the correct state (must be CREATED)
      */
     waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
+    protected waitTillIntermediarySwapProcessed(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<RefundAuthorizationResponse>;
+    /**
+     * Checks whether the swap was already processed by the LP and is either successful (requires proof which is
+     *  either a HTLC pre-image for LN swaps or valid txId for on-chain swap) or failed and we can cooperatively
+     *  refund.
+     *
+     * @param save whether to save the data
+     * @returns true if swap is processed, false if the swap is still ongoing
+     * @private
+     */
+    protected checkIntermediarySwapProcessed(save?: boolean): Promise<boolean>;
     /**
      * A blocking promise resolving when swap was concluded by the intermediary,
      *  rejecting in case of failure
@@ -135,25 +137,10 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      * @throws {Error} When swap expires or if the swap has invalid state (must be COMMITED)
      */
     waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<boolean>;
-    protected waitTillIntermediarySwapProcessed(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<RefundAuthorizationResponse>;
     /**
-     * Checks whether the swap was already processed by the LP and is either successful (requires proof which is
-     *  either a HTLC pre-image for LN swaps or valid txId for on-chain swap) or failed and we can cooperatively
-     *  refund.
-     *
-     * @param save whether to save the data
-     * @returns true if swap is processed, false if the swap is still ongoing
-     * @private
+     * Get the estimated smart chain transaction fee of the refund transaction
      */
-    checkIntermediarySwapProcessed(save?: boolean): Promise<boolean>;
-    /**
-     * Refunds the swap if the swap is in refundable state, you can check so with isRefundable()
-     *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
-     * @param abortSignal               Abort signal
-     * @throws {Error} If invalid signer is provided that doesn't match the swap data
-     */
-    refund(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
+    getRefundFee(): Promise<bigint>;
     /**
      * Returns transactions for refunding the swap if the swap is in refundable state, you can check so with isRefundable()
      *
@@ -162,6 +149,14 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      * @throws {Error} When state is not refundable
      */
     txsRefund(signer?: string): Promise<T["TX"][]>;
+    /**
+     * Refunds the swap if the swap is in refundable state, you can check so with isRefundable()
+     *
+     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param abortSignal               Abort signal
+     * @throws {Error} If invalid signer is provided that doesn't match the swap data
+     */
+    refund(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
     /**
      * Waits till a swap is refunded, should be called after sending the refund transactions manually
      *

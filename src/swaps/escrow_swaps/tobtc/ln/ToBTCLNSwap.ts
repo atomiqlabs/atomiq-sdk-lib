@@ -55,7 +55,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
 
         this.paymentHash = this.getPaymentHash().toString("hex");
         this.logger = getLogger("ToBTCLN("+this.getIdentifierHashString()+"): ");
-        this.tryCalculateSwapFee();
+        this.tryRecomputeSwapPrice();
     }
 
     _setPaymentResult(result: { secret?: string; txId?: string }, check: boolean = false): Promise<boolean> {
@@ -92,8 +92,8 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
     /**
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
      */
-    getLightningInvoice(): string {
-        return this.pr;
+    getOutputAddress(): string {
+        return this.lnurl ?? this.pr;
     }
 
     /**
@@ -129,9 +129,6 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
         return parsed.tagsObject.payment_hash;
     }
 
-    getRecipient(): string {
-        return this.lnurl ?? this.pr;
-    }
 
     //////////////////////////////
     //// LNURL-pay

@@ -44,6 +44,7 @@ __exportStar(require("./prices/SingleSwapPrice"), exports);
 __exportStar(require("./prices/SwapPriceWithChain"), exports);
 __exportStar(require("./Tokens"), exports);
 __exportStar(require("./swaps/ISwap"), exports);
+__exportStar(require("./swaps/IAddressSwap"), exports);
 __exportStar(require("./swaps/ISwapWrapper"), exports);
 __exportStar(require("./swaps/swapper/Swapper"), exports);
 __exportStar(require("./swaps/swapper/SwapperWithSigner"), exports);

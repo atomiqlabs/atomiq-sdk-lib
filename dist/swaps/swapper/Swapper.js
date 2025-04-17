@@ -744,7 +744,7 @@ class Swapper extends events_1.EventEmitter {
                 }
                 return unifiedSwapStorage.query(queryParams, reviver);
             }));
-            return res.flat().filter(swap => swap.isActionable());
+            return res.flat().filter(swap => swap.requiresAction());
         }
         else {
             const { unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
@@ -757,7 +757,7 @@ class Swapper extends events_1.EventEmitter {
                 swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });
                 queryParams.push(swapTypeQueryParams);
             }
-            return (await unifiedSwapStorage.query(queryParams, reviver)).filter(swap => swap.isActionable());
+            return (await unifiedSwapStorage.query(queryParams, reviver)).filter(swap => swap.requiresAction());
         }
     }
     async getRefundableSwaps(chainId, signer) {
@@ -797,7 +797,7 @@ class Swapper extends events_1.EventEmitter {
                 const wrapper = this.chains[chainId].wrappers[key];
                 const result = wrapper.pendingSwaps.get(id)?.deref();
                 if (signer != null) {
-                    if (result.getInitiator() === signer)
+                    if (result._getInitiator() === signer)
                         return result;
                 }
                 else {
@@ -812,7 +812,7 @@ class Swapper extends events_1.EventEmitter {
                     const result = wrapper.pendingSwaps.get(id)?.deref();
                     if (result != null) {
                         if (signer != null) {
-                            if (result.getInitiator() === signer)
+                            if (result._getInitiator() === signer)
                                 return result;
                         }
                         else {

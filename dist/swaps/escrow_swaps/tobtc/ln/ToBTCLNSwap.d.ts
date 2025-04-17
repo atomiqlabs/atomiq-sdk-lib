@@ -34,7 +34,7 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
     /**
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
      */
-    getLightningInvoice(): string;
+    getOutputAddress(): string;
     /**
      * Returns payment secret (pre-image) as a proof of payment
      */
@@ -47,7 +47,6 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
     getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
     protected getLpIdentifier(): string;
-    getRecipient(): string;
     /**
      * Is this an LNURL-pay swap?
      */

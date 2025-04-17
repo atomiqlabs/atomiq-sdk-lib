@@ -25,6 +25,17 @@ export declare abstract class IEscrowSwap<T extends ChainType = ChainType, S ext
     protected constructor(wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>, obj: any);
     protected constructor(wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>, swapInit: IEscrowSwapInit<T["Data"]>);
     /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    protected getIdentifierHash(): Buffer;
+    /**
+     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
+     *  lightning swaps the identifier hash is used instead of claim data hash
+     */
+    protected getIdentifierHashString(): string;
+    _getEscrowHash(): string | null;
+    /**
      * Returns the escrow hash - i.e. hash of the escrow data
      */
     getEscrowHash(): string | null;
@@ -32,16 +43,6 @@ export declare abstract class IEscrowSwap<T extends ChainType = ChainType, S ext
      * Returns the claim data hash - i.e. hash passed to the claim handler
      */
     getClaimHash(): string;
-    /**
-     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
-     *  lightning swaps the identifier hash is used instead of claim data hash
-     */
-    getIdentifierHash(): Buffer;
-    /**
-     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
-     *  lightning swaps the identifier hash is used instead of claim data hash
-     */
-    getIdentifierHashString(): string;
     getId(): string;
     /**
      * Periodically checks for init signature's expiry
@@ -68,20 +69,28 @@ export declare abstract class IEscrowSwap<T extends ChainType = ChainType, S ext
      */
     protected watchdogWaitTillResult(abortSignal?: AbortSignal, interval?: number): Promise<SwapCommitStatus.PAID | SwapCommitStatus.EXPIRED | SwapCommitStatus.NOT_COMMITED>;
     /**
-     * Checks if the swap's quote is still valid
-     */
-    isQuoteValid(): Promise<boolean>;
-    /**
      * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
      */
-    isQuoteDefinitelyExpired(): Promise<boolean>;
+    protected verifyQuoteDefinitelyExpired(): Promise<boolean>;
+    /**
+     * Checks if the swap's quote is still valid
+     */
+    verifyQuoteValid(): Promise<boolean>;
     /**
      * Get the estimated smart chain fee of the commit transaction
      */
-    getCommitFee(): Promise<bigint>;
+    protected getCommitFee(): Promise<bigint>;
     /**
      * Returns the transaction fee paid on the smart chain
      */
     getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
+    /**
+     * Checks if the initiator/sender has enough balance to cover the transaction fee for processing the swap
+     */
+    abstract hasEnoughForTxFees(): Promise<{
+        enoughBalance: boolean;
+        balance: TokenAmount;
+        required: TokenAmount;
+    }>;
     serialize(): any;
 }

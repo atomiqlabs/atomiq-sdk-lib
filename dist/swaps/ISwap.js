@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ISwap = exports.isISwapInit = void 0;
+exports.ISwap = exports.ppmToPercentage = exports.isISwapInit = void 0;
 const SwapType_1 = require("./enums/SwapType");
 const events_1 = require("events");
 const ISwapPrice_1 = require("../prices/abstract/ISwapPrice");
@@ -17,6 +17,16 @@ function isISwapInit(obj) {
         (typeof obj.exactIn === 'boolean');
 }
 exports.isISwapInit = isISwapInit;
+function ppmToPercentage(ppm) {
+    if (ppm == null)
+        return null;
+    return {
+        ppm,
+        decimal: Number(ppm) / 1000000,
+        percentage: Number(ppm) / 10000
+    };
+}
+exports.ppmToPercentage = ppmToPercentage;
 class ISwap {
     constructor(wrapper, swapInitOrObj) {
         this.currentVersion = 1;
@@ -86,6 +96,33 @@ class ISwap {
     }
     //////////////////////////////
     //// Pricing
+    tryRecomputeSwapPrice() {
+        if (this.pricingInfo.swapPriceUSatPerToken == null) {
+            if (this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC) {
+                const input = this.getInput();
+                this.pricingInfo = this.wrapper.prices.recomputePriceInfoSend(this.chainIdentifier, this.getOutput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, input.rawAmount, input.token.address);
+            }
+            else {
+                const output = this.getOutput();
+                this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, output.rawAmount, output.token.address);
+            }
+        }
+    }
+    /**
+     * Re-fetches & revalidates the price data
+     */
+    async refreshPriceData() {
+        if (this.pricingInfo == null)
+            return null;
+        if (this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC) {
+            const input = this.getInput();
+            this.pricingInfo = await this.wrapper.prices.isValidAmountSend(this.chainIdentifier, this.getOutput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, input.rawAmount, input.token.address);
+        }
+        else {
+            const output = this.getOutput();
+            this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, output.rawAmount, output.token.address);
+        }
+    }
     /**
      * Checks if the pricing for the swap is valid, according to max allowed price difference set in the ISwapPrice
      */
@@ -93,21 +130,36 @@ class ISwap {
         return this.pricingInfo == null ? null : this.pricingInfo.isValid;
     }
     /**
-     * Returns the price difference between offered price and current market price in PPM (parts per million)
+     * Returns pricing info about the swap
      */
-    getPriceDifferencePPM() {
-        return this.pricingInfo == null ? null : this.pricingInfo.differencePPM;
+    getPriceInfo() {
+        const swapPrice = this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC ?
+            100000000000000 / Number(this.pricingInfo.swapPriceUSatPerToken) :
+            Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
+        const marketPrice = this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC ?
+            100000000000000 / Number(this.pricingInfo.realPriceUSatPerToken) :
+            Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
+        return {
+            marketPrice,
+            swapPrice,
+            difference: ppmToPercentage(this.pricingInfo.differencePPM)
+        };
     }
     /**
-     * Returns the price difference between offered price and current market price as a decimal number
+     * @param signer Signer to check with this swap's initiator
+     * @throws {Error} When signer's address doesn't match with the swap's initiator one
      */
-    getPriceDifferencePct() {
-        return this.pricingInfo == null ? null : this.pricingInfo.differencePPM == null ? null : Number(this.pricingInfo.differencePPM) / 1000000;
+    checkSigner(signer) {
+        if ((typeof (signer) === "string" ? signer : signer.getAddress()) !== this._getInitiator())
+            throw new Error("Invalid signer provided!");
+    }
+    isInitiated() {
+        return this.initiated;
     }
     /**
      * Returns quote expiry in UNIX millis
      */
-    getExpiry() {
+    getQuoteExpiry() {
         return this.expiry;
     }
     /**
@@ -128,24 +180,6 @@ class ISwap {
     getState() {
         return this.state;
     }
-    /**
-     * @param signer Signer to check with this swap's initiator
-     * @throws {Error} When signer's address doesn't match with the swap's initiator one
-     */
-    checkSigner(signer) {
-        if ((typeof (signer) === "string" ? signer : signer.getAddress()) !== this.getInitiator())
-            throw new Error("Invalid signer provided!");
-    }
-    isInitiated() {
-        return this.initiated;
-    }
-    /**
-     * Returns total fee for the swap, the fee is represented in source currency & destination currency, but is
-     *  paid only once
-     */
-    getFee() {
-        return this.getSwapFee();
-    }
     //////////////////////////////
     //// Storage
     serialize() {
@@ -154,8 +188,8 @@ class ISwap {
         return {
             id: this.getId(),
             type: this.getType(),
-            escrowHash: this.getEscrowHash(),
-            initiator: this.getInitiator(),
+            escrowHash: this._getEscrowHash(),
+            initiator: this._getInitiator(),
             _isValid: this.pricingInfo.isValid,
             _differencePPM: this.pricingInfo.differencePPM == null ? null : this.pricingInfo.differencePPM.toString(10),
             _satsBaseFee: this.pricingInfo.satsBaseFee == null ? null : this.pricingInfo.satsBaseFee.toString(10),

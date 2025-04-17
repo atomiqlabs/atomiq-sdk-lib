@@ -43,22 +43,21 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     constructor(wrapper: FromBTCLNWrapper<T>, init: FromBTCLNSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNWrapper<T>, obj: any);
     protected upgradeVersion(): void;
+    protected getIdentifierHash(): Buffer;
+    protected getPaymentHash(): Buffer;
+    protected canCommit(): boolean;
     getInputTxId(): string | null;
-    getIdentifierHash(): Buffer;
-    getPaymentHash(): Buffer;
-    getAddress(): string;
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap
      */
-    getLightningInvoice(): string;
-    getQrData(): string;
+    getAddress(): string;
+    getHyperlink(): string;
     /**
      * Returns timeout time (in UNIX milliseconds) when the LN invoice will expire
      */
     getTimeoutTime(): number;
     /**
-     * Returns timeout time (in UNIX milliseconds) when the on-chain address will expire and no funds should be sent
-     *  to that address anymore
+     * Returns timeout time (in UNIX milliseconds) when the swap htlc will expire
      */
     getHtlcTimeoutTime(): number;
     isFinished(): boolean;
@@ -67,14 +66,8 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     isFailed(): boolean;
     isQuoteExpired(): boolean;
     isQuoteSoftExpired(): boolean;
-    isQuoteValid(): Promise<boolean>;
-    canCommit(): boolean;
-    canClaim(): boolean;
+    verifyQuoteValid(): Promise<boolean>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>>;
-    /**
-     * Estimated transaction fee for commit & claim txs combined
-     */
-    getCommitAndClaimFee(): Promise<bigint>;
     getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
     hasEnoughForTxFees(): Promise<{
         enoughBalance: boolean;
@@ -82,18 +75,11 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
         required: TokenAmount;
     }>;
     /**
-     * Waits till an LN payment is received by the intermediary and client can continue commiting & claiming the HTLC
-     *
-     * @param abortSignal Abort signal to stop waiting for payment
-     * @param checkIntervalSeconds How often to poll the intermediary for answer
-     */
-    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void>;
-    /**
      * Checks whether the LP received the LN payment and we can continue by committing & claiming the HTLC on-chain
      *
      * @param save If the new swap state should be saved
      */
-    checkIntermediaryPaymentReceived(save?: boolean): Promise<boolean | null>;
+    protected checkIntermediaryPaymentReceived(save?: boolean): Promise<boolean | null>;
     /**
      * Checks the data returned by the intermediary in the payment auth request
      *
@@ -106,6 +92,13 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @throws {Error} If the swap is already committed on-chain
      */
     protected checkIntermediaryReturnedAuthData(signer: string, data: T["Data"], signature: SignatureData): Promise<void>;
+    /**
+     * Waits till an LN payment is received by the intermediary and client can continue commiting & claiming the HTLC
+     *
+     * @param abortSignal Abort signal to stop waiting for payment
+     * @param checkIntervalSeconds How often to poll the intermediary for answer
+     */
+    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in an HTLC
      *
@@ -140,7 +133,23 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @throws {Error} If the LP refunded sooner than we were able to claim
      */
     waitTillClaimed(abortSignal?: AbortSignal): Promise<void>;
+    /**
+     * Estimated transaction fee for commit & claim txs combined
+     */
+    getCommitAndClaimFee(): Promise<bigint>;
     canCommitAndClaimInOneShot(): boolean;
+    /**
+     * Returns transactions for both commit & claim operation together, such that they can be signed all at once by
+     *  the wallet. CAUTION: transactions must be sent sequentially, such that the claim (2nd) transaction is only
+     *  sent after the commit (1st) transaction confirms. Failure to do so can reveal the HTLC pre-image too soon,
+     *  opening a possibility for the LP to steal funds.
+     *
+     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
+     *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
+     *
+     * @throws {Error} If in invalid state (must be PR_PAID or CLAIM_COMMITED)
+     */
+    txsCommitAndClaim(skipChecks?: boolean): Promise<T["TX"][]>;
     /**
      * Commits and claims the swap, in a way that the transactions can be signed together by the underlying provider and
      *  then sent sequentially
@@ -153,18 +162,6 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
     commitAndClaim(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string[]>;
-    /**==
-     * Returns transactions for both commit & claim operation together, such that they can be signed all at once by
-     *  the wallet. CAUTION: transactions must be sent sequentially, such that the claim (2nd) transaction is only
-     *  sent after the commit (1st) transaction confirms. Failure to do so can reveal the HTLC pre-image too soon,
-     *  opening a possibility for the LP to steal funds.
-     *
-     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
-     *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
-     *
-     * @throws {Error} If in invalid state (must be PR_PAID or CLAIM_COMMITED)
-     */
-    txsCommitAndClaim(skipChecks?: boolean): Promise<T["TX"][]>;
     /**
      * Is this an LNURL-withdraw swap?
      */

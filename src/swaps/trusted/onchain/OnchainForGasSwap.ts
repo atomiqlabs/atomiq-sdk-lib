@@ -3,15 +3,15 @@ import {ChainType} from "@atomiqlabs/base";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
 import {getLogger, timeoutPromise} from "../../../utils/Utils";
 import {isISwapInit, ISwap, ISwapInit} from "../../ISwap";
-import {PriceInfoType} from "../../../prices/abstract/ISwapPrice";
 import {
     AddressStatusResponseCodes,
     TrustedIntermediaryAPI
 } from "../../../intermediaries/TrustedIntermediaryAPI";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {OnchainForGasWrapper} from "./OnchainForGasWrapper";
-import {Fee} from "../../fee/Fee";
+import {Fee, FeeType} from "../../fee/Fee";
 import {IBitcoinWallet} from "../../../btc/wallet/IBitcoinWallet";
+import {IAddressSwap} from "../../IAddressSwap";
 
 export enum OnchainForGasSwapState {
     EXPIRED = -3,
@@ -45,7 +45,7 @@ export function isOnchainForGasSwapInit(obj: any): obj is OnchainForGasSwapInit 
         isISwapInit(obj);
 }
 
-export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> {
+export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> implements IAddressSwap {
     getSmartChainNetworkFee = null;
     protected readonly TYPE: SwapType = SwapType.TRUSTED_FROM_BTC;
 
@@ -92,18 +92,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             this.refundTxId = initOrObj.refundTxId;
         }
         this.logger = getLogger("OnchainForGas("+this.getId()+"): ");
-        this.tryCalculateSwapFee();
-
-        if(this.pricingInfo.swapPriceUSatPerToken==null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
-                this.chainIdentifier,
-                this.inputAmount,
-                this.pricingInfo.satsBaseFee,
-                this.pricingInfo.feePPM,
-                this.outputAmount,
-                this.token ?? this.wrapper.getNativeToken().address
-            );
-        }
+        this.tryRecomputeSwapPrice();
     }
 
     protected upgradeVersion() {
@@ -117,44 +106,19 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
      * In case swapFee in BTC is not supplied it recalculates it based on swap price
      * @protected
      */
-    protected tryCalculateSwapFee() {
+    protected tryRecomputeSwapPrice() {
         if(this.swapFeeBtc==null) {
             this.swapFeeBtc = this.swapFee * this.getInput().rawAmount / this.getOutAmountWithoutFee();
         }
-    }
-
-
-    //////////////////////////////
-    //// Pricing
-
-    async refreshPriceData(): Promise<PriceInfoType> {
-        if(this.pricingInfo==null) return null;
-        const priceData = await this.wrapper.prices.isValidAmountReceive(
-            this.chainIdentifier,
-            this.inputAmount,
-            this.pricingInfo.satsBaseFee,
-            this.pricingInfo.feePPM,
-            this.outputAmount,
-            this.token ?? this.wrapper.getNativeToken().address
-        );
-        this.pricingInfo = priceData;
-        return priceData;
-    }
-
-    getSwapPrice(): number {
-        return Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
-    }
-
-    getMarketPrice(): number {
-        return Number(this.pricingInfo.realPriceUSatPerToken) / 100000000000000;
+        super.tryRecomputeSwapPrice();
     }
 
 
     //////////////////////////////
     //// Getters & utils
 
-    getInputAddress(): string | null {
-        return this.address;
+    _getEscrowHash(): string {
+        return this.paymentHash;
     }
 
     getOutputAddress(): string | null {
@@ -169,14 +133,6 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         return this.scTxId;
     }
 
-    getRecipient(): string {
-        return this.recipient;
-    }
-
-    getEscrowHash(): string {
-        return this.paymentHash;
-    }
-
     getId(): string {
         return this.paymentHash;
     }
@@ -185,19 +141,12 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         return this.address;
     }
 
-    /**
-     * Returns bitcoin address where the on-chain BTC should be sent to
-     */
-    getBitcoinAddress(): string {
-        return this.address;
-    }
-
-    getQrData(): string {
+    getHyperlink(): string {
         return "bitcoin:"+this.address+"?amount="+encodeURIComponent((Number(this.inputAmount)/100000000).toString(10));
     }
 
-    getTimeoutTime(): number {
-        return this.expiry;
+    requiresAction(): boolean {
+        return this.state===OnchainForGasSwapState.REFUNDABLE;
     }
 
     isFinished(): boolean {
@@ -220,12 +169,8 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         return this.state===OnchainForGasSwapState.FINISHED;
     }
 
-    isQuoteValid(): Promise<boolean> {
-        return Promise.resolve(this.getTimeoutTime()>Date.now());
-    }
-
-    isActionable(): boolean {
-        return this.state===OnchainForGasSwapState.REFUNDABLE;
+    verifyQuoteValid(): Promise<boolean> {
+        return Promise.resolve(this.expiry>Date.now());
     }
 
     //////////////////////////////
@@ -239,15 +184,15 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         return toTokenAmount(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices);
     }
 
-    getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>> {
-        return toTokenAmount(this.inputAmount - this.swapFeeBtc, BitcoinTokens.BTC, this.wrapper.prices);
-    }
-
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>> {
         return toTokenAmount(this.inputAmount, BitcoinTokens.BTC, this.wrapper.prices);
     }
 
-    getSwapFee(): Fee {
+    getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>> {
+        return toTokenAmount(this.inputAmount - this.swapFeeBtc, BitcoinTokens.BTC, this.wrapper.prices);
+    }
+
+    protected getSwapFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>> {
         return {
             amountInSrcToken: toTokenAmount(this.swapFeeBtc, BitcoinTokens.BTC, this.wrapper.prices),
             amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
@@ -256,20 +201,31 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         };
     }
 
+    getFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>> {
+        return this.getSwapFee();
+    }
+
+    getFeeBreakdown(): [{type: FeeType.SWAP, fee: Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>}] {
+        return [{
+            type: FeeType.SWAP,
+            fee: this.getSwapFee()
+        }];
+    }
+
     getRealSwapFeePercentagePPM(): bigint {
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
+    }
+
+    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
+        return wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
     }
 
 
     //////////////////////////////
     //// Payment
 
-    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
-        return wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
-    }
-
-    async checkAddress(save: boolean = true): Promise<boolean> {
+    protected async checkAddress(save: boolean = true): Promise<boolean> {
         if(
             this.state===OnchainForGasSwapState.FAILED ||
             this.state===OnchainForGasSwapState.EXPIRED ||
@@ -338,6 +294,17 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
                 if(save) await this._saveAndEmit();
                 return true;
         }
+    }
+
+    protected async setRefundAddress(refundAddress: string): Promise<void> {
+        if(this.refundAddress!=null) {
+            if(this.refundAddress!==refundAddress) throw new Error("Different refund address already set!");
+            return;
+        }
+        await TrustedIntermediaryAPI.setRefundAddress(
+            this.url, this.paymentHash, this.sequence, refundAddress, this.wrapper.options.getRequestTimeout
+        );
+        this.refundAddress = refundAddress;
     }
 
     /**
@@ -410,17 +377,6 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         if(this.isFailed()) throw new PaymentAuthError("Swap failed");
     }
 
-    async setRefundAddress(refundAddress: string): Promise<void> {
-        if(this.refundAddress!=null) {
-            if(this.refundAddress!==refundAddress) throw new Error("Different refund address already set!");
-            return;
-        }
-        await TrustedIntermediaryAPI.setRefundAddress(
-            this.url, this.paymentHash, this.sequence, refundAddress, this.wrapper.options.getRequestTimeout
-        );
-        this.refundAddress = refundAddress;
-    }
-
     async requestRefund(refundAddress?: string, abortSignal?: AbortSignal): Promise<void> {
         if(refundAddress!=null) await this.setRefundAddress(refundAddress);
         await this.waitTillRefunded(abortSignal);
@@ -447,16 +403,8 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         };
     }
 
-    getInitiator(): string {
+    _getInitiator(): string {
         return this.recipient;
-    }
-
-    hasEnoughForTxFees(): Promise<{ enoughBalance: boolean; balance: TokenAmount; required: TokenAmount }> {
-        return Promise.resolve({
-            balance: toTokenAmount(0n, this.wrapper.getNativeToken(), this.wrapper.prices),
-            enoughBalance: true,
-            required: toTokenAmount(0n, this.wrapper.getNativeToken(), this.wrapper.prices)
-        });
     }
 
 

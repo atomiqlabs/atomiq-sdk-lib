@@ -7,6 +7,7 @@ const Utils_1 = require("../../../utils/Utils");
 const ISwap_1 = require("../../ISwap");
 const TrustedIntermediaryAPI_1 = require("../../../intermediaries/TrustedIntermediaryAPI");
 const Tokens_1 = require("../../../Tokens");
+const Fee_1 = require("../../fee/Fee");
 var OnchainForGasSwapState;
 (function (OnchainForGasSwapState) {
     OnchainForGasSwapState[OnchainForGasSwapState["EXPIRED"] = -3] = "EXPIRED";
@@ -52,10 +53,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
             this.refundTxId = initOrObj.refundTxId;
         }
         this.logger = (0, Utils_1.getLogger)("OnchainForGas(" + this.getId() + "): ");
-        this.tryCalculateSwapFee();
-        if (this.pricingInfo.swapPriceUSatPerToken == null) {
-            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.inputAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.outputAmount, this.token ?? this.wrapper.getNativeToken().address);
-        }
+        this.tryRecomputeSwapPrice();
     }
     upgradeVersion() {
         if (this.version == null) {
@@ -67,30 +65,16 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
      * In case swapFee in BTC is not supplied it recalculates it based on swap price
      * @protected
      */
-    tryCalculateSwapFee() {
+    tryRecomputeSwapPrice() {
         if (this.swapFeeBtc == null) {
             this.swapFeeBtc = this.swapFee * this.getInput().rawAmount / this.getOutAmountWithoutFee();
         }
-    }
-    //////////////////////////////
-    //// Pricing
-    async refreshPriceData() {
-        if (this.pricingInfo == null)
-            return null;
-        const priceData = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.inputAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.outputAmount, this.token ?? this.wrapper.getNativeToken().address);
-        this.pricingInfo = priceData;
-        return priceData;
-    }
-    getSwapPrice() {
-        return Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
-    }
-    getMarketPrice() {
-        return Number(this.pricingInfo.realPriceUSatPerToken) / 100000000000000;
+        super.tryRecomputeSwapPrice();
     }
     //////////////////////////////
     //// Getters & utils
-    getInputAddress() {
-        return this.address;
+    _getEscrowHash() {
+        return this.paymentHash;
     }
     getOutputAddress() {
         return this.recipient;
@@ -101,29 +85,17 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
     getOutputTxId() {
         return this.scTxId;
     }
-    getRecipient() {
-        return this.recipient;
-    }
-    getEscrowHash() {
-        return this.paymentHash;
-    }
     getId() {
         return this.paymentHash;
     }
     getAddress() {
         return this.address;
     }
-    /**
-     * Returns bitcoin address where the on-chain BTC should be sent to
-     */
-    getBitcoinAddress() {
-        return this.address;
-    }
-    getQrData() {
+    getHyperlink() {
         return "bitcoin:" + this.address + "?amount=" + encodeURIComponent((Number(this.inputAmount) / 100000000).toString(10));
     }
-    getTimeoutTime() {
-        return this.expiry;
+    requiresAction() {
+        return this.state === OnchainForGasSwapState.REFUNDABLE;
     }
     isFinished() {
         return this.state === OnchainForGasSwapState.FINISHED || this.state === OnchainForGasSwapState.FAILED || this.state === OnchainForGasSwapState.EXPIRED || this.state === OnchainForGasSwapState.REFUNDED;
@@ -140,11 +112,8 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
     isSuccessful() {
         return this.state === OnchainForGasSwapState.FINISHED;
     }
-    isQuoteValid() {
-        return Promise.resolve(this.getTimeoutTime() > Date.now());
-    }
-    isActionable() {
-        return this.state === OnchainForGasSwapState.REFUNDABLE;
+    verifyQuoteValid() {
+        return Promise.resolve(this.expiry > Date.now());
     }
     //////////////////////////////
     //// Amounts & fees
@@ -154,11 +123,11 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
     getOutput() {
         return (0, Tokens_1.toTokenAmount)(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices);
     }
-    getInputWithoutFee() {
-        return (0, Tokens_1.toTokenAmount)(this.inputAmount - this.swapFeeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
-    }
     getInput() {
         return (0, Tokens_1.toTokenAmount)(this.inputAmount, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
+    }
+    getInputWithoutFee() {
+        return (0, Tokens_1.toTokenAmount)(this.inputAmount - this.swapFeeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
     }
     getSwapFee() {
         return {
@@ -167,15 +136,24 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
             usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
         };
     }
+    getFee() {
+        return this.getSwapFee();
+    }
+    getFeeBreakdown() {
+        return [{
+                type: Fee_1.FeeType.SWAP,
+                fee: this.getSwapFee()
+            }];
+    }
     getRealSwapFeePercentagePPM() {
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
     }
-    //////////////////////////////
-    //// Payment
     async estimateBitcoinFee(wallet, feeRate) {
         return wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
     }
+    //////////////////////////////
+    //// Payment
     async checkAddress(save = true) {
         if (this.state === OnchainForGasSwapState.FAILED ||
             this.state === OnchainForGasSwapState.EXPIRED ||
@@ -251,6 +229,15 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
                 return true;
         }
     }
+    async setRefundAddress(refundAddress) {
+        if (this.refundAddress != null) {
+            if (this.refundAddress !== refundAddress)
+                throw new Error("Different refund address already set!");
+            return;
+        }
+        await TrustedIntermediaryAPI_1.TrustedIntermediaryAPI.setRefundAddress(this.url, this.paymentHash, this.sequence, refundAddress, this.wrapper.options.getRequestTimeout);
+        this.refundAddress = refundAddress;
+    }
     /**
      * A blocking promise resolving when payment was received by the intermediary and client can continue
      * rejecting in case of failure
@@ -312,15 +299,6 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
         if (this.isFailed())
             throw new PaymentAuthError_1.PaymentAuthError("Swap failed");
     }
-    async setRefundAddress(refundAddress) {
-        if (this.refundAddress != null) {
-            if (this.refundAddress !== refundAddress)
-                throw new Error("Different refund address already set!");
-            return;
-        }
-        await TrustedIntermediaryAPI_1.TrustedIntermediaryAPI.setRefundAddress(this.url, this.paymentHash, this.sequence, refundAddress, this.wrapper.options.getRequestTimeout);
-        this.refundAddress = refundAddress;
-    }
     async requestRefund(refundAddress, abortSignal) {
         if (refundAddress != null)
             await this.setRefundAddress(refundAddress);
@@ -344,15 +322,8 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
             refundTxId: this.refundTxId,
         };
     }
-    getInitiator() {
+    _getInitiator() {
         return this.recipient;
-    }
-    hasEnoughForTxFees() {
-        return Promise.resolve({
-            balance: (0, Tokens_1.toTokenAmount)(0n, this.wrapper.getNativeToken(), this.wrapper.prices),
-            enoughBalance: true,
-            required: (0, Tokens_1.toTokenAmount)(0n, this.wrapper.getNativeToken(), this.wrapper.prices)
-        });
     }
     //////////////////////////////
     //// Swap ticks & sync

@@ -65,25 +65,15 @@ export abstract class IEscrowSwap<
         }
     }
 
-    /**
-     * Returns the escrow hash - i.e. hash of the escrow data
-     */
-    getEscrowHash(): string | null {
-        return this.data?.getEscrowHash();
-    }
 
-    /**
-     * Returns the claim data hash - i.e. hash passed to the claim handler
-     */
-    getClaimHash(): string {
-        return this.data?.getClaimHash();
-    }
+    //////////////////////////////
+    //// Identifiers
 
     /**
      * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
      *  lightning swaps the identifier hash is used instead of claim data hash
      */
-    getIdentifierHash(): Buffer {
+    protected getIdentifierHash(): Buffer {
         const claimHashBuffer = Buffer.from(this.getClaimHash(), "hex");
         if(this.randomNonce==null) return claimHashBuffer;
         return Buffer.concat([claimHashBuffer, Buffer.from(this.randomNonce, "hex")]);
@@ -93,15 +83,37 @@ export abstract class IEscrowSwap<
      * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
      *  lightning swaps the identifier hash is used instead of claim data hash
      */
-    getIdentifierHashString(): string {
-        const paymentHash = this.getIdentifierHash();
-        if(paymentHash==null) return null;
-        return paymentHash.toString("hex");
+    protected getIdentifierHashString(): string {
+        const identifierHash = this.getIdentifierHash();
+        if(identifierHash==null) return null;
+        return identifierHash.toString("hex");
+    }
+
+    _getEscrowHash(): string | null {
+        return this.data?.getEscrowHash();
+    }
+
+    /**
+     * Returns the escrow hash - i.e. hash of the escrow data
+     */
+    getEscrowHash(): string | null {
+        return this._getEscrowHash();
+    }
+
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
+    getClaimHash(): string {
+        return this.data?.getClaimHash();
     }
 
     getId(): string {
         return this.getIdentifierHashString();
     }
+
+
+    //////////////////////////////
+    //// Watchdogs
 
     /**
      * Periodically checks for init signature's expiry
@@ -135,7 +147,7 @@ export abstract class IEscrowSwap<
         while(status===SwapCommitStatus.NOT_COMMITED) {
             await timeoutPromise(interval*1000, abortSignal);
             try {
-                status = await this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data);
+                status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
                 if(
                     status===SwapCommitStatus.NOT_COMMITED &&
                     await this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData)
@@ -162,7 +174,7 @@ export abstract class IEscrowSwap<
         while(status===SwapCommitStatus.COMMITED || status===SwapCommitStatus.REFUNDABLE) {
             await timeoutPromise(interval*1000, abortSignal);
             try {
-                status = await this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data);
+                status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
             } catch (e) {
                 this.logger.error("watchdogWaitTillResult(): Error when fetching commit status: ", e);
             }
@@ -171,10 +183,25 @@ export abstract class IEscrowSwap<
         return status;
     }
 
+
+    //////////////////////////////
+    //// Quote verification
+
+    /**
+     * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
+     */
+    protected async verifyQuoteDefinitelyExpired(): Promise<boolean> {
+        return tryWithRetries(
+            () => this.wrapper.contract.isInitAuthorizationExpired(
+                this.data, this.signatureData
+            )
+        );
+    }
+
     /**
      * Checks if the swap's quote is still valid
      */
-    async isQuoteValid(): Promise<boolean> {
+    async verifyQuoteValid(): Promise<boolean> {
         try {
             await tryWithRetries(
                 () => this.wrapper.contract.isValidInitAuthorization(
@@ -191,16 +218,6 @@ export abstract class IEscrowSwap<
         }
     }
 
-    /**
-     * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
-     */
-    async isQuoteDefinitelyExpired(): Promise<boolean> {
-        return tryWithRetries(
-            () => this.wrapper.contract.isInitAuthorizationExpired(
-                this.data, this.signatureData
-            )
-        );
-    }
 
     //////////////////////////////
     //// Amounts & fees
@@ -208,7 +225,7 @@ export abstract class IEscrowSwap<
     /**
      * Get the estimated smart chain fee of the commit transaction
      */
-    getCommitFee(): Promise<bigint> {
+    protected getCommitFee(): Promise<bigint> {
         return this.wrapper.contract.getCommitFee(this.data, this.feeRate);
     }
 
@@ -227,6 +244,11 @@ export abstract class IEscrowSwap<
             this.wrapper.prices
         );
     }
+
+    /**
+     * Checks if the initiator/sender has enough balance to cover the transaction fee for processing the swap
+     */
+    abstract hasEnoughForTxFees(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}>;
 
     serialize(): any {
         return {

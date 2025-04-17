@@ -28,6 +28,7 @@ export * from "./prices/SingleSwapPrice";
 export * from "./prices/SwapPriceWithChain";
 export * from "./Tokens";
 export * from "./swaps/ISwap";
+export * from "./swaps/IAddressSwap";
 export * from "./swaps/ISwapWrapper";
 export * from "./swaps/swapper/Swapper";
 export * from "./swaps/swapper/SwapperWithSigner";

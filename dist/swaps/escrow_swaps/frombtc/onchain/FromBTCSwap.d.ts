@@ -33,32 +33,39 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     constructor(wrapper: FromBTCWrapper<T>, init: FromBTCSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCWrapper<T>, obj: any);
     protected upgradeVersion(): void;
-    getInputTxId(): string | null;
-    getAddress(): string;
     /**
      * Returns bitcoin address where the on-chain BTC should be sent to
      */
-    getBitcoinAddress(): string;
-    getQrData(): string;
+    getAddress(): string;
+    getHyperlink(): string;
+    getInputTxId(): string | null;
     /**
      * Returns timeout time (in UNIX milliseconds) when the on-chain address will expire and no funds should be sent
      *  to that address anymore
      */
     getTimeoutTime(): number;
+    requiresAction(): boolean;
     isFinished(): boolean;
     isClaimable(): boolean;
-    isActionable(): boolean;
     isSuccessful(): boolean;
     isFailed(): boolean;
     isQuoteExpired(): boolean;
     isQuoteSoftExpired(): boolean;
-    canCommit(): boolean;
-    canClaim(): boolean;
+    protected canCommit(): boolean;
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>>;
     /**
      * Returns claimer bounty, acting as a reward for watchtowers to claim the swap automatically
      */
     getClaimerBounty(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+    /**
+     * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
+     */
+    protected getBitcoinPayment(): Promise<{
+        txId: string;
+        vout: number;
+        confirmations: number;
+        targetConfirmations: number;
+    } | null>;
     /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
      *
@@ -68,15 +75,6 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<void>;
-    /**
-     * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
-     */
-    getBitcoinPayment(): Promise<{
-        txId: string;
-        vout: number;
-        confirmations: number;
-        targetConfirmations: number;
-    } | null>;
     estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in a PTLC

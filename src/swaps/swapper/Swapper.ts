@@ -1216,7 +1216,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 }
                 return unifiedSwapStorage.query(queryParams, reviver);
             }));
-            return res.flat().filter(swap => swap.isActionable());
+            return res.flat().filter(swap => swap.requiresAction());
         } else {
             const {unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
             const queryParams: Array<QueryParams[]> = [];
@@ -1227,7 +1227,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
                 queryParams.push(swapTypeQueryParams);
             }
-            return (await unifiedSwapStorage.query(queryParams, reviver)).filter(swap => swap.isActionable());
+            return (await unifiedSwapStorage.query(queryParams, reviver)).filter(swap => swap.requiresAction());
         }
     }
 
@@ -1286,7 +1286,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                 const wrapper: ISwapWrapper<any, ISwap> = this.chains[chainId].wrappers[key];
                 const result = wrapper.pendingSwaps.get(id)?.deref();
                 if(signer!=null) {
-                    if(result.getInitiator()===signer) return result;
+                    if(result._getInitiator()===signer) return result;
                 } else {
                     return result;
                 }
@@ -1298,7 +1298,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter implements Swapp
                     const result = wrapper.pendingSwaps.get(id)?.deref();
                     if(result!=null) {
                         if(signer!=null) {
-                            if(result.getInitiator()===signer) return result;
+                            if(result._getInitiator()===signer) return result;
                         } else {
                             return result;
                         }

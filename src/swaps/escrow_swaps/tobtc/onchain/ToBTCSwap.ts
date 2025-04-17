@@ -60,7 +60,7 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
             this.nonce = (initOrObject.nonce==null ? null : BigInt(initOrObject.nonce)) ?? this.data.getNonceHint();
         }
         this.logger = getLogger("ToBTC("+this.getIdentifierHashString()+"): ");
-        this.tryCalculateSwapFee();
+        this.tryRecomputeSwapPrice();
     }
 
     async _setPaymentResult(result: { secret?: string; txId?: string }, check: boolean = false): Promise<boolean> {
@@ -95,6 +95,13 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
     //////////////////////////////
     //// Getters & utils
 
+    /**
+     * Returns the bitcoin address where the BTC will be sent to
+     */
+    getOutputAddress(): string {
+        return this.address;
+    }
+
     getOutputTxId(): string | null {
         return this.txId;
     }
@@ -104,24 +111,6 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
      */
     getBitcoinFeeRate(): number {
         return this.satsPerVByte;
-    }
-
-    /**
-     * Returns the bitcoin address where the BTC will be sent to
-     */
-    getBitcoinAddress(): string {
-        return this.address;
-    }
-
-    /**
-     * Returns the transaction ID of the transaction sending the BTC
-     */
-    getBitcoinTxId(): string | null {
-        return this.txId;
-    }
-
-    getRecipient(): string {
-        return this.address;
     }
 
 

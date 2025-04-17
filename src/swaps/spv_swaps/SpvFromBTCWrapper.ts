@@ -14,7 +14,7 @@ import {SwapType} from "../enums/SwapType";
 import {BitcoinRpcWithTxoListener} from "../../btc/BitcoinRpcWithTxoListener";
 import {UnifiedSwapStorage} from "../../storage/UnifiedSwapStorage";
 import {UnifiedSwapEventListener} from "../../events/UnifiedSwapEventListener";
-import {ISwapPrice, PriceInfoType} from "../../prices/abstract/ISwapPrice";
+import {ISwapPrice} from "../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {Intermediary} from "../../intermediaries/Intermediary";
 import {

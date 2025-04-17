@@ -1,10 +1,10 @@
 import { IFromBTCWrapper } from "./IFromBTCWrapper";
 import { ChainType } from "@atomiqlabs/base";
-import { PriceInfoType } from "../../../prices/abstract/ISwapPrice";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
 import { IEscrowSwap, IEscrowSwapInit } from "../IEscrowSwap";
-import { Fee } from "../../fee/Fee";
-export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S extends number = number> extends IEscrowSwap<T, S> {
+import { Fee, FeeType } from "../../fee/Fee";
+import { IAddressSwap } from "../../IAddressSwap";
+export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S extends number = number> extends IEscrowSwap<T, S> implements IAddressSwap {
     protected abstract readonly inputToken: BtcToken;
     protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, init: IEscrowSwapInit<T["Data"]>);
     protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, obj: any);
@@ -12,16 +12,9 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
      * In case swapFee in BTC is not supplied it recalculates it based on swap price
      * @protected
      */
-    protected tryCalculateSwapFee(): void;
+    protected tryRecomputeSwapPrice(): void;
     protected getSwapData(): T["Data"];
-    refreshPriceData(): Promise<PriceInfoType>;
-    getSwapPrice(): number;
-    getMarketPrice(): number;
     getRealSwapFeePercentagePPM(): bigint;
-    abstract getInputTxId(): string | null;
-    getOutputTxId(): string | null;
-    getInputAddress(): string | null;
-    getOutputAddress(): string | null;
     /**
      * Returns the bitcoin address or lightning invoice to be paid for the swap
      */
@@ -30,27 +23,41 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
      * Returns a string that can be displayed as QR code representation of the address or lightning invoice
      *  (with bitcoin: or lightning: prefix)
      */
-    abstract getQrData(): string;
+    abstract getHyperlink(): string;
     abstract isClaimable(): boolean;
-    isActionable(): boolean;
     /**
      * Returns if the swap can be committed
      */
-    abstract canCommit(): boolean;
+    protected abstract canCommit(): boolean;
+    _getInitiator(): string;
+    getOutputTxId(): string | null;
+    getOutputAddress(): string | null;
+    requiresAction(): boolean;
     protected getOutAmountWithoutFee(): bigint;
-    getOutputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+    protected getSwapFee(): Fee<T["ChainId"], BtcToken, SCToken<T["ChainId"]>>;
+    getFee(): Fee;
+    getFeeBreakdown(): [{
+        type: FeeType.SWAP;
+        fee: Fee<T["ChainId"], BtcToken, SCToken<T["ChainId"]>>;
+    }];
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken>;
-    getSwapFee(): Fee;
     getSecurityDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getTotalDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
-    getInitiator(): string;
-    getClaimFee(): Promise<bigint>;
     hasEnoughForTxFees(): Promise<{
         enoughBalance: boolean;
         balance: TokenAmount;
         required: TokenAmount;
     }>;
+    /**
+     * Returns the transactions required for committing the swap on-chain, locking the tokens from the intermediary
+     *  in an HTLC or PTLC
+     *
+     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
+     *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
+     * @throws {Error} When in invalid state to commit the swap
+     */
+    txsCommit(skipChecks?: boolean): Promise<T["TX"][]>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in an HTLC or PTLC
      *
@@ -61,16 +68,9 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
     abstract commit(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
-    /**
-     * Returns the transactions required for committing the swap on-chain, locking the tokens from the intermediary
-     *  in an HTLC or PTLC
-     *
-     * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
-     *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
-     * @throws {Error} When in invalid state to commit the swap
-     */
-    txsCommit(skipChecks?: boolean): Promise<T["TX"][]>;
     abstract waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
+    getClaimFee(): Promise<bigint>;
+    abstract txsClaim(signer?: T["Signer"]): Promise<T["TX"][]>;
     /**
      * Claims and finishes the swap
      *
@@ -78,7 +78,6 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
     abstract claim(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
-    abstract txsClaim(signer?: T["Signer"]): Promise<T["TX"][]>;
     /**
      * Waits till the swap is successfully claimed
      *

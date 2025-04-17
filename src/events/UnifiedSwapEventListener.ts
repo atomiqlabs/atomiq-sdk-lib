@@ -59,7 +59,7 @@ export class UnifiedSwapEventListener<
                 return new obj.reviver(val);
             }
         );
-        swaps.forEach(swap => swapsByEscrowHash[swap.getEscrowHash()] = swap);
+        swaps.forEach(swap => swapsByEscrowHash[swap._getEscrowHash()] = swap);
 
         for(let event of events) {
             const swap = swapsByEscrowHash[chainEventToEscrowHash(event)];

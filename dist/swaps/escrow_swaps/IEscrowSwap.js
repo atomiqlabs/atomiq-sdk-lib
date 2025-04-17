@@ -33,18 +33,8 @@ class IEscrowSwap extends ISwap_1.ISwap {
             this.refundTxId = swapInitOrObj.refundTxId;
         }
     }
-    /**
-     * Returns the escrow hash - i.e. hash of the escrow data
-     */
-    getEscrowHash() {
-        return this.data?.getEscrowHash();
-    }
-    /**
-     * Returns the claim data hash - i.e. hash passed to the claim handler
-     */
-    getClaimHash() {
-        return this.data?.getClaimHash();
-    }
+    //////////////////////////////
+    //// Identifiers
     /**
      * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
      *  lightning swaps the identifier hash is used instead of claim data hash
@@ -60,14 +50,31 @@ class IEscrowSwap extends ISwap_1.ISwap {
      *  lightning swaps the identifier hash is used instead of claim data hash
      */
     getIdentifierHashString() {
-        const paymentHash = this.getIdentifierHash();
-        if (paymentHash == null)
+        const identifierHash = this.getIdentifierHash();
+        if (identifierHash == null)
             return null;
-        return paymentHash.toString("hex");
+        return identifierHash.toString("hex");
+    }
+    _getEscrowHash() {
+        return this.data?.getEscrowHash();
+    }
+    /**
+     * Returns the escrow hash - i.e. hash of the escrow data
+     */
+    getEscrowHash() {
+        return this._getEscrowHash();
+    }
+    /**
+     * Returns the claim data hash - i.e. hash passed to the claim handler
+     */
+    getClaimHash() {
+        return this.data?.getClaimHash();
     }
     getId() {
         return this.getIdentifierHashString();
     }
+    //////////////////////////////
+    //// Watchdogs
     /**
      * Periodically checks for init signature's expiry
      *
@@ -101,7 +108,7 @@ class IEscrowSwap extends ISwap_1.ISwap {
         while (status === base_1.SwapCommitStatus.NOT_COMMITED) {
             await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
             try {
-                status = await this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data);
+                status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
                 if (status === base_1.SwapCommitStatus.NOT_COMMITED &&
                     await this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData))
                     return false;
@@ -126,7 +133,7 @@ class IEscrowSwap extends ISwap_1.ISwap {
         while (status === base_1.SwapCommitStatus.COMMITED || status === base_1.SwapCommitStatus.REFUNDABLE) {
             await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
             try {
-                status = await this.wrapper.contract.getCommitStatus(this.getInitiator(), this.data);
+                status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
             }
             catch (e) {
                 this.logger.error("watchdogWaitTillResult(): Error when fetching commit status: ", e);
@@ -136,10 +143,18 @@ class IEscrowSwap extends ISwap_1.ISwap {
             abortSignal.throwIfAborted();
         return status;
     }
+    //////////////////////////////
+    //// Quote verification
+    /**
+     * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
+     */
+    async verifyQuoteDefinitelyExpired() {
+        return (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData));
+    }
     /**
      * Checks if the swap's quote is still valid
      */
-    async isQuoteValid() {
+    async verifyQuoteValid() {
         try {
             await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this.data, this.signatureData, this.feeRate), null, base_1.SignatureVerificationError);
             return true;
@@ -149,12 +164,6 @@ class IEscrowSwap extends ISwap_1.ISwap {
                 return false;
             }
         }
-    }
-    /**
-     * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
-     */
-    async isQuoteDefinitelyExpired() {
-        return (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData));
     }
     //////////////////////////////
     //// Amounts & fees
