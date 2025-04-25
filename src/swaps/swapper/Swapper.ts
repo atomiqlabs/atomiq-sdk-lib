@@ -29,16 +29,26 @@ import {LnForGasSwap} from "../trusted/ln/LnForGasSwap";
 import {EventEmitter} from "events";
 import {MempoolBitcoinBlock} from "../../btc/mempool/MempoolBitcoinBlock";
 import {Intermediary} from "../../intermediaries/Intermediary";
-import {isLNURLPay, isLNURLWithdraw, LNURL, LNURLPay, LNURLWithdraw} from "../../utils/LNURL";
+import {isLNURLPay, isLNURLWithdraw, LNURLPay, LNURLWithdraw} from "../../utils/LNURL";
 import {AmountData, ISwapWrapper, WrapperCtorTokens} from "../ISwapWrapper";
 import {bigIntCompare, bigIntMax, bigIntMin, getLogger, objectMap, randomBytes} from "../../utils/Utils";
 import {OutOfBoundsError} from "../../errors/RequestError";
 import {SwapperWithChain} from "./SwapperWithChain";
-import {BtcToken, isBtcToken, isSCToken, SCToken, Token} from "../../Tokens";
+import {
+    BitcoinTokens,
+    BtcToken,
+    fromDecimal,
+    isBtcToken,
+    isSCToken,
+    SCToken,
+    Token,
+    TokenAmount,
+    toTokenAmount
+} from "../../Tokens";
 import {OnchainForGasSwap} from "../trusted/onchain/OnchainForGasSwap";
 import {OnchainForGasWrapper} from "../trusted/onchain/OnchainForGasWrapper";
 import {BTC_NETWORK, NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
-import {Address, Transaction} from "@scure/btc-signer";
+import {Transaction} from "@scure/btc-signer";
 import {IUnifiedStorage, QueryParams} from "../../storage/IUnifiedStorage";
 import {IndexedDBUnifiedStorage} from "../../browser-storage/IndexedDBUnifiedStorage";
 import {UnifiedSwapStorage} from "../../storage/UnifiedSwapStorage";
@@ -114,7 +124,12 @@ export type SupportsSwapType<
     Type extends (SwapType.TRUSTED_FROM_BTCLN | SwapType.TRUSTED_FROM_BTC) ? true :
         NotNever<C["Contract"]>;
 
-export class Swapper<T extends MultiChain> extends EventEmitter {
+export class Swapper<T extends MultiChain> extends EventEmitter<{
+    lpsRemoved: [Intermediary[]],
+    lpsAdded: [Intermediary[]],
+    swapState: [ISwap],
+    swapLimitsChanged: []
+}> {
 
     protected readonly logger = getLogger(this.constructor.name+": ");
 
@@ -360,53 +375,6 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
         return wrapper.getDummySwapPsbt(includeGasToken);
     }
 
-    getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SwapBounds;
-    getSwapBounds(): MultichainSwapBounds;
-
-    /**
-     * Returns swap bounds (minimums & maximums) for different swap types & tokens
-     */
-    getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier?: ChainIdentifier): SwapBounds | MultichainSwapBounds {
-        if(this.intermediaryDiscovery!=null) {
-            if(chainIdentifier==null) {
-                return this.intermediaryDiscovery.getMultichainSwapBounds();
-            } else {
-                return this.intermediaryDiscovery.getSwapBounds(chainIdentifier);
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Returns maximum possible swap amount
-     *
-     * @param chainIdentifier
-     * @param type      Type of the swap
-     * @param token     Token of the swap
-     */
-    getMaximum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, type: SwapType, token: string): bigint {
-        if(this.intermediaryDiscovery!=null) {
-            const max = this.intermediaryDiscovery.getSwapMaximum(chainIdentifier, type, token);
-            if(max!=null) return BigInt(max);
-        }
-        return 0n;
-    }
-
-    /**
-     * Returns minimum possible swap amount
-     *
-     * @param chainIdentifier
-     * @param type      Type of swap
-     * @param token     Token of the swap
-     */
-    getMinimum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, type: SwapType, token: string): bigint {
-        if(this.intermediaryDiscovery!=null) {
-            const min = this.intermediaryDiscovery.getSwapMinimum(chainIdentifier, type, token);
-            if(min!=null) return BigInt(min);
-        }
-        return 0n;
-    }
-
     /**
      * Initializes the swap storage and loads existing swaps, needs to be called before any other action
      */
@@ -484,42 +452,6 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
     }
 
     /**
-     * Returns a set of supported tokens by all the intermediaries offering a specific swap service
-     *
-     * @param swapType Swap service type to check supported tokens for
-     */
-    getSupportedTokens(swapType: SwapType): SCToken[] {
-        const tokens: SCToken[] = [];
-        this.intermediaryDiscovery.intermediaries.forEach(lp => {
-            if(lp.services[swapType]==null) return;
-            if(lp.services[swapType].chainTokens==null) return;
-            for(let chainId in lp.services[swapType].chainTokens) {
-                for(let tokenAddress of lp.services[swapType].chainTokens[chainId]) {
-                    const token = this.tokens?.[chainId]?.[tokenAddress];
-                    if(token!=null) tokens.push(token);
-                }
-            }
-        });
-        return tokens;
-    }
-
-    /**
-     * Returns the set of supported token addresses by all the intermediaries we know of offering a specific swapType service
-     *
-     * @param chainIdentifier
-     * @param swapType Specific swap type for which to obtain supported tokens
-     */
-    getSupportedTokenAddresses<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, swapType: SwapType): Set<string> {
-        const set = new Set<string>();
-        this.intermediaryDiscovery.intermediaries.forEach(lp => {
-            if(lp.services[swapType]==null) return;
-            if(lp.services[swapType].chainTokens==null || lp.services[swapType].chainTokens[chainIdentifier]==null) return;
-            lp.services[swapType].chainTokens[chainIdentifier].forEach(token => set.add(token));
-        });
-        return set;
-    }
-
-    /**
      * Creates swap & handles intermediary, quote selection
      *
      * @param chainIdentifier
@@ -553,9 +485,12 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
             candidates = this.intermediaryDiscovery.getSwapCandidates(chainIdentifier, swapType, amountData.token, amountData.amount);
         }
 
+        let swapLimitsChanged = false;
+
         if(candidates.length===0)  {
             this.logger.warn("createSwap(): No valid intermediary found, reloading intermediary database...");
             await this.intermediaryDiscovery.reloadIntermediaries();
+            swapLimitsChanged = true;
 
             if(!inBtc) {
                 //Get candidates not based on the amount
@@ -618,8 +553,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
                     if(e instanceof IntermediaryError) {
                         //Blacklist that node
                         this.intermediaryDiscovery.removeIntermediary(data.intermediary);
-                    }
-                    if(e instanceof OutOfBoundsError) {
+                        swapLimitsChanged = true;
+                    } else if(e instanceof OutOfBoundsError) {
                         if(min==null || max==null) {
                             min = e.min;
                             max = e.max;
@@ -627,6 +562,15 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
                             min = bigIntMin(min, e.min);
                             max = bigIntMax(max, e.max);
                         }
+                        data.intermediary.swapBounds[swapType] ??= {};
+                        data.intermediary.swapBounds[swapType][chainIdentifier] ??= {};
+                        const tokenBoundsData = (data.intermediary.swapBounds[swapType][chainIdentifier][amountData.token] ??= {input: null, output: null});
+                        if(amountData.exactIn) {
+                            tokenBoundsData.input = {min: e.min, max: e.max};
+                        } else {
+                            tokenBoundsData.output = {min: e.min, max: e.max};
+                        }
+                        swapLimitsChanged = true;
                     }
                     this.logger.warn("createSwap(): Intermediary "+data.intermediary.url+" error: ", e);
                     error = e;
@@ -660,6 +604,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
 
         this.logger.debug("createSwap(): Sorted quotes, best price to worst: ", quotes)
 
+        if(swapLimitsChanged) this.emit("swapLimitsChanged");
+
         return quotes[0].quote;
     }
 
@@ -685,6 +631,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
         additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
         options?: ToBTCOptions
     ): Promise<ToBTCSwap<T[ChainIdentifier]>> {
+        if(address.startsWith("bitcoin:")) {
+            address = address.substring(8).split("?")[0];
+        }
         options ??= {};
         options.confirmationTarget ??= 3;
         options.confirmations ??= 2;
@@ -728,6 +677,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
         options?: ToBTCLNOptions
     ): Promise<ToBTCLNSwap<T[ChainIdentifier]>> {
         options ??= {};
+        if(paymentRequest.startsWith("lightning:")) paymentRequest = paymentRequest.substring(10);
         const parsedPR = bolt11Decode(paymentRequest);
         const amountData = {
             amount: (BigInt(parsedPR.millisatoshis) + 999n) / 1000n,
@@ -784,7 +734,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
             chainIdentifier as ChainIdentifier,
             (candidates: Intermediary[], abortSignal: AbortSignal, chain) => chain.wrappers[SwapType.TO_BTCLN].createViaLNURL(
                 signer,
-                typeof(lnurlPay)==="string" ? lnurlPay : lnurlPay.params,
+                typeof(lnurlPay)==="string" ? (lnurlPay.startsWith("lightning:") ? lnurlPay.substring(10): lnurlPay) : lnurlPay.params,
                 amountData,
                 candidates,
                 options,
@@ -945,7 +895,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
             chainIdentifier as ChainIdentifier,
             (candidates: Intermediary[], abortSignal: AbortSignal, chain) => chain.wrappers[SwapType.FROM_BTCLN].createViaLNURL(
                 signer,
-                typeof(lnurl)==="string" ? lnurl : lnurl.params,
+                typeof(lnurl)==="string" ? (lnurl.startsWith("lightning:") ? lnurl.substring(10): lnurl) : lnurl.params,
                 amountData,
                 candidates,
                 additionalParams,
@@ -1063,12 +1013,10 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
      * Returns all swaps
      */
     getAllSwaps(): Promise<ISwap[]>;
-
     /**
      * Returns all swaps for the specific chain, and optionally also for a specific signer's address
      */
     getAllSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
-
     async getAllSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<ISwap[]> {
         const queryParams: QueryParams[] = [];
         if(signer!=null) queryParams.push({key: "intiator", value: signer});
@@ -1089,12 +1037,10 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
      * Returns all swaps where an action is required (either claim or refund)
      */
     getActionableSwaps(): Promise<ISwap[]>;
-
     /**
      * Returns swaps where an action is required (either claim or refund) for the specific chain, and optionally also for a specific signer's address
      */
     getActionableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
-
     async getActionableSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<ISwap[]> {
         if(chainId==null) {
             const res: ISwap[][] = await Promise.all(Object.keys(this.chains).map((chainId) => {
@@ -1128,12 +1074,10 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
      * Returns all swaps that are refundable
      */
     getRefundableSwaps(): Promise<IToBTCSwap[]>;
-
     /**
      * Returns swaps which are refundable for the specific chain, and optionally also for a specific signer's address
      */
     getRefundableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IToBTCSwap<T[C]>[]>;
-
     async getRefundableSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<IToBTCSwap[]> {
         if(chainId==null) {
             const res: IToBTCSwap[][] = await Promise.all(Object.keys(this.chains).map((chainId) => {
@@ -1166,12 +1110,10 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
      * Returns swap with a specific id (identifier)
      */
     getSwapById(id: string): Promise<ISwap>;
-
     /**
      * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
     getSwapById<C extends ChainIds<T>>(id: string, chainId: C, signer?: string): Promise<ISwap<T[C]>>;
-
     async getSwapById<C extends ChainIds<T>>(id: string, chainId?: C, signer?: string): Promise<ISwap> {
         //Check in pending swaps first
         if(chainId!=null) {
@@ -1287,15 +1229,29 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
         }
     }
 
+    /**
+     * Creates a child swapper instance with a given smart chain
+     *
+     * @param chainIdentifier
+     */
     withChain<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SwapperWithChain<T, ChainIdentifier> {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         return new SwapperWithChain<T, ChainIdentifier>(this, chainIdentifier as ChainIdentifier);
     }
 
+    /**
+     * Returns supported smart chains
+     */
     getChains(): ChainIds<T>[] {
         return Object.keys(this.chains);
     }
 
+    /**
+     * Returns whether the SDK supports a given swap type on a given chain based on currently known LPs
+     *
+     * @param chainId
+     * @param swapType
+     */
     supportsSwapType<
         ChainIdentifier extends ChainIds<T>,
         Type extends SwapType
@@ -1303,6 +1259,12 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
         return (this.chains[chainId]?.wrappers[swapType] != null) as any;
     }
 
+    /**
+     * Returns type of the swap based on input and output tokens specified
+     *
+     * @param srcToken
+     * @param dstToken
+     */
     getSwapType<C extends ChainIds<T>>(srcToken: BtcToken<true>, dstToken: SCToken<C>): SwapType.FROM_BTCLN;
     getSwapType<C extends ChainIds<T>>(srcToken: BtcToken<false>, dstToken: SCToken<C>): (SupportsSwapType<T[C], SwapType.SPV_VAULT_FROM_BTC> extends true ? SwapType.SPV_VAULT_FROM_BTC : SwapType.FROM_BTC);
     getSwapType<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<false>): SwapType.TO_BTC;
@@ -1368,13 +1330,390 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
         }
     } as const;
 
+    /**
+     * Returns minimum/maximum limits for inputs and outputs for a swap between given tokens
+     *
+     * @param srcToken
+     * @param dstToken
+     */
+    getSwapLimits<C extends ChainIds<T>, A extends Token<C>, B extends Token<C>>(srcToken: A, dstToken: B): {
+        input: {min: TokenAmount<string, A>, max: TokenAmount<string, A>},
+        output: {min: TokenAmount<string, B>, max: TokenAmount<string, B>}
+    } {
+        const swapType = this.getSwapType(srcToken, dstToken);
+        const scToken = isSCToken(srcToken) ? srcToken : isSCToken(dstToken) ? dstToken : null;
+        const result: {input: {min: bigint, max: bigint}, output: {min: bigint, max: bigint}} = {
+            input: {min: null, max: null},
+            output: {min: null, max: null}
+        };
+        for(let lp of this.intermediaryDiscovery.intermediaries) {
+            const lpMinMax = lp.getSwapLimits(swapType, scToken.chainId, scToken.address);
+            result.input.min = result.input.min==null ? lpMinMax.input.min : bigIntMin(result.input.min, lpMinMax.input.min);
+            result.input.max = result.input.max==null ? lpMinMax.input.max : bigIntMax(result.input.max, lpMinMax.input.max);
+            result.output.min = result.output.min==null ? lpMinMax.output.min : bigIntMin(result.output.min, lpMinMax.output.min);
+            result.output.max = result.output.max==null ? lpMinMax.output.max : bigIntMax(result.output.max, lpMinMax.output.max);
+        }
+        return {
+            input: {
+                min: toTokenAmount(result.input.min ?? 1n, srcToken, this.prices),
+                max: toTokenAmount(result.input.max, srcToken, this.prices),
+            },
+            output: {
+                min: toTokenAmount(result.output.min ?? 1n, dstToken, this.prices),
+                max: toTokenAmount(result.output.max, dstToken, this.prices),
+            }
+        }
+    }
+
+    /**
+     * Returns a set of supported tokens by all the intermediaries offering a specific swap service
+     *
+     * @param _swapType Swap service type to check supported tokens for
+     */
+    private getSupportedTokens(_swapType: SwapType): SCToken[] {
+        const tokens: SCToken[] = [];
+        this.intermediaryDiscovery.intermediaries.forEach(lp => {
+            for(let chainId of this.getChains()) {
+                let swapType = _swapType;
+                if(swapType===SwapType.FROM_BTC && this.supportsSwapType(chainId, SwapType.SPV_VAULT_FROM_BTC)) swapType = SwapType.SPV_VAULT_FROM_BTC;
+                if(lp.services[swapType]==null) break;
+                if(lp.services[swapType].chainTokens==null) break;
+                for(let tokenAddress of lp.services[swapType].chainTokens[chainId]) {
+                    const token = this.tokens?.[chainId]?.[tokenAddress];
+                    if(token!=null) tokens.push(token);
+                }
+            }
+        });
+        return tokens;
+    }
+
+    /**
+     * Returns the set of supported token addresses by all the intermediaries we know of offering a specific swapType service
+     *
+     * @param chainIdentifier
+     * @param swapType Specific swap type for which to obtain supported tokens
+     */
+    private getSupportedTokenAddresses<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, swapType: SwapType): Set<string> {
+        const set = new Set<string>();
+        this.intermediaryDiscovery.intermediaries.forEach(lp => {
+            if(lp.services[swapType]==null) return;
+            if(lp.services[swapType].chainTokens==null || lp.services[swapType].chainTokens[chainIdentifier]==null) return;
+            lp.services[swapType].chainTokens[chainIdentifier].forEach(token => set.add(token));
+        });
+        return set;
+    }
+
+    /**
+     * Returns tokens that you can swap to (if input=true) from a given token,
+     *  or tokens that you can swap from (if input=false) to a given token
+     */
+    getSwapCounterTokens(token: Token, input: boolean): Token[] {
+        if(isSCToken(token)) {
+            const result: Token[] = [];
+            if(input) {
+                //TO_BTC or TO_BTCLN
+                if(this.getSupportedTokenAddresses(token.chainId, SwapType.TO_BTCLN).has(token.address)) {
+                    result.push(BitcoinTokens.BTCLN);
+                }
+                if(this.getSupportedTokenAddresses(token.chainId, SwapType.TO_BTC).has(token.address)) {
+                    result.push(BitcoinTokens.BTC);
+                }
+            } else {
+                //FROM_BTC or FROM_BTCLN
+                if(this.getSupportedTokenAddresses(token.chainId, SwapType.FROM_BTCLN).has(token.address)) {
+                    result.push(BitcoinTokens.BTCLN);
+                }
+                const fromOnchainSwapType = this.supportsSwapType(token.chainId, SwapType.SPV_VAULT_FROM_BTC) ? SwapType.SPV_VAULT_FROM_BTC : SwapType.FROM_BTC;
+                if(this.getSupportedTokenAddresses(token.chainId, fromOnchainSwapType).has(token.address)) {
+                    result.push(BitcoinTokens.BTC);
+                }
+            }
+            return result;
+        } else {
+            if(input) {
+                if(token.lightning) {
+                    return this.getSupportedTokens(SwapType.FROM_BTCLN);
+                } else {
+                    return this.getSupportedTokens(SwapType.FROM_BTC);
+                }
+            } else {
+                if(token.lightning) {
+                    return this.getSupportedTokens(SwapType.TO_BTCLN);
+                } else {
+                    return this.getSupportedTokens(SwapType.TO_BTC);
+                }
+            }
+        }
+    }
+
+    private parseBitcoinAddress(resultText: string): {
+        type: "BITCOIN",
+        swapType: SwapType.TO_BTC,
+        min?: TokenAmount,
+        max?: TokenAmount
+    } {
+        let _amount: bigint = null;
+        if(resultText.includes("?")) {
+            const arr = resultText.split("?");
+            resultText = arr[0];
+            const params = arr[1].split("&");
+            for(let param of params) {
+                const arr2 = param.split("=");
+                const key = arr2[0];
+                const value = decodeURIComponent(arr2[1]);
+                if(key==="amount") {
+                    _amount = fromDecimal(parseFloat(value).toString(8), 8);
+                }
+            }
+        }
+        if(this.BtcUtils.isValidBitcoinAddress(resultText)) {
+            const tokenAmount = toTokenAmount(_amount, BitcoinTokens.BTC, this.prices);
+            return {
+                type: "BITCOIN",
+                swapType: SwapType.TO_BTC,
+                max: tokenAmount,
+                min: tokenAmount
+            };
+        }
+    }
+
+    private parseLNURLSync(resultText: string): {
+        type: "LNURL",
+        swapType: null
+    } {
+        if(this.BtcUtils.isValidLNURL(resultText)) {
+            return {
+                type: "LNURL",
+                swapType: null
+            };
+        }
+    }
+
+    private async parseLNURL(resultText: string): Promise<{
+        type: "LNURL",
+        swapType: SwapType.TO_BTCLN | SwapType.FROM_BTCLN,
+        lnurl: LNURLPay | LNURLWithdraw,
+        min: TokenAmount,
+        max: TokenAmount
+    }> {
+        if(this.BtcUtils.isValidLNURL(resultText)) {
+            try {
+                const result = await this.BtcUtils.getLNURLTypeAndData(resultText);
+                if(isLNURLPay(result)) {
+                    return {
+                        type: "LNURL",
+                        swapType: SwapType.TO_BTCLN,
+                        lnurl: result,
+                        min: toTokenAmount(result.min, BitcoinTokens.BTCLN, this.prices),
+                        max: toTokenAmount(result.max, BitcoinTokens.BTCLN, this.prices)
+                    };
+                }
+                if(isLNURLWithdraw(result)) {
+                    return {
+                        type: "LNURL",
+                        swapType: SwapType.FROM_BTCLN,
+                        lnurl: result,
+                        min: toTokenAmount(result.min, BitcoinTokens.BTCLN, this.prices),
+                        max: toTokenAmount(result.max, BitcoinTokens.BTCLN, this.prices)
+                    };
+                }
+                throw new Error("Invalid LNURL specified!");
+            } catch (e) {
+                throw new Error("Failed to contact LNURL service, check your internet connection and retry later.");
+            }
+        }
+    }
+
+    private parseLightningInvoice(resultText: string): {
+        type: "LIGHTNING",
+        swapType: SwapType.TO_BTCLN,
+        min: TokenAmount,
+        max: TokenAmount
+    } {
+        if(this.BtcUtils.isLightningInvoice(resultText)) {
+            if(this.BtcUtils.isValidLightningInvoice(resultText)) {
+                const amountBN = this.BtcUtils.getLightningInvoiceValue(resultText);
+                return {
+                    type: "LIGHTNING",
+                    swapType: SwapType.TO_BTCLN,
+                    min: toTokenAmount(amountBN, BitcoinTokens.BTCLN, this.prices),
+                    max: toTokenAmount(amountBN, BitcoinTokens.BTCLN, this.prices)
+                }
+            } else {
+                throw new Error("Lightning invoice needs to contain an amount!");
+            }
+        }
+    }
+
+    private parseSmartchainAddress(resultText: string): {
+        type: ChainIds<T>,
+        swapType: SwapType.SPV_VAULT_FROM_BTC,
+        min?: TokenAmount,
+        max?: TokenAmount
+    } {
+        for(let chainId of this.getChains()) {
+            if(this.chains[chainId].chainInterface.isValidAddress(resultText)) {
+                if(this.supportsSwapType(chainId, SwapType.SPV_VAULT_FROM_BTC)) {
+                    return {
+                        type: chainId,
+                        swapType: SwapType.SPV_VAULT_FROM_BTC
+                    }
+                } else {
+                    return {
+                        type: chainId,
+                        swapType: null
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * General parser for bitcoin addresses, LNURLs, lightning invoices, smart chain addresses, also fetches LNURL data
+     *  (hence returns Promise)
+     *
+     * @param addressString Address to parse
+     * @throws {Error} Error in address parsing
+     * @returns Address data or null if address doesn't conform to any known format
+     */
+    async parseAddress(addressString: string): Promise<{
+        type: "BITCOIN" | "LIGHTNING" | "LNURL" | ChainIds<T>,
+        swapType: SwapType.TO_BTC | SwapType.TO_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTCLN | null,
+        lnurl?: LNURLPay | LNURLWithdraw,
+        min?: TokenAmount,
+        max?: TokenAmount
+    }> {
+        if(addressString.startsWith("bitcoin:")) {
+            const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
+            if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
+            throw new Error("Invalid bitcoin address!");
+        }
+
+        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
+        if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
+
+        if(addressString.startsWith("lightning:")) {
+            const resultText = addressString.substring(10);
+            const resultLnurl = await this.parseLNURL(resultText);
+            if(resultLnurl!=null) return resultLnurl;
+
+            const resultLightningInvoice = this.parseLightningInvoice(resultText);
+            if(resultLightningInvoice!=null) return resultLightningInvoice;
+
+            throw new Error("Invalid lightning network invoice or LNURL!");
+        }
+
+        const resultLnurl = await this.parseLNURL(addressString);
+        if(resultLnurl!=null) return resultLnurl;
+
+        const resultLightningInvoice = this.parseLightningInvoice(addressString);
+        if(resultLightningInvoice!=null) return resultLightningInvoice;
+
+        return this.parseSmartchainAddress(addressString);
+    }
+
+    /**
+     * Synchronous general parser for bitcoin addresses, LNURLs, lightning invoices, smart chain addresses, doesn't fetch
+     *  LNURL data, reports swapType: null instead to prevent returning a Promise
+     *
+     * @param addressString Address to parse
+     * @throws {Error} Error in address parsing
+     * @returns Address data or null if address doesn't conform to any known format
+     */
+    parseAddressSync(addressString: string): {
+        type: "BITCOIN" | "LIGHTNING" | "LNURL" | ChainIds<T>,
+        swapType: SwapType.TO_BTC | SwapType.TO_BTCLN | SwapType.SPV_VAULT_FROM_BTC | null,
+        min?: TokenAmount,
+        max?: TokenAmount
+    } {
+        if(addressString.startsWith("bitcoin:")) {
+            const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
+            if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
+            throw new Error("Invalid bitcoin address!");
+        }
+
+        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
+        if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
+
+        if(addressString.startsWith("lightning:")) {
+            const resultText = addressString.substring(10);
+            const resultLnurl = this.parseLNURLSync(resultText);
+            if(resultLnurl!=null) return resultLnurl;
+
+            const resultLightningInvoice = this.parseLightningInvoice(resultText);
+            if(resultLightningInvoice!=null) return resultLightningInvoice;
+
+            throw new Error("Invalid lightning network invoice or LNURL!");
+        }
+
+        const resultLnurl = this.parseLNURLSync(addressString);
+        if(resultLnurl!=null) return resultLnurl;
+
+        const resultLightningInvoice = this.parseLightningInvoice(addressString);
+        if(resultLightningInvoice!=null) return resultLightningInvoice;
+
+        return this.parseSmartchainAddress(addressString);
+    }
+
+
+    ///////////////////////////////////
+    /// Deprecated
+
+    /**
+     * Returns swap bounds (minimums & maximums) for different swap types & tokens
+     * @deprecated Use getSwapLimits() instead!
+     */
+    getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SwapBounds;
+    getSwapBounds(): MultichainSwapBounds;
+    getSwapBounds<ChainIdentifier extends ChainIds<T>>(chainIdentifier?: ChainIdentifier): SwapBounds | MultichainSwapBounds {
+        if(this.intermediaryDiscovery!=null) {
+            if(chainIdentifier==null) {
+                return this.intermediaryDiscovery.getMultichainSwapBounds();
+            } else {
+                return this.intermediaryDiscovery.getSwapBounds(chainIdentifier);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns maximum possible swap amount
+     * @deprecated Use getSwapLimits() instead!
+     *
+     * @param chainIdentifier
+     * @param type      Type of the swap
+     * @param token     Token of the swap
+     */
+    getMaximum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, type: SwapType, token: string): bigint {
+        if(this.intermediaryDiscovery!=null) {
+            const max = this.intermediaryDiscovery.getSwapMaximum(chainIdentifier, type, token);
+            if(max!=null) return BigInt(max);
+        }
+        return 0n;
+    }
+
+    /**
+     * Returns minimum possible swap amount
+     * @deprecated Use getSwapLimits() instead!
+     *
+     * @param chainIdentifier
+     * @param type      Type of swap
+     * @param token     Token of the swap
+     */
+    getMinimum<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, type: SwapType, token: string): bigint {
+        if(this.intermediaryDiscovery!=null) {
+            const min = this.intermediaryDiscovery.getSwapMinimum(chainIdentifier, type, token);
+            if(min!=null) return BigInt(min);
+        }
+        return 0n;
+    }
+
 
     ///////////////////////////////////
     /// Smart chain specific functions
 
     getBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>): Promise<bigint>;
     getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string): Promise<bigint>;
-
     /**
      * Returns the token balance of the wallet
      */
@@ -1395,7 +1734,6 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
 
     getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<bigint>;
     getSpendableBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string, feeMultiplier?: number): Promise<bigint>;
-
     /**
      * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
      */
@@ -1469,6 +1807,11 @@ export class Swapper<T extends MultiChain> extends EventEmitter {
         return this.tokens[chainIdentifier][this.chains[chainIdentifier].chainInterface.getNativeCurrencyAddress()] as SCToken<ChainIdentifier>;
     }
 
+    /**
+     * Returns a random signer for a given smart chain
+     *
+     * @param chainIdentifier
+     */
     randomSigner<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): T[ChainIdentifier]["Signer"] {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         return this.chains[chainIdentifier].chainInterface.randomSigner();
