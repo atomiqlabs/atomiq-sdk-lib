@@ -4,7 +4,7 @@ import {ChainType} from "@atomiqlabs/base";
 import {LnForGasWrapper} from "./LnForGasWrapper";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
 import {getLogger, timeoutPromise} from "../../../utils/Utils";
-import {isISwapInit, ISwap, ISwapInit} from "../../ISwap";
+import {isISwapInit, ISwap, ISwapInit, ppmToPercentage} from "../../ISwap";
 import {InvoiceStatusResponseCodes, TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediaryAPI";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {Fee, FeeBreakdown, FeeType} from "../../fee/Fee";
@@ -185,11 +185,18 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     }
 
     protected getSwapFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>> {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
+
         return {
             amountInSrcToken: toTokenAmount(this.swapFeeBtc, BitcoinTokens.BTCLN, this.wrapper.prices),
             amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            composition: {
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, BitcoinTokens.BTCLN, this.wrapper.prices),
+                percentage: ppmToPercentage(swapFeePPM)
+            }
         };
     }
 
@@ -202,11 +209,6 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
             type: FeeType.SWAP,
             fee: this.getSwapFee()
         }];
-    }
-
-    getRealSwapFeePercentagePPM(): bigint {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
     }
 
 

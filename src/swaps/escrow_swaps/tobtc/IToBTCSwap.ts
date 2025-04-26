@@ -10,6 +10,7 @@ import {extendAbortController, timeoutPromise, tryWithRetries} from "../../../ut
 import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {IEscrowSwap, IEscrowSwapInit, isIEscrowSwapInit} from "../IEscrowSwap";
 import {Fee, FeeBreakdown, FeeType} from "../../fee/Fee";
+import {ppmToPercentage} from "../../ISwap";
 
 export type IToBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
     networkFee: bigint,
@@ -102,15 +103,6 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
 
 
     //////////////////////////////
-    //// Pricing
-
-    getRealSwapFeePercentagePPM(): bigint {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
-    }
-
-
-    //////////////////////////////
     //// Getters & utils
 
     getInputTxId(): string | null {
@@ -157,11 +149,18 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
     //// Amounts & fees
 
     protected getSwapFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken> {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
+
         return {
             amountInSrcToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
             amountInDstToken: toTokenAmount(this.swapFeeBtc, this.outputToken, this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            composition: {
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, this.outputToken, this.wrapper.prices),
+                percentage: ppmToPercentage(swapFeePPM)
+            }
         };
     }
 

@@ -1,5 +1,5 @@
 import {IFromBTCWrapper} from "./IFromBTCWrapper";
-import {ISwapInit} from "../../ISwap";
+import {ISwapInit, ppmToPercentage} from "../../ISwap";
 import {
     ChainType,
     SignatureVerificationError,
@@ -39,15 +39,6 @@ export abstract class IFromBTCSwap<
 
     protected getSwapData(): T["Data"] {
         return this.data;
-    }
-
-
-    //////////////////////////////
-    //// Pricing
-
-    getRealSwapFeePercentagePPM(): bigint {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
     }
 
 
@@ -97,11 +88,18 @@ export abstract class IFromBTCSwap<
     }
 
     protected getSwapFee(): Fee<T["ChainId"], BtcToken, SCToken<T["ChainId"]>> {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
+
         return {
             amountInSrcToken: toTokenAmount(this.swapFeeBtc, this.inputToken, this.wrapper.prices),
             amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            composition: {
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, this.inputToken, this.wrapper.prices),
+                percentage: ppmToPercentage(swapFeePPM)
+            }
         };
     }
 

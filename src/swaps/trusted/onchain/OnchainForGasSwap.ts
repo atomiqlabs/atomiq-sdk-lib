@@ -2,7 +2,7 @@ import {SwapType} from "../../enums/SwapType";
 import {ChainType} from "@atomiqlabs/base";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
 import {getLogger, timeoutPromise} from "../../../utils/Utils";
-import {isISwapInit, ISwap, ISwapInit} from "../../ISwap";
+import {isISwapInit, ISwap, ISwapInit, ppmToPercentage} from "../../ISwap";
 import {
     AddressStatusResponseCodes,
     TrustedIntermediaryAPI
@@ -12,6 +12,8 @@ import {OnchainForGasWrapper} from "./OnchainForGasWrapper";
 import {Fee, FeeType} from "../../fee/Fee";
 import {IBitcoinWallet} from "../../../btc/wallet/IBitcoinWallet";
 import {IAddressSwap} from "../../IAddressSwap";
+import {FromBTCSwapState} from "../../escrow_swaps/frombtc/onchain/FromBTCSwap";
+import {IBTCWalletSwap} from "../../IBTCWalletSwap";
 
 export enum OnchainForGasSwapState {
     EXPIRED = -3,
@@ -45,7 +47,7 @@ export function isOnchainForGasSwapInit(obj: any): obj is OnchainForGasSwapInit 
         isISwapInit(obj);
 }
 
-export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> implements IAddressSwap {
+export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> implements IAddressSwap, IBTCWalletSwap {
     getSmartChainNetworkFee = null;
     protected readonly TYPE: SwapType = SwapType.TRUSTED_FROM_BTC;
 
@@ -173,6 +175,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         return Promise.resolve(this.expiry>Date.now());
     }
 
+
     //////////////////////////////
     //// Amounts & fees
 
@@ -193,11 +196,18 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
     }
 
     protected getSwapFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>> {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
+
         return {
             amountInSrcToken: toTokenAmount(this.swapFeeBtc, BitcoinTokens.BTC, this.wrapper.prices),
             amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            composition: {
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, BitcoinTokens.BTC, this.wrapper.prices),
+                percentage: ppmToPercentage(swapFeePPM)
+            }
         };
     }
 
@@ -212,13 +222,14 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         }];
     }
 
-    getRealSwapFeePercentagePPM(): bigint {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
-    }
-
     async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
         return wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
+    }
+
+    async sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string> {
+        if(this.state!==OnchainForGasSwapState.PR_CREATED)
+            throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
+        return await wallet.sendTransaction(this.address, this.inputAmount, feeRate);
     }
 
 
@@ -317,11 +328,11 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
      * @throws {PaymentAuthError} If swap expired or failed
      * @throws {Error} When in invalid state (not PR_CREATED)
      */
-    async waitForPayment(
+    async waitForBitcoinTransaction(
         abortSignal?: AbortSignal,
         checkIntervalSeconds: number = 5,
-        updateCallback?: (txId: string, txEtaMs: number) => void
-    ): Promise<boolean> {
+        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
+    ): Promise<string> {
         if(this.state!==OnchainForGasSwapState.PR_CREATED) throw new Error("Must be in PR_CREATED state!");
 
         if(!this.initiated) {
@@ -337,12 +348,12 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             if(this.txId!=null && updateCallback!=null) {
                 const res = await this.wrapper.btcRpc.getTransaction(this.txId);
                 if(res==null) {
-                    updateCallback(null, null);
+                    updateCallback(null, null, 1, null);
                 } else if(res.confirmations>0) {
-                    updateCallback(res.txid, 0);
+                    updateCallback(res.txid, res.confirmations, 1, 0);
                 } else {
                     const delay = await this.wrapper.btcRpc.getConfirmationDelay(res, 1);
-                    updateCallback(res.txid, delay);
+                    updateCallback(res.txid, 0, 1, delay);
                 }
             }
             if(this.state===OnchainForGasSwapState.PR_CREATED)
@@ -352,10 +363,10 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         if(
             (this.state as OnchainForGasSwapState)===OnchainForGasSwapState.REFUNDABLE ||
             (this.state as OnchainForGasSwapState)===OnchainForGasSwapState.REFUNDED
-        ) return false;
+        ) return this.txId;
         if(this.isQuoteExpired()) throw new PaymentAuthError("Swap expired");
         if(this.isFailed()) throw new PaymentAuthError("Swap failed");
-        return true;
+        return this.txId;
     }
 
     async waitTillRefunded(

@@ -9,6 +9,7 @@ import {extendAbortController, getLogger, tryWithRetries} from "../../../../util
 import {IEscrowSwapInit, isIEscrowSwapInit} from "../../IEscrowSwap";
 import {IBitcoinWallet} from "../../../../btc/wallet/IBitcoinWallet";
 import {Fee} from "../../../fee/Fee";
+import {IBTCWalletSwap} from "../../../IBTCWalletSwap";
 
 export enum FromBTCSwapState {
     FAILED = -4,
@@ -33,7 +34,7 @@ export function isFromBTCSwapInit<T extends SwapData>(obj: any): obj is FromBTCS
         isIEscrowSwapInit<T>(obj);
 }
 
-export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T, FromBTCSwapState> {
+export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T, FromBTCSwapState> implements IBTCWalletSwap{
     protected readonly inputToken: BtcToken<false> = BitcoinTokens.BTC;
     protected readonly TYPE = SwapType.FROM_BTC;
 
@@ -206,7 +207,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         abortSignal?: AbortSignal,
         checkIntervalSeconds?: number,
         updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
-    ): Promise<void> {
+    ): Promise<string> {
         if(this.state!==FromBTCSwapState.CLAIM_COMMITED && this.state!==FromBTCSwapState.EXPIRED) throw new Error("Must be in COMMITED state!");
 
         const result = await this.wrapper.btcRpc.waitForAddressTxo(
@@ -232,10 +233,18 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         }
 
         await this._saveAndEmit();
+
+        return result.tx.txid;
     }
 
     async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
         return wallet.getTransactionFee(this.address, this.amount, feeRate);
+    }
+
+    async sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string> {
+        if(this.state!==FromBTCSwapState.CLAIM_COMMITED)
+            throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
+        return await wallet.sendTransaction(this.address, this.amount, feeRate);
     }
 
 

@@ -1,6 +1,6 @@
 import {coinSelect, maxSendable, CoinselectAddressTypes, CoinselectTxInput} from "../coinselect2";
 import {BTC_NETWORK} from "@scure/btc-signer/utils"
-import {p2wpkh, OutScript, Transaction, p2tr} from "@scure/btc-signer";
+import {p2wpkh, OutScript, Transaction, p2tr, Address} from "@scure/btc-signer";
 import {IBitcoinWallet} from "./IBitcoinWallet";
 import {MempoolApi} from "../mempool/MempoolApi";
 import {Buffer} from "buffer";
@@ -19,6 +19,23 @@ export type BitcoinWalletUtxo = {
     },
     confirmed: boolean
 };
+
+export function identifyAddressType(address: string, network: BTC_NETWORK): CoinselectAddressTypes {
+    switch(Address(network).decode(address).type) {
+        case "pkh":
+            return "p2pkh";
+        case "wpkh":
+            return "p2wpkh";
+        case "tr":
+            return "p2tr";
+        case "sh":
+            return "p2sh-p2wpkh";
+        case "wsh":
+            return "p2wsh";
+        default:
+            return null;
+    }
+}
 
 export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
 

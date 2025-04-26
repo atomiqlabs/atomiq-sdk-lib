@@ -1,5 +1,6 @@
 import {ISwapPrice} from "../../prices/abstract/ISwapPrice";
 import {
+    AbstractSigner,
     BigIntBufferUtils,
     BitcoinNetwork,
     BtcRelay,
@@ -57,6 +58,8 @@ import {IToBTCSwap} from "../escrow_swaps/tobtc/IToBTCSwap";
 import {SpvFromBTCOptions, SpvFromBTCWrapper} from "../spv_swaps/SpvFromBTCWrapper";
 import {SpvFromBTCSwap} from "../spv_swaps/SpvFromBTCSwap";
 import {SwapperBtcUtils} from "./utils/SwapperBtcUtils";
+import {IBitcoinWallet} from "../../btc/wallet/IBitcoinWallet";
+import {SingleAddressBitcoinWallet} from "../../btc/wallet/SingleAddressBitcoinWallet";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -1712,91 +1715,85 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     ///////////////////////////////////
     /// Smart chain specific functions
 
-    getBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>): Promise<bigint>;
-    getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string): Promise<bigint>;
-    /**
-     * Returns the token balance of the wallet
-     */
-    getBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifierOrSigner: ChainIdentifier, signerOrToken: string | SCToken<ChainIdentifier>, token?: string): Promise<bigint> {
-        let chainIdentifier: ChainIdentifier;
-        let signer: string;
-        if(typeof(signerOrToken)==="string") {
-            chainIdentifier = chainIdentifierOrSigner;
-            signer = signerOrToken;
+    getBitcoinSpendableBalance(addressOrWallet: string | IBitcoinWallet, swapType: SwapType.SPV_VAULT_FROM_BTC, targetChain: ChainIds<T>, gasDrop?: boolean): Promise<{
+        balance: TokenAmount,
+        feeRate: number
+    }>;
+    getBitcoinSpendableBalance(addressOrWallet: string | IBitcoinWallet, swapType: SwapType.FROM_BTC | SwapType.TRUSTED_FROM_BTC): Promise<{
+        balance: TokenAmount,
+        feeRate: number
+    }>;
+    async getBitcoinSpendableBalance(
+        addressOrWallet: string | IBitcoinWallet,
+        swapType?: SwapType.FROM_BTC | SwapType.TRUSTED_FROM_BTC | SwapType.SPV_VAULT_FROM_BTC,
+        targetChain?: ChainIds<T>,
+        gasDrop: boolean = false
+    ): Promise<{
+        balance: TokenAmount,
+        feeRate: number
+    }> {
+        if(typeof(addressOrWallet)!=="string" && (addressOrWallet as IBitcoinWallet).getTransactionFee==null)
+            throw new Error("Wallet must be a string address or IBitcoinWallet");
+
+        let bitcoinWallet: IBitcoinWallet;
+        if(typeof(addressOrWallet)==="string") {
+            bitcoinWallet = new SingleAddressBitcoinWallet(this.mempoolApi, this.bitcoinNetwork, addressOrWallet);
         } else {
-            chainIdentifier = signerOrToken.chainId;
-            token = signerOrToken.address;
-            signer = chainIdentifierOrSigner;
+            bitcoinWallet = addressOrWallet as IBitcoinWallet;
         }
-        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
-        return this.chains[chainIdentifier].swapContract.getBalance(signer, token, false);
+
+        let result: {balance: bigint, feeRate: number, totalFee: number};
+        if(swapType===SwapType.SPV_VAULT_FROM_BTC) {
+            result = await bitcoinWallet.getSpendableBalance(this.getRandomSpvVaultPsbt(targetChain, gasDrop));
+        } else {
+            result = await bitcoinWallet.getSpendableBalance();
+        }
+
+        return {
+            balance: toTokenAmount(result.balance, BitcoinTokens.BTC, this.prices),
+            feeRate: result.feeRate
+        }
     }
 
-    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(signer: string, token: SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<bigint>;
-    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, token: string, feeMultiplier?: number): Promise<bigint>;
     /**
      * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
      */
-    async getSpendableBalance<ChainIdentifier extends ChainIds<T>>(
-        chainIdentifierOrSigner: ChainIdentifier,
-        signerOrToken: string | SCToken<ChainIdentifier>,
-        tokenOrFeeMultiplier?: string | number,
-        feeMultiplier?: number
-    ): Promise<bigint> {
-        let chainIdentifier: ChainIdentifier | string;
-        let signer: string;
-        let token: string;
-        if(typeof(signerOrToken)==="string") {
-            chainIdentifier = chainIdentifierOrSigner;
-            signer = signerOrToken;
-            token = tokenOrFeeMultiplier as string;
+    async getSpendableBalance<ChainIdentifier extends ChainIds<T>>(wallet: string | T[ChainIdentifier]["Signer"], token: SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<TokenAmount> {
+        if(typeof(wallet)!=="string" && (wallet as AbstractSigner).getAddress==null)
+            throw new Error("Signer must be a string or smart chain signer");
+
+        if(this.chains[token.chainId]==null) throw new Error("Invalid chain identifier! Unknown chain: "+token.chainId);
+
+        const {swapContract, chainInterface} = this.chains[token.chainId];
+
+        const signer = typeof(wallet)==="string" ? wallet : (wallet as AbstractSigner).getAddress();
+
+        let finalBalance: bigint;
+        if(chainInterface.getNativeCurrencyAddress()!==token.address) {
+            finalBalance = await chainInterface.getBalance(signer, token.address);
         } else {
-            chainIdentifier = signerOrToken.chainId;
-            token = signerOrToken.address;
-            signer = chainIdentifierOrSigner;
-            feeMultiplier = tokenOrFeeMultiplier as number;
-        }
-        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+            let [balance, commitFee] = await Promise.all([
+                chainInterface.getBalance(signer, token.address),
+                swapContract.getCommitFee(
+                    //Use large amount, such that the fee for wrapping more tokens is always included!
+                    await swapContract.createSwapData(
+                        ChainSwapType.HTLC, signer, null, token.address,
+                        0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn,
+                        swapContract.getHashForHtlc(randomBytes(32)).toString("hex"),
+                        BigIntBufferUtils.fromBuffer(randomBytes(8)), BigInt(Math.floor(Date.now()/1000)),
+                        true, false, BigIntBufferUtils.fromBuffer(randomBytes(2)), BigIntBufferUtils.fromBuffer(randomBytes(2))
+                    ),
+                )
+            ]);
 
-        const {swapContract, chainInterface} = this.chains[chainIdentifier];
+            if(feeMultiplier!=null) {
+                commitFee = commitFee * (BigInt(Math.floor(feeMultiplier*1000000))) / 1000000n;
+            }
 
-        if(chainInterface.getNativeCurrencyAddress()!==token) return await this.getBalance(chainIdentifier, signer, token);
-
-        let [balance, commitFee] = await Promise.all([
-            this.getBalance(chainIdentifier, signer, token),
-            swapContract.getCommitFee(
-                //Use large amount, such that the fee for wrapping more tokens is always included!
-                await swapContract.createSwapData(
-                    ChainSwapType.HTLC, signer, null, token,
-                    0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn,
-                    swapContract.getHashForHtlc(randomBytes(32)).toString("hex"),
-                    BigIntBufferUtils.fromBuffer(randomBytes(8)), BigInt(Math.floor(Date.now()/1000)),
-                    true, false, BigIntBufferUtils.fromBuffer(randomBytes(2)), BigIntBufferUtils.fromBuffer(randomBytes(2))
-                ),
-            )
-        ]);
-
-        if(feeMultiplier!=null) {
-            commitFee = commitFee * (BigInt(Math.floor(feeMultiplier*1000000))) / 1000000n;
+            finalBalance = bigIntMax(balance - commitFee, 0n);
         }
 
-        return bigIntMax(balance - commitFee, 0n);
-    }
-
-    /**
-     * Returns the native token balance of the wallet
-     */
-    getNativeBalance<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string): Promise<bigint> {
-        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
-        return this.chains[chainIdentifier].chainInterface.getBalance(signer, this.getNativeTokenAddress(chainIdentifier));
-    }
-
-    /**
-     * Returns the address of the native token's address of the chain
-     */
-    getNativeTokenAddress<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): string {
-        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
-        return this.chains[chainIdentifier].chainInterface.getNativeCurrencyAddress();
+        return toTokenAmount(finalBalance, token, this.prices);
     }
 
     /**

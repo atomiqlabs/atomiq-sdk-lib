@@ -236,11 +236,6 @@ export abstract class ISwap<
         }
     }
 
-    /**
-     * Returns the real swap fee percentage as PPM (parts per million)
-     */
-    abstract getRealSwapFeePercentagePPM(): bigint;
-
 
     //////////////////////////////
     //// Getters & utils

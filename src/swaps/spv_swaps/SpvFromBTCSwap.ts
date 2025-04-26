@@ -1,4 +1,4 @@
-import {isISwapInit, ISwap, ISwapInit} from "../ISwap";
+import {isISwapInit, ISwap, ISwapInit, ppmToPercentage} from "../ISwap";
 import {
     ChainType,
     SpvWithdrawalClaimedState,
@@ -16,6 +16,7 @@ import {Buffer} from "buffer";
 import {Fee, FeeType} from "../fee/Fee";
 import {IBitcoinWallet} from "../../btc/wallet/IBitcoinWallet";
 import {IntermediaryAPI} from "../../intermediaries/IntermediaryAPI";
+import {IBTCWalletSwap} from "../IBTCWalletSwap";
 
 export enum SpvFromBTCSwapState {
     CLOSED = -5,
@@ -86,7 +87,7 @@ export function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit {
         isISwapInit(obj);
 }
 
-export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> {
+export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> implements IBTCWalletSwap {
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
 
     readonly wrapper: SpvFromBTCWrapper<T>;
@@ -206,11 +207,6 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         );
     }
 
-    getRealSwapFeePercentagePPM(): bigint {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / (this.btcAmount - this.swapFeeBtc - this.gasSwapFeeBtc);
-    }
-
 
     //////////////////////////////
     //// Getters & utils
@@ -304,11 +300,19 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             * (10n ** BigInt(outputToken.decimals))
             * 1_000_000n
             / this.pricingInfo.swapPriceUSatPerToken;
+
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const swapFeePPM = feeWithoutBaseFee * 1000000n / (this.btcAmount - this.swapFeeBtc - this.gasSwapFeeBtc);
+
         return {
             amountInSrcToken: toTokenAmount(this.swapFeeBtc + this.gasSwapFeeBtc, BitcoinTokens.BTC, this.wrapper.prices),
             amountInDstToken: toTokenAmount(this.swapFee + gasSwapFeeInOutputToken, outputToken, this.wrapper.prices),
             usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.gasSwapFeeBtc, abortSignal, preFetchedUsdPrice)
+                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.gasSwapFeeBtc, abortSignal, preFetchedUsdPrice),
+            composition: {
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, BitcoinTokens.BTC, this.wrapper.prices),
+                percentage: ppmToPercentage(swapFeePPM)
+            }
         };
     }
 
@@ -479,10 +483,6 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         return {psbt, signInputs};
     }
 
-    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
-        return wallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
-    }
-
     async submitPsbt(psbt: Transaction): Promise<string> {
         //Ensure not expired
         if(this.expiry<Date.now()) {
@@ -569,7 +569,11 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         return this.data.getTxId();
     }
 
-    async signAndSubmit(wallet: IBitcoinWallet, feeRate?: number): Promise<string> {
+    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
+        return wallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
+    }
+
+    async sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string> {
         let {psbt, signInputs} = await this.getFundedPsbt(wallet, feeRate);
         psbt = await wallet.signPsbt(psbt, signInputs);
         return await this.submitPsbt(psbt);
@@ -611,7 +615,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         abortSignal?: AbortSignal,
         checkIntervalSeconds?: number,
         updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
-    ): Promise<void> {
+    ): Promise<string> {
         if(
             this.state!==SpvFromBTCSwapState.POSTED &&
             this.state!==SpvFromBTCSwapState.BROADCASTED &&
@@ -641,6 +645,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             await this._saveAndEmit(SpvFromBTCSwapState.BTC_TX_CONFIRMED);
         }
 
+        return result.txid;
     }
 
 
