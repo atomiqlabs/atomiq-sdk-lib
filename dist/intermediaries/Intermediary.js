@@ -11,6 +11,26 @@ class Intermediary {
         this.addresses = addresses;
         this.services = services;
         this.reputation = reputation;
+        this.swapBounds = {};
+        for (let _swapType in this.services) {
+            const swapType = parseInt(_swapType);
+            const serviceInfo = this.services[_swapType];
+            const btcBounds = { min: BigInt(serviceInfo.min), max: BigInt(serviceInfo.max) };
+            const isSend = swapType === SwapType_1.SwapType.TO_BTC || swapType === SwapType_1.SwapType.TO_BTCLN;
+            this.swapBounds[swapType] = {};
+            for (let chainIdentifier in serviceInfo.chainTokens) {
+                this.swapBounds[swapType][chainIdentifier] = {};
+                for (let tokenAddress of serviceInfo.chainTokens[chainIdentifier]) {
+                    this.swapBounds[swapType][chainIdentifier][tokenAddress] = {
+                        input: isSend ? { min: null, max: null } : btcBounds,
+                        output: !isSend ? { min: null, max: null } : btcBounds,
+                    };
+                }
+            }
+        }
+    }
+    getSwapLimits(swapType, chainId, tokenAddress) {
+        return this.swapBounds[swapType]?.[chainId]?.[tokenAddress];
     }
     /**
      * Returns tokens supported by the intermediary, optionally constrained to the specific swap types
@@ -23,7 +43,8 @@ class Intermediary {
         SwapType_1.SwapType.TO_BTC,
         SwapType_1.SwapType.TO_BTCLN,
         SwapType_1.SwapType.FROM_BTC,
-        SwapType_1.SwapType.FROM_BTCLN
+        SwapType_1.SwapType.FROM_BTCLN,
+        SwapType_1.SwapType.SPV_VAULT_FROM_BTC
     ]) {
         const swapTypes = new Set(swapTypesArr);
         let tokens = new Set();

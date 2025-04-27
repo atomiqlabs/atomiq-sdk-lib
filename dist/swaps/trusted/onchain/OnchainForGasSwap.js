@@ -130,10 +130,16 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
         return (0, Tokens_1.toTokenAmount)(this.inputAmount - this.swapFeeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
     }
     getSwapFee() {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
         return {
             amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices),
             amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            composition: {
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices),
+                percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
+            }
         };
     }
     getFee() {
@@ -145,12 +151,13 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
                 fee: this.getSwapFee()
             }];
     }
-    getRealSwapFeePercentagePPM() {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
-    }
     async estimateBitcoinFee(wallet, feeRate) {
         return wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
+    }
+    async sendBitcoinTransaction(wallet, feeRate) {
+        if (this.state !== OnchainForGasSwapState.PR_CREATED)
+            throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
+        return await wallet.sendTransaction(this.address, this.inputAmount, feeRate);
     }
     //////////////////////////////
     //// Payment
@@ -248,7 +255,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
      * @throws {PaymentAuthError} If swap expired or failed
      * @throws {Error} When in invalid state (not PR_CREATED)
      */
-    async waitForPayment(abortSignal, checkIntervalSeconds = 5, updateCallback) {
+    async waitForBitcoinTransaction(abortSignal, checkIntervalSeconds = 5, updateCallback) {
         if (this.state !== OnchainForGasSwapState.PR_CREATED)
             throw new Error("Must be in PR_CREATED state!");
         if (!this.initiated) {
@@ -261,14 +268,14 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
             if (this.txId != null && updateCallback != null) {
                 const res = await this.wrapper.btcRpc.getTransaction(this.txId);
                 if (res == null) {
-                    updateCallback(null, null);
+                    updateCallback(null, null, 1, null);
                 }
                 else if (res.confirmations > 0) {
-                    updateCallback(res.txid, 0);
+                    updateCallback(res.txid, res.confirmations, 1, 0);
                 }
                 else {
                     const delay = await this.wrapper.btcRpc.getConfirmationDelay(res, 1);
-                    updateCallback(res.txid, delay);
+                    updateCallback(res.txid, 0, 1, delay);
                 }
             }
             if (this.state === OnchainForGasSwapState.PR_CREATED)
@@ -276,12 +283,12 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
         }
         if (this.state === OnchainForGasSwapState.REFUNDABLE ||
             this.state === OnchainForGasSwapState.REFUNDED)
-            return false;
+            return this.txId;
         if (this.isQuoteExpired())
             throw new PaymentAuthError_1.PaymentAuthError("Swap expired");
         if (this.isFailed())
             throw new PaymentAuthError_1.PaymentAuthError("Swap failed");
-        return true;
+        return this.txId;
     }
     async waitTillRefunded(abortSignal, checkIntervalSeconds = 5) {
         if (this.state === OnchainForGasSwapState.REFUNDED)

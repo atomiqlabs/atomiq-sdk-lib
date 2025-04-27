@@ -77,10 +77,6 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
         swapPrice: number;
         difference: PercentagePPM;
     };
-    /**
-     * Returns the real swap fee percentage as PPM (parts per million)
-     */
-    abstract getRealSwapFeePercentagePPM(): bigint;
     abstract _getEscrowHash(): string;
     /**
      * @param signer Signer to check with this swap's initiator

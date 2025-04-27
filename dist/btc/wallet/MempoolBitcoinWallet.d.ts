@@ -19,6 +19,7 @@ export type BitcoinWalletUtxo = {
     };
     confirmed: boolean;
 };
+export declare function identifyAddressType(address: string, network: BTC_NETWORK): CoinselectAddressTypes;
 export declare abstract class MempoolBitcoinWallet implements IBitcoinWallet {
     mempoolApi: MempoolApi;
     network: BTC_NETWORK;

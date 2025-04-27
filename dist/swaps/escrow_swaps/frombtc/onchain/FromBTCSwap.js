@@ -174,9 +174,15 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             this.state = FromBTCSwapState.BTC_TX_CONFIRMED;
         }
         await this._saveAndEmit();
+        return result.tx.txid;
     }
     async estimateBitcoinFee(wallet, feeRate) {
         return wallet.getTransactionFee(this.address, this.amount, feeRate);
+    }
+    async sendBitcoinTransaction(wallet, feeRate) {
+        if (this.state !== FromBTCSwapState.CLAIM_COMMITED)
+            throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
+        return await wallet.sendTransaction(this.address, this.amount, feeRate);
     }
     //////////////////////////////
     //// Commit

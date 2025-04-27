@@ -1,10 +1,27 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MempoolBitcoinWallet = void 0;
+exports.MempoolBitcoinWallet = exports.identifyAddressType = void 0;
 const coinselect2_1 = require("../coinselect2");
 const btc_signer_1 = require("@scure/btc-signer");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../../utils/Utils");
+function identifyAddressType(address, network) {
+    switch ((0, btc_signer_1.Address)(network).decode(address).type) {
+        case "pkh":
+            return "p2pkh";
+        case "wpkh":
+            return "p2wpkh";
+        case "tr":
+            return "p2tr";
+        case "sh":
+            return "p2sh-p2wpkh";
+        case "wsh":
+            return "p2wsh";
+        default:
+            return null;
+    }
+}
+exports.identifyAddressType = identifyAddressType;
 class MempoolBitcoinWallet {
     constructor(mempoolApi, network, feeMultiplier = 1.25, feeOverride) {
         this.mempoolApi = mempoolApi;

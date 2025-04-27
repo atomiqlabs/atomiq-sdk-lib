@@ -116,10 +116,6 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             return null;
         this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputWithoutFee().rawAmount, this.outputSwapToken);
     }
-    getRealSwapFeePercentagePPM() {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / (this.btcAmount - this.swapFeeBtc - this.gasSwapFeeBtc);
-    }
     //////////////////////////////
     //// Getters & utils
     _getInitiator() {
@@ -187,10 +183,16 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             * (10n ** BigInt(outputToken.decimals))
             * 1000000n
             / this.pricingInfo.swapPriceUSatPerToken;
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const swapFeePPM = feeWithoutBaseFee * 1000000n / (this.btcAmount - this.swapFeeBtc - this.gasSwapFeeBtc);
         return {
             amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc + this.gasSwapFeeBtc, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices),
             amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee + gasSwapFeeInOutputToken, outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.gasSwapFeeBtc, abortSignal, preFetchedUsdPrice)
+            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.gasSwapFeeBtc, abortSignal, preFetchedUsdPrice),
+            composition: {
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices),
+                percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
+            }
         };
     }
     getWatchtowerFee() {
@@ -327,9 +329,6 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         }
         return { psbt, signInputs };
     }
-    async estimateBitcoinFee(wallet, feeRate) {
-        return wallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
-    }
     async submitPsbt(psbt) {
         //Ensure not expired
         if (this.expiry < Date.now()) {
@@ -398,7 +397,10 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         }
         return this.data.getTxId();
     }
-    async signAndSubmit(wallet, feeRate) {
+    async estimateBitcoinFee(wallet, feeRate) {
+        return wallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
+    }
+    async sendBitcoinTransaction(wallet, feeRate) {
         let { psbt, signInputs } = await this.getFundedPsbt(wallet, feeRate);
         psbt = await wallet.signPsbt(psbt, signInputs);
         return await this.submitPsbt(psbt);
@@ -446,6 +448,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             this.state !== SpvFromBTCSwapState.CLAIMED) {
             await this._saveAndEmit(SpvFromBTCSwapState.BTC_TX_CONFIRMED);
         }
+        return result.txid;
     }
     //////////////////////////////
     //// Claim

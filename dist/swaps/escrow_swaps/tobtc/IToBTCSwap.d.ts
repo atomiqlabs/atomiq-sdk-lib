@@ -38,7 +38,6 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
         secret?: string;
         txId?: string;
     }, check?: boolean): Promise<boolean>;
-    getRealSwapFeePercentagePPM(): bigint;
     getInputTxId(): string | null;
     requiresAction(): boolean;
     /**

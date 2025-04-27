@@ -5,6 +5,7 @@ import { ChainType, SwapData } from "@atomiqlabs/base";
 import { BtcToken, SCToken, TokenAmount } from "../../../../Tokens";
 import { IEscrowSwapInit } from "../../IEscrowSwap";
 import { IBitcoinWallet } from "../../../../btc/wallet/IBitcoinWallet";
+import { IBTCWalletSwap } from "../../../IBTCWalletSwap";
 export declare enum FromBTCSwapState {
     FAILED = -4,
     EXPIRED = -3,
@@ -21,7 +22,7 @@ export type FromBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
     requiredConfirmations: number;
 };
 export declare function isFromBTCSwapInit<T extends SwapData>(obj: any): obj is FromBTCSwapInit<T>;
-export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T, FromBTCSwapState> {
+export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T, FromBTCSwapState> implements IBTCWalletSwap {
     protected readonly inputToken: BtcToken<false>;
     protected readonly TYPE = SwapType.FROM_BTC;
     readonly wrapper: FromBTCWrapper<T>;
@@ -74,8 +75,9 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<void>;
+    waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
     estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
+    sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in a PTLC
      *

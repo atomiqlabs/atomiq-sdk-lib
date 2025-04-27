@@ -44,6 +44,15 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
      * Value between 0 and 1, where 0 is not likely and 1 is very likely
      */
     getConfidence(): number;
+    /**
+     * Checks whether a swap is likely to fail, based on the confidence as reported by the LP
+     */
+    willLikelyFail(): boolean;
+    /**
+     * Tries to detect if the target lightning invoice is a non-custodial mobile wallet, care must be taken
+     *  for such a wallet to be online when attempting to make a swap
+     */
+    isPayingToNonCustodialWallet(): boolean;
     getIdentifierHash(): Buffer;
     getPaymentHash(): Buffer;
     protected getLpIdentifier(): string;

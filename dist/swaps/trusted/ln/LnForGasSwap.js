@@ -142,10 +142,16 @@ class LnForGasSwap extends ISwap_1.ISwap {
         return (0, Tokens_1.toTokenAmount)(amount - this.swapFeeBtc, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices);
     }
     getSwapFee() {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
         return {
             amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices),
             amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            composition: {
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices),
+                percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
+            }
         };
     }
     getFee() {
@@ -156,10 +162,6 @@ class LnForGasSwap extends ISwap_1.ISwap {
                 type: Fee_1.FeeType.SWAP,
                 fee: this.getSwapFee()
             }];
-    }
-    getRealSwapFeePercentagePPM() {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
     }
     //////////////////////////////
     //// Payment

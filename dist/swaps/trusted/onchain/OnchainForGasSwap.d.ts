@@ -6,6 +6,7 @@ import { OnchainForGasWrapper } from "./OnchainForGasWrapper";
 import { Fee, FeeType } from "../../fee/Fee";
 import { IBitcoinWallet } from "../../../btc/wallet/IBitcoinWallet";
 import { IAddressSwap } from "../../IAddressSwap";
+import { IBTCWalletSwap } from "../../IBTCWalletSwap";
 export declare enum OnchainForGasSwapState {
     EXPIRED = -3,
     FAILED = -2,
@@ -25,7 +26,7 @@ export type OnchainForGasSwapInit = ISwapInit & {
     refundAddress?: string;
 };
 export declare function isOnchainForGasSwapInit(obj: any): obj is OnchainForGasSwapInit;
-export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> implements IAddressSwap {
+export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T, OnchainForGasSwapState> implements IAddressSwap, IBTCWalletSwap {
     getSmartChainNetworkFee: any;
     protected readonly TYPE: SwapType;
     private readonly paymentHash;
@@ -72,8 +73,8 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
         type: FeeType.SWAP;
         fee: Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
     }];
-    getRealSwapFeePercentagePPM(): bigint;
     estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
+    sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     protected checkAddress(save?: boolean): Promise<boolean>;
     protected setRefundAddress(refundAddress: string): Promise<void>;
     /**
@@ -86,7 +87,7 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
      * @throws {PaymentAuthError} If swap expired or failed
      * @throws {Error} When in invalid state (not PR_CREATED)
      */
-    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, txEtaMs: number) => void): Promise<boolean>;
+    waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
     waitTillRefunded(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void>;
     requestRefund(refundAddress?: string, abortSignal?: AbortSignal): Promise<void>;
     serialize(): any;

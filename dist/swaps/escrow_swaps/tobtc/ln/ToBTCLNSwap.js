@@ -18,6 +18,11 @@ function isToBTCLNSwapInit(obj) {
         (0, IToBTCSwap_1.isIToBTCSwapInit)(obj);
 }
 exports.isToBTCLNSwapInit = isToBTCLNSwapInit;
+//Set of nodes which disallow probing, resulting in 0 confidence reported by the LP
+const SNOWFLAKE_LIST = new Set([
+    "038f8f113c580048d847d6949371726653e02b928196bad310e3eda39ff61723f6",
+    "03a6ce61fcaacd38d31d4e3ce2d506602818e3856b4b44faff1dde9642ba705976"
+]);
 class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     constructor(wrapper, initOrObj) {
         if (isToBTCLNSwapInit(initOrObj))
@@ -80,6 +85,30 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
      */
     getConfidence() {
         return this.confidence;
+    }
+    /**
+     * Checks whether a swap is likely to fail, based on the confidence as reported by the LP
+     */
+    willLikelyFail() {
+        const parsedRequest = (0, bolt11_1.decode)(this.pr);
+        if (parsedRequest.tagsObject.routing_info != null) {
+            for (let route of parsedRequest.tagsObject.routing_info) {
+                if (SNOWFLAKE_LIST.has(route.pubkey)) {
+                    return false;
+                }
+            }
+        }
+        return this.confidence === 0;
+    }
+    /**
+     * Tries to detect if the target lightning invoice is a non-custodial mobile wallet, care must be taken
+     *  for such a wallet to be online when attempting to make a swap
+     */
+    isPayingToNonCustodialWallet() {
+        const parsedRequest = (0, bolt11_1.decode)(this.pr);
+        if (parsedRequest.tagsObject.routing_info != null) {
+            return parsedRequest.tagsObject.routing_info.length > 0;
+        }
     }
     getIdentifierHash() {
         const paymentHashBuffer = this.getPaymentHash();

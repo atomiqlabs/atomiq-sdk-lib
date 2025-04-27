@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwapperWithChain = void 0;
-const SwapperWithSigner_1 = require("./SwapperWithSigner");
+const SwapType_1 = require("../enums/SwapType");
 const SwapPriceWithChain_1 = require("../../prices/SwapPriceWithChain");
+const Tokens_1 = require("../../Tokens");
 class SwapperWithChain {
     get intermediaryDiscovery() {
         return this.swapper.intermediaryDiscovery;
@@ -16,106 +17,16 @@ class SwapperWithChain {
     get bitcoinNetwork() {
         return this.swapper.bitcoinNetwork;
     }
+    get Utils() {
+        return this.swapper.Utils;
+    }
+    get SwapTypeInfo() {
+        return this.swapper.SwapTypeInfo;
+    }
     constructor(swapper, chainIdentifier) {
         this.swapper = swapper;
         this.chainIdentifier = chainIdentifier;
         this.prices = new SwapPriceWithChain_1.SwapPriceWithChain(swapper.prices, chainIdentifier);
-    }
-    /**
-     * Returns true if string is a valid bitcoin address
-     *
-     * @param addr
-     */
-    isValidBitcoinAddress(addr) {
-        return this.swapper.isValidBitcoinAddress(addr);
-    }
-    /**
-     * Returns true if string is a valid BOLT11 bitcoin lightning invoice WITH AMOUNT
-     *
-     * @param lnpr
-     */
-    isValidLightningInvoice(lnpr) {
-        return this.swapper.isValidLightningInvoice(lnpr);
-    }
-    /**
-     * Returns true if string is a valid LNURL (no checking on type is performed)
-     *
-     * @param lnurl
-     */
-    isValidLNURL(lnurl) {
-        return this.swapper.isValidLNURL(lnurl);
-    }
-    /**
-     * Returns type and data about an LNURL
-     *
-     * @param lnurl
-     * @param shouldRetry
-     */
-    getLNURLTypeAndData(lnurl, shouldRetry) {
-        return this.swapper.getLNURLTypeAndData(lnurl, shouldRetry);
-    }
-    /**
-     * Returns satoshi value of BOLT11 bitcoin lightning invoice WITH AMOUNT
-     *
-     * @param lnpr
-     */
-    getLightningInvoiceValue(lnpr) {
-        return this.swapper.getLightningInvoiceValue(lnpr);
-    }
-    /**
-     * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
-     *  to allow for coinselection algorithm to determine maximum sendable amount there
-     *
-     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
-     */
-    getRandomSpvVaultPsbt(includeGasToken) {
-        return this.swapper.getRandomSpvVaultPsbt(this.chainIdentifier, includeGasToken);
-    }
-    /**
-     * Returns swap bounds (minimums & maximums) for different swap types & tokens
-     */
-    getSwapBounds() {
-        return this.swapper.getSwapBounds(this.chainIdentifier);
-    }
-    /**
-     * Returns maximum possible swap amount
-     *
-     * @param type      Type of the swap
-     * @param token     Token of the swap
-     */
-    getMaximum(type, token) {
-        return this.swapper.getMaximum(this.chainIdentifier, type, token);
-    }
-    /**
-     * Returns minimum possible swap amount
-     *
-     * @param type      Type of swap
-     * @param token     Token of the swap
-     */
-    getMinimum(type, token) {
-        return this.swapper.getMinimum(this.chainIdentifier, type, token);
-    }
-    /**
-     * Returns a set of supported tokens by all the intermediaries offering a specific swap service
-     *
-     * @param swapType Swap service type to check supported tokens for
-     */
-    getSupportedTokens(swapType) {
-        const arr = [];
-        this.getSupportedTokenAddresses(swapType).forEach(tokenAddress => {
-            const token = this.swapper.tokens?.[this.chainIdentifier]?.[tokenAddress];
-            if (token != null)
-                arr.push(token);
-        });
-        return arr;
-    }
-    /**
-     * Returns the set of supported tokens by all the intermediaries we know of offering a specific swapType service
-     *
-     * @param swapType Specific swap type for which to obtain supported tokens
-     */
-    getSupportedTokenAddresses(swapType) {
-        return this.swapper.getSupportedTokenAddresses(this.chainIdentifier, swapType);
     }
     createToBTCSwap(signer, tokenAddress, address, amount, exactIn, additionalParams, options) {
         return this.swapper.createToBTCSwap(this.chainIdentifier, signer, tokenAddress, address, amount, exactIn, additionalParams, options);
@@ -140,19 +51,19 @@ class SwapperWithChain {
     }
     /**
      * Creates a swap from srcToken to dstToken, of a specific token amount, either specifying input amount (exactIn=true)
-     *  or output amount (exactIn=false), NOTE: For regular -> BTC-LN (lightning) swaps the passed amount is ignored and
-     *  invoice's pre-set amount is used instead.
+     *  or output amount (exactIn=false), NOTE: For regular SmartChain -> BTC-LN (lightning) swaps the passed amount is ignored and
+     *  invoice's pre-set amount is used instead, use LNURL-pay for dynamic amounts
      *
-     * @param signer
      * @param srcToken Source token of the swap, user pays this token
      * @param dstToken Destination token of the swap, user receives this token
      * @param amount Amount of the swap
      * @param exactIn Whether the amount specified is an input amount (exactIn=true) or an output amount (exactIn=false)
-     * @param addressLnurlLightningInvoice Bitcoin on-chain address, lightning invoice, LNURL-pay to pay or
-     *  LNURL-withdrawal to withdraw money from
+     * @param src Source wallet/lnurl-withdraw of the swap
+     * @param dst Destination smart chain address, bitcoin on-chain address, lightning invoice, LNURL-pay
+     * @param options Options for the swap
      */
-    create(signer, srcToken, dstToken, amount, exactIn, addressLnurlLightningInvoice) {
-        return this.swapper.create(signer, srcToken, dstToken, amount, exactIn, addressLnurlLightningInvoice);
+    create(srcToken, dstToken, amount, exactIn, src, dst, options) {
+        return this.swapper.create(srcToken, dstToken, amount, exactIn, src, dst, options);
     }
     /**
      * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
@@ -184,62 +95,135 @@ class SwapperWithChain {
     async _syncSwaps(signer) {
         return this.swapper._syncSwaps(this.chainIdentifier, signer);
     }
-    /**
-     * Returns the token balance of the wallet
-     */
-    getBalance(signer, token) {
-        let tokenAddress;
-        if (typeof (token) === 'string') {
-            tokenAddress = token;
-        }
-        else {
-            if (this.chainIdentifier !== token.chainId)
-                throw new Error("Invalid token, chainId mismatch!");
-            tokenAddress = token.address;
-        }
-        return this.swapper.getBalance(this.chainIdentifier, signer, tokenAddress);
-    }
-    /**
-     * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
-     */
-    getSpendableBalance(signer, token, feeMultiplier) {
-        let tokenAddress;
-        if (typeof (token) === 'string') {
-            tokenAddress = token;
-        }
-        else {
-            if (this.chainIdentifier !== token.chainId)
-                throw new Error("Invalid token, chainId mismatch!");
-            tokenAddress = token.address;
-        }
-        return this.swapper.getSpendableBalance(this.chainIdentifier, signer, tokenAddress, feeMultiplier);
-    }
-    /**
-     * Returns the native token balance of the wallet
-     */
-    getNativeBalance(signer) {
-        return this.swapper.getNativeBalance(this.chainIdentifier, signer);
-    }
-    /**
-     * Returns the address of the native token of the chain
-     */
-    getNativeToken() {
-        return this.swapper.getNativeToken(this.chainIdentifier);
-    }
-    /**
-     * Returns the address of the native token's address of the chain
-     */
-    getNativeTokenAddress() {
-        return this.swapper.getNativeTokenAddress(this.chainIdentifier);
-    }
-    withSigner(signer) {
-        return new SwapperWithSigner_1.SwapperWithSigner(this, signer);
-    }
-    randomSigner() {
-        return this.swapper.randomSigner(this.chainIdentifier);
-    }
     supportsSwapType(swapType) {
         return this.swapper.supportsSwapType(this.chainIdentifier, swapType);
+    }
+    getSwapType(srcToken, dstToken) {
+        return this.swapper.getSwapType(srcToken, dstToken);
+    }
+    /**
+     * Returns minimum/maximum limits for inputs and outputs for a swap between given tokens
+     *
+     * @param srcToken
+     * @param dstToken
+     */
+    getSwapLimits(srcToken, dstToken) {
+        return this.swapper.getSwapLimits(srcToken, dstToken);
+    }
+    /**
+     * Returns a set of supported tokens by all the intermediaries offering a specific swap service
+     *
+     * @param _swapType Swap service type to check supported tokens for
+     */
+    getSupportedTokens(_swapType) {
+        const tokens = [];
+        this.intermediaryDiscovery.intermediaries.forEach(lp => {
+            let swapType = _swapType;
+            if (swapType === SwapType_1.SwapType.FROM_BTC && this.supportsSwapType(SwapType_1.SwapType.SPV_VAULT_FROM_BTC))
+                swapType = SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
+            if (lp.services[swapType] == null)
+                return;
+            if (lp.services[swapType].chainTokens == null)
+                return;
+            for (let tokenAddress of lp.services[swapType].chainTokens[this.chainIdentifier]) {
+                const token = this.swapper.tokens?.[this.chainIdentifier]?.[tokenAddress];
+                if (token != null)
+                    tokens.push(token);
+            }
+        });
+        return tokens;
+    }
+    /**
+     * Returns the set of supported tokens by all the intermediaries we know of offering a specific swapType service
+     *
+     * @param swapType Specific swap type for which to obtain supported tokens
+     */
+    getSupportedTokenAddresses(swapType) {
+        const set = new Set();
+        this.intermediaryDiscovery.intermediaries.forEach(lp => {
+            if (lp.services[swapType] == null)
+                return;
+            if (lp.services[swapType].chainTokens == null || lp.services[swapType].chainTokens[this.chainIdentifier] == null)
+                return;
+            lp.services[swapType].chainTokens[this.chainIdentifier].forEach(token => set.add(token));
+        });
+        return set;
+    }
+    /**
+     * Returns tokens that you can swap to (if input=true) from a given token,
+     *  or tokens that you can swap from (if input=false) to a given token
+     */
+    getSwapCounterTokens(token, input) {
+        if ((0, Tokens_1.isSCToken)(token)) {
+            const result = [];
+            if (input) {
+                //TO_BTC or TO_BTCLN
+                if (this.getSupportedTokenAddresses(SwapType_1.SwapType.TO_BTCLN).has(token.address)) {
+                    result.push(Tokens_1.BitcoinTokens.BTCLN);
+                }
+                if (this.getSupportedTokenAddresses(SwapType_1.SwapType.TO_BTC).has(token.address)) {
+                    result.push(Tokens_1.BitcoinTokens.BTC);
+                }
+            }
+            else {
+                //FROM_BTC or FROM_BTCLN
+                if (this.getSupportedTokenAddresses(SwapType_1.SwapType.FROM_BTCLN).has(token.address)) {
+                    result.push(Tokens_1.BitcoinTokens.BTCLN);
+                }
+                const fromOnchainSwapType = this.supportsSwapType(SwapType_1.SwapType.SPV_VAULT_FROM_BTC) ? SwapType_1.SwapType.SPV_VAULT_FROM_BTC : SwapType_1.SwapType.FROM_BTC;
+                if (this.getSupportedTokenAddresses(fromOnchainSwapType).has(token.address)) {
+                    result.push(Tokens_1.BitcoinTokens.BTC);
+                }
+            }
+            return result;
+        }
+        else {
+            if (input) {
+                if (token.lightning) {
+                    return this.getSupportedTokens(SwapType_1.SwapType.FROM_BTCLN);
+                }
+                else {
+                    return this.getSupportedTokens(SwapType_1.SwapType.FROM_BTC);
+                }
+            }
+            else {
+                if (token.lightning) {
+                    return this.getSupportedTokens(SwapType_1.SwapType.TO_BTCLN);
+                }
+                else {
+                    return this.getSupportedTokens(SwapType_1.SwapType.TO_BTC);
+                }
+            }
+        }
+    }
+    ///////////////////////////////////
+    /// Deprecated
+    /**
+     * Returns swap bounds (minimums & maximums) for different swap types & tokens
+     * @deprecated Use getSwapLimits() instead!
+     */
+    getSwapBounds() {
+        return this.swapper.getSwapBounds(this.chainIdentifier);
+    }
+    /**
+     * Returns maximum possible swap amount
+     * @deprecated Use getSwapLimits() instead!
+     *
+     * @param type      Type of the swap
+     * @param token     Token of the swap
+     */
+    getMaximum(type, token) {
+        return this.swapper.getMaximum(this.chainIdentifier, type, token);
+    }
+    /**
+     * Returns minimum possible swap amount
+     * @deprecated Use getSwapLimits() instead!
+     *
+     * @param type      Type of swap
+     * @param token     Token of the swap
+     */
+    getMinimum(type, token) {
+        return this.swapper.getMinimum(this.chainIdentifier, type, token);
     }
 }
 exports.SwapperWithChain = SwapperWithChain;

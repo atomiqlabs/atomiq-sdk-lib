@@ -5,5 +5,4 @@ var FeeType;
 (function (FeeType) {
     FeeType[FeeType["SWAP"] = 0] = "SWAP";
     FeeType[FeeType["NETWORK_OUTPUT"] = 1] = "NETWORK_OUTPUT";
-    FeeType[FeeType["WATCHTOWER"] = 2] = "WATCHTOWER";
 })(FeeType = exports.FeeType || (exports.FeeType = {}));

@@ -8,6 +8,7 @@ const Utils_1 = require("../../../utils/Utils");
 const Tokens_1 = require("../../../Tokens");
 const IEscrowSwap_1 = require("../IEscrowSwap");
 const Fee_1 = require("../../fee/Fee");
+const ISwap_1 = require("../../ISwap");
 function isIToBTCSwapInit(obj) {
     return typeof (obj.networkFee) === "bigint" &&
         (obj.networkFeeBtc == null || typeof (obj.networkFeeBtc) === "bigint") &&
@@ -71,12 +72,6 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
         return this.getClaimHash();
     }
     //////////////////////////////
-    //// Pricing
-    getRealSwapFeePercentagePPM() {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
-    }
-    //////////////////////////////
     //// Getters & utils
     getInputTxId() {
         return this.commitTxId;
@@ -111,10 +106,16 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
     //////////////////////////////
     //// Amounts & fees
     getSwapFee() {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
         return {
             amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
             amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            composition: {
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, this.outputToken, this.wrapper.prices),
+                percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
+            }
         };
     }
     /**

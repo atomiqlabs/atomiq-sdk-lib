@@ -1,11 +1,8 @@
 import {ISwapPrice} from "../../prices/abstract/ISwapPrice";
 import {
-    AbstractSigner,
-    BigIntBufferUtils,
     BitcoinNetwork,
     BtcRelay,
     ChainData,
-    ChainSwapType,
     ChainType,
     RelaySynchronizer
 } from "@atomiqlabs/base";
@@ -38,7 +35,6 @@ import {SwapperWithChain} from "./SwapperWithChain";
 import {
     BitcoinTokens,
     BtcToken,
-    fromDecimal,
     isBtcToken,
     isSCToken,
     SCToken,
@@ -49,7 +45,6 @@ import {
 import {OnchainForGasSwap} from "../trusted/onchain/OnchainForGasSwap";
 import {OnchainForGasWrapper} from "../trusted/onchain/OnchainForGasWrapper";
 import {BTC_NETWORK, NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
-import {Transaction} from "@scure/btc-signer";
 import {IUnifiedStorage, QueryParams} from "../../storage/IUnifiedStorage";
 import {IndexedDBUnifiedStorage} from "../../browser-storage/IndexedDBUnifiedStorage";
 import {UnifiedSwapStorage} from "../../storage/UnifiedSwapStorage";
@@ -57,9 +52,7 @@ import {UnifiedSwapEventListener} from "../../events/UnifiedSwapEventListener";
 import {IToBTCSwap} from "../escrow_swaps/tobtc/IToBTCSwap";
 import {SpvFromBTCOptions, SpvFromBTCWrapper} from "../spv_swaps/SpvFromBTCWrapper";
 import {SpvFromBTCSwap} from "../spv_swaps/SpvFromBTCSwap";
-import {SwapperBtcUtils} from "./utils/SwapperBtcUtils";
-import {IBitcoinWallet} from "../../btc/wallet/IBitcoinWallet";
-import {SingleAddressBitcoinWallet} from "../../btc/wallet/SingleAddressBitcoinWallet";
+import {SwapperUtils} from "./utils/SwapperUtils";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -155,7 +148,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             [tokenAddress: string]: SCToken
         }
     };
-    readonly BtcUtils: SwapperBtcUtils;
+    readonly Utils: SwapperUtils<T>;
 
     constructor(
         bitcoinRpc: MempoolBitcoinRpc,
@@ -173,7 +166,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         this._bitcoinNetwork = options.bitcoinNetwork;
         this.bitcoinNetwork = options.bitcoinNetwork===BitcoinNetwork.MAINNET ? NETWORK :
                 options.bitcoinNetwork===BitcoinNetwork.TESTNET ? TEST_NETWORK : null;
-        this.BtcUtils = new SwapperBtcUtils(this.bitcoinNetwork);
+        this.Utils = new SwapperUtils(this);
 
         this.prices = pricing;
         this.bitcoinRpc = bitcoinRpc;
@@ -363,19 +356,6 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         this.intermediaryDiscovery.on("added", (intermediaries: Intermediary[]) => {
             this.emit("lpsAdded", intermediaries);
         });
-    }
-
-    /**
-     * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
-     *  to allow for coinselection algorithm to determine maximum sendable amount there
-     *
-     * @param chainIdentifier
-     * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
-     */
-    getRandomSpvVaultPsbt<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, includeGasToken?: boolean): Transaction {
-        const wrapper = this.chains[chainIdentifier].wrappers[SwapType.SPV_VAULT_FROM_BTC];
-        if(wrapper==null) throw new Error("Chain doesn't support spv vault swaps!");
-        return wrapper.getDummySwapPsbt(includeGasToken);
     }
 
     /**
@@ -946,16 +926,16 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         return this.chains[chainId as C].wrappers[SwapType.TRUSTED_FROM_BTC].create(signer, amount, useUrl, refundAddress);
     }
 
-    create<C extends ChainIds<T>>(srcToken: BtcToken<true>, dstToken: SCToken<C>, amount: bigint, exactIn: boolean, src: undefined | string | LNURLWithdraw, dstSmartchainWallet: string): Promise<FromBTCLNSwap<T[C]>>;
-    create<C extends ChainIds<T>>(srcToken: BtcToken<false>, dstToken: SCToken<C>, amount: bigint, exactIn: boolean, src: undefined | string, dstSmartchainWallet: string): Promise<(SupportsSwapType<T[C], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T[C]> : FromBTCSwap<T[C]>)>;
-    create<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<false>, amount: bigint, exactIn: boolean, src: string, dstAddress: string): Promise<ToBTCSwap<T[C]>>;
-    create<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: bigint, exactIn: boolean, src: string, dstLnurlPay: string | LNURLPay): Promise<ToBTCLNSwap<T[C]>>;
-    create<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: bigint, exactIn: false, src: string, dstLightningInvoice: string): Promise<ToBTCLNSwap<T[C]>>;
-    create<C extends ChainIds<T>>(srcToken: Token<C>, dstToken: Token<C>, amount: bigint, exactIn: boolean, src: undefined | string | LNURLWithdraw, dst: string | LNURLPay): Promise<ISwap<T[C]>>;
+    create<C extends ChainIds<T>>(srcToken: BtcToken<true>, dstToken: SCToken<C>, amount: bigint, exactIn: boolean, src: undefined | string | LNURLWithdraw, dstSmartchainWallet: string, options?: FromBTCLNOptions): Promise<FromBTCLNSwap<T[C]>>;
+    create<C extends ChainIds<T>>(srcToken: BtcToken<false>, dstToken: SCToken<C>, amount: bigint, exactIn: boolean, src: undefined | string, dstSmartchainWallet: string, options?: (SupportsSwapType<T[C], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCOptions : FromBTCOptions)): Promise<(SupportsSwapType<T[C], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T[C]> : FromBTCSwap<T[C]>)>;
+    create<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<false>, amount: bigint, exactIn: boolean, src: string, dstAddress: string, options?: ToBTCOptions): Promise<ToBTCSwap<T[C]>>;
+    create<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: bigint, exactIn: boolean, src: string, dstLnurlPay: string | LNURLPay, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[C]>>;
+    create<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: bigint, exactIn: false, src: string, dstLightningInvoice: string, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[C]>>;
+    create<C extends ChainIds<T>>(srcToken: Token<C>, dstToken: Token<C>, amount: bigint, exactIn: boolean, src: undefined | string | LNURLWithdraw, dst: string | LNURLPay, options?: FromBTCLNOptions | SpvFromBTCOptions | FromBTCOptions | ToBTCOptions | ToBTCLNOptions): Promise<ISwap<T[C]>>;
     /**
      * Creates a swap from srcToken to dstToken, of a specific token amount, either specifying input amount (exactIn=true)
-     *  or output amount (exactIn=false), NOTE: For regular -> BTC-LN (lightning) swaps the passed amount is ignored and
-     *  invoice's pre-set amount is used instead.
+     *  or output amount (exactIn=false), NOTE: For regular SmartChain -> BTC-LN (lightning) swaps the passed amount is ignored and
+     *  invoice's pre-set amount is used instead, use LNURL-pay for dynamic amounts
      *
      * @param srcToken Source token of the swap, user pays this token
      * @param dstToken Destination token of the swap, user receives this token
@@ -963,8 +943,17 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param exactIn Whether the amount specified is an input amount (exactIn=true) or an output amount (exactIn=false)
      * @param src Source wallet/lnurl-withdraw of the swap
      * @param dst Destination smart chain address, bitcoin on-chain address, lightning invoice, LNURL-pay
+     * @param options Options for the swap
      */
-    create<C extends ChainIds<T>>(srcToken: Token<C>, dstToken: Token<C>, amount: bigint, exactIn: boolean, src: undefined | string | LNURLWithdraw, dst: string |  LNURLPay): Promise<ISwap<T[C]>> {
+    create<C extends ChainIds<T>>(
+        srcToken: Token<C>,
+        dstToken: Token<C>,
+        amount: bigint,
+        exactIn: boolean,
+        src: undefined | string | LNURLWithdraw,
+        dst: string |  LNURLPay,
+        options?: FromBTCLNOptions | SpvFromBTCOptions | FromBTCOptions | ToBTCOptions | ToBTCLNOptions
+    ): Promise<ISwap<T[C]>> {
         if(srcToken.chain==="BTC") {
             if(dstToken.chain==="SC") {
                 if(typeof(dst)!=="string") throw new Error("Destination for BTC/BTC-LN -> smart chain swaps must be a smart chain address!");
@@ -974,14 +963,14 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                         if(typeof(src)!=="string" && !isLNURLWithdraw(src)) throw new Error("LNURL must be a string or LNURLWithdraw object!");
                         return this.createFromBTCLNSwapViaLNURL(dstToken.chainId, dst, dstToken.address, src, amount, !exactIn);
                     } else {
-                        return this.createFromBTCLNSwap(dstToken.chainId, dst, dstToken.address, amount, !exactIn);
+                        return this.createFromBTCLNSwap(dstToken.chainId, dst, dstToken.address, amount, !exactIn, undefined, options as any);
                     }
                 } else {
                     //FROM_BTC
                     if(this.supportsSwapType(dstToken.chainId, SwapType.SPV_VAULT_FROM_BTC)) {
-                        return this.createFromBTCSwapNew(dstToken.chainId, dst, dstToken.address, amount, !exactIn);
+                        return this.createFromBTCSwapNew(dstToken.chainId, dst, dstToken.address, amount, !exactIn, undefined, options as any);
                     } else {
-                        return this.createFromBTCSwap(dstToken.chainId, dst, dstToken.address, amount, !exactIn);
+                        return this.createFromBTCSwap(dstToken.chainId, dst, dstToken.address, amount, !exactIn, undefined, options as any);
                     }
                 }
             }
@@ -991,21 +980,21 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 if(dstToken.lightning) {
                     //TO_BTCLN
                     if(typeof(dst)!=="string" && !isLNURLPay(dst)) throw new Error("Destination LNURL link/lightning invoice must be a string or LNURLPay object!");
-                    if(isLNURLPay(dst) || this.BtcUtils.isValidLNURL(dst)) {
-                        return this.createToBTCLNSwapViaLNURL(srcToken.chainId, src, srcToken.address, dst, amount, exactIn);
-                    } else if(this.BtcUtils.isLightningInvoice(dst)) {
-                        if(!this.BtcUtils.isValidLightningInvoice(dst))
+                    if(isLNURLPay(dst) || this.Utils.isValidLNURL(dst)) {
+                        return this.createToBTCLNSwapViaLNURL(srcToken.chainId, src, srcToken.address, dst, amount, exactIn, undefined, options as any);
+                    } else if(this.Utils.isLightningInvoice(dst)) {
+                        if(!this.Utils.isValidLightningInvoice(dst))
                             throw new Error("Invalid lightning invoice specified, lightning invoice MUST contain pre-set amount!");
                         if(exactIn)
                             throw new Error("Only exact out swaps are possible with lightning invoices, use LNURL links for exact in lightning swaps!");
-                        return this.createToBTCLNSwap(srcToken.chainId, src, srcToken.address, dst);
+                        return this.createToBTCLNSwap(srcToken.chainId, src, srcToken.address, dst, undefined, options as any);
                     } else {
                         throw new Error("Supplied parameter is not LNURL link nor lightning invoice (bolt11)!");
                     }
                 } else {
                     //TO_BTC
                     if(typeof(dst)!=="string") throw new Error("Destination bitcoin address must be a string!");
-                    return this.createToBTCSwap(srcToken.chainId, src, srcToken.address, dst, amount, exactIn);
+                    return this.createToBTCSwap(srcToken.chainId, src, srcToken.address, dst, amount, exactIn, undefined, options as any);
                 }
             }
         }
@@ -1245,7 +1234,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     /**
      * Returns supported smart chains
      */
-    getChains(): ChainIds<T>[] {
+    getSmartChains(): ChainIds<T>[] {
         return Object.keys(this.chains);
     }
 
@@ -1376,7 +1365,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     private getSupportedTokens(_swapType: SwapType): SCToken[] {
         const tokens: SCToken[] = [];
         this.intermediaryDiscovery.intermediaries.forEach(lp => {
-            for(let chainId of this.getChains()) {
+            for(let chainId of this.getSmartChains()) {
                 let swapType = _swapType;
                 if(swapType===SwapType.FROM_BTC && this.supportsSwapType(chainId, SwapType.SPV_VAULT_FROM_BTC)) swapType = SwapType.SPV_VAULT_FROM_BTC;
                 if(lp.services[swapType]==null) break;
@@ -1449,215 +1438,6 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         }
     }
 
-    private parseBitcoinAddress(resultText: string): {
-        type: "BITCOIN",
-        swapType: SwapType.TO_BTC,
-        min?: TokenAmount,
-        max?: TokenAmount
-    } {
-        let _amount: bigint = null;
-        if(resultText.includes("?")) {
-            const arr = resultText.split("?");
-            resultText = arr[0];
-            const params = arr[1].split("&");
-            for(let param of params) {
-                const arr2 = param.split("=");
-                const key = arr2[0];
-                const value = decodeURIComponent(arr2[1]);
-                if(key==="amount") {
-                    _amount = fromDecimal(parseFloat(value).toString(8), 8);
-                }
-            }
-        }
-        if(this.BtcUtils.isValidBitcoinAddress(resultText)) {
-            const tokenAmount = toTokenAmount(_amount, BitcoinTokens.BTC, this.prices);
-            return {
-                type: "BITCOIN",
-                swapType: SwapType.TO_BTC,
-                max: tokenAmount,
-                min: tokenAmount
-            };
-        }
-    }
-
-    private parseLNURLSync(resultText: string): {
-        type: "LNURL",
-        swapType: null
-    } {
-        if(this.BtcUtils.isValidLNURL(resultText)) {
-            return {
-                type: "LNURL",
-                swapType: null
-            };
-        }
-    }
-
-    private async parseLNURL(resultText: string): Promise<{
-        type: "LNURL",
-        swapType: SwapType.TO_BTCLN | SwapType.FROM_BTCLN,
-        lnurl: LNURLPay | LNURLWithdraw,
-        min: TokenAmount,
-        max: TokenAmount
-    }> {
-        if(this.BtcUtils.isValidLNURL(resultText)) {
-            try {
-                const result = await this.BtcUtils.getLNURLTypeAndData(resultText);
-                if(isLNURLPay(result)) {
-                    return {
-                        type: "LNURL",
-                        swapType: SwapType.TO_BTCLN,
-                        lnurl: result,
-                        min: toTokenAmount(result.min, BitcoinTokens.BTCLN, this.prices),
-                        max: toTokenAmount(result.max, BitcoinTokens.BTCLN, this.prices)
-                    };
-                }
-                if(isLNURLWithdraw(result)) {
-                    return {
-                        type: "LNURL",
-                        swapType: SwapType.FROM_BTCLN,
-                        lnurl: result,
-                        min: toTokenAmount(result.min, BitcoinTokens.BTCLN, this.prices),
-                        max: toTokenAmount(result.max, BitcoinTokens.BTCLN, this.prices)
-                    };
-                }
-                throw new Error("Invalid LNURL specified!");
-            } catch (e) {
-                throw new Error("Failed to contact LNURL service, check your internet connection and retry later.");
-            }
-        }
-    }
-
-    private parseLightningInvoice(resultText: string): {
-        type: "LIGHTNING",
-        swapType: SwapType.TO_BTCLN,
-        min: TokenAmount,
-        max: TokenAmount
-    } {
-        if(this.BtcUtils.isLightningInvoice(resultText)) {
-            if(this.BtcUtils.isValidLightningInvoice(resultText)) {
-                const amountBN = this.BtcUtils.getLightningInvoiceValue(resultText);
-                return {
-                    type: "LIGHTNING",
-                    swapType: SwapType.TO_BTCLN,
-                    min: toTokenAmount(amountBN, BitcoinTokens.BTCLN, this.prices),
-                    max: toTokenAmount(amountBN, BitcoinTokens.BTCLN, this.prices)
-                }
-            } else {
-                throw new Error("Lightning invoice needs to contain an amount!");
-            }
-        }
-    }
-
-    private parseSmartchainAddress(resultText: string): {
-        type: ChainIds<T>,
-        swapType: SwapType.SPV_VAULT_FROM_BTC,
-        min?: TokenAmount,
-        max?: TokenAmount
-    } {
-        for(let chainId of this.getChains()) {
-            if(this.chains[chainId].chainInterface.isValidAddress(resultText)) {
-                if(this.supportsSwapType(chainId, SwapType.SPV_VAULT_FROM_BTC)) {
-                    return {
-                        type: chainId,
-                        swapType: SwapType.SPV_VAULT_FROM_BTC
-                    }
-                } else {
-                    return {
-                        type: chainId,
-                        swapType: null
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * General parser for bitcoin addresses, LNURLs, lightning invoices, smart chain addresses, also fetches LNURL data
-     *  (hence returns Promise)
-     *
-     * @param addressString Address to parse
-     * @throws {Error} Error in address parsing
-     * @returns Address data or null if address doesn't conform to any known format
-     */
-    async parseAddress(addressString: string): Promise<{
-        type: "BITCOIN" | "LIGHTNING" | "LNURL" | ChainIds<T>,
-        swapType: SwapType.TO_BTC | SwapType.TO_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTCLN | null,
-        lnurl?: LNURLPay | LNURLWithdraw,
-        min?: TokenAmount,
-        max?: TokenAmount
-    }> {
-        if(addressString.startsWith("bitcoin:")) {
-            const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
-            if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
-            throw new Error("Invalid bitcoin address!");
-        }
-
-        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
-        if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
-
-        if(addressString.startsWith("lightning:")) {
-            const resultText = addressString.substring(10);
-            const resultLnurl = await this.parseLNURL(resultText);
-            if(resultLnurl!=null) return resultLnurl;
-
-            const resultLightningInvoice = this.parseLightningInvoice(resultText);
-            if(resultLightningInvoice!=null) return resultLightningInvoice;
-
-            throw new Error("Invalid lightning network invoice or LNURL!");
-        }
-
-        const resultLnurl = await this.parseLNURL(addressString);
-        if(resultLnurl!=null) return resultLnurl;
-
-        const resultLightningInvoice = this.parseLightningInvoice(addressString);
-        if(resultLightningInvoice!=null) return resultLightningInvoice;
-
-        return this.parseSmartchainAddress(addressString);
-    }
-
-    /**
-     * Synchronous general parser for bitcoin addresses, LNURLs, lightning invoices, smart chain addresses, doesn't fetch
-     *  LNURL data, reports swapType: null instead to prevent returning a Promise
-     *
-     * @param addressString Address to parse
-     * @throws {Error} Error in address parsing
-     * @returns Address data or null if address doesn't conform to any known format
-     */
-    parseAddressSync(addressString: string): {
-        type: "BITCOIN" | "LIGHTNING" | "LNURL" | ChainIds<T>,
-        swapType: SwapType.TO_BTC | SwapType.TO_BTCLN | SwapType.SPV_VAULT_FROM_BTC | null,
-        min?: TokenAmount,
-        max?: TokenAmount
-    } {
-        if(addressString.startsWith("bitcoin:")) {
-            const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
-            if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
-            throw new Error("Invalid bitcoin address!");
-        }
-
-        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
-        if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
-
-        if(addressString.startsWith("lightning:")) {
-            const resultText = addressString.substring(10);
-            const resultLnurl = this.parseLNURLSync(resultText);
-            if(resultLnurl!=null) return resultLnurl;
-
-            const resultLightningInvoice = this.parseLightningInvoice(resultText);
-            if(resultLightningInvoice!=null) return resultLightningInvoice;
-
-            throw new Error("Invalid lightning network invoice or LNURL!");
-        }
-
-        const resultLnurl = this.parseLNURLSync(addressString);
-        if(resultLnurl!=null) return resultLnurl;
-
-        const resultLightningInvoice = this.parseLightningInvoice(addressString);
-        if(resultLightningInvoice!=null) return resultLightningInvoice;
-
-        return this.parseSmartchainAddress(addressString);
-    }
-
 
     ///////////////////////////////////
     /// Deprecated
@@ -1709,109 +1489,6 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             if(min!=null) return BigInt(min);
         }
         return 0n;
-    }
-
-
-    ///////////////////////////////////
-    /// Smart chain specific functions
-
-    getBitcoinSpendableBalance(addressOrWallet: string | IBitcoinWallet, swapType: SwapType.SPV_VAULT_FROM_BTC, targetChain: ChainIds<T>, gasDrop?: boolean): Promise<{
-        balance: TokenAmount,
-        feeRate: number
-    }>;
-    getBitcoinSpendableBalance(addressOrWallet: string | IBitcoinWallet, swapType: SwapType.FROM_BTC | SwapType.TRUSTED_FROM_BTC): Promise<{
-        balance: TokenAmount,
-        feeRate: number
-    }>;
-    async getBitcoinSpendableBalance(
-        addressOrWallet: string | IBitcoinWallet,
-        swapType?: SwapType.FROM_BTC | SwapType.TRUSTED_FROM_BTC | SwapType.SPV_VAULT_FROM_BTC,
-        targetChain?: ChainIds<T>,
-        gasDrop: boolean = false
-    ): Promise<{
-        balance: TokenAmount,
-        feeRate: number
-    }> {
-        if(typeof(addressOrWallet)!=="string" && (addressOrWallet as IBitcoinWallet).getTransactionFee==null)
-            throw new Error("Wallet must be a string address or IBitcoinWallet");
-
-        let bitcoinWallet: IBitcoinWallet;
-        if(typeof(addressOrWallet)==="string") {
-            bitcoinWallet = new SingleAddressBitcoinWallet(this.mempoolApi, this.bitcoinNetwork, addressOrWallet);
-        } else {
-            bitcoinWallet = addressOrWallet as IBitcoinWallet;
-        }
-
-        let result: {balance: bigint, feeRate: number, totalFee: number};
-        if(swapType===SwapType.SPV_VAULT_FROM_BTC) {
-            result = await bitcoinWallet.getSpendableBalance(this.getRandomSpvVaultPsbt(targetChain, gasDrop));
-        } else {
-            result = await bitcoinWallet.getSpendableBalance();
-        }
-
-        return {
-            balance: toTokenAmount(result.balance, BitcoinTokens.BTC, this.prices),
-            feeRate: result.feeRate
-        }
-    }
-
-    /**
-     * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
-     */
-    async getSpendableBalance<ChainIdentifier extends ChainIds<T>>(wallet: string | T[ChainIdentifier]["Signer"], token: SCToken<ChainIdentifier>, feeMultiplier?: number): Promise<TokenAmount> {
-        if(typeof(wallet)!=="string" && (wallet as AbstractSigner).getAddress==null)
-            throw new Error("Signer must be a string or smart chain signer");
-
-        if(this.chains[token.chainId]==null) throw new Error("Invalid chain identifier! Unknown chain: "+token.chainId);
-
-        const {swapContract, chainInterface} = this.chains[token.chainId];
-
-        const signer = typeof(wallet)==="string" ? wallet : (wallet as AbstractSigner).getAddress();
-
-        let finalBalance: bigint;
-        if(chainInterface.getNativeCurrencyAddress()!==token.address) {
-            finalBalance = await chainInterface.getBalance(signer, token.address);
-        } else {
-            let [balance, commitFee] = await Promise.all([
-                chainInterface.getBalance(signer, token.address),
-                swapContract.getCommitFee(
-                    //Use large amount, such that the fee for wrapping more tokens is always included!
-                    await swapContract.createSwapData(
-                        ChainSwapType.HTLC, signer, null, token.address,
-                        0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn,
-                        swapContract.getHashForHtlc(randomBytes(32)).toString("hex"),
-                        BigIntBufferUtils.fromBuffer(randomBytes(8)), BigInt(Math.floor(Date.now()/1000)),
-                        true, false, BigIntBufferUtils.fromBuffer(randomBytes(2)), BigIntBufferUtils.fromBuffer(randomBytes(2))
-                    ),
-                )
-            ]);
-
-            if(feeMultiplier!=null) {
-                commitFee = commitFee * (BigInt(Math.floor(feeMultiplier*1000000))) / 1000000n;
-            }
-
-            finalBalance = bigIntMax(balance - commitFee, 0n);
-        }
-
-        return toTokenAmount(finalBalance, token, this.prices);
-    }
-
-    /**
-     * Returns the address of the native currency of the chain
-     */
-    getNativeToken<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): SCToken<ChainIdentifier> {
-        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
-        return this.tokens[chainIdentifier][this.chains[chainIdentifier].chainInterface.getNativeCurrencyAddress()] as SCToken<ChainIdentifier>;
-    }
-
-    /**
-     * Returns a random signer for a given smart chain
-     *
-     * @param chainIdentifier
-     */
-    randomSigner<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): T[ChainIdentifier]["Signer"] {
-        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
-        return this.chains[chainIdentifier].chainInterface.randomSigner();
     }
 
 }

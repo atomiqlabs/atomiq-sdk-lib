@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IFromBTCSwap = void 0;
+const ISwap_1 = require("../../ISwap");
 const base_1 = require("@atomiqlabs/base");
 const Tokens_1 = require("../../../Tokens");
 const IEscrowSwap_1 = require("../IEscrowSwap");
@@ -22,12 +23,6 @@ class IFromBTCSwap extends IEscrowSwap_1.IEscrowSwap {
     getSwapData() {
         return this.data;
     }
-    //////////////////////////////
-    //// Pricing
-    getRealSwapFeePercentagePPM() {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        return feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
-    }
     _getInitiator() {
         return this.getSwapData().getClaimer();
     }
@@ -46,10 +41,16 @@ class IFromBTCSwap extends IEscrowSwap_1.IEscrowSwap {
         return this.getSwapData().getAmount() + this.swapFee;
     }
     getSwapFee() {
+        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
         return {
             amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, this.inputToken, this.wrapper.prices),
             amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice)
+            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            composition: {
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, this.inputToken, this.wrapper.prices),
+                percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
+            }
         };
     }
     getFee() {

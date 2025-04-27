@@ -6,6 +6,7 @@ import { Transaction } from "@scure/btc-signer";
 import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
 import { Fee, FeeType } from "../fee/Fee";
 import { IBitcoinWallet } from "../../btc/wallet/IBitcoinWallet";
+import { IBTCWalletSwap } from "../IBTCWalletSwap";
 export declare enum SpvFromBTCSwapState {
     CLOSED = -5,
     FAILED = -4,
@@ -46,7 +47,7 @@ export type SpvFromBTCSwapInit = ISwapInit & {
     executionFeeShare: bigint;
 };
 export declare function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit;
-export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> {
+export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> implements IBTCWalletSwap {
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
     readonly wrapper: SpvFromBTCWrapper<T>;
     readonly quoteId: string;
@@ -84,7 +85,6 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      */
     protected tryCalculateSwapFee(): void;
     refreshPriceData(): Promise<void>;
-    getRealSwapFeePercentagePPM(): bigint;
     _getInitiator(): string;
     _getEscrowHash(): string;
     getId(): string;
@@ -141,9 +141,9 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         psbt: Transaction;
         signInputs: number[];
     }>;
-    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
     submitPsbt(psbt: Transaction): Promise<string>;
-    signAndSubmit(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
+    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
+    sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     /**
      * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
      */
@@ -160,7 +160,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<void>;
+    waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
     /**
      * Returns transactions required to claim the swap on-chain (and possibly also sync the bitcoin light client)
      *  after a bitcoin transaction was sent and confirmed

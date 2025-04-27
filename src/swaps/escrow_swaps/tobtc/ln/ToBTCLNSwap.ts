@@ -25,6 +25,12 @@ export function isToBTCLNSwapInit<T extends SwapData>(obj: any): obj is ToBTCLNS
         isIToBTCSwapInit<T>(obj);
 }
 
+//Set of nodes which disallow probing, resulting in 0 confidence reported by the LP
+const SNOWFLAKE_LIST: Set<string> = new Set([
+    "038f8f113c580048d847d6949371726653e02b928196bad310e3eda39ff61723f6",
+    "03a6ce61fcaacd38d31d4e3ce2d506602818e3856b4b44faff1dde9642ba705976"
+]);
+
 export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
     protected outputToken: BtcToken<true> = BitcoinTokens.BTCLN;
     protected readonly TYPE = SwapType.TO_BTCLN;
@@ -109,6 +115,35 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
      */
     getConfidence(): number {
         return this.confidence;
+    }
+
+    /**
+     * Checks whether a swap is likely to fail, based on the confidence as reported by the LP
+     */
+    willLikelyFail(): boolean {
+        const parsedRequest = bolt11Decode(this.pr);
+
+        if(parsedRequest.tagsObject.routing_info!=null) {
+            for (let route of parsedRequest.tagsObject.routing_info) {
+                if(SNOWFLAKE_LIST.has(route.pubkey)) {
+                    return false;
+                }
+            }
+        }
+
+        return this.confidence===0;
+    }
+
+    /**
+     * Tries to detect if the target lightning invoice is a non-custodial mobile wallet, care must be taken
+     *  for such a wallet to be online when attempting to make a swap
+     */
+    isPayingToNonCustodialWallet(): boolean {
+        const parsedRequest = bolt11Decode(this.pr);
+
+        if(parsedRequest.tagsObject.routing_info!=null) {
+            return parsedRequest.tagsObject.routing_info.length>0;
+        }
     }
 
     getIdentifierHash(): Buffer {
