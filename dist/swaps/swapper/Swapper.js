@@ -71,7 +71,7 @@ class Swapper extends events_1.EventEmitter {
         options.swapStorage ??= (name) => new IndexedDBUnifiedStorage_1.IndexedDBUnifiedStorage(name);
         this._bitcoinNetwork = options.bitcoinNetwork;
         this.bitcoinNetwork = options.bitcoinNetwork === base_1.BitcoinNetwork.MAINNET ? utils_1.NETWORK :
-            options.bitcoinNetwork === base_1.BitcoinNetwork.TESTNET ? utils_1.TEST_NETWORK : null;
+            (options.bitcoinNetwork === base_1.BitcoinNetwork.TESTNET || options.bitcoinNetwork === base_1.BitcoinNetwork.TESTNET4) ? utils_1.TEST_NETWORK : null;
         this.Utils = new SwapperUtils_1.SwapperUtils(this);
         this.prices = pricing;
         this.bitcoinRpc = bitcoinRpc;
