@@ -1270,7 +1270,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             } else {
                 return SwapType.TO_BTC;
             }
-        } else {
+        } else if(isBtcToken(srcToken)) {
             if(!isSCToken(dstToken)) throw new Error("Swap not supported");
             if(srcToken.lightning) {
                 return SwapType.FROM_BTCLN;
@@ -1282,6 +1282,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 }
             }
         }
+        return null;
     }
 
     readonly SwapTypeInfo = {

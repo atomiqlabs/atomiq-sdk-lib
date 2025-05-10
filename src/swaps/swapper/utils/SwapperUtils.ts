@@ -92,10 +92,10 @@ export class SwapperUtils<T extends MultiChain> {
     }
 
     private parseBitcoinAddress(resultText: string): {
+        address: string,
         type: "BITCOIN",
         swapType: SwapType.TO_BTC,
-        min?: TokenAmount,
-        max?: TokenAmount
+        amount?: TokenAmount
     } {
         let _amount: bigint = null;
         if(resultText.includes("?")) {
@@ -112,22 +112,23 @@ export class SwapperUtils<T extends MultiChain> {
             }
         }
         if(this.isValidBitcoinAddress(resultText)) {
-            const tokenAmount = toTokenAmount(_amount, BitcoinTokens.BTC, this.root.prices);
             return {
+                address: resultText,
                 type: "BITCOIN",
                 swapType: SwapType.TO_BTC,
-                max: tokenAmount,
-                min: tokenAmount
+                amount: toTokenAmount(_amount, BitcoinTokens.BTC, this.root.prices)
             };
         }
     }
 
     private parseLNURLSync(resultText: string): {
+        address: string,
         type: "LNURL",
         swapType: null
     } {
         if(this.isValidLNURL(resultText)) {
             return {
+                address: resultText,
                 type: "LNURL",
                 swapType: null
             };
@@ -135,34 +136,36 @@ export class SwapperUtils<T extends MultiChain> {
     }
 
     private async parseLNURL(resultText: string): Promise<{
+        address: string,
         type: "LNURL",
         swapType: SwapType.TO_BTCLN | SwapType.FROM_BTCLN,
         lnurl: LNURLPay | LNURLWithdraw,
-        min: TokenAmount,
-        max: TokenAmount
+        min?: TokenAmount,
+        max?: TokenAmount,
+        amount?: TokenAmount
     }> {
         if(this.isValidLNURL(resultText)) {
             try {
                 const result = await this.getLNURLTypeAndData(resultText);
-                if(isLNURLPay(result)) {
+                if(result==null) throw new Error("Invalid LNURL specified!");
+                const response = {
+                    address: resultText,
+                    type: "LNURL",
+                    swapType: isLNURLPay(result) ? SwapType.TO_BTCLN : isLNURLWithdraw(result) ? SwapType.FROM_BTCLN : null,
+                    lnurl: result
+                } as const;
+                if(result.min===result.max) {
                     return {
-                        type: "LNURL",
-                        swapType: SwapType.TO_BTCLN,
-                        lnurl: result,
+                        ...response,
+                        amount: toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices)
+                    }
+                } else {
+                    return {
+                        ...response,
                         min: toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices),
                         max: toTokenAmount(result.max, BitcoinTokens.BTCLN, this.root.prices)
-                    };
+                    }
                 }
-                if(isLNURLWithdraw(result)) {
-                    return {
-                        type: "LNURL",
-                        swapType: SwapType.FROM_BTCLN,
-                        lnurl: result,
-                        min: toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices),
-                        max: toTokenAmount(result.max, BitcoinTokens.BTCLN, this.root.prices)
-                    };
-                }
-                throw new Error("Invalid LNURL specified!");
             } catch (e) {
                 throw new Error("Failed to contact LNURL service, check your internet connection and retry later.");
             }
@@ -170,19 +173,19 @@ export class SwapperUtils<T extends MultiChain> {
     }
 
     private parseLightningInvoice(resultText: string): {
+        address: string,
         type: "LIGHTNING",
         swapType: SwapType.TO_BTCLN,
-        min: TokenAmount,
-        max: TokenAmount
+        amount: TokenAmount
     } {
         if(this.isLightningInvoice(resultText)) {
             if(this.isValidLightningInvoice(resultText)) {
                 const amountBN = this.getLightningInvoiceValue(resultText);
                 return {
+                    address: resultText,
                     type: "LIGHTNING",
                     swapType: SwapType.TO_BTCLN,
-                    min: toTokenAmount(amountBN, BitcoinTokens.BTCLN, this.root.prices),
-                    max: toTokenAmount(amountBN, BitcoinTokens.BTCLN, this.root.prices)
+                    amount: toTokenAmount(amountBN, BitcoinTokens.BTCLN, this.root.prices)
                 }
             } else {
                 throw new Error("Lightning invoice needs to contain an amount!");
@@ -191,6 +194,7 @@ export class SwapperUtils<T extends MultiChain> {
     }
 
     private parseSmartchainAddress(resultText: string): {
+        address: string,
         type: ChainIds<T>,
         swapType: SwapType.SPV_VAULT_FROM_BTC,
         min?: TokenAmount,
@@ -200,11 +204,13 @@ export class SwapperUtils<T extends MultiChain> {
             if(this.root.chains[chainId].chainInterface.isValidAddress(resultText)) {
                 if(this.root.supportsSwapType(chainId, SwapType.SPV_VAULT_FROM_BTC)) {
                     return {
+                        address: resultText,
                         type: chainId,
                         swapType: SwapType.SPV_VAULT_FROM_BTC
                     }
                 } else {
                     return {
+                        address: resultText,
                         type: chainId,
                         swapType: null
                     }
@@ -222,11 +228,13 @@ export class SwapperUtils<T extends MultiChain> {
      * @returns Address data or null if address doesn't conform to any known format
      */
     async parseAddress(addressString: string): Promise<{
+        address: string,
         type: "BITCOIN" | "LIGHTNING" | "LNURL" | ChainIds<T>,
         swapType: SwapType.TO_BTC | SwapType.TO_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTCLN | null,
         lnurl?: LNURLPay | LNURLWithdraw,
         min?: TokenAmount,
-        max?: TokenAmount
+        max?: TokenAmount,
+        amount?: TokenAmount
     }> {
         if(addressString.startsWith("bitcoin:")) {
             const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
@@ -234,7 +242,7 @@ export class SwapperUtils<T extends MultiChain> {
             throw new Error("Invalid bitcoin address!");
         }
 
-        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
+        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString);
         if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
 
         if(addressString.startsWith("lightning:")) {
@@ -266,10 +274,12 @@ export class SwapperUtils<T extends MultiChain> {
      * @returns Address data or null if address doesn't conform to any known format
      */
     parseAddressSync(addressString: string): {
+        address: string,
         type: "BITCOIN" | "LIGHTNING" | "LNURL" | ChainIds<T>,
         swapType: SwapType.TO_BTC | SwapType.TO_BTCLN | SwapType.SPV_VAULT_FROM_BTC | null,
         min?: TokenAmount,
-        max?: TokenAmount
+        max?: TokenAmount,
+        amount?: TokenAmount
     } {
         if(addressString.startsWith("bitcoin:")) {
             const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
@@ -277,7 +287,7 @@ export class SwapperUtils<T extends MultiChain> {
             throw new Error("Invalid bitcoin address!");
         }
 
-        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
+        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString);
         if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
 
         if(addressString.startsWith("lightning:")) {

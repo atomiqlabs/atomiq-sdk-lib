@@ -76,7 +76,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
-    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
+    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
     sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in a PTLC

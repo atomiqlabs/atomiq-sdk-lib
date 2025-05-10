@@ -99,18 +99,18 @@ class SwapperUtils {
             }
         }
         if (this.isValidBitcoinAddress(resultText)) {
-            const tokenAmount = (0, Tokens_1.toTokenAmount)(_amount, Tokens_1.BitcoinTokens.BTC, this.root.prices);
             return {
+                address: resultText,
                 type: "BITCOIN",
                 swapType: SwapType_1.SwapType.TO_BTC,
-                max: tokenAmount,
-                min: tokenAmount
+                amount: (0, Tokens_1.toTokenAmount)(_amount, Tokens_1.BitcoinTokens.BTC, this.root.prices)
             };
         }
     }
     parseLNURLSync(resultText) {
         if (this.isValidLNURL(resultText)) {
             return {
+                address: resultText,
                 type: "LNURL",
                 swapType: null
             };
@@ -120,25 +120,27 @@ class SwapperUtils {
         if (this.isValidLNURL(resultText)) {
             try {
                 const result = await this.getLNURLTypeAndData(resultText);
-                if ((0, LNURL_1.isLNURLPay)(result)) {
+                if (result == null)
+                    throw new Error("Invalid LNURL specified!");
+                const response = {
+                    address: resultText,
+                    type: "LNURL",
+                    swapType: (0, LNURL_1.isLNURLPay)(result) ? SwapType_1.SwapType.TO_BTCLN : (0, LNURL_1.isLNURLWithdraw)(result) ? SwapType_1.SwapType.FROM_BTCLN : null,
+                    lnurl: result
+                };
+                if (result.min === result.max) {
                     return {
-                        type: "LNURL",
-                        swapType: SwapType_1.SwapType.TO_BTCLN,
-                        lnurl: result,
+                        ...response,
+                        amount: (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
+                    };
+                }
+                else {
+                    return {
+                        ...response,
                         min: (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices),
                         max: (0, Tokens_1.toTokenAmount)(result.max, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
                     };
                 }
-                if ((0, LNURL_1.isLNURLWithdraw)(result)) {
-                    return {
-                        type: "LNURL",
-                        swapType: SwapType_1.SwapType.FROM_BTCLN,
-                        lnurl: result,
-                        min: (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices),
-                        max: (0, Tokens_1.toTokenAmount)(result.max, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
-                    };
-                }
-                throw new Error("Invalid LNURL specified!");
             }
             catch (e) {
                 throw new Error("Failed to contact LNURL service, check your internet connection and retry later.");
@@ -150,10 +152,10 @@ class SwapperUtils {
             if (this.isValidLightningInvoice(resultText)) {
                 const amountBN = this.getLightningInvoiceValue(resultText);
                 return {
+                    address: resultText,
                     type: "LIGHTNING",
                     swapType: SwapType_1.SwapType.TO_BTCLN,
-                    min: (0, Tokens_1.toTokenAmount)(amountBN, Tokens_1.BitcoinTokens.BTCLN, this.root.prices),
-                    max: (0, Tokens_1.toTokenAmount)(amountBN, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
+                    amount: (0, Tokens_1.toTokenAmount)(amountBN, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
                 };
             }
             else {
@@ -166,12 +168,14 @@ class SwapperUtils {
             if (this.root.chains[chainId].chainInterface.isValidAddress(resultText)) {
                 if (this.root.supportsSwapType(chainId, SwapType_1.SwapType.SPV_VAULT_FROM_BTC)) {
                     return {
+                        address: resultText,
                         type: chainId,
                         swapType: SwapType_1.SwapType.SPV_VAULT_FROM_BTC
                     };
                 }
                 else {
                     return {
+                        address: resultText,
                         type: chainId,
                         swapType: null
                     };
@@ -194,7 +198,7 @@ class SwapperUtils {
                 return parsedBitcoinAddress;
             throw new Error("Invalid bitcoin address!");
         }
-        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
+        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString);
         if (parsedBitcoinAddress != null)
             return parsedBitcoinAddress;
         if (addressString.startsWith("lightning:")) {
@@ -230,7 +234,7 @@ class SwapperUtils {
                 return parsedBitcoinAddress;
             throw new Error("Invalid bitcoin address!");
         }
-        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
+        const parsedBitcoinAddress = this.parseBitcoinAddress(addressString);
         if (parsedBitcoinAddress != null)
             return parsedBitcoinAddress;
         if (addressString.startsWith("lightning:")) {

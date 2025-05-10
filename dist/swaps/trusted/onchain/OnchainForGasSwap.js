@@ -152,7 +152,8 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
             }];
     }
     async estimateBitcoinFee(wallet, feeRate) {
-        return wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
+        const txFee = await wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
+        return (0, Tokens_1.toTokenAmount)(txFee == null ? null : BigInt(txFee), Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
     }
     async sendBitcoinTransaction(wallet, feeRate) {
         if (this.state !== OnchainForGasSwapState.PR_CREATED)

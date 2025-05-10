@@ -398,7 +398,8 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         return this.data.getTxId();
     }
     async estimateBitcoinFee(wallet, feeRate) {
-        return wallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
+        const txFee = await wallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
+        return (0, Tokens_1.toTokenAmount)(txFee == null ? null : BigInt(txFee), Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
     }
     async sendBitcoinTransaction(wallet, feeRate) {
         let { psbt, signInputs } = await this.getFundedPsbt(wallet, feeRate);

@@ -142,7 +142,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         signInputs: number[];
     }>;
     submitPsbt(psbt: Transaction): Promise<string>;
-    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
+    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
     sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     /**
      * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.

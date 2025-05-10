@@ -237,8 +237,9 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         return result.tx.txid;
     }
 
-    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
-        return wallet.getTransactionFee(this.address, this.amount, feeRate);
+    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
+        const txFee = await wallet.getTransactionFee(this.address, this.amount, feeRate);
+        return toTokenAmount(txFee==null ? null : BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
     }
 
     async sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string> {

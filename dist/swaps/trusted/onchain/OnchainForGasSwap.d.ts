@@ -73,7 +73,7 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
         type: FeeType.SWAP;
         fee: Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
     }];
-    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
+    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
     sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     protected checkAddress(save?: boolean): Promise<boolean>;
     protected setRefundAddress(refundAddress: string): Promise<void>;

@@ -855,7 +855,7 @@ class Swapper extends events_1.EventEmitter {
                 return SwapType_1.SwapType.TO_BTC;
             }
         }
-        else {
+        else if ((0, Tokens_1.isBtcToken)(srcToken)) {
             if (!(0, Tokens_1.isSCToken)(dstToken))
                 throw new Error("Swap not supported");
             if (srcToken.lightning) {
@@ -870,6 +870,7 @@ class Swapper extends events_1.EventEmitter {
                 }
             }
         }
+        return null;
     }
     /**
      * Returns minimum/maximum limits for inputs and outputs for a swap between given tokens

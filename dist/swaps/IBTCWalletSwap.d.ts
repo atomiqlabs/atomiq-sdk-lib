@@ -1,6 +1,7 @@
 import { IBitcoinWallet } from "../btc/wallet/IBitcoinWallet";
+import { BtcToken, TokenAmount } from "../Tokens";
 export interface IBTCWalletSwap {
-    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number>;
+    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
     sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     /**
      * Waits till the bitcoin transaction confirms

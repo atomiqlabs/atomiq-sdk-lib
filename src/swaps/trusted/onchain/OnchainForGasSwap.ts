@@ -222,8 +222,9 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         }];
     }
 
-    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<number> {
-        return wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
+    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
+        const txFee = await wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
+        return toTokenAmount(txFee==null ? null : BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
     }
 
     async sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string> {

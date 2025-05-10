@@ -60,11 +60,13 @@ export declare class SwapperUtils<T extends MultiChain> {
      * @returns Address data or null if address doesn't conform to any known format
      */
     parseAddress(addressString: string): Promise<{
+        address: string;
         type: "BITCOIN" | "LIGHTNING" | "LNURL" | ChainIds<T>;
         swapType: SwapType.TO_BTC | SwapType.TO_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTCLN | null;
         lnurl?: LNURLPay | LNURLWithdraw;
         min?: TokenAmount;
         max?: TokenAmount;
+        amount?: TokenAmount;
     }>;
     /**
      * Synchronous general parser for bitcoin addresses, LNURLs, lightning invoices, smart chain addresses, doesn't fetch
@@ -75,10 +77,12 @@ export declare class SwapperUtils<T extends MultiChain> {
      * @returns Address data or null if address doesn't conform to any known format
      */
     parseAddressSync(addressString: string): {
+        address: string;
         type: "BITCOIN" | "LIGHTNING" | "LNURL" | ChainIds<T>;
         swapType: SwapType.TO_BTC | SwapType.TO_BTCLN | SwapType.SPV_VAULT_FROM_BTC | null;
         min?: TokenAmount;
         max?: TokenAmount;
+        amount?: TokenAmount;
     };
     /**
      * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
