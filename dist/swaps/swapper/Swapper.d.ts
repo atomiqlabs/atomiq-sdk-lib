@@ -361,11 +361,17 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
         };
     };
     /**
+     * Returns supported tokens for a given direction
+     *
+     * @param input Whether to return input tokens or output tokens
+     */
+    getSupportedTokens(input: boolean): Token[];
+    /**
      * Returns a set of supported tokens by all the intermediaries offering a specific swap service
      *
      * @param _swapType Swap service type to check supported tokens for
      */
-    private getSupportedTokens;
+    private getSupportedTokensForSwapType;
     /**
      * Returns the set of supported token addresses by all the intermediaries we know of offering a specific swapType service
      *

@@ -1359,12 +1359,67 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     }
 
     /**
+     * Returns supported tokens for a given direction
+     *
+     * @param input Whether to return input tokens or output tokens
+     */
+    getSupportedTokens(input: boolean): Token[] {
+        const tokens: {[chainId: string]: Set<string>} = {};
+        let lightning = false;
+        let btc = false;
+        this.intermediaryDiscovery.intermediaries.forEach(lp => {
+            for(let swapType of [SwapType.TO_BTC, SwapType.TO_BTCLN, SwapType.FROM_BTC, SwapType.FROM_BTCLN, SwapType.SPV_VAULT_FROM_BTC]) {
+                if(lp.services[swapType]==null) continue;
+                if(lp.services[swapType].chainTokens==null) continue;
+                for(let chainId of this.getSmartChains()) {
+                    if(swapType===SwapType.FROM_BTC && this.supportsSwapType(chainId, SwapType.SPV_VAULT_FROM_BTC)) continue;
+                    for (let tokenAddress of lp.services[swapType].chainTokens[chainId]) {
+                        if(input) {
+                            if(swapType===SwapType.TO_BTC || swapType===SwapType.TO_BTCLN) {
+                                tokens[chainId] ??= new Set();
+                                tokens[chainId].add(tokenAddress);
+                            }
+                            if(swapType===SwapType.FROM_BTCLN) {
+                                lightning = true;
+                            }
+                            if(swapType===SwapType.FROM_BTC || swapType===SwapType.SPV_VAULT_FROM_BTC) {
+                                btc = true;
+                            }
+                        } else {
+                            if(swapType===SwapType.FROM_BTCLN || swapType===SwapType.FROM_BTC || swapType===SwapType.SPV_VAULT_FROM_BTC) {
+                                tokens[chainId] ??= new Set();
+                                tokens[chainId].add(tokenAddress);
+                            }
+                            if(swapType===SwapType.TO_BTCLN) {
+                                lightning = true;
+                            }
+                            if(swapType===SwapType.TO_BTC) {
+                                btc = true;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        const output: Token[] = [];
+        if(lightning) output.push(BitcoinTokens.BTCLN);
+        if(btc) output.push(BitcoinTokens.BTC);
+        for(let chainId in tokens) {
+            tokens[chainId].forEach(tokenAddress => {
+                const token = this.tokens?.[chainId]?.[tokenAddress];
+                if(token!=null) output.push(token);
+            })
+        }
+        return output;
+    }
+
+    /**
      * Returns a set of supported tokens by all the intermediaries offering a specific swap service
      *
      * @param _swapType Swap service type to check supported tokens for
      */
-    private getSupportedTokens(_swapType: SwapType): SCToken[] {
-        const tokens: SCToken[] = [];
+    private getSupportedTokensForSwapType(_swapType: SwapType): SCToken[] {
+        const tokens: {[chainId: string]: Set<string>} = {};
         this.intermediaryDiscovery.intermediaries.forEach(lp => {
             for(let chainId of this.getSmartChains()) {
                 let swapType = _swapType;
@@ -1372,12 +1427,19 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 if(lp.services[swapType]==null) break;
                 if(lp.services[swapType].chainTokens==null) break;
                 for(let tokenAddress of lp.services[swapType].chainTokens[chainId]) {
-                    const token = this.tokens?.[chainId]?.[tokenAddress];
-                    if(token!=null) tokens.push(token);
+                    tokens[chainId] ??= new Set();
+                    tokens[chainId].add(tokenAddress);
                 }
             }
         });
-        return tokens;
+        const output: SCToken[] = [];
+        for(let chainId in tokens) {
+            tokens[chainId].forEach(tokenAddress => {
+                const token = this.tokens?.[chainId]?.[tokenAddress];
+                if(token!=null) output.push(token);
+            })
+        }
+        return output;
     }
 
     /**
@@ -1425,15 +1487,15 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         } else {
             if(input) {
                 if(token.lightning) {
-                    return this.getSupportedTokens(SwapType.FROM_BTCLN);
+                    return this.getSupportedTokensForSwapType(SwapType.FROM_BTCLN);
                 } else {
-                    return this.getSupportedTokens(SwapType.FROM_BTC);
+                    return this.getSupportedTokensForSwapType(SwapType.FROM_BTC);
                 }
             } else {
                 if(token.lightning) {
-                    return this.getSupportedTokens(SwapType.TO_BTCLN);
+                    return this.getSupportedTokensForSwapType(SwapType.TO_BTCLN);
                 } else {
-                    return this.getSupportedTokens(SwapType.TO_BTC);
+                    return this.getSupportedTokensForSwapType(SwapType.TO_BTC);
                 }
             }
         }
