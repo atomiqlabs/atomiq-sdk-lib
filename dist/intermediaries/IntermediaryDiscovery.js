@@ -106,8 +106,13 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
         for (let chain in response.chains) {
             if (this.swapContracts[chain] != null) {
                 const { signature, address } = response.chains[chain];
-                await this.swapContracts[chain].isValidDataSignature(buffer_1.Buffer.from(response.envelope), signature, address);
-                addresses[chain] = address;
+                try {
+                    await this.swapContracts[chain].isValidDataSignature(buffer_1.Buffer.from(response.envelope), signature, address);
+                    addresses[chain] = address;
+                }
+                catch (e) {
+                    logger.warn("Failed to verify " + chain + " signature for intermediary: " + url);
+                }
             }
         }
         if (abortSignal != null)
@@ -120,6 +125,10 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
                 serviceData.chainTokens = {
                     [DEFAULT_CHAIN]: serviceData.tokens
                 };
+            for (let chain in serviceData.chainTokens) {
+                if (addresses[chain] == null)
+                    delete serviceData.chainTokens[chain];
+            }
         }
         return {
             addresses,
