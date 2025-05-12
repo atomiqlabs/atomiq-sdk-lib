@@ -500,7 +500,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         this.logger.debug("createSwap() Swap candidates: ", candidates.map(lp => lp.url).join());
         const quotePromises: {quote: Promise<S>, intermediary: Intermediary}[] = await create(candidates, abortController.signal, this.chains[chainIdentifier]);
 
-        const quotes = await new Promise<{
+        const promiseAll = new Promise<{
             quote: S,
             intermediary: Intermediary
         }[]>((resolve, reject) => {
@@ -575,22 +575,28 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             });
         });
 
-        //TODO: Intermediary's reputation is not taken into account!
-        quotes.sort((a, b) => {
-            if(amountData.exactIn) {
-                //Compare outputs
-                return bigIntCompare(b.quote.getOutput().rawAmount, a.quote.getOutput().rawAmount);
-            } else {
-                //Compare inputs
-                return bigIntCompare(a.quote.getOutput().rawAmount, b.quote.getOutput().rawAmount);
-            }
-        });
+        try {
+            const quotes = await promiseAll;
 
-        this.logger.debug("createSwap(): Sorted quotes, best price to worst: ", quotes)
+            //TODO: Intermediary's reputation is not taken into account!
+            quotes.sort((a, b) => {
+                if(amountData.exactIn) {
+                    //Compare outputs
+                    return bigIntCompare(b.quote.getOutput().rawAmount, a.quote.getOutput().rawAmount);
+                } else {
+                    //Compare inputs
+                    return bigIntCompare(a.quote.getOutput().rawAmount, b.quote.getOutput().rawAmount);
+                }
+            });
 
-        if(swapLimitsChanged) this.emit("swapLimitsChanged");
+            this.logger.debug("createSwap(): Sorted quotes, best price to worst: ", quotes);
 
-        return quotes[0].quote;
+            if(swapLimitsChanged) this.emit("swapLimitsChanged");
+            return quotes[0].quote;
+        } catch (e) {
+            if(swapLimitsChanged) this.emit("swapLimitsChanged");
+            throw e;
+        }
     }
 
     /**

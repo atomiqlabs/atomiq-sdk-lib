@@ -281,7 +281,7 @@ class Swapper extends events_1.EventEmitter {
         const abortController = new AbortController();
         this.logger.debug("createSwap() Swap candidates: ", candidates.map(lp => lp.url).join());
         const quotePromises = await create(candidates, abortController.signal, this.chains[chainIdentifier]);
-        const quotes = await new Promise((resolve, reject) => {
+        const promiseAll = new Promise((resolve, reject) => {
             let min;
             let max;
             let error;
@@ -351,21 +351,29 @@ class Swapper extends events_1.EventEmitter {
                 });
             });
         });
-        //TODO: Intermediary's reputation is not taken into account!
-        quotes.sort((a, b) => {
-            if (amountData.exactIn) {
-                //Compare outputs
-                return (0, Utils_1.bigIntCompare)(b.quote.getOutput().rawAmount, a.quote.getOutput().rawAmount);
-            }
-            else {
-                //Compare inputs
-                return (0, Utils_1.bigIntCompare)(a.quote.getOutput().rawAmount, b.quote.getOutput().rawAmount);
-            }
-        });
-        this.logger.debug("createSwap(): Sorted quotes, best price to worst: ", quotes);
-        if (swapLimitsChanged)
-            this.emit("swapLimitsChanged");
-        return quotes[0].quote;
+        try {
+            const quotes = await promiseAll;
+            //TODO: Intermediary's reputation is not taken into account!
+            quotes.sort((a, b) => {
+                if (amountData.exactIn) {
+                    //Compare outputs
+                    return (0, Utils_1.bigIntCompare)(b.quote.getOutput().rawAmount, a.quote.getOutput().rawAmount);
+                }
+                else {
+                    //Compare inputs
+                    return (0, Utils_1.bigIntCompare)(a.quote.getOutput().rawAmount, b.quote.getOutput().rawAmount);
+                }
+            });
+            this.logger.debug("createSwap(): Sorted quotes, best price to worst: ", quotes);
+            if (swapLimitsChanged)
+                this.emit("swapLimitsChanged");
+            return quotes[0].quote;
+        }
+        catch (e) {
+            if (swapLimitsChanged)
+                this.emit("swapLimitsChanged");
+            throw e;
+        }
     }
     /**
      * Creates To BTC swap
