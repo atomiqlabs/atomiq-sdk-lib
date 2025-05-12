@@ -185,6 +185,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                     ticker: tokenData.ticker,
                     name: tokenData.name,
                     decimals: chainData.decimals,
+                    displayDecimals: chainData.displayDecimals,
                     address: chainData.address
                 }
             }

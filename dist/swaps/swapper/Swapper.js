@@ -88,6 +88,7 @@ class Swapper extends events_1.EventEmitter {
                     ticker: tokenData.ticker,
                     name: tokenData.name,
                     decimals: chainData.decimals,
+                    displayDecimals: chainData.displayDecimals,
                     address: chainData.address
                 };
             }
