@@ -257,11 +257,11 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             opReturnData.length > 75 ? buffer_1.Buffer.from([0x6a, 0x4c, opReturnData.length]) : buffer_1.Buffer.from([0x6a, opReturnData.length]),
             opReturnData
         ]);
-        if (this.callerFeeShare < 0n || this.callerFeeShare >= 0xfffffn)
+        if (this.callerFeeShare < 0n || this.callerFeeShare > 0xfffffn)
             throw new Error("Caller fee out of bounds!");
-        if (this.frontingFeeShare < 0n || this.frontingFeeShare >= 0xfffffn)
+        if (this.frontingFeeShare < 0n || this.frontingFeeShare > 0xfffffn)
             throw new Error("Fronting fee out of bounds!");
-        if (this.executionFeeShare < 0n || this.executionFeeShare >= 0xfffffn)
+        if (this.executionFeeShare < 0n || this.executionFeeShare > 0xfffffn)
             throw new Error("Execution fee out of bounds!");
         const nSequence0 = 0x80000000n | (this.callerFeeShare & 0xfffffn) | (this.frontingFeeShare & 1047552n) << 10n;
         const nSequence1 = 0x80000000n | (this.executionFeeShare & 0xfffffn) | (this.frontingFeeShare & 1023n) << 20n;

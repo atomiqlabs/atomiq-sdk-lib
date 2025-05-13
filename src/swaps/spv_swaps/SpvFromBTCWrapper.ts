@@ -236,24 +236,24 @@ export class SpvFromBTCWrapper<
                 (claimFeeRate * BigInt(this.options.maxTransactionsDelta))
             ) * BigInt(Math.floor(options.feeSafetyFactor*1000000)) / 1_000_000n;
 
-            let amountInNativeToken: bigint;
+            let payoutAmount: bigint;
             if(amountData.exactIn) {
                 //Convert input amount in BTC to
-                amountInNativeToken = await this.prices.getFromBtcSwapAmount(this.chainIdentifier, amountData.amount, this.chain.getNativeCurrencyAddress(), abortController.signal, nativeTokenPrice);
+                const amountInNativeToken = await this.prices.getFromBtcSwapAmount(this.chainIdentifier, amountData.amount, this.chain.getNativeCurrencyAddress(), abortController.signal, nativeTokenPrice);
+                payoutAmount = amountInNativeToken - totalFeeInNativeToken;
             } else {
                 if(amountData.token===this.chain.getNativeCurrencyAddress()) {
                     //Both amounts in same currency
-                    amountInNativeToken = amountData.amount;
+                    payoutAmount = amountData.amount;
                 } else {
                     //Need to convert both to native currency
                     const btcAmount = await this.prices.getToBtcSwapAmount(this.chainIdentifier, amountData.amount, amountData.token, abortController.signal, await pricePrefetch);
-                    amountInNativeToken = await this.prices.getFromBtcSwapAmount(this.chainIdentifier, btcAmount, this.chain.getNativeCurrencyAddress(), abortController.signal, nativeTokenPrice);
+                    payoutAmount = await this.prices.getFromBtcSwapAmount(this.chainIdentifier, btcAmount, this.chain.getNativeCurrencyAddress(), abortController.signal, nativeTokenPrice);
                 }
             }
 
-            this.logger.debug("preFetchCallerFeeShare(): Caller fee in native token: "+totalFeeInNativeToken.toString(10)+" total swap amount in native token: "+amountInNativeToken.toString(10));
+            this.logger.debug("preFetchCallerFeeShare(): Caller fee in native token: "+totalFeeInNativeToken.toString(10)+" total payout in native token: "+payoutAmount.toString(10));
 
-            const payoutAmount = amountInNativeToken - totalFeeInNativeToken;
             const callerFeeShare = ((totalFeeInNativeToken * 100_000n) + payoutAmount - 1n) / payoutAmount; //Make sure to round up here
             if(callerFeeShare < 0n) return 0n;
             if(callerFeeShare >= 2n**20n) return 2n**20n - 1n;

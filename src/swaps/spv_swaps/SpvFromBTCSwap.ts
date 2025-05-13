@@ -411,9 +411,9 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             opReturnData
         ]);
 
-        if(this.callerFeeShare<0n || this.callerFeeShare>=0xFFFFFn) throw new Error("Caller fee out of bounds!");
-        if(this.frontingFeeShare<0n || this.frontingFeeShare>=0xFFFFFn) throw new Error("Fronting fee out of bounds!");
-        if(this.executionFeeShare<0n || this.executionFeeShare>=0xFFFFFn) throw new Error("Execution fee out of bounds!");
+        if(this.callerFeeShare<0n || this.callerFeeShare>0xFFFFFn) throw new Error("Caller fee out of bounds!");
+        if(this.frontingFeeShare<0n || this.frontingFeeShare>0xFFFFFn) throw new Error("Fronting fee out of bounds!");
+        if(this.executionFeeShare<0n || this.executionFeeShare>0xFFFFFn) throw new Error("Execution fee out of bounds!");
 
         const nSequence0 = 0x80000000n | (this.callerFeeShare & 0xFFFFFn) | (this.frontingFeeShare & 0b1111_1111_1100_0000_0000n) << 10n;
         const nSequence1 = 0x80000000n | (this.executionFeeShare & 0xFFFFFn) | (this.frontingFeeShare & 0b0000_0000_0011_1111_1111n) << 20n;
