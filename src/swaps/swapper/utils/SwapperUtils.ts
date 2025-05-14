@@ -107,7 +107,7 @@ export class SwapperUtils<T extends MultiChain> {
                 const key = arr2[0];
                 const value = decodeURIComponent(arr2[1]);
                 if(key==="amount") {
-                    _amount = fromDecimal(parseFloat(value).toString(8), 8);
+                    _amount = fromDecimal(parseFloat(value).toFixed(8), 8);
                 }
             }
         }

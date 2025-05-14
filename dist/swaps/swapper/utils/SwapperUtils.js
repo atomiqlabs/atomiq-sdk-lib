@@ -94,7 +94,7 @@ class SwapperUtils {
                 const key = arr2[0];
                 const value = decodeURIComponent(arr2[1]);
                 if (key === "amount") {
-                    _amount = (0, Tokens_1.fromDecimal)(parseFloat(value).toString(8), 8);
+                    _amount = (0, Tokens_1.fromDecimal)(parseFloat(value).toFixed(8), 8);
                 }
             }
         }
