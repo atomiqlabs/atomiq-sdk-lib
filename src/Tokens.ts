@@ -72,7 +72,8 @@ export type TokenAmount<
     amount: string,
     _amount: number,
     token: T,
-    usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) => Promise<number>
+    usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) => Promise<number>,
+    toString: () => string
 };
 
 export function fromDecimal(amount: string, decimalCount: number) {
@@ -137,6 +138,7 @@ export function toTokenAmount<
         _amount: parseFloat(amountStr),
         token,
         usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-            prices.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice)
+            prices.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice),
+        toString: () => amountStr+" "+token.ticker
     };
 }

@@ -30,6 +30,7 @@ export type TokenAmount<ChainIdentifier extends string = string, T extends Token
     _amount: number;
     token: T;
     usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) => Promise<number>;
+    toString: () => string;
 };
 export declare function fromDecimal(amount: string, decimalCount: number): bigint;
 export declare function toDecimal(amount: bigint, decimalCount: number, cut?: boolean, displayDecimals?: number): string;

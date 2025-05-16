@@ -97,7 +97,8 @@ function toTokenAmount(amount, token, prices) {
         amount: amountStr,
         _amount: parseFloat(amountStr),
         token,
-        usdValue: (abortSignal, preFetchedUsdPrice) => prices.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice)
+        usdValue: (abortSignal, preFetchedUsdPrice) => prices.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice),
+        toString: () => amountStr + " " + token.ticker
     };
 }
 exports.toTokenAmount = toTokenAmount;
