@@ -137,7 +137,10 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         psbt: Transaction;
         in1sequence: number;
     }>;
-    getFundedPsbt(wallet: IBitcoinWallet, feeRate?: number): Promise<{
+    getFundedPsbt(_bitcoinWallet: IBitcoinWallet | {
+        address: string;
+        publicKey: string;
+    }, feeRate?: number): Promise<{
         psbt: Transaction;
         signInputs: number[];
     }>;

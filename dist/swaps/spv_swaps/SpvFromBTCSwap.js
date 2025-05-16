@@ -9,7 +9,9 @@ const btc_signer_1 = require("@scure/btc-signer");
 const Tokens_1 = require("../../Tokens");
 const buffer_1 = require("buffer");
 const Fee_1 = require("../fee/Fee");
+const IBitcoinWallet_1 = require("../../btc/wallet/IBitcoinWallet");
 const IntermediaryAPI_1 = require("../../intermediaries/IntermediaryAPI");
+const SingleAddressBitcoinWallet_1 = require("../../btc/wallet/SingleAddressBitcoinWallet");
 var SpvFromBTCSwapState;
 (function (SpvFromBTCSwapState) {
     SpvFromBTCSwapState[SpvFromBTCSwapState["CLOSED"] = -5] = "CLOSED";
@@ -311,16 +313,23 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             in1sequence: res.in1sequence
         };
     }
-    async getFundedPsbt(wallet, feeRate) {
+    async getFundedPsbt(_bitcoinWallet, feeRate) {
+        let bitcoinWallet;
+        if ((0, IBitcoinWallet_1.isIBitcoinWallet)(_bitcoinWallet)) {
+            bitcoinWallet = _bitcoinWallet;
+        }
+        else {
+            bitcoinWallet = new SingleAddressBitcoinWallet_1.SingleAddressBitcoinWallet(this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork, _bitcoinWallet);
+        }
         if (feeRate != null) {
             if (feeRate < this.minimumBtcFeeRate)
                 throw new Error("Bitcoin tx fee needs to be at least " + this.minimumBtcFeeRate + " sats/vB");
         }
         else {
-            feeRate = Math.max(this.minimumBtcFeeRate, await wallet.getFeeRate());
+            feeRate = Math.max(this.minimumBtcFeeRate, await bitcoinWallet.getFeeRate());
         }
         let { psbt, in1sequence } = await this.getPsbt();
-        psbt = await wallet.fundPsbt(psbt, feeRate);
+        psbt = await bitcoinWallet.fundPsbt(psbt, feeRate);
         psbt.updateInput(1, { sequence: in1sequence });
         //Sign every input except the first one
         const signInputs = [];

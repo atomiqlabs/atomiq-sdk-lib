@@ -1,7 +1,7 @@
 import {SwapType} from "../../enums/SwapType";
 import {ChainType} from "@atomiqlabs/base";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
-import {getLogger, timeoutPromise} from "../../../utils/Utils";
+import {getLogger, timeoutPromise, toOutputScript} from "../../../utils/Utils";
 import {isISwapInit, ISwap, ISwapInit, ppmToPercentage} from "../../ISwap";
 import {
     AddressStatusResponseCodes,
@@ -10,10 +10,13 @@ import {
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {OnchainForGasWrapper} from "./OnchainForGasWrapper";
 import {Fee, FeeType} from "../../fee/Fee";
-import {IBitcoinWallet} from "../../../btc/wallet/IBitcoinWallet";
+import {IBitcoinWallet, isIBitcoinWallet} from "../../../btc/wallet/IBitcoinWallet";
 import {IAddressSwap} from "../../IAddressSwap";
 import {FromBTCSwapState} from "../../escrow_swaps/frombtc/onchain/FromBTCSwap";
 import {IBTCWalletSwap} from "../../IBTCWalletSwap";
+import {Transaction} from "@scure/btc-signer";
+import {SingleAddressBitcoinWallet} from "../../../btc/wallet/SingleAddressBitcoinWallet";
+import {Buffer} from "buffer";
 
 export enum OnchainForGasSwapState {
     EXPIRED = -3,
@@ -222,6 +225,60 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         }];
     }
 
+    async getFundedPsbt(_bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string }, feeRate?: number): Promise<{psbt: Transaction, signInputs: number[]}> {
+        if(this.state!==OnchainForGasSwapState.PR_CREATED)
+            throw new Error("Swap already paid for!");
+
+        let bitcoinWallet: IBitcoinWallet;
+        if(isIBitcoinWallet(_bitcoinWallet)) {
+            bitcoinWallet = _bitcoinWallet;
+        } else {
+            bitcoinWallet = new SingleAddressBitcoinWallet(this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork, _bitcoinWallet);
+        }
+        //TODO: Maybe re-introduce fee rate check here if passed from the user
+        if(feeRate==null) {
+            feeRate = await bitcoinWallet.getFeeRate();
+        }
+
+        const basePsbt = new Transaction({
+            allowUnknownOutputs: true,
+            allowLegacyWitnessUtxo: true
+        });
+        basePsbt.addOutput({
+            amount: this.outputAmount,
+            script: toOutputScript(this.wrapper.options.bitcoinNetwork, this.address)
+        });
+
+        const psbt = await bitcoinWallet.fundPsbt(basePsbt, feeRate);
+        //Sign every input
+        const signInputs: number[] = [];
+        for(let i=0;i<psbt.inputsLength;i++) {
+            signInputs.push(i);
+        }
+        return {psbt, signInputs};
+    }
+
+    async submitPsbt(psbt: Transaction): Promise<string> {
+        if(this.state!==OnchainForGasSwapState.PR_CREATED)
+            throw new Error("Swap already paid for!");
+
+        //Ensure not expired
+        if(this.expiry<Date.now()) {
+            throw new Error("Swap expired!");
+        }
+
+        const output0 = psbt.getOutput(0);
+        if(output0.amount!==this.outputAmount)
+            throw new Error("PSBT output amount invalid, expected: "+this.outputAmount+" got: "+output0.amount);
+        const expectedOutputScript = toOutputScript(this.wrapper.options.bitcoinNetwork, this.address);
+        if(!expectedOutputScript.equals(output0.script))
+            throw new Error("PSBT output script invalid!");
+
+        if(!psbt.isFinal) psbt.finalize();
+
+        return await this.wrapper.btcRpc.sendRawTransaction(Buffer.from(psbt.toBytes(true, true)).toString("hex"));
+    }
+
     async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
         const txFee = await wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
         return toTokenAmount(txFee==null ? null : BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
@@ -229,7 +286,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
 
     async sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string> {
         if(this.state!==OnchainForGasSwapState.PR_CREATED)
-            throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
+            throw new Error("Swap already paid for!");
         return await wallet.sendTransaction(this.address, this.inputAmount, feeRate);
     }
 

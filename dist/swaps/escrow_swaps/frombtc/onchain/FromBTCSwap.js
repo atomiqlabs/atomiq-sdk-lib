@@ -8,6 +8,9 @@ const buffer_1 = require("buffer");
 const Tokens_1 = require("../../../../Tokens");
 const Utils_1 = require("../../../../utils/Utils");
 const IEscrowSwap_1 = require("../../IEscrowSwap");
+const IBitcoinWallet_1 = require("../../../../btc/wallet/IBitcoinWallet");
+const btc_signer_1 = require("@scure/btc-signer");
+const SingleAddressBitcoinWallet_1 = require("../../../../btc/wallet/SingleAddressBitcoinWallet");
 var FromBTCSwapState;
 (function (FromBTCSwapState) {
     FromBTCSwapState[FromBTCSwapState["FAILED"] = -4] = "FAILED";
@@ -175,6 +178,53 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
         }
         await this._saveAndEmit();
         return result.tx.txid;
+    }
+    async getFundedPsbt(_bitcoinWallet, feeRate) {
+        if (this.state !== FromBTCSwapState.CLAIM_COMMITED)
+            throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
+        let bitcoinWallet;
+        if ((0, IBitcoinWallet_1.isIBitcoinWallet)(_bitcoinWallet)) {
+            bitcoinWallet = _bitcoinWallet;
+        }
+        else {
+            bitcoinWallet = new SingleAddressBitcoinWallet_1.SingleAddressBitcoinWallet(this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork, _bitcoinWallet);
+        }
+        //TODO: Maybe re-introduce fee rate check here if passed from the user
+        if (feeRate == null) {
+            feeRate = await bitcoinWallet.getFeeRate();
+        }
+        const basePsbt = new btc_signer_1.Transaction({
+            allowUnknownOutputs: true,
+            allowLegacyWitnessUtxo: true
+        });
+        basePsbt.addOutput({
+            amount: this.amount,
+            script: (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.address)
+        });
+        const psbt = await bitcoinWallet.fundPsbt(basePsbt, feeRate);
+        //Sign every input
+        const signInputs = [];
+        for (let i = 0; i < psbt.inputsLength; i++) {
+            signInputs.push(i);
+        }
+        return { psbt, signInputs };
+    }
+    async submitPsbt(psbt) {
+        if (this.state !== FromBTCSwapState.CLAIM_COMMITED)
+            throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
+        //Ensure not expired
+        if (this.getTimeoutTime() < Date.now()) {
+            throw new Error("Swap address expired!");
+        }
+        const output0 = psbt.getOutput(0);
+        if (output0.amount !== this.amount)
+            throw new Error("PSBT output amount invalid, expected: " + this.amount + " got: " + output0.amount);
+        const expectedOutputScript = (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.address);
+        if (!expectedOutputScript.equals(output0.script))
+            throw new Error("PSBT output script invalid!");
+        if (!psbt.isFinal)
+            psbt.finalize();
+        return await this.wrapper.btcRpc.sendRawTransaction(buffer_1.Buffer.from(psbt.toBytes(true, true)).toString("hex"));
     }
     async estimateBitcoinFee(wallet, feeRate) {
         const txFee = await wallet.getTransactionFee(this.address, this.amount, feeRate);

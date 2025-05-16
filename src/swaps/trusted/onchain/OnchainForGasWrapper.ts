@@ -3,7 +3,7 @@ import {TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediar
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {ChainType} from "@atomiqlabs/base";
 import {OnchainForGasSwap, OnchainForGasSwapInit, OnchainForGasSwapState} from "./OnchainForGasSwap";
-import {BitcoinRpcWithTxoListener} from "../../../btc/BitcoinRpcWithTxoListener";
+import {BitcoinRpcWithAddressIndex} from "../../../btc/BitcoinRpcWithAddressIndex";
 import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {Intermediary} from "../../../intermediaries/Intermediary";
@@ -11,12 +11,17 @@ import {SwapType} from "../../enums/SwapType";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../storage/UnifiedSwapStorage";
 import {ISwap} from "../../ISwap";
+import {BTC_NETWORK} from "@scure/btc-signer/utils";
 
-export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
+export type OnchainForGasWrapperOptions = ISwapWrapperOptions & {
+    bitcoinNetwork: BTC_NETWORK
+};
+
+export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>, OnchainForGasWrapperOptions> {
     public readonly TYPE = SwapType.TRUSTED_FROM_BTC;
     public readonly swapDeserializer = OnchainForGasSwap;
 
-    readonly btcRpc: BitcoinRpcWithTxoListener<any>;
+    readonly btcRpc: BitcoinRpcWithAddressIndex<any>;
 
     /**
      * @param chainIdentifier
@@ -36,8 +41,8 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         chain: T["ChainInterface"],
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
-        btcRpc: BitcoinRpcWithTxoListener<any>,
-        options?: ISwapWrapperOptions,
+        btcRpc: BitcoinRpcWithAddressIndex<any>,
+        options?: OnchainForGasWrapperOptions,
         events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);

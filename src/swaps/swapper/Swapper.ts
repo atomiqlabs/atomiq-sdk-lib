@@ -293,7 +293,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 bitcoinRpc,
                 {
                     getRequestTimeout: options.getRequestTimeout,
-                    postRequestTimeout: options.postRequestTimeout
+                    postRequestTimeout: options.postRequestTimeout,
+                    bitcoinNetwork: this.bitcoinNetwork
                 }
             );
 
@@ -431,7 +432,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 (wrappers[key] as ISwapWrapper<any, any>).events.removeListener("swapState", this.swapStateListener);
                 await wrappers[key].stop();
             }
-            unifiedChainEvents.stop();
+            await unifiedChainEvents.stop();
         }
     }
 

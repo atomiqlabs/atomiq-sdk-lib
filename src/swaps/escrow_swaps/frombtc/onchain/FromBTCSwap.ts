@@ -5,11 +5,15 @@ import {ChainType, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
 import {isISwapInit, ISwapInit} from "../../../ISwap";
 import {Buffer} from "buffer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../../Tokens";
-import {extendAbortController, getLogger, tryWithRetries} from "../../../../utils/Utils";
+import {extendAbortController, getLogger, toOutputScript, tryWithRetries} from "../../../../utils/Utils";
 import {IEscrowSwapInit, isIEscrowSwapInit} from "../../IEscrowSwap";
-import {IBitcoinWallet} from "../../../../btc/wallet/IBitcoinWallet";
+import {IBitcoinWallet, isIBitcoinWallet} from "../../../../btc/wallet/IBitcoinWallet";
 import {Fee} from "../../../fee/Fee";
 import {IBTCWalletSwap} from "../../../IBTCWalletSwap";
+import {getInputType, Transaction} from "@scure/btc-signer";
+import {SingleAddressBitcoinWallet} from "../../../../btc/wallet/SingleAddressBitcoinWallet";
+import {IntermediaryAPI} from "../../../../intermediaries/IntermediaryAPI";
+import {SpvFromBTCSwapState} from "../../../spv_swaps/SpvFromBTCSwap";
 
 export enum FromBTCSwapState {
     FAILED = -4,
@@ -235,6 +239,60 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         await this._saveAndEmit();
 
         return result.tx.txid;
+    }
+
+    async getFundedPsbt(_bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string }, feeRate?: number): Promise<{psbt: Transaction, signInputs: number[]}> {
+        if(this.state!==FromBTCSwapState.CLAIM_COMMITED)
+            throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
+
+        let bitcoinWallet: IBitcoinWallet;
+        if(isIBitcoinWallet(_bitcoinWallet)) {
+            bitcoinWallet = _bitcoinWallet;
+        } else {
+            bitcoinWallet = new SingleAddressBitcoinWallet(this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork, _bitcoinWallet);
+        }
+        //TODO: Maybe re-introduce fee rate check here if passed from the user
+        if(feeRate==null) {
+            feeRate = await bitcoinWallet.getFeeRate();
+        }
+
+        const basePsbt = new Transaction({
+            allowUnknownOutputs: true,
+            allowLegacyWitnessUtxo: true
+        });
+        basePsbt.addOutput({
+            amount: this.amount,
+            script: toOutputScript(this.wrapper.options.bitcoinNetwork, this.address)
+        });
+
+        const psbt = await bitcoinWallet.fundPsbt(basePsbt, feeRate);
+        //Sign every input
+        const signInputs: number[] = [];
+        for(let i=0;i<psbt.inputsLength;i++) {
+            signInputs.push(i);
+        }
+        return {psbt, signInputs};
+    }
+
+    async submitPsbt(psbt: Transaction): Promise<string> {
+        if(this.state!==FromBTCSwapState.CLAIM_COMMITED)
+            throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
+
+        //Ensure not expired
+        if(this.getTimeoutTime()<Date.now()) {
+            throw new Error("Swap address expired!");
+        }
+
+        const output0 = psbt.getOutput(0);
+        if(output0.amount!==this.amount)
+            throw new Error("PSBT output amount invalid, expected: "+this.amount+" got: "+output0.amount);
+        const expectedOutputScript = toOutputScript(this.wrapper.options.bitcoinNetwork, this.address);
+        if(!expectedOutputScript.equals(output0.script))
+            throw new Error("PSBT output script invalid!");
+
+        if(!psbt.isFinal) psbt.finalize();
+
+        return await this.wrapper.btcRpc.sendRawTransaction(Buffer.from(psbt.toBytes(true, true)).toString("hex"));
     }
 
     async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {

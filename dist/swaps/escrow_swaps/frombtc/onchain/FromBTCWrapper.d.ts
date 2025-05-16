@@ -4,7 +4,7 @@ import { FromBTCSwap, FromBTCSwapState } from "./FromBTCSwap";
 import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, RelaySynchronizer, SwapData, BtcRelay } from "@atomiqlabs/base";
 import { EventEmitter } from "events";
 import { Intermediary } from "../../../../intermediaries/Intermediary";
-import { BitcoinRpcWithTxoListener } from "../../../../btc/BitcoinRpcWithTxoListener";
+import { BitcoinRpcWithAddressIndex } from "../../../../btc/BitcoinRpcWithAddressIndex";
 import { ISwapPrice } from "../../../../prices/abstract/ISwapPrice";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../../ISwapWrapper";
 import { SwapType } from "../../../enums/SwapType";
@@ -30,7 +30,7 @@ export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper
     readonly swapDeserializer: typeof FromBTCSwap;
     readonly synchronizer: RelaySynchronizer<any, T["TX"], any>;
     readonly btcRelay: BtcRelay<any, T["TX"], any>;
-    readonly btcRpc: BitcoinRpcWithTxoListener<any>;
+    readonly btcRpc: BitcoinRpcWithAddressIndex<any>;
     /**
      * @param chainIdentifier
      * @param unifiedStorage Storage interface for the current environment
@@ -46,7 +46,7 @@ export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithTxoListener<any>, options?: FromBTCWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithAddressIndex<any>, options?: FromBTCWrapperOptions, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     readonly pendingSwapStates: FromBTCSwapState[];

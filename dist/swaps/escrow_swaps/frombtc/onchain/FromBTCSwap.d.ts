@@ -6,6 +6,7 @@ import { BtcToken, SCToken, TokenAmount } from "../../../../Tokens";
 import { IEscrowSwapInit } from "../../IEscrowSwap";
 import { IBitcoinWallet } from "../../../../btc/wallet/IBitcoinWallet";
 import { IBTCWalletSwap } from "../../../IBTCWalletSwap";
+import { Transaction } from "@scure/btc-signer";
 export declare enum FromBTCSwapState {
     FAILED = -4,
     EXPIRED = -3,
@@ -76,6 +77,14 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
+    getFundedPsbt(_bitcoinWallet: IBitcoinWallet | {
+        address: string;
+        publicKey: string;
+    }, feeRate?: number): Promise<{
+        psbt: Transaction;
+        signInputs: number[];
+    }>;
+    submitPsbt(psbt: Transaction): Promise<string>;
     estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
     sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     /**

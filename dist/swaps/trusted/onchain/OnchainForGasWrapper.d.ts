@@ -2,7 +2,7 @@
 import { ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { ChainType } from "@atomiqlabs/base";
 import { OnchainForGasSwap, OnchainForGasSwapState } from "./OnchainForGasSwap";
-import { BitcoinRpcWithTxoListener } from "../../../btc/BitcoinRpcWithTxoListener";
+import { BitcoinRpcWithAddressIndex } from "../../../btc/BitcoinRpcWithAddressIndex";
 import { ISwapPrice } from "../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { Intermediary } from "../../../intermediaries/Intermediary";
@@ -10,10 +10,14 @@ import { SwapType } from "../../enums/SwapType";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
 import { UnifiedSwapStorage } from "../../../storage/UnifiedSwapStorage";
 import { ISwap } from "../../ISwap";
-export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
+import { BTC_NETWORK } from "@scure/btc-signer/utils";
+export type OnchainForGasWrapperOptions = ISwapWrapperOptions & {
+    bitcoinNetwork: BTC_NETWORK;
+};
+export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>, OnchainForGasWrapperOptions> {
     readonly TYPE = SwapType.TRUSTED_FROM_BTC;
     readonly swapDeserializer: typeof OnchainForGasSwap;
-    readonly btcRpc: BitcoinRpcWithTxoListener<any>;
+    readonly btcRpc: BitcoinRpcWithAddressIndex<any>;
     /**
      * @param chainIdentifier
      * @param unifiedStorage Storage interface for the current environment
@@ -25,7 +29,7 @@ export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrap
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, btcRpc: BitcoinRpcWithTxoListener<any>, options?: ISwapWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, btcRpc: BitcoinRpcWithAddressIndex<any>, options?: OnchainForGasWrapperOptions, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     /**

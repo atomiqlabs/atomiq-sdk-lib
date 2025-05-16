@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MempoolBitcoinRpc = void 0;
 const base_1 = require("@atomiqlabs/base");
 const MempoolBitcoinBlock_1 = require("./MempoolBitcoinBlock");
+const MempoolApi_1 = require("./MempoolApi");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../../utils/Utils");
 const btc_signer_1 = require("@scure/btc-signer");
@@ -46,8 +47,8 @@ function bitcoinTxToBtcTx(btcTx) {
     };
 }
 class MempoolBitcoinRpc {
-    constructor(mempoolApi) {
-        this.api = mempoolApi;
+    constructor(urlOrMempoolApi) {
+        this.api = urlOrMempoolApi instanceof MempoolApi_1.MempoolApi ? urlOrMempoolApi : new MempoolApi_1.MempoolApi(urlOrMempoolApi);
     }
     /**
      * Returns a txo hash for a specific transaction vout
@@ -321,6 +322,26 @@ class MempoolBitcoinRpc {
     }
     getEffectiveFeeRate(btcTx) {
         throw new Error("Unsupported.");
+    }
+    async getFeeRate() {
+        return (await this.api.getFees()).fastestFee;
+    }
+    getAddressBalances(address) {
+        return this.api.getAddressBalances(address);
+    }
+    async getAddressUTXOs(address) {
+        return (await this.api.getAddressUTXOs(address)).map(val => ({
+            txid: val.txid,
+            vout: val.vout,
+            confirmed: val.status.confirmed,
+            block_height: val.status.block_height,
+            block_hash: val.status.block_hash,
+            block_time: val.status.block_time,
+            value: val.value
+        }));
+    }
+    getCPFPData(txId) {
+        return this.api.getCPFPData(txId);
     }
 }
 exports.MempoolBitcoinRpc = MempoolBitcoinRpc;

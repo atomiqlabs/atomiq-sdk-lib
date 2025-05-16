@@ -4,7 +4,7 @@ import { BtcRelay, ChainEvent, ChainType, RelaySynchronizer, SpvVaultClaimEvent,
 import { SpvFromBTCSwap } from "./SpvFromBTCSwap";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { SwapType } from "../enums/SwapType";
-import { BitcoinRpcWithTxoListener } from "../../btc/BitcoinRpcWithTxoListener";
+import { BitcoinRpcWithAddressIndex } from "../../btc/BitcoinRpcWithAddressIndex";
 import { UnifiedSwapStorage } from "../../storage/UnifiedSwapStorage";
 import { UnifiedSwapEventListener } from "../../events/UnifiedSwapEventListener";
 import { ISwapPrice } from "../../prices/abstract/ISwapPrice";
@@ -31,7 +31,7 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
     readonly synchronizer: RelaySynchronizer<any, T["TX"], any>;
     readonly contract: T["SpvVaultContract"];
     readonly btcRelay: T["BtcRelay"];
-    readonly btcRpc: BitcoinRpcWithTxoListener<any>;
+    readonly btcRpc: BitcoinRpcWithAddressIndex<any>;
     readonly spvWithdrawalDataDeserializer: new (data: any) => T["SpvVaultWithdrawalData"];
     /**
      * @param chainIdentifier
@@ -48,7 +48,7 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["SpvVaultContract"], prices: ISwapPrice, tokens: WrapperCtorTokens, spvWithdrawalDataDeserializer: new (data: any) => T["SpvVaultWithdrawalData"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithTxoListener<any>, options?: SpvFromBTCWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["SpvVaultContract"], prices: ISwapPrice, tokens: WrapperCtorTokens, spvWithdrawalDataDeserializer: new (data: any) => T["SpvVaultWithdrawalData"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithAddressIndex<any>, options?: SpvFromBTCWrapperOptions, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     readonly pendingSwapStates: Array<SpvFromBTCSwap<T>["state"]>;

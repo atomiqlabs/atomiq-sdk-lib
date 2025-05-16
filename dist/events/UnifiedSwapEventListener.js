@@ -52,6 +52,7 @@ class UnifiedSwapEventListener {
     }
     stop() {
         this.events.unregisterListener(this.listener);
+        return this.events.stop();
     }
     registerListener(type, listener, reviver) {
         this.listeners[type] = {

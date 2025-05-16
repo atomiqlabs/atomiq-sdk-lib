@@ -364,7 +364,7 @@ export class SwapperUtils<T extends MultiChain> {
 
         let bitcoinWallet: IBitcoinWallet;
         if(typeof(addressOrWallet)==="string") {
-            bitcoinWallet = new SingleAddressBitcoinWallet(this.root.mempoolApi, this.bitcoinNetwork, addressOrWallet);
+            bitcoinWallet = new SingleAddressBitcoinWallet(this.root.bitcoinRpc, this.bitcoinNetwork, addressOrWallet);
         } else {
             bitcoinWallet = addressOrWallet as IBitcoinWallet;
         }

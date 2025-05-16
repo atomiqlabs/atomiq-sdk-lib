@@ -11,7 +11,7 @@ import {
 import {SpvFromBTCSwap, SpvFromBTCSwapInit, SpvFromBTCSwapState} from "./SpvFromBTCSwap";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {SwapType} from "../enums/SwapType";
-import {BitcoinRpcWithTxoListener} from "../../btc/BitcoinRpcWithTxoListener";
+import {BitcoinRpcWithAddressIndex} from "../../btc/BitcoinRpcWithAddressIndex";
 import {UnifiedSwapStorage} from "../../storage/UnifiedSwapStorage";
 import {UnifiedSwapEventListener} from "../../events/UnifiedSwapEventListener";
 import {ISwapPrice} from "../../prices/abstract/ISwapPrice";
@@ -33,6 +33,7 @@ import {IntermediaryError} from "../../errors/IntermediaryError";
 import {CoinselectAddressTypes} from "../../btc/coinselect2";
 import {OutScript, Transaction} from "@scure/btc-signer";
 import {ISwap} from "../ISwap";
+import {MempoolApi} from "../../btc/mempool/MempoolApi";
 
 export type SpvFromBTCOptions = {
     gasAmount?: bigint,
@@ -59,7 +60,7 @@ export class SpvFromBTCWrapper<
     readonly synchronizer: RelaySynchronizer<any, T["TX"], any>;
     readonly contract: T["SpvVaultContract"];
     readonly btcRelay: T["BtcRelay"];
-    readonly btcRpc: BitcoinRpcWithTxoListener<any>;
+    readonly btcRpc: BitcoinRpcWithAddressIndex<any>;
 
     readonly spvWithdrawalDataDeserializer: new (data: any) => T["SpvVaultWithdrawalData"];
 
@@ -89,7 +90,7 @@ export class SpvFromBTCWrapper<
         spvWithdrawalDataDeserializer: new (data: any) => T["SpvVaultWithdrawalData"],
         btcRelay: BtcRelay<any, T["TX"], any>,
         synchronizer: RelaySynchronizer<any, T["TX"], any>,
-        btcRpc: BitcoinRpcWithTxoListener<any>,
+        btcRpc: BitcoinRpcWithAddressIndex<any>,
         options?: SpvFromBTCWrapperOptions,
         events?: EventEmitter<{swapState: [ISwap]}>
     ) {

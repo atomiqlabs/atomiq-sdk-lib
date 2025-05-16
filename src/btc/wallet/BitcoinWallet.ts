@@ -2,9 +2,9 @@ import {coinSelect, maxSendable, CoinselectAddressTypes, CoinselectTxInput} from
 import {BTC_NETWORK} from "@scure/btc-signer/utils"
 import {p2wpkh, OutScript, Transaction, p2tr, Address} from "@scure/btc-signer";
 import {IBitcoinWallet} from "./IBitcoinWallet";
-import {MempoolApi} from "../mempool/MempoolApi";
 import {Buffer} from "buffer";
 import {randomBytes, toCoinselectAddressType, toOutputScript} from "../../utils/Utils";
+import {BitcoinRpcWithAddressIndex} from "../BitcoinRpcWithAddressIndex";
 
 export type BitcoinWalletUtxo = {
     vout: number,
@@ -37,15 +37,15 @@ export function identifyAddressType(address: string, network: BTC_NETWORK): Coin
     }
 }
 
-export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
+export abstract class BitcoinWallet implements IBitcoinWallet {
 
-    mempoolApi: MempoolApi;
+    rpc: BitcoinRpcWithAddressIndex<any>;
     network: BTC_NETWORK;
     feeMultiplier: number;
     feeOverride: number;
 
-    constructor(mempoolApi: MempoolApi, network: BTC_NETWORK, feeMultiplier: number = 1.25, feeOverride?: number) {
-        this.mempoolApi = mempoolApi;
+    constructor(mempoolApi: BitcoinRpcWithAddressIndex<any>, network: BTC_NETWORK, feeMultiplier: number = 1.25, feeOverride?: number) {
+        this.rpc = mempoolApi;
         this.network = network;
         this.feeMultiplier = feeMultiplier;
         this.feeOverride = feeOverride;
@@ -55,22 +55,22 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
         if(this.feeOverride!=null) {
             return this.feeOverride;
         }
-        return Math.floor((await this.mempoolApi.getFees()).fastestFee*this.feeMultiplier);
+        return Math.floor((await this.rpc.getFeeRate())*this.feeMultiplier);
     }
 
     protected _sendTransaction(rawHex: string): Promise<string> {
-        return this.mempoolApi.sendTransaction(rawHex);
+        return this.rpc.sendRawTransaction(rawHex);
     }
 
     protected _getBalance(address: string): Promise<{ confirmedBalance: bigint; unconfirmedBalance: bigint }> {
-        return this.mempoolApi.getAddressBalances(address);
+        return this.rpc.getAddressBalances(address);
     }
 
     protected async _getUtxoPool(
         sendingAddress: string,
         sendingAddressType: CoinselectAddressTypes
     ): Promise<BitcoinWalletUtxo[]> {
-        const utxos = await this.mempoolApi.getAddressUTXOs(sendingAddress);
+        const utxos = await this.rpc.getAddressUTXOs(sendingAddress);
 
         let totalSpendable = 0;
 
@@ -88,14 +88,14 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
                 type: sendingAddressType,
                 outputScript: outputScript,
                 address: sendingAddress,
-                cpfp: !utxo.status.confirmed ? await this.mempoolApi.getCPFPData(utxo.txid).then((result) => {
+                cpfp: !utxo.confirmed ? await this.rpc.getCPFPData(utxo.txid).then((result) => {
                     if(result.effectiveFeePerVsize==null) return null;
                     return {
                         txVsize: result.adjustedVsize,
                         txEffectiveFeeRate: result.effectiveFeePerVsize
                     }
                 }) : null,
-                confirmed: utxo.status.confirmed
+                confirmed: utxo.confirmed
             })
         }
 
@@ -226,7 +226,7 @@ export abstract class MempoolBitcoinWallet implements IBitcoinWallet {
                     return {
                         txid: input.txId,
                         index: input.vout,
-                        nonWitnessUtxo: await this.mempoolApi.getRawTransaction(input.txId),
+                        nonWitnessUtxo: (await this.rpc.getTransaction(input.txId)).raw,
                         sighashType: 0x01
                     };
             }

@@ -1,6 +1,15 @@
 import { IBitcoinWallet } from "../btc/wallet/IBitcoinWallet";
 import { BtcToken, TokenAmount } from "../Tokens";
+import { Transaction } from "@scure/btc-signer";
 export interface IBTCWalletSwap {
+    getFundedPsbt(_bitcoinWallet: IBitcoinWallet | {
+        address: string;
+        publicKey: string;
+    }, feeRate?: number): Promise<{
+        psbt: Transaction;
+        signInputs: number[];
+    }>;
+    submitPsbt(psbt: Transaction): Promise<string>;
     estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
     sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     /**

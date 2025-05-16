@@ -127,7 +127,8 @@ class Swapper extends events_1.EventEmitter {
             });
             wrappers[SwapType_1.SwapType.TRUSTED_FROM_BTC] = new OnchainForGasWrapper_1.OnchainForGasWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, pricing, tokens, bitcoinRpc, {
                 getRequestTimeout: options.getRequestTimeout,
-                postRequestTimeout: options.postRequestTimeout
+                postRequestTimeout: options.postRequestTimeout,
+                bitcoinNetwork: this.bitcoinNetwork
             });
             if (spvVaultContract != null) {
                 wrappers[SwapType_1.SwapType.SPV_VAULT_FROM_BTC] = new SpvFromBTCWrapper_1.SpvFromBTCWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, spvVaultContract, pricing, tokens, spvVaultWithdrawalDataConstructor, btcRelay, synchronizer, bitcoinRpc, {
@@ -226,7 +227,7 @@ class Swapper extends events_1.EventEmitter {
                 wrappers[key].events.removeListener("swapState", this.swapStateListener);
                 await wrappers[key].stop();
             }
-            unifiedChainEvents.stop();
+            await unifiedChainEvents.stop();
         }
     }
     /**

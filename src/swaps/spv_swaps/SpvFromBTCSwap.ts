@@ -14,9 +14,10 @@ import {getInputType, Transaction} from "@scure/btc-signer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
 import {Buffer} from "buffer";
 import {Fee, FeeType} from "../fee/Fee";
-import {IBitcoinWallet} from "../../btc/wallet/IBitcoinWallet";
+import {IBitcoinWallet, isIBitcoinWallet} from "../../btc/wallet/IBitcoinWallet";
 import {IntermediaryAPI} from "../../intermediaries/IntermediaryAPI";
 import {IBTCWalletSwap} from "../IBTCWalletSwap";
+import {SingleAddressBitcoinWallet} from "../../btc/wallet/SingleAddressBitcoinWallet";
 
 export enum SpvFromBTCSwapState {
     CLOSED = -5,
@@ -466,14 +467,20 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         };
     }
 
-    async getFundedPsbt(wallet: IBitcoinWallet, feeRate?: number): Promise<{psbt: Transaction, signInputs: number[]}> {
+    async getFundedPsbt(_bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string }, feeRate?: number): Promise<{psbt: Transaction, signInputs: number[]}> {
+        let bitcoinWallet: IBitcoinWallet;
+        if(isIBitcoinWallet(_bitcoinWallet)) {
+            bitcoinWallet = _bitcoinWallet;
+        } else {
+            bitcoinWallet = new SingleAddressBitcoinWallet(this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork, _bitcoinWallet);
+        }
         if(feeRate!=null) {
             if(feeRate<this.minimumBtcFeeRate) throw new Error("Bitcoin tx fee needs to be at least "+this.minimumBtcFeeRate+" sats/vB");
         } else {
-            feeRate = Math.max(this.minimumBtcFeeRate, await wallet.getFeeRate());
+            feeRate = Math.max(this.minimumBtcFeeRate, await bitcoinWallet.getFeeRate());
         }
         let {psbt, in1sequence} = await this.getPsbt();
-        psbt = await wallet.fundPsbt(psbt, feeRate);
+        psbt = await bitcoinWallet.fundPsbt(psbt, feeRate);
         psbt.updateInput(1, {sequence: in1sequence});
         //Sign every input except the first one
         const signInputs: number[] = [];

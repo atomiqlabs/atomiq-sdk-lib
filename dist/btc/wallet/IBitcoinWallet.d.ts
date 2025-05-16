@@ -1,4 +1,5 @@
 import { Transaction } from "@scure/btc-signer";
+export declare function isIBitcoinWallet(val: any): val is IBitcoinWallet;
 export interface IBitcoinWallet {
     sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string>;
     fundPsbt(psbt: Transaction, feeRate?: number): Promise<Transaction>;

@@ -7,6 +7,7 @@ import { Fee, FeeType } from "../../fee/Fee";
 import { IBitcoinWallet } from "../../../btc/wallet/IBitcoinWallet";
 import { IAddressSwap } from "../../IAddressSwap";
 import { IBTCWalletSwap } from "../../IBTCWalletSwap";
+import { Transaction } from "@scure/btc-signer";
 export declare enum OnchainForGasSwapState {
     EXPIRED = -3,
     FAILED = -2,
@@ -73,6 +74,14 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
         type: FeeType.SWAP;
         fee: Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
     }];
+    getFundedPsbt(_bitcoinWallet: IBitcoinWallet | {
+        address: string;
+        publicKey: string;
+    }, feeRate?: number): Promise<{
+        psbt: Transaction;
+        signInputs: number[];
+    }>;
+    submitPsbt(psbt: Transaction): Promise<string>;
     estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
     sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
     protected checkAddress(save?: boolean): Promise<boolean>;

@@ -5,10 +5,29 @@ export type BtcTxWithBlockheight = BtcTx & {
     blockheight?: number
 };
 
-export interface BitcoinRpcWithTxoListener<T extends BtcBlock> extends BitcoinRpc<T> {
+export type BtcAddressUtxo = {
+    txid: string,
+    vout: number,
+    confirmed: boolean,
+    block_height: number,
+    block_hash: string,
+    block_time: number
+    value: bigint
+};
 
+export interface BitcoinRpcWithAddressIndex<T extends BtcBlock> extends BitcoinRpc<T> {
+
+    getFeeRate(): Promise<number>;
+    getAddressBalances(address: string): Promise<{
+        confirmedBalance: bigint,
+        unconfirmedBalance: bigint
+    }>;
+    getAddressUTXOs(address: string): Promise<BtcAddressUtxo[]>;
+    getCPFPData(txId: string): Promise<{
+        effectiveFeePerVsize: number,
+        adjustedVsize: number
+    }>;
     getTransaction(txId: string): Promise<BtcTxWithBlockheight>;
-
     waitForTransaction(
         txId: string,
         requiredConfirmations: number,

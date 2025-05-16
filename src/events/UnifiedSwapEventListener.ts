@@ -81,8 +81,9 @@ export class UnifiedSwapEventListener<
         });
     }
 
-    stop() {
+    stop(): Promise<void> {
         this.events.unregisterListener(this.listener);
+        return this.events.stop();
     }
 
     registerListener<S extends ISwap<T>>(type: SwapType, listener: SwapEventListener<T, S>, reviver: new (val: any) => S): void {

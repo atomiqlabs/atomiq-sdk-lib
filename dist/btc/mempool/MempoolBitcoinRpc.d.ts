@@ -4,11 +4,11 @@ import { BtcBlockWithTxs, BtcSyncInfo, BtcTx } from "@atomiqlabs/base";
 import { MempoolBitcoinBlock } from "./MempoolBitcoinBlock";
 import { MempoolApi } from "./MempoolApi";
 import { Buffer } from "buffer";
-import { BitcoinRpcWithTxoListener, BtcTxWithBlockheight } from "../BitcoinRpcWithTxoListener";
+import { BitcoinRpcWithAddressIndex, BtcTxWithBlockheight } from "../BitcoinRpcWithAddressIndex";
 import { LightningNetworkApi, LNNodeLiquidity } from "../LightningNetworkApi";
-export declare class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitcoinBlock>, LightningNetworkApi {
+export declare class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitcoinBlock>, LightningNetworkApi {
     api: MempoolApi;
-    constructor(mempoolApi: MempoolApi);
+    constructor(urlOrMempoolApi: MempoolApi | string | string[]);
     /**
      * Returns a txo hash for a specific transaction vout
      *
@@ -85,5 +85,23 @@ export declare class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<Memp
         vsize: number;
         fee: number;
         feeRate: number;
+    }>;
+    getFeeRate(): Promise<number>;
+    getAddressBalances(address: string): Promise<{
+        confirmedBalance: bigint;
+        unconfirmedBalance: bigint;
+    }>;
+    getAddressUTXOs(address: string): Promise<{
+        txid: string;
+        vout: number;
+        confirmed: boolean;
+        block_height: number;
+        block_hash: string;
+        block_time: number;
+        value: bigint;
+    }[]>;
+    getCPFPData(txId: string): Promise<{
+        effectiveFeePerVsize: number;
+        adjustedVsize: number;
     }>;
 }

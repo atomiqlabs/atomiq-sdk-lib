@@ -273,7 +273,7 @@ class SwapperUtils {
             throw new Error("Wallet must be a string address or IBitcoinWallet");
         let bitcoinWallet;
         if (typeof (addressOrWallet) === "string") {
-            bitcoinWallet = new SingleAddressBitcoinWallet_1.SingleAddressBitcoinWallet(this.root.mempoolApi, this.bitcoinNetwork, addressOrWallet);
+            bitcoinWallet = new SingleAddressBitcoinWallet_1.SingleAddressBitcoinWallet(this.root.bitcoinRpc, this.bitcoinNetwork, addressOrWallet);
         }
         else {
             bitcoinWallet = addressOrWallet;

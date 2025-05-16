@@ -18,10 +18,11 @@ __exportStar(require("./btc/mempool/synchronizer/MempoolBtcRelaySynchronizer"), 
 __exportStar(require("./btc/mempool/MempoolApi"), exports);
 __exportStar(require("./btc/mempool/MempoolBitcoinRpc"), exports);
 __exportStar(require("./btc/mempool/MempoolBitcoinBlock"), exports);
-__exportStar(require("./btc/BitcoinRpcWithTxoListener"), exports);
+__exportStar(require("./btc/BitcoinRpcWithAddressIndex"), exports);
 __exportStar(require("./btc/LightningNetworkApi"), exports);
 __exportStar(require("./btc/wallet/IBitcoinWallet"), exports);
-__exportStar(require("./btc/wallet/MempoolBitcoinWallet"), exports);
+__exportStar(require("./btc/wallet/BitcoinWallet"), exports);
+__exportStar(require("./btc/wallet/SingleAddressBitcoinWallet"), exports);
 __exportStar(require("./btc/coinselect2"), exports);
 __exportStar(require("./errors/IntermediaryError"), exports);
 __exportStar(require("./errors/PaymentAuthError"), exports);

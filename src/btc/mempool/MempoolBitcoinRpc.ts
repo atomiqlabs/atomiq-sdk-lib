@@ -2,7 +2,7 @@ import {BigIntBufferUtils, BtcBlockWithTxs, BtcSyncInfo, BtcTx} from "@atomiqlab
 import {MempoolBitcoinBlock} from "./MempoolBitcoinBlock";
 import {BitcoinTransaction, MempoolApi, TxVout} from "./MempoolApi";
 import {Buffer} from "buffer";
-import {BitcoinRpcWithTxoListener, BtcTxWithBlockheight} from "../BitcoinRpcWithTxoListener";
+import {BitcoinRpcWithAddressIndex, BtcTxWithBlockheight} from "../BitcoinRpcWithAddressIndex";
 import {LightningNetworkApi, LNNodeLiquidity} from "../LightningNetworkApi";
 import {timeoutPromise} from "../../utils/Utils";
 import {Script, Transaction} from "@scure/btc-signer";
@@ -49,12 +49,12 @@ function bitcoinTxToBtcTx(btcTx: Transaction): BtcTx {
     }
 }
 
-export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitcoinBlock>, LightningNetworkApi {
+export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitcoinBlock>, LightningNetworkApi {
 
     api: MempoolApi;
 
-    constructor(mempoolApi: MempoolApi) {
-        this.api = mempoolApi;
+    constructor(urlOrMempoolApi: MempoolApi | string | string[]) {
+        this.api = urlOrMempoolApi instanceof MempoolApi ? urlOrMempoolApi : new MempoolApi(urlOrMempoolApi);
     }
 
     /**
@@ -384,6 +384,44 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
 
     getEffectiveFeeRate(btcTx: BtcTx): Promise<{ vsize: number; fee: number; feeRate: number }> {
         throw new Error("Unsupported.");
+    }
+
+    async getFeeRate(): Promise<number> {
+        return (await this.api.getFees()).fastestFee;
+    }
+
+    getAddressBalances(address: string): Promise<{
+        confirmedBalance: bigint,
+        unconfirmedBalance: bigint
+    }> {
+        return this.api.getAddressBalances(address);
+    }
+
+    async getAddressUTXOs(address:string): Promise<{
+        txid: string,
+        vout: number,
+        confirmed: boolean,
+        block_height: number,
+        block_hash: string,
+        block_time: number
+        value: bigint
+    }[]> {
+        return (await this.api.getAddressUTXOs(address)).map(val => ({
+            txid: val.txid,
+            vout: val.vout,
+            confirmed: val.status.confirmed,
+            block_height: val.status.block_height,
+            block_hash: val.status.block_hash,
+            block_time: val.status.block_time,
+            value: val.value
+        }));
+    }
+
+    getCPFPData(txId: string): Promise<{
+        effectiveFeePerVsize: number,
+        adjustedVsize: number
+    }> {
+        return this.api.getCPFPData(txId)
     }
 
 }

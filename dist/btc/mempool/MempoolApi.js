@@ -159,8 +159,12 @@ class MempoolApi {
      * @param txId
      */
     async getRawTransaction(txId) {
-        const rawTransaction = await this.request("tx/" + txId + "/hex", "str");
-        return buffer_1.Buffer.from(rawTransaction, "hex");
+        const rawTransaction = await this.request("tx/" + txId + "/hex", "str").catch((e) => {
+            if (e.message === "Transaction not found")
+                return null;
+            throw e;
+        });
+        return rawTransaction == null ? null : buffer_1.Buffer.from(rawTransaction, "hex");
     }
     /**
      * Returns confirmed & unconfirmed balance of the specific bitcoin address

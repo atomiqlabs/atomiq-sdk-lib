@@ -349,8 +349,11 @@ export class MempoolApi {
      * @param txId
      */
     async getRawTransaction(txId: string): Promise<Buffer> {
-        const rawTransaction: string = await this.request<string>("tx/"+txId+"/hex", "str");
-        return Buffer.from(rawTransaction, "hex")
+        const rawTransaction: string = await this.request<string>("tx/"+txId+"/hex", "str").catch((e: Error) => {
+            if(e.message==="Transaction not found") return null;
+            throw e;
+        });
+        return rawTransaction==null ? null : Buffer.from(rawTransaction, "hex")
     }
 
     /**

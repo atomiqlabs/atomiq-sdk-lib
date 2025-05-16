@@ -12,7 +12,7 @@ import {
 } from "@atomiqlabs/base";
 import {EventEmitter} from "events";
 import {Intermediary} from "../../../../intermediaries/Intermediary";
-import {BitcoinRpcWithTxoListener} from "../../../../btc/BitcoinRpcWithTxoListener";
+import {BitcoinRpcWithAddressIndex} from "../../../../btc/BitcoinRpcWithAddressIndex";
 import {ISwapPrice} from "../../../../prices/abstract/ISwapPrice";
 import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../../ISwapWrapper";
 import {Buffer} from "buffer";
@@ -25,6 +25,7 @@ import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {UnifiedSwapEventListener} from "../../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
 import {ISwap} from "../../../ISwap";
+import {MempoolApi} from "../../../../btc/mempool/MempoolApi";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint,
@@ -49,7 +50,7 @@ export class FromBTCWrapper<
 
     readonly synchronizer: RelaySynchronizer<any, T["TX"], any>;
     readonly btcRelay: BtcRelay<any, T["TX"], any>;
-    readonly btcRpc: BitcoinRpcWithTxoListener<any>;
+    readonly btcRpc: BitcoinRpcWithAddressIndex<any>;
 
     /**
      * @param chainIdentifier
@@ -77,7 +78,7 @@ export class FromBTCWrapper<
         swapDataDeserializer: new (data: any) => T["Data"],
         btcRelay: BtcRelay<any, T["TX"], any>,
         synchronizer: RelaySynchronizer<any, T["TX"], any>,
-        btcRpc: BitcoinRpcWithTxoListener<any>,
+        btcRpc: BitcoinRpcWithAddressIndex<any>,
         options?: FromBTCWrapperOptions,
         events?: EventEmitter<{swapState: [ISwap]}>
     ) {

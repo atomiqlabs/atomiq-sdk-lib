@@ -1,53 +1,71 @@
-import {coinSelect, maxSendable, CoinselectAddressTypes, CoinselectTxInput} from "../coinselect2";
-import {BTC_NETWORK} from "@scure/btc-signer/utils"
-import {p2wpkh, OutScript, Transaction, p2tr} from "@scure/btc-signer";
-import {IBitcoinWallet} from "./IBitcoinWallet";
-import {MempoolApi} from "../mempool/MempoolApi";
+import {CoinselectAddressTypes} from "../coinselect2";
+import {BTC_NETWORK, pubECDSA, randomPrivateKeyBytes} from "@scure/btc-signer/utils"
+import {getAddress, Transaction, WIF} from "@scure/btc-signer";
 import {Buffer} from "buffer";
-import {randomBytes, toCoinselectAddressType, toOutputScript} from "../../utils/Utils";
-import {identifyAddressType, MempoolBitcoinWallet} from "./MempoolBitcoinWallet";
-import {add} from "@noble/hashes/_u64";
+import {identifyAddressType, BitcoinWallet} from "./BitcoinWallet";
+import {BitcoinRpcWithAddressIndex} from "../BitcoinRpcWithAddressIndex";
 
-export type BitcoinWalletUtxo = {
-    vout: number,
-    txId: string,
-    value: number,
-    type: CoinselectAddressTypes,
-    outputScript: Buffer,
-    address: string,
-    cpfp?: {
-        txVsize: number,
-        txEffectiveFeeRate: number
-    },
-    confirmed: boolean
-};
+export class SingleAddressBitcoinWallet extends BitcoinWallet {
 
-export class SingleAddressBitcoinWallet extends MempoolBitcoinWallet {
-
+    readonly privKey: Uint8Array;
+    readonly pubkey: Uint8Array;
     readonly address: string;
     readonly addressType: CoinselectAddressTypes;
 
-    constructor(mempoolApi: MempoolApi, network: BTC_NETWORK, address: string, feeMultiplier: number = 1.25, feeOverride?: number) {
+    constructor(mempoolApi: BitcoinRpcWithAddressIndex<any>, network: BTC_NETWORK, addressDataOrWIF: string | {address: string, publicKey: string}, feeMultiplier: number = 1.25, feeOverride?: number) {
         super(mempoolApi, network, feeMultiplier, feeOverride);
-        this.address = address;
-        this.addressType = identifyAddressType(address, network);
+        if(typeof(addressDataOrWIF)==="string") {
+            this.privKey = WIF().decode(addressDataOrWIF);
+            this.pubkey = pubECDSA(this.privKey);
+            this.address = getAddress("wpkh", this.privKey, network);
+        } else {
+            this.address = addressDataOrWIF.address;
+            this.pubkey = Buffer.from(addressDataOrWIF.publicKey, "hex");
+        }
+        this.addressType = identifyAddressType(this.address, network);
     }
 
-    sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string> {
-        throw new Error("Not implemented.");
-    }
-    fundPsbt(psbt: Transaction, feeRate?: number): Promise<Transaction> {
-        throw new Error("Not implemented.");
-    }
-    signPsbt(psbt: Transaction, signInputs: number[]): Promise<Transaction> {
-        throw new Error("Not implemented.");
+    protected toBitcoinWalletAccounts(): {pubkey: string, address: string, addressType: CoinselectAddressTypes}[] {
+        return [{
+            pubkey: Buffer.from(this.pubkey).toString("hex"), address: this.address, addressType: this.addressType
+        }];
     }
 
-    getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number> {
-        throw new Error("Not implemented.");
+    async sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string> {
+        if(!this.privKey) throw new Error("Not supported.");
+        const {psbt} = await super._getPsbt(this.toBitcoinWalletAccounts(), address, Number(amount), feeRate);
+        psbt.sign(this.privKey);
+        psbt.finalize();
+        const txHex = Buffer.from(psbt.extract()).toString("hex");
+        return await super._sendTransaction(txHex);
     }
-    getFundedPsbtFee(psbt: Transaction, feeRate?: number): Promise<number> {
-        throw new Error("Not implemented.");
+
+    async fundPsbt(inputPsbt: Transaction, feeRate?: number): Promise<Transaction> {
+        const {psbt} = await super._fundPsbt(this.toBitcoinWalletAccounts(), inputPsbt, feeRate);
+        if(psbt==null) {
+            throw new Error("Not enough balance!");
+        }
+        return psbt;
+    }
+
+    async signPsbt(psbt: Transaction, signInputs: number[]): Promise<Transaction> {
+        if(!this.privKey) throw new Error("Not supported.");
+        for(let signInput of signInputs) {
+            psbt.signIdx(this.privKey, signInput);
+        }
+        return psbt;
+    }
+
+    async getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number> {
+        const {psbt, fee} = await super._getPsbt(this.toBitcoinWalletAccounts(), address, Number(amount), feeRate);
+        if(psbt==null) return null;
+        return fee;
+    }
+
+    async getFundedPsbtFee(basePsbt: Transaction, feeRate?: number): Promise<number> {
+        const {psbt, fee} = await super._fundPsbt(this.toBitcoinWalletAccounts(), basePsbt, feeRate);
+        if(psbt==null) return null;
+        return fee;
     }
 
     getReceiveAddress(): string {
@@ -66,6 +84,10 @@ export class SingleAddressBitcoinWallet extends MempoolBitcoinWallet {
         totalFee: number
     }> {
         return this._getSpendableBalance([{address: this.address, addressType: this.addressType}], psbt, feeRate);
+    }
+
+    static generateRandomPrivateKey(): string {
+         return WIF().encode(randomPrivateKeyBytes());
     }
 
 }
