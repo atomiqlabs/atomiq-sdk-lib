@@ -242,8 +242,7 @@ class LnForGasSwap extends ISwap_1.ISwap {
         }
         if (this.isFailed())
             throw new PaymentAuthError_1.PaymentAuthError("Swap failed");
-        if (this.isQuoteExpired())
-            throw new PaymentAuthError_1.PaymentAuthError("Swap expired");
+        return !this.isQuoteExpired();
     }
     //////////////////////////////
     //// Storage

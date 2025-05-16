@@ -3,7 +3,6 @@ import {FromBTCLNWrapper} from "./FromBTCLNWrapper";
 import {IFromBTCSwap} from "../IFromBTCSwap";
 import {SwapType} from "../../../enums/SwapType";
 import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
-import {isISwapInit, ISwapInit} from "../../../ISwap";
 import {Buffer} from "buffer";
 import {LNURL, LNURLWithdraw, LNURLWithdrawParamsWithUrl} from "../../../../utils/LNURL";
 import {UserError} from "../../../../errors/UserError";
@@ -334,7 +333,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * @param abortSignal Abort signal to stop waiting for payment
      * @param checkIntervalSeconds How often to poll the intermediary for answer
      */
-    async waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds: number = 5): Promise<void> {
+    async waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds: number = 5): Promise<boolean> {
         if(
             this.state!==FromBTCLNSwapState.PR_CREATED &&
             (this.state!==FromBTCLNSwapState.QUOTE_SOFT_EXPIRED || this.signatureData!=null)
@@ -391,7 +390,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                 };
                 await this._saveAndEmit(FromBTCLNSwapState.PR_PAID);
             }
-            return;
+            return true;
         }
 
         if(this.state===FromBTCLNSwapState.PR_CREATED || this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
@@ -399,7 +398,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                 await this._saveAndEmit(FromBTCLNSwapState.QUOTE_EXPIRED);
             }
 
-            throw new PaymentAuthError(resp.msg, resp.code, (resp as any).data);
+            return false;
         }
     }
 

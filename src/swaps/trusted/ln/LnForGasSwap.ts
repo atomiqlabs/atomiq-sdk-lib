@@ -275,7 +275,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
      * @throws {PaymentAuthError} If swap expired or failed
      * @throws {Error} When in invalid state (not PR_CREATED)
      */
-    async waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds: number = 5): Promise<void> {
+    async waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds: number = 5): Promise<boolean> {
         if(this.state!==LnForGasSwapState.PR_CREATED) throw new Error("Must be in PR_CREATED state!");
 
         if(!this.initiated) {
@@ -289,7 +289,8 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         }
 
         if(this.isFailed()) throw new PaymentAuthError("Swap failed");
-        if(this.isQuoteExpired()) throw new PaymentAuthError("Swap expired");
+        return !this.isQuoteExpired();
+
     }
 
 

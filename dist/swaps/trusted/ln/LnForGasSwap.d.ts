@@ -75,7 +75,7 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
      * @throws {PaymentAuthError} If swap expired or failed
      * @throws {Error} When in invalid state (not PR_CREATED)
      */
-    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void>;
+    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<boolean>;
     serialize(): any;
     _getInitiator(): string;
     _sync(save?: boolean): Promise<boolean>;

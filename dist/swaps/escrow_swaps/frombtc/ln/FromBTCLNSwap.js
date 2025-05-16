@@ -10,7 +10,6 @@ const LNURL_1 = require("../../../../utils/LNURL");
 const UserError_1 = require("../../../../errors/UserError");
 const IntermediaryAPI_1 = require("../../../../intermediaries/IntermediaryAPI");
 const IntermediaryError_1 = require("../../../../errors/IntermediaryError");
-const PaymentAuthError_1 = require("../../../../errors/PaymentAuthError");
 const Utils_1 = require("../../../../utils/Utils");
 const Tokens_1 = require("../../../../Tokens");
 const IEscrowSwap_1 = require("../../IEscrowSwap");
@@ -316,13 +315,13 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                 };
                 await this._saveAndEmit(FromBTCLNSwapState.PR_PAID);
             }
-            return;
+            return true;
         }
         if (this.state === FromBTCLNSwapState.PR_CREATED || this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
             if (resp.code === IntermediaryAPI_1.PaymentAuthorizationResponseCodes.EXPIRED) {
                 await this._saveAndEmit(FromBTCLNSwapState.QUOTE_EXPIRED);
             }
-            throw new PaymentAuthError_1.PaymentAuthError(resp.msg, resp.code, resp.data);
+            return false;
         }
     }
     //////////////////////////////

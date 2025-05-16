@@ -98,7 +98,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @param abortSignal Abort signal to stop waiting for payment
      * @param checkIntervalSeconds How often to poll the intermediary for answer
      */
-    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void>;
+    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<boolean>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in an HTLC
      *
