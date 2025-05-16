@@ -32,6 +32,7 @@ import {RequestError} from "../../errors/RequestError";
 import {IntermediaryError} from "../../errors/IntermediaryError";
 import {CoinselectAddressTypes} from "../../btc/coinselect2";
 import {OutScript, Transaction} from "@scure/btc-signer";
+import {ISwap} from "../ISwap";
 
 export type SpvFromBTCOptions = {
     gasAmount?: bigint,
@@ -90,7 +91,7 @@ export class SpvFromBTCWrapper<
         synchronizer: RelaySynchronizer<any, T["TX"], any>,
         btcRpc: BitcoinRpcWithTxoListener<any>,
         options?: SpvFromBTCWrapperOptions,
-        events?: EventEmitter
+        events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         if(options==null) options = {};
         options.bitcoinNetwork ??= TEST_NETWORK;

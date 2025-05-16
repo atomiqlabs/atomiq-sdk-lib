@@ -10,6 +10,7 @@ import {Intermediary} from "../../../intermediaries/Intermediary";
 import {SwapType} from "../../enums/SwapType";
 import {UnifiedSwapEventListener} from "../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../storage/UnifiedSwapStorage";
+import {ISwap} from "../../ISwap";
 
 export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
     public readonly TYPE = SwapType.TRUSTED_FROM_BTC;
@@ -37,7 +38,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         tokens: WrapperCtorTokens,
         btcRpc: BitcoinRpcWithTxoListener<any>,
         options?: ISwapWrapperOptions,
-        events?: EventEmitter
+        events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
         this.btcRpc = btcRpc;

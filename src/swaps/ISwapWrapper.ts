@@ -55,7 +55,7 @@ export abstract class ISwapWrapper<
     readonly chainIdentifier: string;
     readonly chain: T["ChainInterface"];
     readonly prices: ISwapPrice;
-    readonly events: EventEmitter;
+    readonly events: EventEmitter<{swapState: [ISwap]}>;
     readonly options: O;
     readonly tokens: {
         [tokenAddress: string]: SCToken<T["ChainId"]>
@@ -85,7 +85,7 @@ export abstract class ISwapWrapper<
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
         options: O,
-        events?: EventEmitter
+        events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         this.unifiedStorage = unifiedStorage;
         this.unifiedChainEvents = unifiedChainEvents;

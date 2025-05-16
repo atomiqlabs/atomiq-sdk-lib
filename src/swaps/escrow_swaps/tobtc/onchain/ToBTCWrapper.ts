@@ -18,6 +18,7 @@ import {RequestError} from "../../../../errors/RequestError";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {UnifiedSwapEventListener} from "../../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
+import {ISwap} from "../../../ISwap";
 
 export type ToBTCOptions = {
     confirmationTarget?: number,
@@ -65,7 +66,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
         swapDataDeserializer: new (data: any) => T["Data"],
         btcRpc: BitcoinRpc<any>,
         options?: ToBTCWrapperOptions,
-        events?: EventEmitter
+        events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         if(options==null) options = {};
         options.bitcoinNetwork = options.bitcoinNetwork ?? TEST_NETWORK;

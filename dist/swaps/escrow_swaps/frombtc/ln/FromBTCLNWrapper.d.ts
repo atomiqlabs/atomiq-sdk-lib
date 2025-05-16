@@ -14,6 +14,7 @@ import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../../ISw
 import { LNURLWithdrawParamsWithUrl } from "../../../../utils/LNURL";
 import { UnifiedSwapEventListener } from "../../../../events/UnifiedSwapEventListener";
 import { UnifiedSwapStorage } from "../../../../storage/UnifiedSwapStorage";
+import { ISwap } from "../../../ISwap";
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer;
 };
@@ -34,7 +35,9 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: ISwapWrapperOptions, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: ISwapWrapperOptions, events?: EventEmitter<{
+        swapState: [ISwap];
+    }>);
     readonly pendingSwapStates: FromBTCLNSwapState[];
     readonly tickSwapState: FromBTCLNSwapState[];
     protected processEventInitialize(swap: FromBTCLNSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean>;

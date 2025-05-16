@@ -16,6 +16,7 @@ import {LNURL, LNURLPayParamsWithUrl} from "../../../../utils/LNURL";
 import {IToBTCSwapInit, ToBTCSwapState} from "../IToBTCSwap";
 import {UnifiedSwapEventListener} from "../../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
+import {ISwap} from "../../../ISwap";
 
 export type ToBTCLNOptions = {
     expirySeconds?: number,
@@ -45,7 +46,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         tokens: WrapperCtorTokens,
         swapDataDeserializer: new (data: any) => T["Data"],
         options?: ToBTCLNWrapperOptions,
-        events?: EventEmitter
+        events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         if(options==null) options = {};
         options.paymentTimeoutSeconds ??= 4*24*60*60;

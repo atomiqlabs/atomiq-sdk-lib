@@ -11,6 +11,7 @@ import { ISwapPrice } from "../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { Intermediary } from "../../intermediaries/Intermediary";
 import { Transaction } from "@scure/btc-signer";
+import { ISwap } from "../ISwap";
 export type SpvFromBTCOptions = {
     gasAmount?: bigint;
     unsafeZeroWatchtowerFee?: boolean;
@@ -47,7 +48,9 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["SpvVaultContract"], prices: ISwapPrice, tokens: WrapperCtorTokens, spvWithdrawalDataDeserializer: new (data: any) => T["SpvVaultWithdrawalData"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithTxoListener<any>, options?: SpvFromBTCWrapperOptions, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["SpvVaultContract"], prices: ISwapPrice, tokens: WrapperCtorTokens, spvWithdrawalDataDeserializer: new (data: any) => T["SpvVaultWithdrawalData"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithTxoListener<any>, options?: SpvFromBTCWrapperOptions, events?: EventEmitter<{
+        swapState: [ISwap];
+    }>);
     readonly pendingSwapStates: Array<SpvFromBTCSwap<T>["state"]>;
     readonly tickSwapState: Array<SpvFromBTCSwap<T>["state"]>;
     protected processEventFront(event: SpvVaultFrontEvent, swap: SpvFromBTCSwap<T>): boolean;

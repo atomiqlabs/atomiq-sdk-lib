@@ -10,6 +10,7 @@ import { SwapType } from "../../../enums/SwapType";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { UnifiedSwapEventListener } from "../../../../events/UnifiedSwapEventListener";
 import { UnifiedSwapStorage } from "../../../../storage/UnifiedSwapStorage";
+import { ISwap } from "../../../ISwap";
 export type ToBTCOptions = {
     confirmationTarget?: number;
     confirmations?: number;
@@ -39,7 +40,9 @@ export declare class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, 
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRpc: BitcoinRpc<any>, options?: ToBTCWrapperOptions, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRpc: BitcoinRpc<any>, options?: ToBTCWrapperOptions, events?: EventEmitter<{
+        swapState: [ISwap];
+    }>);
     /**
      * Returns randomly generated random escrow nonce to be used for to BTC on-chain swaps
      * @private

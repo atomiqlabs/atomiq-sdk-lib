@@ -9,6 +9,7 @@ import { Intermediary } from "../../../intermediaries/Intermediary";
 import { SwapType } from "../../enums/SwapType";
 import { UnifiedSwapEventListener } from "../../../events/UnifiedSwapEventListener";
 import { UnifiedSwapStorage } from "../../../storage/UnifiedSwapStorage";
+import { ISwap } from "../../ISwap";
 export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>> {
     readonly TYPE = SwapType.TRUSTED_FROM_BTC;
     readonly swapDeserializer: typeof OnchainForGasSwap;
@@ -24,7 +25,9 @@ export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrap
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, btcRpc: BitcoinRpcWithTxoListener<any>, options?: ISwapWrapperOptions, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, btcRpc: BitcoinRpcWithTxoListener<any>, options?: ISwapWrapperOptions, events?: EventEmitter<{
+        swapState: [ISwap];
+    }>);
     /**
      * Returns a newly created swap, receiving 'amount' base units of gas token
      *

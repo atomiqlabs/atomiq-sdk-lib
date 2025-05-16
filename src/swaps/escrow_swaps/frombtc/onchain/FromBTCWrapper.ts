@@ -24,6 +24,7 @@ import {RequestError} from "../../../../errors/RequestError";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {UnifiedSwapEventListener} from "../../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
+import {ISwap} from "../../../ISwap";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint,
@@ -78,7 +79,7 @@ export class FromBTCWrapper<
         synchronizer: RelaySynchronizer<any, T["TX"], any>,
         btcRpc: BitcoinRpcWithTxoListener<any>,
         options?: FromBTCWrapperOptions,
-        events?: EventEmitter
+        events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         if(options==null) options = {};
         options.bitcoinNetwork = options.bitcoinNetwork ?? TEST_NETWORK;

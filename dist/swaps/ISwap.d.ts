@@ -47,7 +47,9 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Event emitter emitting "swapState" event when swap's state changes
      */
-    events: EventEmitter;
+    events: EventEmitter<{
+        swapState: [ISwap];
+    }>;
     protected constructor(wrapper: ISwapWrapper<T, ISwap<T, S>>, obj: any);
     protected constructor(wrapper: ISwapWrapper<T, ISwap<T, S>>, swapInit: ISwapInit);
     protected abstract upgradeVersion(): void;

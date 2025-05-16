@@ -25,6 +25,7 @@ import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../../ISwap
 import {LNURL, LNURLWithdrawParamsWithUrl} from "../../../../utils/LNURL";
 import {UnifiedSwapEventListener} from "../../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
+import {ISwap} from "../../../ISwap";
 
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer
@@ -62,7 +63,7 @@ export class FromBTCLNWrapper<
         swapDataDeserializer: new (data: any) => T["Data"],
         lnApi: LightningNetworkApi,
         options: ISwapWrapperOptions,
-        events?: EventEmitter
+        events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, options, events);
         this.lnApi = lnApi;

@@ -38,7 +38,9 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
     readonly chainIdentifier: string;
     readonly chain: T["ChainInterface"];
     readonly prices: ISwapPrice;
-    readonly events: EventEmitter;
+    readonly events: EventEmitter<{
+        swapState: [ISwap];
+    }>;
     readonly options: O;
     readonly tokens: {
         [tokenAddress: string]: SCToken<T["ChainId"]>;
@@ -58,7 +60,9 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, options: O, events?: EventEmitter);
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, options: O, events?: EventEmitter<{
+        swapState: [ISwap];
+    }>);
     /**
      * Pre-fetches swap price for a given swap
      *

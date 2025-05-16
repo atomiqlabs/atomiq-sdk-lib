@@ -39,7 +39,7 @@ export abstract class IEscrowSwapWrapper<
         tokens: WrapperCtorTokens,
         swapDataDeserializer: new (data: any) => T["Data"],
         options: O,
-        events?: EventEmitter
+        events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
         this.swapDataDeserializer = swapDataDeserializer;
