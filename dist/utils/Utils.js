@@ -241,9 +241,14 @@ function timeoutPromise(timeout, abortSignal) {
             reject(abortSignal.reason);
             return;
         }
-        let timeoutHandle = setTimeout(resolve, timeout);
+        let abortSignalListener;
+        let timeoutHandle = setTimeout(() => {
+            if (abortSignalListener != null)
+                abortSignal.removeEventListener("abort", abortSignalListener);
+            resolve();
+        }, timeout);
         if (abortSignal != null) {
-            abortSignal.addEventListener("abort", () => {
+            abortSignal.addEventListener("abort", abortSignalListener = () => {
                 if (timeoutHandle != null)
                     clearTimeout(timeoutHandle);
                 timeoutHandle = null;

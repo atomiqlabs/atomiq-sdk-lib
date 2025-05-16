@@ -262,15 +262,19 @@ export async function httpPost<T>(url: string, body: any, timeout?: number, abor
  * @param timeout how many milliseconds to wait for
  * @param abortSignal
  */
-export function timeoutPromise(timeout: number, abortSignal?: AbortSignal) {
-    return new Promise((resolve, reject) => {
+export function timeoutPromise(timeout: number, abortSignal?: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
         if (abortSignal != null && abortSignal.aborted) {
             reject(abortSignal.reason);
             return;
         }
-        let timeoutHandle = setTimeout(resolve, timeout);
+        let abortSignalListener: () => void;
+        let timeoutHandle = setTimeout(() => {
+            if(abortSignalListener!=null) abortSignal.removeEventListener("abort", abortSignalListener);
+            resolve();
+        }, timeout);
         if (abortSignal != null) {
-            abortSignal.addEventListener("abort", () => {
+            abortSignal.addEventListener("abort", abortSignalListener = () => {
                 if (timeoutHandle != null) clearTimeout(timeoutHandle);
                 timeoutHandle = null;
                 reject(abortSignal.reason);

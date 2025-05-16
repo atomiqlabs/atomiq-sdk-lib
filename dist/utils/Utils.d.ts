@@ -96,7 +96,7 @@ export declare function httpPost<T>(url: string, body: any, timeout?: number, ab
  * @param timeout how many milliseconds to wait for
  * @param abortSignal
  */
-export declare function timeoutPromise(timeout: number, abortSignal?: AbortSignal): Promise<unknown>;
+export declare function timeoutPromise(timeout: number, abortSignal?: AbortSignal): Promise<void>;
 /**
  * Returns an abort signal that aborts after a specified timeout in milliseconds
  *
