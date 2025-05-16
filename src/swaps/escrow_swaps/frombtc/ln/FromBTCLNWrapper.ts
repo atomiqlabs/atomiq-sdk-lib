@@ -82,15 +82,16 @@ export class FromBTCLNWrapper<
         FromBTCLNSwapState.CLAIM_COMMITED
     ];
 
-    protected async processEventInitialize(swap: FromBTCLNSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean> {
+    protected processEventInitialize(swap: FromBTCLNSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean> {
         if(swap.state===FromBTCLNSwapState.PR_PAID || swap.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-            if(swap.state===FromBTCLNSwapState.PR_PAID || swap.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) swap.state = FromBTCLNSwapState.CLAIM_COMMITED;
-            return true;
+            swap.state = FromBTCLNSwapState.CLAIM_COMMITED;
+            return Promise.resolve(true);
         }
+        return Promise.resolve(false);
     }
 
     protected processEventClaim(swap: FromBTCLNSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean> {
-        if(swap.state!==FromBTCLNSwapState.FAILED) {
+        if(swap.state!==FromBTCLNSwapState.FAILED && swap.state!==FromBTCLNSwapState.CLAIM_CLAIMED) {
             swap.state = FromBTCLNSwapState.CLAIM_CLAIMED;
             return Promise.resolve(true);
         }
@@ -98,7 +99,7 @@ export class FromBTCLNWrapper<
     }
 
     protected processEventRefund(swap: FromBTCLNSwap<T>, event: RefundEvent<T["Data"]>): Promise<boolean> {
-        if(swap.state!==FromBTCLNSwapState.CLAIM_CLAIMED) {
+        if(swap.state!==FromBTCLNSwapState.CLAIM_CLAIMED && swap.state!==FromBTCLNSwapState.FAILED) {
             swap.state = FromBTCLNSwapState.FAILED;
             return Promise.resolve(true);
         }

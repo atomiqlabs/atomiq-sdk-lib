@@ -80,7 +80,7 @@ export abstract class IToBTCWrapper<
     }
 
     protected processEventClaim(swap: S, event: ClaimEvent<T["Data"]>): Promise<boolean> {
-        if(swap.state!==ToBTCSwapState.REFUNDED) {
+        if(swap.state!==ToBTCSwapState.REFUNDED && swap.state!==ToBTCSwapState.CLAIMED) {
             swap.state = ToBTCSwapState.CLAIMED;
             swap._setPaymentResult({secret: event.result, txId: Buffer.from(event.result, "hex").reverse().toString("hex")});
             return Promise.resolve(true);
@@ -89,7 +89,7 @@ export abstract class IToBTCWrapper<
     }
 
     protected processEventRefund(swap: S, event: RefundEvent<T["Data"]>): Promise<boolean> {
-        if(swap.state!==ToBTCSwapState.CLAIMED) {
+        if(swap.state!==ToBTCSwapState.CLAIMED && swap.state!==ToBTCSwapState.REFUNDED) {
             swap.state = ToBTCSwapState.REFUNDED;
             return Promise.resolve(true);
         }

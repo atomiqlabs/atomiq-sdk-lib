@@ -112,7 +112,7 @@ export class FromBTCWrapper<
     }
 
     protected processEventClaim(swap: FromBTCSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean> {
-        if(swap.state!==FromBTCSwapState.FAILED) {
+        if(swap.state!==FromBTCSwapState.FAILED && swap.state!==FromBTCSwapState.CLAIM_CLAIMED) {
             swap.state = FromBTCSwapState.CLAIM_CLAIMED;
             return Promise.resolve(true);
         }
@@ -120,7 +120,7 @@ export class FromBTCWrapper<
     }
 
     protected processEventRefund(swap: FromBTCSwap<T>, event: RefundEvent<T["Data"]>): Promise<boolean> {
-        if(swap.state!==FromBTCSwapState.CLAIM_CLAIMED) {
+        if(swap.state!==FromBTCSwapState.CLAIM_CLAIMED && swap.state!==FromBTCSwapState.FAILED) {
             swap.state = FromBTCSwapState.FAILED;
             return Promise.resolve(true);
         }

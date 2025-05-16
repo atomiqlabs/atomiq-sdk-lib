@@ -68,7 +68,7 @@ class IToBTCWrapper extends IEscrowSwapWrapper_1.IEscrowSwapWrapper {
         }
     }
     processEventClaim(swap, event) {
-        if (swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDED) {
+        if (swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDED && swap.state !== IToBTCSwap_1.ToBTCSwapState.CLAIMED) {
             swap.state = IToBTCSwap_1.ToBTCSwapState.CLAIMED;
             swap._setPaymentResult({ secret: event.result, txId: Buffer.from(event.result, "hex").reverse().toString("hex") });
             return Promise.resolve(true);
@@ -76,7 +76,7 @@ class IToBTCWrapper extends IEscrowSwapWrapper_1.IEscrowSwapWrapper {
         return Promise.resolve(false);
     }
     processEventRefund(swap, event) {
-        if (swap.state !== IToBTCSwap_1.ToBTCSwapState.CLAIMED) {
+        if (swap.state !== IToBTCSwap_1.ToBTCSwapState.CLAIMED && swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDED) {
             swap.state = IToBTCSwap_1.ToBTCSwapState.REFUNDED;
             return Promise.resolve(true);
         }

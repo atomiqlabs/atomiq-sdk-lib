@@ -46,22 +46,22 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         ];
         this.lnApi = lnApi;
     }
-    async processEventInitialize(swap, event) {
+    processEventInitialize(swap, event) {
         if (swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.PR_PAID || swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-            if (swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.PR_PAID || swap.state === FromBTCLNSwap_1.FromBTCLNSwapState.QUOTE_SOFT_EXPIRED)
-                swap.state = FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED;
-            return true;
+            swap.state = FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED;
+            return Promise.resolve(true);
         }
+        return Promise.resolve(false);
     }
     processEventClaim(swap, event) {
-        if (swap.state !== FromBTCLNSwap_1.FromBTCLNSwapState.FAILED) {
+        if (swap.state !== FromBTCLNSwap_1.FromBTCLNSwapState.FAILED && swap.state !== FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_CLAIMED) {
             swap.state = FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_CLAIMED;
             return Promise.resolve(true);
         }
         return Promise.resolve(false);
     }
     processEventRefund(swap, event) {
-        if (swap.state !== FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_CLAIMED) {
+        if (swap.state !== FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_CLAIMED && swap.state !== FromBTCLNSwap_1.FromBTCLNSwapState.FAILED) {
             swap.state = FromBTCLNSwap_1.FromBTCLNSwapState.FAILED;
             return Promise.resolve(true);
         }
