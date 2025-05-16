@@ -115,7 +115,7 @@ class ISwapWrapper {
         }
         if (!noTimers)
             this.startTickInterval();
-        this.logger.info("init(): Swap wrapper initialized");
+        // this.logger.info("init(): Swap wrapper initialized");
         this.isInitialized = true;
     }
     startTickInterval() {

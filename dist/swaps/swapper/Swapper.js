@@ -174,11 +174,10 @@ class Swapper extends events_1.EventEmitter {
      * Initializes the swap storage and loads existing swaps, needs to be called before any other action
      */
     async init() {
-        this.logger.info("init(): Intializing swapper: ", this);
         for (let chainIdentifier in this.chains) {
             const { swapContract, unifiedChainEvents, unifiedSwapStorage, wrappers, reviver } = this.chains[chainIdentifier];
             await swapContract.start();
-            this.logger.info("init(): Intialized swap contract: " + chainIdentifier);
+            this.logger.debug("init(): Intialized swap contract: " + chainIdentifier);
             await unifiedSwapStorage.init();
             if (unifiedSwapStorage.storage instanceof IndexedDBUnifiedStorage_1.IndexedDBUnifiedStorage) {
                 //Try to migrate the data here
@@ -204,13 +203,13 @@ class Swapper extends events_1.EventEmitter {
             }
             if (!this.options.noEvents)
                 await unifiedChainEvents.start();
-            this.logger.info("init(): Intialized events: " + chainIdentifier);
+            this.logger.debug("init(): Intialized events: " + chainIdentifier);
             for (let key in wrappers) {
-                this.logger.info("init(): Initializing " + SwapType_1.SwapType[key] + ": " + chainIdentifier);
+                // this.logger.debug("init(): Initializing "+SwapType[key]+": "+chainIdentifier);
                 await wrappers[key].init(this.options.noTimers, this.options.dontCheckPastSwaps);
             }
         }
-        this.logger.info("init(): Initializing intermediary discovery");
+        this.logger.debug("init(): Initializing intermediary discovery");
         if (!this.options.dontFetchLPs)
             await this.intermediaryDiscovery.init();
         if (this.options.defaultTrustedIntermediaryUrl != null) {
