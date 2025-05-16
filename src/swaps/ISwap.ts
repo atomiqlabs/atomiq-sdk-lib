@@ -31,15 +31,18 @@ export function isISwapInit(obj: any): obj is ISwapInit {
 export type PercentagePPM = {
     ppm: bigint,
     decimal: number,
-    percentage: number
+    percentage: number,
+    toString: (decimal?: number) => string
 };
 
 export function ppmToPercentage(ppm: bigint): PercentagePPM {
     if(ppm==null) return null;
+    const percentage = Number(ppm)/10_000;
     return {
         ppm,
         decimal: Number(ppm)/1_000_000,
-        percentage: Number(ppm)/10_000
+        percentage: percentage,
+        toString: (decimals?: number) => (decimals!=null ? percentage.toFixed(decimals) : percentage)+"%"
     }
 }
 
