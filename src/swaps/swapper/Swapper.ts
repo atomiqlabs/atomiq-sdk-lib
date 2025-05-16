@@ -424,12 +424,14 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     async stop() {
         for(let chainIdentifier in this.chains) {
             const {
-                wrappers
+                wrappers,
+                unifiedChainEvents
             } = this.chains[chainIdentifier];
             for(let key in wrappers) {
                 (wrappers[key] as ISwapWrapper<any, any>).events.removeListener("swapState", this.swapStateListener);
                 await wrappers[key].stop();
             }
+            unifiedChainEvents.stop();
         }
     }
 

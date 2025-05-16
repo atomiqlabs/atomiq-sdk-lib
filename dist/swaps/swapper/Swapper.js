@@ -221,11 +221,12 @@ class Swapper extends events_1.EventEmitter {
      */
     async stop() {
         for (let chainIdentifier in this.chains) {
-            const { wrappers } = this.chains[chainIdentifier];
+            const { wrappers, unifiedChainEvents } = this.chains[chainIdentifier];
             for (let key in wrappers) {
                 wrappers[key].events.removeListener("swapState", this.swapStateListener);
                 await wrappers[key].stop();
             }
+            unifiedChainEvents.stop();
         }
     }
     /**
