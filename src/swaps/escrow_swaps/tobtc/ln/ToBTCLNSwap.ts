@@ -144,6 +144,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
         if(parsedRequest.tagsObject.routing_info!=null) {
             return parsedRequest.tagsObject.routing_info.length>0;
         }
+        return false;
     }
 
     getIdentifierHash(): Buffer {
