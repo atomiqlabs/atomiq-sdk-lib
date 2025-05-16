@@ -1,4 +1,4 @@
-import {BtcRelay, BtcStoredHeader, RelaySynchronizer} from "@atomiqlabs/base";
+import {BtcRelay, BtcStoredHeader, RelaySynchronizer, StatePredictorUtils} from "@atomiqlabs/base";
 import {MempoolBitcoinBlock} from "../MempoolBitcoinBlock";
 import {MempoolBitcoinRpc} from "../MempoolBitcoinRpc";
 
@@ -109,6 +109,10 @@ export class MempoolBtcRelaySynchronizer<B extends BtcStoredHeader<any>, TX> imp
         }
 
         if(headerCache.length>0) await saveHeaders(headerCache);
+
+        if(cacheData.forkId!==0) {
+            throw new Error("Unable to synchronize on-chain bitcoin light client! Not enough chainwork at connected RPC.");
+        }
 
         return {
             txs: txsList,
