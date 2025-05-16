@@ -2,7 +2,7 @@ import { ISwapPrice } from "./prices/abstract/ISwapPrice";
 export type BtcToken<L = boolean> = {
     chain: "BTC";
     lightning: L;
-    ticker: L extends true ? "BTCLN" : "BTC";
+    ticker: "BTC";
     decimals: 8;
     name: L extends true ? "Bitcoin (lightning L2)" : "Bitcoin (on-chain L1)";
     displayDecimals?: number;

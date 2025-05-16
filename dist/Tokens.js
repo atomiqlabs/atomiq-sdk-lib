@@ -21,7 +21,7 @@ exports.BitcoinTokens = {
     BTCLN: {
         chain: "BTC",
         lightning: true,
-        ticker: "BTCLN",
+        ticker: "BTC",
         decimals: 8,
         name: "Bitcoin (lightning L2)"
     }
