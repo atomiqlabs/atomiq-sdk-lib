@@ -48,6 +48,7 @@ __exportStar(require("./swaps/IAddressSwap"), exports);
 __exportStar(require("./swaps/ISwapWrapper"), exports);
 __exportStar(require("./swaps/swapper/Swapper"), exports);
 __exportStar(require("./swaps/swapper/SwapperWithChain"), exports);
+__exportStar(require("./swaps/swapper/SwapperWithSigner"), exports);
 __exportStar(require("./swaps/swapper/utils/SwapperUtils"), exports);
 __exportStar(require("./swaps/enums/SwapType"), exports);
 __exportStar(require("./swaps/enums/SwapDirection"), exports);

@@ -4,6 +4,7 @@ exports.SwapperWithChain = void 0;
 const SwapType_1 = require("../enums/SwapType");
 const SwapPriceWithChain_1 = require("../../prices/SwapPriceWithChain");
 const Tokens_1 = require("../../Tokens");
+const SwapperWithSigner_1 = require("./SwapperWithSigner");
 class SwapperWithChain {
     get intermediaryDiscovery() {
         return this.swapper.intermediaryDiscovery;
@@ -49,6 +50,26 @@ class SwapperWithChain {
     createTrustedLNForGasSwap(signer, amount, trustedIntermediaryUrl) {
         return this.swapper.createTrustedLNForGasSwap(this.chainIdentifier, signer, amount, trustedIntermediaryUrl);
     }
+    createTrustedOnchainForGasSwap(signer, amount, refundAddress, trustedIntermediaryUrl) {
+        return this.swapper.createTrustedOnchainForGasSwap(this.chainIdentifier, signer, amount, refundAddress, trustedIntermediaryUrl);
+    }
+    /**
+     * Creates a swap from srcToken to dstToken, of a specific token amount, either specifying input amount (exactIn=true)
+     *  or output amount (exactIn=false), NOTE: For regular -> BTC-LN (lightning) swaps the passed amount is ignored and
+     *  invoice's pre-set amount is used instead.
+     * @deprecated Use swap() instead
+     *
+     * @param signer Smartchain (Solana, Starknet, etc.) address of the user
+     * @param srcToken Source token of the swap, user pays this token
+     * @param dstToken Destination token of the swap, user receives this token
+     * @param amount Amount of the swap
+     * @param exactIn Whether the amount specified is an input amount (exactIn=true) or an output amount (exactIn=false)
+     * @param addressLnurlLightningInvoice Bitcoin on-chain address, lightning invoice, LNURL-pay to pay or
+     *  LNURL-withdrawal to withdraw money from
+     */
+    create(signer, srcToken, dstToken, amount, exactIn, addressLnurlLightningInvoice) {
+        return this.swapper.create(signer, srcToken, dstToken, amount, exactIn, addressLnurlLightningInvoice);
+    }
     /**
      * Creates a swap from srcToken to dstToken, of a specific token amount, either specifying input amount (exactIn=true)
      *  or output amount (exactIn=false), NOTE: For regular SmartChain -> BTC-LN (lightning) swaps the passed amount is ignored and
@@ -62,8 +83,8 @@ class SwapperWithChain {
      * @param dst Destination smart chain address, bitcoin on-chain address, lightning invoice, LNURL-pay
      * @param options Options for the swap
      */
-    create(srcToken, dstToken, amount, exactIn, src, dst, options) {
-        return this.swapper.create(srcToken, dstToken, amount, exactIn, src, dst, options);
+    swap(srcToken, dstToken, amount, exactIn, src, dst, options) {
+        return this.swapper.swap(srcToken, dstToken, amount, exactIn, src, dst, options);
     }
     /**
      * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
@@ -195,6 +216,14 @@ class SwapperWithChain {
                 }
             }
         }
+    }
+    /**
+     * Creates a child swapper instance with a signer
+     *
+     * @param signer Signer to use for the new swapper instance
+     */
+    withChain(signer) {
+        return new SwapperWithSigner_1.SwapperWithSigner(this, signer);
     }
     ///////////////////////////////////
     /// Deprecated

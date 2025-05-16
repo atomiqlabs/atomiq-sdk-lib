@@ -4,7 +4,7 @@ import { SwapType } from "../enums/SwapType";
 import { LnForGasSwap } from "../trusted/ln/LnForGasSwap";
 import { ISwap } from "../ISwap";
 import { IToBTCSwap } from "../escrow_swaps/tobtc/IToBTCSwap";
-import { ChainIds, MultiChain, SupportsSwapType, Swapper } from "./Swapper";
+import { ChainIds, MultiChain, SupportsSwapType } from "./Swapper";
 import { FromBTCLNSwap } from "../escrow_swaps/frombtc/ln/FromBTCLNSwap";
 import { FromBTCSwap } from "../escrow_swaps/frombtc/onchain/FromBTCSwap";
 import { ToBTCLNSwap } from "../escrow_swaps/tobtc/ln/ToBTCLNSwap";
@@ -19,14 +19,15 @@ import { ToBTCLNOptions } from "../escrow_swaps/tobtc/ln/ToBTCLNWrapper";
 import { FromBTCOptions } from "../escrow_swaps/frombtc/onchain/FromBTCWrapper";
 import { FromBTCLNOptions } from "../escrow_swaps/frombtc/ln/FromBTCLNWrapper";
 import { SwapperUtils } from "./utils/SwapperUtils";
-import { SpvFromBTCOptions } from "../spv_swaps/SpvFromBTCWrapper";
 import { SpvFromBTCSwap } from "../spv_swaps/SpvFromBTCSwap";
+import { SwapperWithChain } from "./SwapperWithChain";
+import { SwapWithSigner } from "./SwapWithSigner";
 import { OnchainForGasSwap } from "../trusted/onchain/OnchainForGasSwap";
-import { SwapperWithSigner } from "./SwapperWithSigner";
-export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier extends ChainIds<T>> {
+export declare class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends ChainIds<T>> {
     readonly chainIdentifier: ChainIdentifier;
-    readonly swapper: Swapper<T>;
-    readonly prices: SwapPriceWithChain<T, ChainIdentifier>;
+    readonly swapper: SwapperWithChain<T, ChainIdentifier>;
+    readonly signer: T[ChainIdentifier]["Signer"];
+    get prices(): SwapPriceWithChain<T, ChainIdentifier>;
     get intermediaryDiscovery(): IntermediaryDiscovery;
     get mempoolApi(): MempoolApi;
     get bitcoinRpc(): MempoolBitcoinRpc;
@@ -69,46 +70,40 @@ export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier exte
             readonly supportsGasDrop: false;
         };
     };
-    constructor(swapper: Swapper<T>, chainIdentifier: ChainIdentifier);
-    createToBTCSwap(signer: string, tokenAddress: string, address: string, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCOptions): Promise<ToBTCSwap<T[ChainIdentifier]>>;
-    createToBTCLNSwap(signer: string, tokenAddress: string, paymentRequest: string, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
-    createToBTCLNSwapViaLNURL(signer: string, tokenAddress: string, lnurlPay: string | LNURLPay, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
-    createFromBTCSwap(signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCOptions): Promise<FromBTCSwap<T[ChainIdentifier]>>;
-    createFromBTCLNSwap(signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNOptions): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
-    createFromBTCLNSwapViaLNURL(signer: string, tokenAddress: string, lnurl: string | LNURLWithdraw, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
-    createTrustedLNForGasSwap(signer: string, amount: bigint, trustedIntermediaryUrl?: string): Promise<LnForGasSwap<T[ChainIdentifier]>>;
-    createTrustedOnchainForGasSwap(signer: string, amount: bigint, refundAddress?: string, trustedIntermediaryUrl?: string): Promise<OnchainForGasSwap<T[ChainIdentifier]>>;
-    create(signer: string, srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean, lnurlWithdraw?: string | LNURLWithdraw): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
-    create(signer: string, srcToken: BtcToken<false>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean): Promise<(SupportsSwapType<T[ChainIdentifier], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T[ChainIdentifier]> : FromBTCSwap<T[ChainIdentifier]>)>;
-    create(signer: string, srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<false>, amount: bigint, exactIn: boolean, address: string): Promise<ToBTCSwap<T[ChainIdentifier]>>;
-    create(signer: string, srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: bigint, exactIn: boolean, lnurlPay: string | LNURLPay): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
-    create(signer: string, srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: bigint, exactIn: false, lightningInvoice: string | LNURLWithdraw | LNURLPay): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
-    swap(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean, src: undefined | string | LNURLWithdraw, dstSmartchainWallet: string, options?: FromBTCLNOptions): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
-    swap(srcToken: BtcToken<false>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean, src: undefined | string, dstSmartchainWallet: string, options?: (SupportsSwapType<T[ChainIdentifier], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCOptions : FromBTCOptions)): Promise<(SupportsSwapType<T[ChainIdentifier], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T[ChainIdentifier]> : FromBTCSwap<T[ChainIdentifier]>)>;
-    swap(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<false>, amount: bigint, exactIn: boolean, src: string, dstAddress: string, options?: ToBTCOptions): Promise<ToBTCSwap<T[ChainIdentifier]>>;
-    swap(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: bigint, exactIn: boolean, src: string, dstLnurlPay: string | LNURLPay, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
-    swap(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: bigint, exactIn: false, src: string, dstLightningInvoice: string, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
-    swap(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>, amount: bigint, exactIn: boolean, src: undefined | string | LNURLWithdraw, dst: string | LNURLPay, options?: FromBTCLNOptions | SpvFromBTCOptions | FromBTCOptions | ToBTCOptions | ToBTCLNOptions): Promise<ISwap<T[ChainIdentifier]>>;
+    constructor(swapper: SwapperWithChain<T, ChainIdentifier>, signer: T[ChainIdentifier]["Signer"]);
+    createToBTCSwap(tokenAddress: string, address: string, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCOptions): Promise<SwapWithSigner<ToBTCSwap<T[ChainIdentifier]>>>;
+    createToBTCLNSwap(tokenAddress: string, paymentRequest: string, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<SwapWithSigner<ToBTCLNSwap<T[ChainIdentifier]>>>;
+    createToBTCLNSwapViaLNURL(tokenAddress: string, lnurlPay: string | LNURLPay, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<SwapWithSigner<ToBTCLNSwap<T[ChainIdentifier]>>>;
+    createFromBTCSwap(tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCOptions): Promise<SwapWithSigner<FromBTCSwap<T[ChainIdentifier]>>>;
+    createFromBTCLNSwap(tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNOptions): Promise<SwapWithSigner<FromBTCLNSwap<T[ChainIdentifier]>>>;
+    createFromBTCLNSwapViaLNURL(tokenAddress: string, lnurl: string | LNURLWithdraw, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>): Promise<SwapWithSigner<FromBTCLNSwap<T[ChainIdentifier]>>>;
+    createTrustedLNForGasSwap(amount: bigint, trustedIntermediaryUrl?: string): Promise<LnForGasSwap<T[ChainIdentifier]>>;
+    createTrustedOnchainForGasSwap(amount: bigint, refundAddress?: string, trustedIntermediaryUrl?: string): Promise<OnchainForGasSwap<T[ChainIdentifier]>>;
+    create(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean, lnurlWithdraw?: string | LNURLWithdraw): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
+    create(srcToken: BtcToken<false>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean): Promise<(SupportsSwapType<T[ChainIdentifier], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T[ChainIdentifier]> : FromBTCSwap<T[ChainIdentifier]>)>;
+    create(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<false>, amount: bigint, exactIn: boolean, address: string): Promise<ToBTCSwap<T[ChainIdentifier]>>;
+    create(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: bigint, exactIn: boolean, lnurlPay: string | LNURLPay): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    create(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: bigint, exactIn: false, lightningInvoice: string | LNURLWithdraw | LNURLPay): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
      */
-    getAllSwaps(signer?: string): Promise<ISwap<T[ChainIdentifier]>[]>;
+    getAllSwaps(): Promise<ISwap<T[ChainIdentifier]>[]>;
     /**
      * Returns swaps that are in-progress and are claimable for the specific chain, optionally also for a specific signer's address
      */
-    getActionableSwaps(signer?: string): Promise<ISwap<T[ChainIdentifier]>[]>;
+    getActionableSwaps(): Promise<ISwap<T[ChainIdentifier]>[]>;
     /**
      * Returns swaps that are refundable for the specific chain, optionally also for a specific signer's address
      */
-    getRefundableSwaps(signer?: string): Promise<IToBTCSwap<T[ChainIdentifier]>[]>;
+    getRefundableSwaps(): Promise<IToBTCSwap<T[ChainIdentifier]>[]>;
     /**
      * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
-    getSwapById(id: string, signer?: string): Promise<ISwap<T[ChainIdentifier]>>;
+    getSwapById(id: string): Promise<ISwap<T[ChainIdentifier]>>;
     /**
      * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes
      */
-    _syncSwaps(signer?: string): Promise<void>;
+    _syncSwaps(): Promise<void>;
     supportsSwapType<Type extends SwapType>(swapType: Type): SupportsSwapType<T[ChainIdentifier], Type>;
     /**
      * Returns type of the swap based on input and output tokens specified
@@ -138,28 +133,10 @@ export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier exte
         };
     };
     /**
-     * Returns a set of supported tokens by all the intermediaries offering a specific swap service
-     *
-     * @param _swapType Swap service type to check supported tokens for
-     */
-    private getSupportedTokens;
-    /**
-     * Returns the set of supported tokens by all the intermediaries we know of offering a specific swapType service
-     *
-     * @param swapType Specific swap type for which to obtain supported tokens
-     */
-    private getSupportedTokenAddresses;
-    /**
      * Returns tokens that you can swap to (if input=true) from a given token,
      *  or tokens that you can swap from (if input=false) to a given token
      */
     getSwapCounterTokens(token: Token, input: boolean): Token<ChainIdentifier>[];
-    /**
-     * Creates a child swapper instance with a signer
-     *
-     * @param signer Signer to use for the new swapper instance
-     */
-    withChain(signer: T[ChainIdentifier]["Signer"]): SwapperWithSigner<T, ChainIdentifier>;
     /**
      * Returns swap bounds (minimums & maximums) for different swap types & tokens
      * @deprecated Use getSwapLimits() instead!

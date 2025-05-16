@@ -559,6 +559,28 @@ class Swapper extends events_1.EventEmitter {
     }
     /**
      * Creates a swap from srcToken to dstToken, of a specific token amount, either specifying input amount (exactIn=true)
+     *  or output amount (exactIn=false), NOTE: For regular -> BTC-LN (lightning) swaps the passed amount is ignored and
+     *  invoice's pre-set amount is used instead.
+     * @deprecated Use swap() instead
+     *
+     * @param signer Smartchain (Solana, Starknet, etc.) address of the user
+     * @param srcToken Source token of the swap, user pays this token
+     * @param dstToken Destination token of the swap, user receives this token
+     * @param amount Amount of the swap
+     * @param exactIn Whether the amount specified is an input amount (exactIn=true) or an output amount (exactIn=false)
+     * @param addressLnurlLightningInvoice Bitcoin on-chain address, lightning invoice, LNURL-pay to pay or
+     *  LNURL-withdrawal to withdraw money from
+     */
+    create(signer, srcToken, dstToken, amount, exactIn, addressLnurlLightningInvoice) {
+        if (srcToken.chain === "BTC") {
+            return this.swap(srcToken, dstToken, amount, exactIn, addressLnurlLightningInvoice, signer);
+        }
+        else {
+            return this.swap(srcToken, dstToken, amount, exactIn, signer, addressLnurlLightningInvoice);
+        }
+    }
+    /**
+     * Creates a swap from srcToken to dstToken, of a specific token amount, either specifying input amount (exactIn=true)
      *  or output amount (exactIn=false), NOTE: For regular SmartChain -> BTC-LN (lightning) swaps the passed amount is ignored and
      *  invoice's pre-set amount is used instead, use LNURL-pay for dynamic amounts
      *
@@ -570,7 +592,7 @@ class Swapper extends events_1.EventEmitter {
      * @param dst Destination smart chain address, bitcoin on-chain address, lightning invoice, LNURL-pay
      * @param options Options for the swap
      */
-    create(srcToken, dstToken, amount, exactIn, src, dst, options) {
+    swap(srcToken, dstToken, amount, exactIn, src, dst, options) {
         if (srcToken.chain === "BTC") {
             if (dstToken.chain === "SC") {
                 if (typeof (dst) !== "string")
@@ -896,6 +918,8 @@ class Swapper extends events_1.EventEmitter {
         };
         for (let lp of this.intermediaryDiscovery.intermediaries) {
             const lpMinMax = lp.getSwapLimits(swapType, scToken.chainId, scToken.address);
+            if (lpMinMax == null)
+                continue;
             result.input.min = result.input.min == null ? lpMinMax.input.min : (0, Utils_1.bigIntMin)(result.input.min, lpMinMax.input.min);
             result.input.max = result.input.max == null ? lpMinMax.input.max : (0, Utils_1.bigIntMax)(result.input.max, lpMinMax.input.max);
             result.output.min = result.output.min == null ? lpMinMax.output.min : (0, Utils_1.bigIntMin)(result.output.min, lpMinMax.output.min);
@@ -928,7 +952,9 @@ class Swapper extends events_1.EventEmitter {
                 if (lp.services[swapType].chainTokens == null)
                     continue;
                 for (let chainId of this.getSmartChains()) {
-                    if (swapType === SwapType_1.SwapType.FROM_BTC && this.supportsSwapType(chainId, SwapType_1.SwapType.SPV_VAULT_FROM_BTC))
+                    if (this.supportsSwapType(chainId, SwapType_1.SwapType.SPV_VAULT_FROM_BTC) ? swapType === SwapType_1.SwapType.FROM_BTC : swapType === SwapType_1.SwapType.SPV_VAULT_FROM_BTC)
+                        continue;
+                    if (lp.services[swapType].chainTokens[chainId] == null)
                         continue;
                     for (let tokenAddress of lp.services[swapType].chainTokens[chainId]) {
                         if (input) {
@@ -989,6 +1015,8 @@ class Swapper extends events_1.EventEmitter {
                     break;
                 if (lp.services[swapType].chainTokens == null)
                     break;
+                if (lp.services[swapType].chainTokens[chainId] == null)
+                    continue;
                 for (let tokenAddress of lp.services[swapType].chainTokens[chainId]) {
                     tokens[chainId] ??= new Set();
                     tokens[chainId].add(tokenAddress);

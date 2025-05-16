@@ -448,4 +448,14 @@ export class SwapperUtils<T extends MultiChain> {
         return this.root.chains[chainIdentifier].chainInterface.randomSigner();
     }
 
+    /**
+     * Returns a random address for a given smart chain
+     *
+     * @param chainIdentifier
+     */
+    randomAddress<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): string {
+        if(this.root.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.randomAddress();
+    }
+
 }

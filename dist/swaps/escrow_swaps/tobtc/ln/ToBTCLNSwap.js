@@ -109,6 +109,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
         if (parsedRequest.tagsObject.routing_info != null) {
             return parsedRequest.tagsObject.routing_info.length > 0;
         }
+        return false;
     }
     getIdentifierHash() {
         const paymentHashBuffer = this.getPaymentHash();
