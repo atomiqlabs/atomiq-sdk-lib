@@ -1,12 +1,13 @@
 import { LoggerType } from "../utils/Utils";
-import { IUnifiedStorage, QueryParams, UnifiedStoredObject } from "../storage/IUnifiedStorage";
+import { IUnifiedStorage, QueryParams, UnifiedStorageCompositeIndexes, UnifiedStoredObject } from "../storage/IUnifiedStorage";
 import { ISwap } from "../swaps/ISwap";
 import { SwapType } from "../swaps/enums/SwapType";
+import { UnifiedSwapStorageIndexes } from "../storage/UnifiedSwapStorage";
 export type QuerySetCondition = {
     key: string;
     values: Set<any>;
 };
-export declare class IndexedDBUnifiedStorage implements IUnifiedStorage {
+export declare class IndexedDBUnifiedStorage implements IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedStorageCompositeIndexes> {
     protected readonly logger: LoggerType;
     storageKey: string;
     db: IDBDatabase;

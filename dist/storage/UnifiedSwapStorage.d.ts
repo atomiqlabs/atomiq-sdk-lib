@@ -5,11 +5,51 @@ export type QueryParams = {
     key: string;
     value: any | any[];
 };
+declare const indexes: readonly [{
+    readonly key: "id";
+    readonly type: "string";
+    readonly unique: true;
+}, {
+    readonly key: "escrowHash";
+    readonly type: "string";
+    readonly unique: true;
+}, {
+    readonly key: "type";
+    readonly type: "number";
+    readonly unique: false;
+}, {
+    readonly key: "initiator";
+    readonly type: "string";
+    readonly unique: false;
+}, {
+    readonly key: "state";
+    readonly type: "number";
+    readonly unique: false;
+}, {
+    readonly key: "paymentHash";
+    readonly type: "string";
+    readonly unique: false;
+}];
+export type UnifiedSwapStorageIndexes = typeof indexes;
+declare const compositeIndexes: readonly [{
+    readonly keys: readonly ["initiator", "id"];
+    readonly unique: false;
+}, {
+    readonly keys: readonly ["type", "state"];
+    readonly unique: false;
+}, {
+    readonly keys: readonly ["type", "paymentHash"];
+    readonly unique: false;
+}, {
+    readonly keys: readonly ["type", "initiator", "state"];
+    readonly unique: false;
+}];
+export type UnifiedSwapStorageCompositeIndexes = typeof compositeIndexes;
 export declare class UnifiedSwapStorage<T extends ChainType> {
-    readonly storage: IUnifiedStorage;
+    readonly storage: IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedSwapStorageCompositeIndexes>;
     readonly weakRefCache: Map<string, WeakRef<ISwap<T>>>;
     readonly noWeakRefMap: boolean;
-    constructor(storage: IUnifiedStorage, noWeakRefMap?: boolean);
+    constructor(storage: IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedSwapStorageCompositeIndexes>, noWeakRefMap?: boolean);
     init(): Promise<void>;
     /**
      * Params are specified in the following way:
@@ -25,3 +65,4 @@ export declare class UnifiedSwapStorage<T extends ChainType> {
     remove<S extends ISwap<T>>(value: S): Promise<void>;
     removeAll<S extends ISwap<T>>(values: S[]): Promise<void>;
 }
+export {};

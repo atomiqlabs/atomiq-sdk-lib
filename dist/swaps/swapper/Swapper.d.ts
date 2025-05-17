@@ -27,7 +27,7 @@ import { OnchainForGasSwap } from "../trusted/onchain/OnchainForGasSwap";
 import { OnchainForGasWrapper } from "../trusted/onchain/OnchainForGasWrapper";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { IUnifiedStorage } from "../../storage/IUnifiedStorage";
-import { UnifiedSwapStorage } from "../../storage/UnifiedSwapStorage";
+import { UnifiedSwapStorage, UnifiedSwapStorageCompositeIndexes, UnifiedSwapStorageIndexes } from "../../storage/UnifiedSwapStorage";
 import { UnifiedSwapEventListener } from "../../events/UnifiedSwapEventListener";
 import { IToBTCSwap } from "../escrow_swaps/tobtc/IToBTCSwap";
 import { SpvFromBTCOptions, SpvFromBTCWrapper } from "../spv_swaps/SpvFromBTCWrapper";
@@ -44,7 +44,7 @@ export type SwapperOptions = {
     };
     storagePrefix?: string;
     defaultTrustedIntermediaryUrl?: string;
-    swapStorage?: <T extends ChainType>(chainId: T["ChainId"]) => IUnifiedStorage;
+    swapStorage?: <T extends ChainType>(chainId: T["ChainId"]) => IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedSwapStorageCompositeIndexes>;
     noTimers?: boolean;
     noEvents?: boolean;
     noSwapCache?: boolean;

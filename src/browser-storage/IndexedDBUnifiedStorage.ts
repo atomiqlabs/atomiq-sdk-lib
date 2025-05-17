@@ -1,7 +1,13 @@
 import {getLogger, LoggerType} from "../utils/Utils";
-import {IUnifiedStorage, QueryParams, UnifiedStoredObject} from "../storage/IUnifiedStorage";
+import {
+    IUnifiedStorage,
+    QueryParams,
+    UnifiedStorageCompositeIndexes,
+    UnifiedStoredObject
+} from "../storage/IUnifiedStorage";
 import {ISwap} from "../swaps/ISwap";
 import {SwapType} from "../swaps/enums/SwapType";
+import {UnifiedSwapStorageIndexes} from "../storage/UnifiedSwapStorage";
 
 export type QuerySetCondition = {
     key: string,
@@ -52,7 +58,7 @@ const indexes = {
     "type, initiator, state": {key: ["type", "initiator", "state"], unique: false}
 }
 
-export class IndexedDBUnifiedStorage implements IUnifiedStorage {
+export class IndexedDBUnifiedStorage implements IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedStorageCompositeIndexes> {
 
     protected readonly logger: LoggerType;
 

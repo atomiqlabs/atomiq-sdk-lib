@@ -10,19 +10,37 @@ export type QueryParams = {
 
 const logger = getLogger("UnifiedSwapStorage: ");
 
+const indexes = [
+    {key: "id", type: "string", unique: true},
+    {key: "escrowHash", type: "string", unique: true},
+    {key: "type", type: "number", unique: false},
+    {key: "initiator", type: "string", unique: false},
+    {key: "state", type: "number", unique: false},
+    {key: "paymentHash", type: "string", unique: false},
+] as const;
+export type UnifiedSwapStorageIndexes = typeof indexes;
+
+const compositeIndexes = [
+    {keys: ["initiator", "id"], unique: false},
+    {keys: ["type", "state"], unique: false},
+    {keys: ["type", "paymentHash"], unique: false},
+    {keys: ["type", "initiator", "state"], unique: false}
+] as const;
+export type UnifiedSwapStorageCompositeIndexes = typeof compositeIndexes;
+
 export class UnifiedSwapStorage<T extends ChainType> {
 
-    readonly storage: IUnifiedStorage;
+    readonly storage: IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedSwapStorageCompositeIndexes>;
     readonly weakRefCache: Map<string, WeakRef<ISwap<T>>> = new Map();
     readonly noWeakRefMap: boolean;
 
-    constructor(storage: IUnifiedStorage, noWeakRefMap?: boolean) {
+    constructor(storage: IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedSwapStorageCompositeIndexes>, noWeakRefMap?: boolean) {
         this.storage = storage;
         this.noWeakRefMap = noWeakRefMap;
     }
 
     init(): Promise<void> {
-        return this.storage.init();
+        return this.storage.init(indexes, compositeIndexes);
     }
 
     /**

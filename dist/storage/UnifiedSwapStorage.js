@@ -3,6 +3,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UnifiedSwapStorage = void 0;
 const Utils_1 = require("../utils/Utils");
 const logger = (0, Utils_1.getLogger)("UnifiedSwapStorage: ");
+const indexes = [
+    { key: "id", type: "string", unique: true },
+    { key: "escrowHash", type: "string", unique: true },
+    { key: "type", type: "number", unique: false },
+    { key: "initiator", type: "string", unique: false },
+    { key: "state", type: "number", unique: false },
+    { key: "paymentHash", type: "string", unique: false },
+];
+const compositeIndexes = [
+    { keys: ["initiator", "id"], unique: false },
+    { keys: ["type", "state"], unique: false },
+    { keys: ["type", "paymentHash"], unique: false },
+    { keys: ["type", "initiator", "state"], unique: false }
+];
 class UnifiedSwapStorage {
     constructor(storage, noWeakRefMap) {
         this.weakRefCache = new Map();
@@ -10,7 +24,7 @@ class UnifiedSwapStorage {
         this.noWeakRefMap = noWeakRefMap;
     }
     init() {
-        return this.storage.init();
+        return this.storage.init(indexes, compositeIndexes);
     }
     /**
      * Params are specified in the following way:
