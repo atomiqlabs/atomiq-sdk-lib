@@ -9,26 +9,32 @@ declare const indexes: readonly [{
     readonly key: "id";
     readonly type: "string";
     readonly unique: true;
+    readonly nullable: false;
 }, {
     readonly key: "escrowHash";
     readonly type: "string";
     readonly unique: true;
+    readonly nullable: true;
 }, {
     readonly key: "type";
     readonly type: "number";
     readonly unique: false;
+    readonly nullable: false;
 }, {
     readonly key: "initiator";
     readonly type: "string";
     readonly unique: false;
+    readonly nullable: false;
 }, {
     readonly key: "state";
     readonly type: "number";
     readonly unique: false;
+    readonly nullable: false;
 }, {
     readonly key: "paymentHash";
     readonly type: "string";
     readonly unique: false;
+    readonly nullable: true;
 }];
 export type UnifiedSwapStorageIndexes = typeof indexes;
 declare const compositeIndexes: readonly [{

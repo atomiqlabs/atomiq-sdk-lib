@@ -12,6 +12,7 @@ export type UnifiedStorageIndexes = readonly {
     key: string;
     type: "number" | "string" | "boolean";
     unique: boolean;
+    nullable: boolean;
 }[];
 /**
  * Defines composite indexes (for queries that use multiple keys)

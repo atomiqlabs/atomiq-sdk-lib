@@ -4,12 +4,12 @@ exports.UnifiedSwapStorage = void 0;
 const Utils_1 = require("../utils/Utils");
 const logger = (0, Utils_1.getLogger)("UnifiedSwapStorage: ");
 const indexes = [
-    { key: "id", type: "string", unique: true },
-    { key: "escrowHash", type: "string", unique: true },
-    { key: "type", type: "number", unique: false },
-    { key: "initiator", type: "string", unique: false },
-    { key: "state", type: "number", unique: false },
-    { key: "paymentHash", type: "string", unique: false },
+    { key: "id", type: "string", unique: true, nullable: false },
+    { key: "escrowHash", type: "string", unique: true, nullable: true },
+    { key: "type", type: "number", unique: false, nullable: false },
+    { key: "initiator", type: "string", unique: false, nullable: false },
+    { key: "state", type: "number", unique: false, nullable: false },
+    { key: "paymentHash", type: "string", unique: false, nullable: true },
 ];
 const compositeIndexes = [
     { keys: ["initiator", "id"], unique: false },

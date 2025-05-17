@@ -11,12 +11,12 @@ export type QueryParams = {
 const logger = getLogger("UnifiedSwapStorage: ");
 
 const indexes = [
-    {key: "id", type: "string", unique: true},
-    {key: "escrowHash", type: "string", unique: true},
-    {key: "type", type: "number", unique: false},
-    {key: "initiator", type: "string", unique: false},
-    {key: "state", type: "number", unique: false},
-    {key: "paymentHash", type: "string", unique: false},
+    {key: "id", type: "string", unique: true, nullable: false},
+    {key: "escrowHash", type: "string", unique: true, nullable: true},
+    {key: "type", type: "number", unique: false, nullable: false},
+    {key: "initiator", type: "string", unique: false, nullable: false},
+    {key: "state", type: "number", unique: false, nullable: false},
+    {key: "paymentHash", type: "string", unique: false, nullable: true},
 ] as const;
 export type UnifiedSwapStorageIndexes = typeof indexes;
 

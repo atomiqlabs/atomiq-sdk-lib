@@ -12,7 +12,8 @@ export type UnifiedStoredObject = {id: string} & any;
 export type UnifiedStorageIndexes = readonly {
     key: string,
     type: "number" | "string" | "boolean",
-    unique: boolean
+    unique: boolean,
+    nullable: boolean
 }[];
 
 /**
