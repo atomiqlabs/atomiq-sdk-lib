@@ -3,15 +3,52 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MempoolBitcoinRpc = void 0;
 const base_1 = require("@atomiqlabs/base");
 const MempoolBitcoinBlock_1 = require("./MempoolBitcoinBlock");
+const MempoolApi_1 = require("./MempoolApi");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../../utils/Utils");
 const btc_signer_1 = require("@scure/btc-signer");
 const sha2_1 = require("@noble/hashes/sha2");
 const BITCOIN_BLOCKTIME = 600 * 1000;
 const BITCOIN_BLOCKSIZE = 1024 * 1024;
+function bitcoinTxToBtcTx(btcTx) {
+    return {
+        locktime: btcTx.lockTime,
+        version: btcTx.version,
+        blockhash: null,
+        confirmations: 0,
+        txid: buffer_1.Buffer.from((0, sha2_1.sha256)((0, sha2_1.sha256)(btcTx.toBytes(true, false)))).reverse().toString("hex"),
+        hex: buffer_1.Buffer.from(btcTx.toBytes(true, false)).toString("hex"),
+        raw: buffer_1.Buffer.from(btcTx.toBytes(true, true)).toString("hex"),
+        vsize: btcTx.isFinal ? btcTx.vsize : null,
+        outs: Array.from({ length: btcTx.outputsLength }, (_, i) => i).map((index) => {
+            const output = btcTx.getOutput(index);
+            return {
+                value: Number(output.amount),
+                n: index,
+                scriptPubKey: {
+                    asm: btc_signer_1.Script.decode(output.script).map(val => typeof (val) === "object" ? buffer_1.Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: buffer_1.Buffer.from(output.script).toString("hex")
+                }
+            };
+        }),
+        ins: Array.from({ length: btcTx.inputsLength }, (_, i) => i).map(index => {
+            const input = btcTx.getInput(index);
+            return {
+                txid: buffer_1.Buffer.from(input.txid).toString("hex"),
+                vout: input.index,
+                scriptSig: {
+                    asm: btc_signer_1.Script.decode(input.finalScriptSig).map(val => typeof (val) === "object" ? buffer_1.Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: buffer_1.Buffer.from(input.finalScriptSig).toString("hex")
+                },
+                sequence: input.sequence,
+                txinwitness: input.finalScriptWitness == null ? [] : input.finalScriptWitness.map(witness => buffer_1.Buffer.from(witness).toString("hex"))
+            };
+        })
+    };
+}
 class MempoolBitcoinRpc {
-    constructor(mempoolApi) {
-        this.api = mempoolApi;
+    constructor(urlOrMempoolApi) {
+        this.api = urlOrMempoolApi instanceof MempoolApi_1.MempoolApi ? urlOrMempoolApi : new MempoolApi_1.MempoolApi(urlOrMempoolApi);
     }
     /**
      * Returns a txo hash for a specific transaction vout
@@ -88,10 +125,17 @@ class MempoolBitcoinRpc {
         let strippedRawTx;
         if (rawTx != null) {
             //Strip witness data
-            const btcTx = btc_signer_1.Transaction.fromRaw(rawTx);
+            const btcTx = btc_signer_1.Transaction.fromRaw(rawTx, {
+                allowLegacyWitnessUtxo: true,
+                allowUnknownInputs: true,
+                allowUnknownOutputs: true,
+                disableScriptCheck: true
+            });
             strippedRawTx = buffer_1.Buffer.from(btcTx.toBytes(true, false)).toString("hex");
         }
         return {
+            locktime: tx.locktime,
+            version: tx.version,
             blockheight: tx.status?.block_height,
             blockhash: tx.status?.block_hash,
             confirmations,
@@ -222,6 +266,26 @@ class MempoolBitcoinRpc {
         }
         abortSignal.throwIfAborted();
     }
+    async waitForTransaction(txId, requiredConfirmations, stateUpdateCbk, abortSignal, intervalSeconds) {
+        if (abortSignal != null)
+            abortSignal.throwIfAborted();
+        while (abortSignal == null || !abortSignal.aborted) {
+            await (0, Utils_1.timeoutPromise)((intervalSeconds || 5) * 1000, abortSignal);
+            const result = await this.getTransaction(txId);
+            if (result == null) {
+                stateUpdateCbk(null, null, null);
+                continue;
+            }
+            const confirmationDelay = await this.getConfirmationDelay(result, requiredConfirmations);
+            if (confirmationDelay == null)
+                continue;
+            if (stateUpdateCbk != null)
+                stateUpdateCbk(result.confirmations, result.txid, confirmationDelay);
+            if (confirmationDelay === 0)
+                return result;
+        }
+        abortSignal.throwIfAborted();
+    }
     async getLNNodeLiquidity(pubkey) {
         const nodeInfo = await this.api.getLNNodeInfo(pubkey);
         return {
@@ -235,6 +299,49 @@ class MempoolBitcoinRpc {
     }
     sendRawPackage(rawTx) {
         throw new Error("Unsupported");
+    }
+    async isSpent(utxo, confirmed) {
+        const [txId, voutStr] = utxo.split(":");
+        const vout = parseInt(voutStr);
+        const outspends = await this.api.getOutspends(txId);
+        if (outspends[vout] == null)
+            return true;
+        if (confirmed) {
+            return outspends[vout].spent && outspends[vout].status.confirmed;
+        }
+        return outspends[vout].spent;
+    }
+    parseTransaction(rawTx) {
+        const btcTx = btc_signer_1.Transaction.fromRaw(buffer_1.Buffer.from(rawTx, "hex"), {
+            allowLegacyWitnessUtxo: true,
+            allowUnknownInputs: true,
+            allowUnknownOutputs: true,
+            disableScriptCheck: true
+        });
+        return Promise.resolve(bitcoinTxToBtcTx(btcTx));
+    }
+    getEffectiveFeeRate(btcTx) {
+        throw new Error("Unsupported.");
+    }
+    async getFeeRate() {
+        return (await this.api.getFees()).fastestFee;
+    }
+    getAddressBalances(address) {
+        return this.api.getAddressBalances(address);
+    }
+    async getAddressUTXOs(address) {
+        return (await this.api.getAddressUTXOs(address)).map(val => ({
+            txid: val.txid,
+            vout: val.vout,
+            confirmed: val.status.confirmed,
+            block_height: val.status.block_height,
+            block_hash: val.status.block_hash,
+            block_time: val.status.block_time,
+            value: val.value
+        }));
+    }
+    getCPFPData(txId) {
+        return this.api.getCPFPData(txId);
     }
 }
 exports.MempoolBitcoinRpc = MempoolBitcoinRpc;

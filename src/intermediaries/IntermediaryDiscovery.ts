@@ -1,5 +1,5 @@
 import {Intermediary, ServicesType} from "./Intermediary";
-import {SwapType} from "../swaps/SwapType";
+import {SwapType} from "../swaps/enums/SwapType";
 import {SwapContract} from "@atomiqlabs/base";
 import {EventEmitter} from "events";
 import {Buffer} from "buffer";
@@ -13,6 +13,7 @@ export enum SwapHandlerType {
     FROM_BTCLN = "FROM_BTCLN",
     FROM_BTC_TRUSTED = "FROM_BTC_TRUSTED",
     FROM_BTCLN_TRUSTED = "FROM_BTCLN_TRUSTED",
+    FROM_BTC_SPV = "FROM_BTC_SPV"
 }
 
 export type SwapHandlerInfoType = {
@@ -71,6 +72,8 @@ function swapHandlerTypeToSwapType(swapHandlerType: SwapHandlerType): SwapType {
             return SwapType.TRUSTED_FROM_BTC;
         case SwapHandlerType.FROM_BTCLN_TRUSTED:
             return SwapType.TRUSTED_FROM_BTCLN;
+        case SwapHandlerType.FROM_BTC_SPV:
+            return SwapType.SPV_VAULT_FROM_BTC;
     }
 }
 
@@ -166,8 +169,12 @@ export class IntermediaryDiscovery extends EventEmitter {
         for(let chain in response.chains) {
             if(this.swapContracts[chain]!=null) {
                 const {signature, address} = response.chains[chain];
-                await this.swapContracts[chain].isValidDataSignature(Buffer.from(response.envelope), signature, address);
-                addresses[chain] = address;
+                try {
+                    await this.swapContracts[chain].isValidDataSignature(Buffer.from(response.envelope), signature, address);
+                    addresses[chain] = address;
+                } catch (e) {
+                    logger.warn("Failed to verify "+chain+" signature for intermediary: "+url);
+                }
             }
         }
         if(abortSignal!=null) abortSignal.throwIfAborted();
@@ -179,6 +186,9 @@ export class IntermediaryDiscovery extends EventEmitter {
             if(serviceData.chainTokens==null) serviceData.chainTokens = {
                 [DEFAULT_CHAIN]: serviceData.tokens
             };
+            for(let chain in serviceData.chainTokens) {
+                if(addresses[chain]==null) delete serviceData.chainTokens[chain];
+            }
         }
 
         return {

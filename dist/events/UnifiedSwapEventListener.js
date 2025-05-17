@@ -1,6 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UnifiedSwapEventListener = void 0;
+const base_1 = require("@atomiqlabs/base");
+function chainEventToEscrowHash(event) {
+    if (event instanceof base_1.SwapEvent)
+        return event.escrowHash;
+    if (event instanceof base_1.SpvVaultFrontEvent ||
+        event instanceof base_1.SpvVaultClaimEvent ||
+        event instanceof base_1.SpvVaultCloseEvent)
+        return event.btcTxId;
+}
 class UnifiedSwapEventListener {
     constructor(unifiedStorage, events) {
         this.listeners = {};
@@ -8,16 +17,21 @@ class UnifiedSwapEventListener {
         this.events = events;
     }
     async processEvents(events) {
-        const swaps = await this.storage.query([[{ key: "escrowHash", value: events.map(event => event.escrowHash) }]], (val) => {
+        const swapsByEscrowHash = {};
+        events.forEach(event => {
+            swapsByEscrowHash[chainEventToEscrowHash(event)] = null;
+        });
+        const swaps = await this.storage.query([
+            [{ key: "escrowHash", value: Object.keys(swapsByEscrowHash) }]
+        ], (val) => {
             const obj = this.listeners[val.type];
             if (obj == null)
                 return null;
             return new obj.reviver(val);
         });
-        const swapsObj = {};
-        swaps.forEach(swap => swapsObj[swap.getEscrowHash()] = swap);
+        swaps.forEach(swap => swapsByEscrowHash[swap._getEscrowHash()] = swap);
         for (let event of events) {
-            const swap = swapsObj[event.escrowHash];
+            const swap = swapsByEscrowHash[chainEventToEscrowHash(event)];
             if (swap == null)
                 continue;
             const obj = this.listeners[swap.getType()];
@@ -38,6 +52,7 @@ class UnifiedSwapEventListener {
     }
     stop() {
         this.events.unregisterListener(this.listener);
+        return this.events.stop();
     }
     registerListener(type, listener, reviver) {
         this.listeners[type] = {

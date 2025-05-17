@@ -80,12 +80,16 @@ class MempoolBtcRelaySynchronizer {
         }
         if (headerCache.length > 0)
             await saveHeaders(headerCache);
+        if (cacheData.forkId !== 0) {
+            throw new Error("Unable to synchronize on-chain bitcoin light client! Not enough chainwork at connected RPC.");
+        }
         return {
             txs: txsList,
             targetCommitedHeader: cacheData.lastStoredHeader,
             blockHeaderMap,
             computedHeaderMap,
-            btcRelayTipBlockHash: btcRelayTipBlockHash,
+            btcRelayTipCommitedHeader: resultStoredHeader,
+            btcRelayTipBlockHeader: resultBitcoinHeader,
             latestBlockHeader: spvTipBlockHeader,
             startForkId
         };

@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ISwapWrapper = void 0;
-const base_1 = require("@atomiqlabs/base");
 const events_1 = require("events");
 const IntermediaryError_1 = require("../errors/IntermediaryError");
 const Utils_1 = require("../utils/Utils");
@@ -10,6 +9,7 @@ class ISwapWrapper {
      * @param chainIdentifier
      * @param unifiedStorage
      * @param unifiedChainEvents
+     * @param chain
      * @param contract Underlying contract handling the swaps
      * @param prices Swap pricing handler
      * @param tokens Chain specific token data
@@ -17,7 +17,7 @@ class ISwapWrapper {
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, contract, prices, tokens, swapDataDeserializer, options, events) {
+    constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events) {
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
         this.pendingSwaps = new Map();
         this.isInitialized = false;
@@ -25,9 +25,8 @@ class ISwapWrapper {
         this.unifiedStorage = unifiedStorage;
         this.unifiedChainEvents = unifiedChainEvents;
         this.chainIdentifier = chainIdentifier;
-        this.contract = contract;
+        this.chain = chain;
         this.prices = prices;
-        this.swapDataDeserializer = swapDataDeserializer;
         this.events = events || new events_1.EventEmitter();
         this.options = options;
         this.tokens = {};
@@ -56,45 +55,9 @@ class ISwapWrapper {
      */
     preFetchPrice(amountData, abortSignal) {
         return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
-            this.logger.warn("preFetchPrice(): Error: ", e);
+            this.logger.error("preFetchPrice(): Error: ", e);
             return null;
         });
-    }
-    /**
-     * Pre-fetches signature verification data from the server's pre-sent promise, doesn't throw, instead returns null
-     *
-     * @param signDataPrefetch Promise that resolves when we receive "signDataPrefetch" from the LP in streaming mode
-     * @protected
-     * @returns Pre-fetched signature verification data or null if failed
-     */
-    preFetchSignData(signDataPrefetch) {
-        if (this.contract.preFetchForInitSignatureVerification == null)
-            return Promise.resolve(null);
-        return signDataPrefetch.then(obj => {
-            if (obj == null)
-                return null;
-            return this.contract.preFetchForInitSignatureVerification(obj);
-        }).catch(e => {
-            this.logger.warn("preFetchSignData(): Error: ", e);
-            return null;
-        });
-    }
-    /**
-     * Verifies swap initialization signature returned by the intermediary
-     *
-     * @param data Parsed swap data from the intermediary
-     * @param signature Response of the intermediary
-     * @param feeRatePromise Pre-fetched fee rate promise
-     * @param preFetchSignatureVerificationData Pre-fetched signature verification data
-     * @param abortSignal
-     * @protected
-     * @returns Swap initialization signature expiry
-     * @throws {SignatureVerificationError} when swap init signature is invalid
-     */
-    async verifyReturnedSignature(data, signature, feeRatePromise, preFetchSignatureVerificationData, abortSignal) {
-        const [feeRate, preFetchedSignatureData] = await Promise.all([feeRatePromise, preFetchSignatureVerificationData]);
-        await (0, Utils_1.tryWithRetries)(() => this.contract.isValidInitAuthorization(data, signature, feeRate, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
-        return await (0, Utils_1.tryWithRetries)(() => this.contract.getInitAuthorizationExpiry(data, signature, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
     }
     /**
      * Verifies returned  price for swaps
@@ -124,49 +87,12 @@ class ISwapWrapper {
         return isValidAmount;
     }
     /**
-     * Processes a single SC on-chain event
-     * @private
-     * @param event
-     * @param swap
-     */
-    async processEvent(event, swap) {
-        if (swap == null)
-            return;
-        let swapChanged = false;
-        if (event instanceof base_1.InitializeEvent) {
-            swapChanged = await this.processEventInitialize(swap, event);
-            if (event.meta?.txId != null && swap.commitTxId !== event.meta.txId) {
-                swap.commitTxId = event.meta.txId;
-                swapChanged ||= true;
-            }
-        }
-        if (event instanceof base_1.ClaimEvent) {
-            swapChanged = await this.processEventClaim(swap, event);
-            if (event.meta?.txId != null && swap.claimTxId !== event.meta.txId) {
-                swap.claimTxId = event.meta.txId;
-                swapChanged ||= true;
-            }
-        }
-        if (event instanceof base_1.RefundEvent) {
-            swapChanged = await this.processEventRefund(swap, event);
-            if (event.meta?.txId != null && swap.refundTxId !== event.meta.txId) {
-                swap.refundTxId = event.meta.txId;
-                swapChanged ||= true;
-            }
-        }
-        this.logger.info("processEvents(): " + event.constructor.name + " processed for " + swap.getIdentifierHashString() + " swap: ", swap);
-        if (swapChanged) {
-            await swap._saveAndEmit();
-        }
-        return true;
-    }
-    /**
      * Initializes the swap wrapper, needs to be called before any other action can be taken
      */
     async init(noTimers = false, noCheckPastSwaps = false) {
         if (this.isInitialized)
             return;
-        const hasEventListener = this.processEventRefund != null || this.processEventClaim != null || this.processEventInitialize != null;
+        const hasEventListener = this.processEvent != null;
         //Save events received in the meantime into the event queue and process them only after we've checked and
         // processed all the past swaps
         let eventQueue = [];
@@ -189,7 +115,7 @@ class ISwapWrapper {
         }
         if (!noTimers)
             this.startTickInterval();
-        this.logger.info("init(): Swap wrapper initialized");
+        // this.logger.info("init(): Swap wrapper initialized");
         this.isInitialized = true;
     }
     startTickInterval() {
@@ -214,7 +140,7 @@ class ISwapWrapper {
                 if (changed)
                     changedSwaps.push(swap);
             }
-        }).catch(e => this.logger.warn("init(): Error when checking swap " + swap.getIdentifierHashString() + ": ", e))));
+        }).catch(e => this.logger.error("init(): Error when checking swap " + swap.getId() + ": ", e))));
         await this.unifiedStorage.removeAll(removeSwaps);
         await this.unifiedStorage.saveAll(changedSwaps);
     }
@@ -261,7 +187,7 @@ class ISwapWrapper {
      * Returns the smart chain's native token used to pay for fees
      */
     getNativeToken() {
-        return this.tokens[this.contract.getNativeCurrencyAddress()];
+        return this.tokens[this.chain.getNativeCurrencyAddress()];
     }
 }
 exports.ISwapWrapper = ISwapWrapper;

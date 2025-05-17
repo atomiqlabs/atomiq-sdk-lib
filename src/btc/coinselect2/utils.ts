@@ -148,16 +148,20 @@ function finalize(
     fee: number
 } {
   const bytesAccum = transactionBytes(inputs, outputs, changeType);
+  console.log("CoinSelect: finalize(): Transaction bytes: ", bytesAccum);
 
   const feeAfterExtraOutput = (feeRate * (bytesAccum + outputBytes({type: changeType}))) + cpfpAddFee;
-  const remainderAfterExtraOutput = sumOrNaN(inputs) - (sumOrNaN(outputs) + feeAfterExtraOutput)
+  console.log("CoinSelect: finalize(): TX fee after adding change output: ", feeAfterExtraOutput);
+  const remainderAfterExtraOutput = Math.floor(sumOrNaN(inputs) - (sumOrNaN(outputs) + feeAfterExtraOutput));
+  console.log("CoinSelect: finalize(): Leaves change (changeType="+changeType+") value: ", remainderAfterExtraOutput);
 
   // is it worth a change output?
   if (remainderAfterExtraOutput >= dustThreshold({type: changeType})) {
     outputs = outputs.concat({ value: remainderAfterExtraOutput, type: changeType })
   }
 
-  const fee = sumOrNaN(inputs) - sumOrNaN(outputs)
+  const fee = sumOrNaN(inputs) - sumOrNaN(outputs);
+  console.log("CoinSelect: finalize(): Re-calculated total fee: ", fee);
   if (!isFinite(fee)) return { fee: (feeRate * bytesAccum) + cpfpAddFee }
 
   return {

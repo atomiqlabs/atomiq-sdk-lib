@@ -1,57 +1,45 @@
 /// <reference types="node" />
-/// <reference types="node" />
-/// <reference types="node" />
-import { SwapType } from "./SwapType";
+import { SwapType } from "./enums/SwapType";
 import { EventEmitter } from "events";
-import { Buffer } from "buffer";
 import { ISwapWrapper } from "./ISwapWrapper";
-import { ChainType, SignatureData, SwapCommitStatus, SwapData } from "@atomiqlabs/base";
+import { ChainType } from "@atomiqlabs/base";
 import { PriceInfoType } from "../prices/abstract/ISwapPrice";
 import { LoggerType } from "../utils/Utils";
-import { SCToken, Token, TokenAmount } from "./Tokens";
-import { SwapDirection } from "./SwapDirection";
-export type ISwapInit<T extends SwapData> = {
+import { TokenAmount } from "../Tokens";
+import { SwapDirection } from "./enums/SwapDirection";
+import { Fee, FeeBreakdown } from "./fee/Fee";
+export type ISwapInit = {
     pricingInfo: PriceInfoType;
     url: string;
     expiry: number;
     swapFee: bigint;
     swapFeeBtc?: bigint;
-    feeRate: any;
-    signatureData?: SignatureData;
-    data?: T;
     exactIn: boolean;
 };
-export declare function isISwapInit<T extends SwapData>(obj: any): obj is ISwapInit<T>;
-export type Fee<ChainIdentifier extends string = string, TSrc extends Token<ChainIdentifier> = Token<ChainIdentifier>, TDst extends Token<ChainIdentifier> = Token<ChainIdentifier>> = {
-    amountInSrcToken: TokenAmount<ChainIdentifier, TSrc>;
-    amountInDstToken: TokenAmount<ChainIdentifier, TDst>;
-    usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) => Promise<number>;
+export declare function isISwapInit(obj: any): obj is ISwapInit;
+export type PercentagePPM = {
+    ppm: bigint;
+    decimal: number;
+    percentage: number;
+    toString: (decimal?: number) => string;
 };
+export declare function ppmToPercentage(ppm: bigint): PercentagePPM;
 export declare abstract class ISwap<T extends ChainType = ChainType, S extends number = number> {
+    protected readonly abstract TYPE: SwapType;
+    protected readonly currentVersion: number;
+    protected readonly wrapper: ISwapWrapper<T, ISwap<T, S>>;
+    readonly url: string;
     readonly chainIdentifier: string;
     readonly exactIn: boolean;
     readonly createdAt: number;
-    protected readonly currentVersion: number;
     protected version: number;
     protected initiated: boolean;
     protected logger: LoggerType;
-    protected readonly abstract TYPE: SwapType;
-    protected readonly wrapper: ISwapWrapper<T, ISwap<T, S>>;
     expiry?: number;
-    readonly url: string;
     state: S;
     pricingInfo: PriceInfoType;
-    data: T["Data"];
-    signatureData?: SignatureData;
-    feeRate?: any;
     protected swapFee: bigint;
     protected swapFeeBtc?: bigint;
-    /**
-     * Transaction IDs for the swap on the smart chain side
-     */
-    commitTxId: string;
-    refundTxId?: string;
-    claimTxId?: string;
     /**
      * Random nonce to differentiate the swap from others with the same identifier hash (i.e. when quoting the same swap
      *  from multiple LPs)
@@ -60,34 +48,12 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Event emitter emitting "swapState" event when swap's state changes
      */
-    events: EventEmitter;
+    events: EventEmitter<{
+        swapState: [ISwap];
+    }>;
     protected constructor(wrapper: ISwapWrapper<T, ISwap<T, S>>, obj: any);
-    protected constructor(wrapper: ISwapWrapper<T, ISwap<T, S>>, swapInit: ISwapInit<T["Data"]>);
+    protected constructor(wrapper: ISwapWrapper<T, ISwap<T, S>>, swapInit: ISwapInit);
     protected abstract upgradeVersion(): void;
-    /**
-     * Periodically checks for init signature's expiry
-     *
-     * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
-     * @protected
-     */
-    protected watchdogWaitTillSignatureExpiry(abortSignal?: AbortSignal, interval?: number): Promise<void>;
-    /**
-     * Periodically checks the chain to see whether the swap is committed
-     *
-     * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
-     * @protected
-     */
-    protected watchdogWaitTillCommited(abortSignal?: AbortSignal, interval?: number): Promise<boolean>;
-    /**
-     * Periodically checks the chain to see whether the swap was finished (claimed or refunded)
-     *
-     * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
-     * @protected
-     */
-    protected watchdogWaitTillResult(abortSignal?: AbortSignal, interval?: number): Promise<SwapCommitStatus.PAID | SwapCommitStatus.EXPIRED | SwapCommitStatus.NOT_COMMITED>;
     /**
      * Waits till the swap reaches a specific state
      *
@@ -97,76 +63,44 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      * @protected
      */
     protected waitTillState(targetState: S, type?: "eq" | "gte" | "neq", abortSignal?: AbortSignal): Promise<void>;
+    protected tryRecomputeSwapPrice(): void;
+    /**
+     * Re-fetches & revalidates the price data
+     */
+    refreshPriceData(): Promise<void>;
     /**
      * Checks if the pricing for the swap is valid, according to max allowed price difference set in the ISwapPrice
      */
     hasValidPrice(): boolean;
     /**
-     * Returns the price difference between offered price and current market price in PPM (parts per million)
+     * Returns pricing info about the swap
      */
-    getPriceDifferencePPM(): bigint;
+    getPriceInfo(): {
+        marketPrice: number;
+        swapPrice: number;
+        difference: PercentagePPM;
+    };
+    abstract _getEscrowHash(): string;
     /**
-     * Returns the price difference between offered price and current market price as a decimal number
+     * @param signer Signer to check with this swap's initiator
+     * @throws {Error} When signer's address doesn't match with the swap's initiator one
      */
-    getPriceDifferencePct(): number;
+    protected checkSigner(signer: T["Signer"] | string): void;
     /**
-     * Re-fetches & revalidates the price data
+     * Checks if the swap's quote is still valid
      */
-    abstract refreshPriceData(): Promise<PriceInfoType>;
-    /**
-     * Returns the offered swap quote price
-     */
-    abstract getSwapPrice(): number;
-    /**
-     * Returns the real current market price fetched from reputable exchanges
-     */
-    abstract getMarketPrice(): number;
-    /**
-     * Returns the real swap fee percentage as PPM (parts per million)
-     */
-    abstract getRealSwapFeePercentagePPM(): bigint;
+    abstract verifyQuoteValid(): Promise<boolean>;
+    abstract getOutputAddress(): string | null;
     abstract getInputTxId(): string | null;
     abstract getOutputTxId(): string | null;
-    abstract getInputAddress(): string | null;
-    abstract getOutputAddress(): string | null;
-    /**
-     * Returns the escrow hash - i.e. hash of the escrow data
-     */
-    getEscrowHash(): string | null;
-    /**
-     * Returns the claim data hash - i.e. hash passed to the claim handler
-     */
-    getClaimHash(): string;
-    /**
-     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
-     *  lightning swaps the identifier hash is used instead of claim data hash
-     */
-    getIdentifierHash(): Buffer;
-    /**
-     * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
-     *  lightning swaps the identifier hash is used instead of claim data hash
-     */
-    getIdentifierHashString(): string;
     /**
      * Returns the ID of the swap, as used in the storage and getSwapById function
      */
-    getId(): string;
+    abstract getId(): string;
     /**
-     * Returns quote expiry in UNIX millis
+     * Checks whether there is some action required from the user for this swap - can mean either refundable or claimable
      */
-    getExpiry(): number;
-    /**
-     * Returns the type of the swap
-     */
-    getType(): SwapType;
-    /**
-     * Returns the direction of the swap
-     */
-    getDirection(): SwapDirection;
-    /**
-     * Returns the current state of the swap
-     */
-    getState(): S;
+    abstract requiresAction(): boolean;
     /**
      * Returns whether the swap is finished and in its terminal state (this can mean successful, refunded or failed)
      */
@@ -191,29 +125,24 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Returns the intiator address of the swap - address that created this swap
      */
-    abstract getInitiator(): string;
-    /**
-     * @param signer Signer to check with this swap's initiator
-     * @throws {Error} When signer's address doesn't match with the swap's initiator one
-     */
-    checkSigner(signer: T["Signer"] | string): void;
-    /**
-     * Checks if the swap's quote is still valid
-     */
-    isQuoteValid(): Promise<boolean>;
-    /**
-     * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
-     */
-    isQuoteDefinitelyExpired(): Promise<boolean>;
+    abstract _getInitiator(): string;
     isInitiated(): boolean;
     /**
-     * Checks whether there is some action required from the user for this swap - can mean either refundable or claimable
+     * Returns quote expiry in UNIX millis
      */
-    abstract isActionable(): boolean;
+    getQuoteExpiry(): number;
     /**
-     * Get the estimated smart chain fee of the commit transaction
+     * Returns the type of the swap
      */
-    getCommitFee(): Promise<bigint>;
+    getType(): SwapType;
+    /**
+     * Returns the direction of the swap
+     */
+    getDirection(): SwapDirection;
+    /**
+     * Returns the current state of the swap
+     */
+    getState(): S;
     /**
      * Returns output amount of the swap, user receives this much
      */
@@ -230,28 +159,15 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      * Returns total fee for the swap, the fee is represented in source currency & destination currency, but is
      *  paid only once
      */
-    getFee(): Fee;
+    abstract getFee(): Fee;
     /**
-     * Returns swap fee for the swap, the fee is represented in source currency & destination currency, but is
-     *  paid only once
+     * Returns the breakdown of all the fees paid
      */
-    abstract getSwapFee(): Fee;
-    /**
-     * Returns the transaction fee paid on the smart chain
-     */
-    getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
-    /**
-     * Checks if the initiator/sender has enough balance to cover the transaction fee for processing the swap
-     */
-    abstract hasEnoughForTxFees(): Promise<{
-        enoughBalance: boolean;
-        balance: TokenAmount;
-        required: TokenAmount;
-    }>;
+    abstract getFeeBreakdown(): FeeBreakdown<T["ChainId"]>;
     serialize(): any;
     _save(): Promise<void>;
     _saveAndEmit(state?: S): Promise<void>;
-    _emitEvent(): void;
+    protected _emitEvent(): void;
     /**
      * Synchronizes swap state from chain and/or LP node, usually ran on startup
      *

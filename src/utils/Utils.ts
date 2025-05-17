@@ -3,6 +3,7 @@ import {BTC_NETWORK} from "@scure/btc-signer/utils";
 import {Buffer} from "buffer";
 import {Address, OutScript} from "@scure/btc-signer";
 import {randomBytes as randomBytesNoble} from "@noble/hashes/utils";
+import {CoinselectAddressTypes} from "../btc/coinselect2";
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
@@ -261,15 +262,19 @@ export async function httpPost<T>(url: string, body: any, timeout?: number, abor
  * @param timeout how many milliseconds to wait for
  * @param abortSignal
  */
-export function timeoutPromise(timeout: number, abortSignal?: AbortSignal) {
-    return new Promise((resolve, reject) => {
+export function timeoutPromise(timeout: number, abortSignal?: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
         if (abortSignal != null && abortSignal.aborted) {
             reject(abortSignal.reason);
             return;
         }
-        let timeoutHandle = setTimeout(resolve, timeout);
+        let abortSignalListener: () => void;
+        let timeoutHandle = setTimeout(() => {
+            if(abortSignalListener!=null) abortSignal.removeEventListener("abort", abortSignalListener);
+            resolve();
+        }, timeout);
         if (abortSignal != null) {
-            abortSignal.addEventListener("abort", () => {
+            abortSignal.addEventListener("abort", abortSignalListener = () => {
                 if (timeoutHandle != null) clearTimeout(timeoutHandle);
                 timeoutHandle = null;
                 reject(abortSignal.reason);
@@ -327,6 +332,23 @@ export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
                 pubkey: outputScript.pubkey
             }));
     }
+}
+
+export function toCoinselectAddressType(outputScript: Uint8Array): CoinselectAddressTypes {
+    const data = OutScript.decode(outputScript);
+    switch(data.type) {
+        case "pkh":
+            return "p2pkh";
+        case "sh":
+            return "p2sh-p2wpkh";
+        case "wpkh":
+            return "p2wpkh"
+        case "wsh":
+            return "p2wsh"
+        case "tr":
+            return "p2tr"
+    }
+    throw new Error("Unrecognized address type!");
 }
 
 export function randomBytes(bytesLength: number): Buffer {

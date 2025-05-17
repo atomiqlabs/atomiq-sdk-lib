@@ -211,6 +211,64 @@ export type FromBTCLNInit = BaseFromBTCSwapInit & {
     descriptionHash?: Buffer
 }
 
+/////////////////////////
+///// Spv vault from BTC
+
+const SpvFromBTCPrepareResponseSchema = {
+    quoteId: FieldTypeEnum.String,
+    expiry: FieldTypeEnum.Number,
+
+    address: FieldTypeEnum.String,
+    vaultId: FieldTypeEnum.BigInt,
+
+    vaultBtcAddress: FieldTypeEnum.String,
+    btcAddress: FieldTypeEnum.String,
+    btcUtxo: FieldTypeEnum.String,
+    btcFeeRate: FieldTypeEnum.Number,
+
+    btcAmount: FieldTypeEnum.BigInt,
+    btcAmountSwap: FieldTypeEnum.BigInt,
+    btcAmountGas: FieldTypeEnum.BigInt,
+
+    total: FieldTypeEnum.BigInt,
+    totalGas: FieldTypeEnum.BigInt,
+
+    totalFeeBtc: FieldTypeEnum.BigInt,
+
+    swapFeeBtc: FieldTypeEnum.BigInt,
+    swapFee: FieldTypeEnum.BigInt,
+
+    gasSwapFeeBtc: FieldTypeEnum.BigInt,
+    gasSwapFee: FieldTypeEnum.BigInt,
+
+    callerFeeShare: FieldTypeEnum.BigInt,
+    frontingFeeShare: FieldTypeEnum.BigInt,
+    executionFeeShare: FieldTypeEnum.BigInt
+} as const;
+
+export type SpvFromBTCPrepareResponseType = RequestSchemaResult<typeof SpvFromBTCPrepareResponseSchema>;
+
+export type SpvFromBTCPrepare = SwapInit & {
+    address: string,
+    amount: bigint,
+    gasAmount: bigint,
+    gasToken: string,
+    exactOut: boolean,
+    callerFeeRate: Promise<bigint>,
+    frontingFeeRate: bigint
+}
+
+const SpvFromBTCInitResponseSchema = {
+    txId: FieldTypeEnum.String
+} as const;
+
+export type SpvFromBTCInitResponseType = RequestSchemaResult<typeof SpvFromBTCInitResponseSchema>;
+
+export type SpvFromBTCInit = {
+    quoteId: string,
+    psbtHex: string
+}
+
 export class IntermediaryAPI {
 
     /**
@@ -625,6 +683,95 @@ export class IntermediaryAPI {
                 return verifySchema(data, ToBTCLNPrepareExactInSchema);
             })
         };
+    }
+
+    /**
+     * Prepare From BTC swap via new spv vault swaps with an intermediary
+     *
+     * @param chainIdentifier
+     * @param baseUrl Base URL of the intermediary
+     * @param init Swap initialization parameters
+     * @param timeout Timeout in milliseconds for the HTTP request
+     * @param abortSignal
+     * @param streamRequest Whether to force streaming (or not streaming) the request, default is autodetect
+     *
+     * @throws {RequestError} If non-200 http response code is returned
+     */
+    static prepareSpvFromBTC(
+        chainIdentifier: string,
+        baseUrl: string,
+        init: SpvFromBTCPrepare,
+        timeout?: number,
+        abortSignal?: AbortSignal,
+        streamRequest?: boolean
+    ): Promise<SpvFromBTCPrepareResponseType> {
+        const responseBodyPromise = streamingFetchPromise(baseUrl+"/frombtc_spv/getQuote?chain="+encodeURIComponent(chainIdentifier), {
+            exactOut: init.exactOut,
+            ...init.additionalParams,
+            address: init.address,
+            amount: init.amount.toString(10),
+            token: init.token,
+            gasAmount: init.gasAmount.toString(10),
+            gasToken: init.gasToken,
+            frontingFeeRate: init.frontingFeeRate.toString(10),
+            callerFeeRate: init.callerFeeRate.then(val => val.toString(10))
+        }, {
+            code: FieldTypeEnum.Number,
+            msg: FieldTypeEnum.String,
+            data: FieldTypeEnum.AnyOptional
+        }, timeout, abortSignal, streamRequest);
+
+        return responseBodyPromise.then((responseBody) => Promise.all([
+            responseBody.code,
+            responseBody.msg,
+            responseBody.data,
+        ])).then(([code, msg, data]) => {
+            if(code!==20000) {
+                throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
+            }
+            return verifySchema(data, SpvFromBTCPrepareResponseSchema);
+        });
+    }
+
+    /**
+     * Prepare From BTC swap via new spv vault swaps with an intermediary
+     *
+     * @param chainIdentifier
+     * @param url
+     * @param init Swap initialization parameters
+     * @param timeout Timeout in milliseconds for the HTTP request
+     * @param abortSignal
+     * @param streamRequest Whether to force streaming (or not streaming) the request, default is autodetect
+     *
+     * @throws {RequestError} If non-200 http response code is returned
+     */
+    static initSpvFromBTC(
+        chainIdentifier: string,
+        url: string,
+        init: SpvFromBTCInit,
+        timeout?: number,
+        abortSignal?: AbortSignal,
+        streamRequest?: boolean
+    ): Promise<SpvFromBTCInitResponseType> {
+        const responseBodyPromise = streamingFetchPromise(url+"/postQuote?chain="+encodeURIComponent(chainIdentifier), {
+            quoteId: init.quoteId,
+            psbtHex: init.psbtHex
+        }, {
+            code: FieldTypeEnum.Number,
+            msg: FieldTypeEnum.String,
+            data: FieldTypeEnum.AnyOptional
+        }, timeout, abortSignal, streamRequest);
+
+        return responseBodyPromise.then((responseBody) => Promise.all([
+            responseBody.code,
+            responseBody.msg,
+            responseBody.data,
+        ])).then(([code, msg, data]) => {
+            if(code!==20000) {
+                throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
+            }
+            return verifySchema(data, SpvFromBTCInitResponseSchema);
+        });
     }
 
 }

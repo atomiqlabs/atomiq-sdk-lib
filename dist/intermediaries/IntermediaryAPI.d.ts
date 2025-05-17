@@ -173,6 +173,47 @@ export type FromBTCLNInit = BaseFromBTCSwapInit & {
     paymentHash: Buffer;
     descriptionHash?: Buffer;
 };
+declare const SpvFromBTCPrepareResponseSchema: {
+    readonly quoteId: FieldTypeEnum.String;
+    readonly expiry: FieldTypeEnum.Number;
+    readonly address: FieldTypeEnum.String;
+    readonly vaultId: FieldTypeEnum.BigInt;
+    readonly vaultBtcAddress: FieldTypeEnum.String;
+    readonly btcAddress: FieldTypeEnum.String;
+    readonly btcUtxo: FieldTypeEnum.String;
+    readonly btcFeeRate: FieldTypeEnum.Number;
+    readonly btcAmount: FieldTypeEnum.BigInt;
+    readonly btcAmountSwap: FieldTypeEnum.BigInt;
+    readonly btcAmountGas: FieldTypeEnum.BigInt;
+    readonly total: FieldTypeEnum.BigInt;
+    readonly totalGas: FieldTypeEnum.BigInt;
+    readonly totalFeeBtc: FieldTypeEnum.BigInt;
+    readonly swapFeeBtc: FieldTypeEnum.BigInt;
+    readonly swapFee: FieldTypeEnum.BigInt;
+    readonly gasSwapFeeBtc: FieldTypeEnum.BigInt;
+    readonly gasSwapFee: FieldTypeEnum.BigInt;
+    readonly callerFeeShare: FieldTypeEnum.BigInt;
+    readonly frontingFeeShare: FieldTypeEnum.BigInt;
+    readonly executionFeeShare: FieldTypeEnum.BigInt;
+};
+export type SpvFromBTCPrepareResponseType = RequestSchemaResult<typeof SpvFromBTCPrepareResponseSchema>;
+export type SpvFromBTCPrepare = SwapInit & {
+    address: string;
+    amount: bigint;
+    gasAmount: bigint;
+    gasToken: string;
+    exactOut: boolean;
+    callerFeeRate: Promise<bigint>;
+    frontingFeeRate: bigint;
+};
+declare const SpvFromBTCInitResponseSchema: {
+    readonly txId: FieldTypeEnum.String;
+};
+export type SpvFromBTCInitResponseType = RequestSchemaResult<typeof SpvFromBTCInitResponseSchema>;
+export type SpvFromBTCInit = {
+    quoteId: string;
+    psbtHex: string;
+};
 export declare class IntermediaryAPI {
     /**
      * Returns the information about a specific intermediary
@@ -302,5 +343,31 @@ export declare class IntermediaryAPI {
         signDataPrefetch: Promise<any>;
         response: Promise<ToBTCLNPrepareExactInResponseType>;
     };
+    /**
+     * Prepare From BTC swap via new spv vault swaps with an intermediary
+     *
+     * @param chainIdentifier
+     * @param baseUrl Base URL of the intermediary
+     * @param init Swap initialization parameters
+     * @param timeout Timeout in milliseconds for the HTTP request
+     * @param abortSignal
+     * @param streamRequest Whether to force streaming (or not streaming) the request, default is autodetect
+     *
+     * @throws {RequestError} If non-200 http response code is returned
+     */
+    static prepareSpvFromBTC(chainIdentifier: string, baseUrl: string, init: SpvFromBTCPrepare, timeout?: number, abortSignal?: AbortSignal, streamRequest?: boolean): Promise<SpvFromBTCPrepareResponseType>;
+    /**
+     * Prepare From BTC swap via new spv vault swaps with an intermediary
+     *
+     * @param chainIdentifier
+     * @param url
+     * @param init Swap initialization parameters
+     * @param timeout Timeout in milliseconds for the HTTP request
+     * @param abortSignal
+     * @param streamRequest Whether to force streaming (or not streaming) the request, default is autodetect
+     *
+     * @throws {RequestError} If non-200 http response code is returned
+     */
+    static initSpvFromBTC(chainIdentifier: string, url: string, init: SpvFromBTCInit, timeout?: number, abortSignal?: AbortSignal, streamRequest?: boolean): Promise<SpvFromBTCInitResponseType>;
 }
 export {};

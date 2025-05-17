@@ -6,9 +6,32 @@ export type QueryParams = {
 
 export type UnifiedStoredObject = {id: string} & any;
 
-export interface IUnifiedStorage {
+/**
+ * Defines simple indexes (for queries that use a single key)
+ */
+export type UnifiedStorageIndexes = readonly {
+    key: string,
+    type: "number" | "string" | "boolean",
+    unique: boolean,
+    nullable: boolean
+}[];
 
-    init(): Promise<void>;
+/**
+ * Defines composite indexes (for queries that use multiple keys)
+ */
+export type UnifiedStorageCompositeIndexes = readonly {
+    keys: readonly string[],
+    unique: boolean
+}[];
+
+export interface IUnifiedStorage<I extends UnifiedStorageIndexes, C extends UnifiedStorageCompositeIndexes> {
+
+    /**
+     * Initializes the storage with given indexes and composite indexes
+     * @param indexes
+     * @param compositeIndexes
+     */
+    init(indexes: I, compositeIndexes: C): Promise<void>;
 
     /**
      * Params are specified in the following way:

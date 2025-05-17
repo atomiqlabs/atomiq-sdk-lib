@@ -4,13 +4,13 @@ exports.blackjack = void 0;
 const utils_1 = require("./utils");
 // add inputs until we reach or surpass the target value (or deplete)
 // worst-case: O(n)
-function blackjack(utxos, outputs, feeRate, type) {
+function blackjack(utxos, outputs, feeRate, type, requiredInputs) {
     if (!isFinite(utils_1.utils.uintOrNaN(feeRate)))
         return null;
-    let bytesAccum = utils_1.utils.transactionBytes([], outputs, type);
-    let inAccum = 0;
+    const inputs = requiredInputs == null ? [] : [...requiredInputs];
+    let bytesAccum = utils_1.utils.transactionBytes(inputs, outputs, type);
+    let inAccum = utils_1.utils.sumOrNaN(inputs);
     let cpfpAddFee = 0;
-    const inputs = [];
     const outAccum = utils_1.utils.sumOrNaN(outputs);
     const threshold = utils_1.utils.dustThreshold({ type });
     for (let i = 0; i < utxos.length; ++i) {
@@ -18,8 +18,8 @@ function blackjack(utxos, outputs, feeRate, type) {
         const inputBytes = utils_1.utils.inputBytes(input);
         let cpfpFee = 0;
         if (input.cpfp != null && input.cpfp.txEffectiveFeeRate < feeRate)
-            cpfpFee = input.cpfp.txVsize * (feeRate - input.cpfp.txEffectiveFeeRate);
-        const fee = (feeRate * (bytesAccum + inputBytes)) + cpfpAddFee + cpfpFee;
+            cpfpFee = Math.ceil(input.cpfp.txVsize * (feeRate - input.cpfp.txEffectiveFeeRate));
+        const fee = Math.ceil((feeRate * (bytesAccum + inputBytes)) + cpfpAddFee + cpfpFee);
         const inputValue = utils_1.utils.uintOrNaN(input.value);
         // would it waste value?
         if ((inAccum + inputValue) > (outAccum + fee + threshold))

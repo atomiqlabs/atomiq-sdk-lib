@@ -1,6 +1,6 @@
 import {HttpPriceProvider} from "./HttpPriceProvider";
 import {CoinType} from "../../abstract/IPriceProvider";
-import {MultiChain} from "../../../swaps/Swapper";
+import {MultiChain} from "../../../swaps/swapper/Swapper";
 
 export abstract class ExchangePriceProvider<T extends MultiChain> extends HttpPriceProvider<T> {
 

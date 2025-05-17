@@ -7,6 +7,7 @@ export function blackjack (
     outputs: CoinselectTxOutput[],
     feeRate: number,
     type: CoinselectAddressTypes,
+    requiredInputs?: CoinselectTxInput[]
 ): {
     inputs?: CoinselectTxInput[],
     outputs?: CoinselectTxOutput[],
@@ -14,10 +15,10 @@ export function blackjack (
 } {
     if (!isFinite(utils.uintOrNaN(feeRate))) return null;
 
-    let bytesAccum = utils.transactionBytes([], outputs, type);
-    let inAccum = 0;
+    const inputs = requiredInputs==null ? [] : [...requiredInputs];
+    let bytesAccum = utils.transactionBytes(inputs, outputs, type);
+    let inAccum = utils.sumOrNaN(inputs);
     let cpfpAddFee = 0;
-    const inputs = [];
     const outAccum = utils.sumOrNaN(outputs);
     const threshold = utils.dustThreshold({type});
 
@@ -25,9 +26,9 @@ export function blackjack (
         const input = utxos[i];
         const inputBytes = utils.inputBytes(input);
         let cpfpFee = 0;
-        if(input.cpfp!=null && input.cpfp.txEffectiveFeeRate<feeRate) cpfpFee = input.cpfp.txVsize * (feeRate - input.cpfp.txEffectiveFeeRate);
+        if(input.cpfp!=null && input.cpfp.txEffectiveFeeRate<feeRate) cpfpFee = Math.ceil(input.cpfp.txVsize * (feeRate - input.cpfp.txEffectiveFeeRate));
 
-        const fee = (feeRate * (bytesAccum + inputBytes)) + cpfpAddFee + cpfpFee;
+        const fee = Math.ceil((feeRate * (bytesAccum + inputBytes)) + cpfpAddFee + cpfpFee);
         const inputValue = utils.uintOrNaN(input.value);
 
         // would it waste value?

@@ -1,4 +1,4 @@
-import {SwapType} from "../swaps/SwapType";
+import {SwapType} from "../swaps/enums/SwapType";
 import {SwapHandlerInfoType} from "./IntermediaryDiscovery";
 import {ChainSwapType, SwapContract} from "@atomiqlabs/base";
 import {LNNodeLiquidity} from "../btc/LightningNetworkApi";
@@ -30,6 +30,22 @@ export class Intermediary {
     readonly url: string;
     readonly addresses: {[chainIdentifier: string]: string};
     readonly services: ServicesType;
+    readonly swapBounds: {
+        [swapType in SwapType]?: {
+            [chainIdentifier: string]: {
+                [tokenAddress: string]: {
+                    input: {
+                        min: bigint,
+                        max: bigint
+                    },
+                    output: {
+                        min: bigint,
+                        max: bigint
+                    }
+                }
+            }
+        }
+    }
     reputation: { [chainIdentifier: string]: SingleChainReputationType } = {};
     liquidity: { [chainIdentifier: string]: SCLiquidity } = {};
     lnData: LNNodeLiquidity;
@@ -44,6 +60,28 @@ export class Intermediary {
         this.addresses = addresses;
         this.services = services;
         this.reputation = reputation;
+
+        this.swapBounds = {};
+        for(let _swapType in this.services) {
+            const swapType: SwapType = parseInt(_swapType);
+            const serviceInfo: SwapHandlerInfoType = this.services[_swapType];
+            const btcBounds = {min: BigInt(serviceInfo.min), max: BigInt(serviceInfo.max)};
+            const isSend = swapType===SwapType.TO_BTC || swapType===SwapType.TO_BTCLN;
+            this.swapBounds[swapType] = {};
+            for(let chainIdentifier in serviceInfo.chainTokens) {
+                this.swapBounds[swapType][chainIdentifier] = {};
+                for(let tokenAddress of serviceInfo.chainTokens[chainIdentifier]) {
+                    this.swapBounds[swapType][chainIdentifier][tokenAddress] = {
+                        input: isSend ? {min: null, max: null} : btcBounds,
+                        output: !isSend ? {min: null, max: null} : btcBounds,
+                    };
+                }
+            }
+        }
+    }
+
+    getSwapLimits(swapType: SwapType, chainId: string, tokenAddress: string): {input: {min: bigint, max: bigint}, output: {min: bigint, max: bigint}} {
+        return this.swapBounds[swapType]?.[chainId]?.[tokenAddress];
     }
 
     /**
@@ -57,7 +95,8 @@ export class Intermediary {
         SwapType.TO_BTC,
         SwapType.TO_BTCLN,
         SwapType.FROM_BTC,
-        SwapType.FROM_BTCLN
+        SwapType.FROM_BTCLN,
+        SwapType.SPV_VAULT_FROM_BTC
     ]): Set<string> {
         const swapTypes = new Set(swapTypesArr);
         let tokens: Set<string> = new Set<string>();

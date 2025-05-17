@@ -2,21 +2,59 @@ import {BigIntBufferUtils, BtcBlockWithTxs, BtcSyncInfo, BtcTx} from "@atomiqlab
 import {MempoolBitcoinBlock} from "./MempoolBitcoinBlock";
 import {BitcoinTransaction, MempoolApi, TxVout} from "./MempoolApi";
 import {Buffer} from "buffer";
-import {BitcoinRpcWithTxoListener, BtcTxWithBlockheight} from "../BitcoinRpcWithTxoListener";
+import {BitcoinRpcWithAddressIndex, BtcTxWithBlockheight} from "../BitcoinRpcWithAddressIndex";
 import {LightningNetworkApi, LNNodeLiquidity} from "../LightningNetworkApi";
 import {timeoutPromise} from "../../utils/Utils";
-import {Transaction} from "@scure/btc-signer";
+import {Script, Transaction} from "@scure/btc-signer";
 import {sha256} from "@noble/hashes/sha2";
 
 const BITCOIN_BLOCKTIME = 600 * 1000;
 const BITCOIN_BLOCKSIZE = 1024*1024;
 
-export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitcoinBlock>, LightningNetworkApi {
+function bitcoinTxToBtcTx(btcTx: Transaction): BtcTx {
+    return {
+        locktime: btcTx.lockTime,
+        version: btcTx.version,
+        blockhash: null,
+        confirmations: 0,
+        txid: Buffer.from(sha256(sha256(btcTx.toBytes(true, false)))).reverse().toString("hex"),
+        hex: Buffer.from(btcTx.toBytes(true, false)).toString("hex"),
+        raw: Buffer.from(btcTx.toBytes(true, true)).toString("hex"),
+        vsize: btcTx.isFinal ? btcTx.vsize : null,
+
+        outs: Array.from({length: btcTx.outputsLength}, (_, i) => i).map((index) => {
+            const output = btcTx.getOutput(index);
+            return {
+                value: Number(output.amount),
+                n: index,
+                scriptPubKey: {
+                    asm: Script.decode(output.script).map(val => typeof(val)==="object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: Buffer.from(output.script).toString("hex")
+                }
+            }
+        }),
+        ins: Array.from({length: btcTx.inputsLength}, (_, i) => i).map(index => {
+            const input = btcTx.getInput(index);
+            return {
+                txid: Buffer.from(input.txid).toString("hex"),
+                vout: input.index,
+                scriptSig: {
+                    asm: Script.decode(input.finalScriptSig).map(val => typeof(val)==="object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: Buffer.from(input.finalScriptSig).toString("hex")
+                },
+                sequence: input.sequence,
+                txinwitness: input.finalScriptWitness==null ? [] : input.finalScriptWitness.map(witness => Buffer.from(witness).toString("hex"))
+            }
+        })
+    }
+}
+
+export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitcoinBlock>, LightningNetworkApi {
 
     api: MempoolApi;
 
-    constructor(mempoolApi: MempoolApi) {
-        this.api = mempoolApi;
+    constructor(urlOrMempoolApi: MempoolApi | string | string[]) {
+        this.api = urlOrMempoolApi instanceof MempoolApi ? urlOrMempoolApi : new MempoolApi(urlOrMempoolApi);
     }
 
     /**
@@ -97,11 +135,18 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
         let strippedRawTx: string;
         if(rawTx!=null) {
             //Strip witness data
-            const btcTx = Transaction.fromRaw(rawTx);
+            const btcTx = Transaction.fromRaw(rawTx, {
+                allowLegacyWitnessUtxo: true,
+                allowUnknownInputs: true,
+                allowUnknownOutputs: true,
+                disableScriptCheck: true
+            });
             strippedRawTx = Buffer.from(btcTx.toBytes(true, false)).toString("hex");
         }
 
         return {
+            locktime: tx.locktime,
+            version: tx.version,
             blockheight: tx.status?.block_height,
             blockhash: tx.status?.block_hash,
             confirmations,
@@ -267,6 +312,38 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
         abortSignal.throwIfAborted();
     }
 
+
+    async waitForTransaction(
+        txId: string, requiredConfirmations: number,
+        stateUpdateCbk: (confirmations: number, txId: string, txEtaMS: number) => void,
+        abortSignal?: AbortSignal, intervalSeconds?: number
+    ): Promise<BtcTxWithBlockheight> {
+        if(abortSignal!=null) abortSignal.throwIfAborted();
+
+        while(abortSignal==null || !abortSignal.aborted) {
+            await timeoutPromise((intervalSeconds || 5)*1000, abortSignal);
+
+            const result = await this.getTransaction(txId);
+            if(result==null) {
+                stateUpdateCbk(null, null, null);
+                continue;
+            }
+
+            const confirmationDelay = await this.getConfirmationDelay(result, requiredConfirmations);
+            if(confirmationDelay==null) continue;
+
+            if(stateUpdateCbk!=null) stateUpdateCbk(
+                result.confirmations,
+                result.txid,
+                confirmationDelay
+            );
+
+            if(confirmationDelay===0) return result;
+        }
+
+        abortSignal.throwIfAborted();
+    }
+
     async getLNNodeLiquidity(pubkey: string): Promise<LNNodeLiquidity> {
         const nodeInfo = await this.api.getLNNodeInfo(pubkey);
         return {
@@ -282,6 +359,69 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithTxoListener<MempoolBitco
 
     sendRawPackage(rawTx: string[]): Promise<string[]> {
         throw new Error("Unsupported");
+    }
+
+    async isSpent(utxo: string, confirmed?: boolean): Promise<boolean> {
+        const [txId, voutStr] = utxo.split(":");
+        const vout = parseInt(voutStr);
+        const outspends = await this.api.getOutspends(txId);
+        if(outspends[vout]==null) return true;
+        if(confirmed) {
+            return outspends[vout].spent && outspends[vout].status.confirmed;
+        }
+        return outspends[vout].spent;
+    }
+
+    parseTransaction(rawTx: string): Promise<BtcTx> {
+        const btcTx = Transaction.fromRaw(Buffer.from(rawTx, "hex"), {
+            allowLegacyWitnessUtxo: true,
+            allowUnknownInputs: true,
+            allowUnknownOutputs: true,
+            disableScriptCheck: true
+        });
+        return Promise.resolve(bitcoinTxToBtcTx(btcTx));
+    }
+
+    getEffectiveFeeRate(btcTx: BtcTx): Promise<{ vsize: number; fee: number; feeRate: number }> {
+        throw new Error("Unsupported.");
+    }
+
+    async getFeeRate(): Promise<number> {
+        return (await this.api.getFees()).fastestFee;
+    }
+
+    getAddressBalances(address: string): Promise<{
+        confirmedBalance: bigint,
+        unconfirmedBalance: bigint
+    }> {
+        return this.api.getAddressBalances(address);
+    }
+
+    async getAddressUTXOs(address:string): Promise<{
+        txid: string,
+        vout: number,
+        confirmed: boolean,
+        block_height: number,
+        block_hash: string,
+        block_time: number
+        value: bigint
+    }[]> {
+        return (await this.api.getAddressUTXOs(address)).map(val => ({
+            txid: val.txid,
+            vout: val.vout,
+            confirmed: val.status.confirmed,
+            block_height: val.status.block_height,
+            block_hash: val.status.block_hash,
+            block_time: val.status.block_time,
+            value: val.value
+        }));
+    }
+
+    getCPFPData(txId: string): Promise<{
+        effectiveFeePerVsize: number,
+        adjustedVsize: number
+    }> {
+        return this.api.getCPFPData(txId)
     }
 
 }

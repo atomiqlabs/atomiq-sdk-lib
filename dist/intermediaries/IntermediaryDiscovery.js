@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IntermediaryDiscovery = exports.SwapHandlerType = void 0;
 const Intermediary_1 = require("./Intermediary");
-const SwapType_1 = require("../swaps/SwapType");
+const SwapType_1 = require("../swaps/enums/SwapType");
 const events_1 = require("events");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../utils/Utils");
@@ -15,6 +15,7 @@ var SwapHandlerType;
     SwapHandlerType["FROM_BTCLN"] = "FROM_BTCLN";
     SwapHandlerType["FROM_BTC_TRUSTED"] = "FROM_BTC_TRUSTED";
     SwapHandlerType["FROM_BTCLN_TRUSTED"] = "FROM_BTCLN_TRUSTED";
+    SwapHandlerType["FROM_BTC_SPV"] = "FROM_BTC_SPV";
 })(SwapHandlerType = exports.SwapHandlerType || (exports.SwapHandlerType = {}));
 /**
  * Converts SwapHandlerType (represented as string & used in REST API communication with intermediaries) to regular
@@ -36,6 +37,8 @@ function swapHandlerTypeToSwapType(swapHandlerType) {
             return SwapType_1.SwapType.TRUSTED_FROM_BTC;
         case SwapHandlerType.FROM_BTCLN_TRUSTED:
             return SwapType_1.SwapType.TRUSTED_FROM_BTCLN;
+        case SwapHandlerType.FROM_BTC_SPV:
+            return SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
     }
 }
 /**
@@ -103,8 +106,13 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
         for (let chain in response.chains) {
             if (this.swapContracts[chain] != null) {
                 const { signature, address } = response.chains[chain];
-                await this.swapContracts[chain].isValidDataSignature(buffer_1.Buffer.from(response.envelope), signature, address);
-                addresses[chain] = address;
+                try {
+                    await this.swapContracts[chain].isValidDataSignature(buffer_1.Buffer.from(response.envelope), signature, address);
+                    addresses[chain] = address;
+                }
+                catch (e) {
+                    logger.warn("Failed to verify " + chain + " signature for intermediary: " + url);
+                }
             }
         }
         if (abortSignal != null)
@@ -117,6 +125,10 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
                 serviceData.chainTokens = {
                     [DEFAULT_CHAIN]: serviceData.tokens
                 };
+            for (let chain in serviceData.chainTokens) {
+                if (addresses[chain] == null)
+                    delete serviceData.chainTokens[chain];
+            }
         }
         return {
             addresses,

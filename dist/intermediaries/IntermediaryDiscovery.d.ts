@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { Intermediary } from "./Intermediary";
-import { SwapType } from "../swaps/SwapType";
+import { SwapType } from "../swaps/enums/SwapType";
 import { SwapContract } from "@atomiqlabs/base";
 import { EventEmitter } from "events";
 export declare enum SwapHandlerType {
@@ -9,7 +9,8 @@ export declare enum SwapHandlerType {
     TO_BTCLN = "TO_BTCLN",
     FROM_BTCLN = "FROM_BTCLN",
     FROM_BTC_TRUSTED = "FROM_BTC_TRUSTED",
-    FROM_BTCLN_TRUSTED = "FROM_BTCLN_TRUSTED"
+    FROM_BTCLN_TRUSTED = "FROM_BTCLN_TRUSTED",
+    FROM_BTC_SPV = "FROM_BTC_SPV"
 }
 export type SwapHandlerInfoType = {
     swapFeePPM: number;

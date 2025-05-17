@@ -2,6 +2,7 @@
 /// <reference types="node" />
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { Buffer } from "buffer";
+import { CoinselectAddressTypes } from "../btc/coinselect2";
 type Constructor<T = any> = new (...args: any[]) => T;
 export type LoggerType = {
     debug: (msg: string, ...args: any[]) => void;
@@ -95,7 +96,7 @@ export declare function httpPost<T>(url: string, body: any, timeout?: number, ab
  * @param timeout how many milliseconds to wait for
  * @param abortSignal
  */
-export declare function timeoutPromise(timeout: number, abortSignal?: AbortSignal): Promise<unknown>;
+export declare function timeoutPromise(timeout: number, abortSignal?: AbortSignal): Promise<void>;
 /**
  * Returns an abort signal that aborts after a specified timeout in milliseconds
  *
@@ -108,5 +109,6 @@ export declare function bigIntMin(a: bigint, b: bigint): bigint;
 export declare function bigIntMax(a: bigint, b: bigint): bigint;
 export declare function bigIntCompare(a: bigint, b: bigint): -1 | 0 | 1;
 export declare function toOutputScript(network: BTC_NETWORK, address: string): Buffer;
+export declare function toCoinselectAddressType(outputScript: Uint8Array): CoinselectAddressTypes;
 export declare function randomBytes(bytesLength: number): Buffer;
 export {};

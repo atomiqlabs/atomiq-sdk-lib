@@ -1,4 +1,4 @@
-import { SwapType } from "../swaps/SwapType";
+import { SwapType } from "../swaps/enums/SwapType";
 import { SwapHandlerInfoType } from "./IntermediaryDiscovery";
 import { ChainSwapType, SwapContract } from "@atomiqlabs/base";
 import { LNNodeLiquidity } from "../btc/LightningNetworkApi";
@@ -26,6 +26,22 @@ export declare class Intermediary {
         [chainIdentifier: string]: string;
     };
     readonly services: ServicesType;
+    readonly swapBounds: {
+        [swapType in SwapType]?: {
+            [chainIdentifier: string]: {
+                [tokenAddress: string]: {
+                    input: {
+                        min: bigint;
+                        max: bigint;
+                    };
+                    output: {
+                        min: bigint;
+                        max: bigint;
+                    };
+                };
+            };
+        };
+    };
     reputation: {
         [chainIdentifier: string]: SingleChainReputationType;
     };
@@ -38,6 +54,16 @@ export declare class Intermediary {
     }, services: ServicesType, reputation?: {
         [chainIdentifier: string]: SingleChainReputationType;
     });
+    getSwapLimits(swapType: SwapType, chainId: string, tokenAddress: string): {
+        input: {
+            min: bigint;
+            max: bigint;
+        };
+        output: {
+            min: bigint;
+            max: bigint;
+        };
+    };
     /**
      * Returns tokens supported by the intermediary, optionally constrained to the specific swap types
      *
