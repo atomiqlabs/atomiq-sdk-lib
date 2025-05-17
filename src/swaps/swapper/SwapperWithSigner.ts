@@ -73,7 +73,7 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
         tokenAddress: string,
         paymentRequest: string,
         additionalParams?: Record<string, any>,
-        options?: ToBTCLNOptions
+        options?: ToBTCLNOptions & {comment?: string}
     ): Promise<SwapWithSigner<ToBTCLNSwap<T[ChainIdentifier]>>> {
         return this.swapper.createToBTCLNSwap(this.signer.getAddress(), tokenAddress, paymentRequest, additionalParams, options)
             .then(swap => wrapSwapWithSigner(swap, this.signer));

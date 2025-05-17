@@ -268,7 +268,14 @@ class SwapperUtils {
             throw new Error("Chain doesn't support spv vault swaps!");
         return wrapper.getDummySwapPsbt(includeGasToken);
     }
-    async getBitcoinSpendableBalance(addressOrWallet, swapType, targetChain, options) {
+    /**
+     * Returns the spendable balance of a bitcoin wallet
+     *
+     * @param addressOrWallet
+     * @param targetChain
+     * @param options Additional options
+     */
+    async getBitcoinSpendableBalance(addressOrWallet, targetChain, options) {
         if (typeof (addressOrWallet) !== "string" && addressOrWallet.getTransactionFee == null)
             throw new Error("Wallet must be a string address or IBitcoinWallet");
         let bitcoinWallet;
@@ -282,7 +289,7 @@ class SwapperUtils {
         if (options?.minFeeRate != null)
             feeRate = Math.max(feeRate, options.minFeeRate);
         let result;
-        if (swapType === SwapType_1.SwapType.SPV_VAULT_FROM_BTC) {
+        if (targetChain != null && this.root.supportsSwapType(targetChain, SwapType_1.SwapType.SPV_VAULT_FROM_BTC)) {
             result = await bitcoinWallet.getSpendableBalance(this.getRandomSpvVaultPsbt(targetChain, options?.gasDrop), feeRate);
         }
         else {

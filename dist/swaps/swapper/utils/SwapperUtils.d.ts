@@ -1,10 +1,10 @@
+import { Transaction } from "@scure/btc-signer";
 import { LNURLPay, LNURLWithdraw } from "../../../utils/LNURL";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { SwapType } from "../../enums/SwapType";
 import { SCToken, TokenAmount } from "../../../Tokens";
 import { ChainIds, MultiChain, Swapper } from "../Swapper";
 import { IBitcoinWallet } from "../../../btc/wallet/IBitcoinWallet";
-import { Transaction } from "@scure/btc-signer";
 export declare class SwapperUtils<T extends MultiChain> {
     readonly bitcoinNetwork: BTC_NETWORK;
     private readonly root;
@@ -93,22 +93,14 @@ export declare class SwapperUtils<T extends MultiChain> {
      */
     getRandomSpvVaultPsbt<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, includeGasToken?: boolean): Transaction;
     /**
-     * Returns the spendable balance of a bitcoin wallet for a given swap type
+     * Returns the spendable balance of a bitcoin wallet
      *
      * @param addressOrWallet
-     * @param swapType
      * @param targetChain
      * @param options Additional options
      */
-    getBitcoinSpendableBalance(addressOrWallet: string | IBitcoinWallet, swapType: SwapType.SPV_VAULT_FROM_BTC, targetChain: ChainIds<T>, options?: {
+    getBitcoinSpendableBalance(addressOrWallet: string | IBitcoinWallet, targetChain?: ChainIds<T>, options?: {
         gasDrop?: boolean;
-        feeRate?: number;
-        minFeeRate?: number;
-    }): Promise<{
-        balance: TokenAmount;
-        feeRate: number;
-    }>;
-    getBitcoinSpendableBalance(addressOrWallet: string | IBitcoinWallet, swapType: SwapType.FROM_BTC | SwapType.TRUSTED_FROM_BTC, targetChain?: ChainIds<T>, options?: {
         feeRate?: number;
         minFeeRate?: number;
     }): Promise<{

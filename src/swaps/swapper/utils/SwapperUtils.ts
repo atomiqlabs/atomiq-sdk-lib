@@ -1,5 +1,5 @@
 import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
-import {Address} from "@scure/btc-signer";
+import {Address, Transaction} from "@scure/btc-signer";
 import {isLNURLPay, isLNURLWithdraw, LNURL, LNURLPay, LNURLWithdraw} from "../../../utils/LNURL";
 import {BTC_NETWORK} from "@scure/btc-signer/utils";
 import {SwapType} from "../../enums/SwapType";
@@ -9,7 +9,6 @@ import {IBitcoinWallet} from "../../../btc/wallet/IBitcoinWallet";
 import {SingleAddressBitcoinWallet} from "../../../btc/wallet/SingleAddressBitcoinWallet";
 import {AbstractSigner, BigIntBufferUtils, ChainSwapType} from "@atomiqlabs/base";
 import {bigIntMax, randomBytes} from "../../../utils/Utils";
-import {Transaction} from "@scure/btc-signer";
 
 export class SwapperUtils<T extends MultiChain> {
 
@@ -324,31 +323,14 @@ export class SwapperUtils<T extends MultiChain> {
     }
 
     /**
-     * Returns the spendable balance of a bitcoin wallet for a given swap type
+     * Returns the spendable balance of a bitcoin wallet
      *
      * @param addressOrWallet
-     * @param swapType
      * @param targetChain
      * @param options Additional options
      */
-    getBitcoinSpendableBalance(addressOrWallet: string | IBitcoinWallet, swapType: SwapType.SPV_VAULT_FROM_BTC, targetChain: ChainIds<T>, options?: {
-        gasDrop?: boolean,
-        feeRate?: number,
-        minFeeRate?: number
-    }): Promise<{
-        balance: TokenAmount,
-        feeRate: number
-    }>;
-    getBitcoinSpendableBalance(addressOrWallet: string | IBitcoinWallet, swapType: SwapType.FROM_BTC | SwapType.TRUSTED_FROM_BTC, targetChain?: ChainIds<T>, options?: {
-        feeRate?: number,
-        minFeeRate?: number
-    }): Promise<{
-        balance: TokenAmount,
-        feeRate: number
-    }>;
     async getBitcoinSpendableBalance(
         addressOrWallet: string | IBitcoinWallet,
-        swapType?: SwapType.FROM_BTC | SwapType.TRUSTED_FROM_BTC | SwapType.SPV_VAULT_FROM_BTC,
         targetChain?: ChainIds<T>,
         options?: {
             gasDrop?: boolean,
@@ -373,7 +355,7 @@ export class SwapperUtils<T extends MultiChain> {
         if(options?.minFeeRate!=null) feeRate = Math.max(feeRate, options.minFeeRate);
 
         let result: {balance: bigint, feeRate: number, totalFee: number};
-        if(swapType===SwapType.SPV_VAULT_FROM_BTC) {
+        if(targetChain!=null && this.root.supportsSwapType(targetChain, SwapType.SPV_VAULT_FROM_BTC)) {
             result = await bitcoinWallet.getSpendableBalance(this.getRandomSpvVaultPsbt(targetChain, options?.gasDrop), feeRate);
         } else {
             result = await bitcoinWallet.getSpendableBalance(undefined, feeRate);

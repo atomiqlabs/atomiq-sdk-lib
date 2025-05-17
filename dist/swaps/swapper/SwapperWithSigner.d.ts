@@ -72,7 +72,9 @@ export declare class SwapperWithSigner<T extends MultiChain, ChainIdentifier ext
     };
     constructor(swapper: SwapperWithChain<T, ChainIdentifier>, signer: T[ChainIdentifier]["Signer"]);
     createToBTCSwap(tokenAddress: string, address: string, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCOptions): Promise<SwapWithSigner<ToBTCSwap<T[ChainIdentifier]>>>;
-    createToBTCLNSwap(tokenAddress: string, paymentRequest: string, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<SwapWithSigner<ToBTCLNSwap<T[ChainIdentifier]>>>;
+    createToBTCLNSwap(tokenAddress: string, paymentRequest: string, additionalParams?: Record<string, any>, options?: ToBTCLNOptions & {
+        comment?: string;
+    }): Promise<SwapWithSigner<ToBTCLNSwap<T[ChainIdentifier]>>>;
     createToBTCLNSwapViaLNURL(tokenAddress: string, lnurlPay: string | LNURLPay, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<SwapWithSigner<ToBTCLNSwap<T[ChainIdentifier]>>>;
     createFromBTCSwap(tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCOptions): Promise<SwapWithSigner<FromBTCSwap<T[ChainIdentifier]>>>;
     createFromBTCLNSwap(tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNOptions): Promise<SwapWithSigner<FromBTCLNSwap<T[ChainIdentifier]>>>;
