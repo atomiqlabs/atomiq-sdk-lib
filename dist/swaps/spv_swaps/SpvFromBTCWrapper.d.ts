@@ -24,6 +24,8 @@ export type SpvFromBTCWrapperOptions = ISwapWrapperOptions & {
     bitcoinBlocktime?: number;
     maxTransactionsDelta?: number;
     maxRawAmountAdjustmentDifferencePPM?: number;
+    maxBtcFeeMultiplier?: number;
+    maxBtcFeeOffset?: number;
 };
 export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper<T, SpvFromBTCSwap<T>, SpvFromBTCWrapperOptions> {
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
@@ -78,6 +80,7 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
      * @param lp Intermediary
      * @param options Options as passed to the swap creation function
      * @param callerFeeShare
+     * @param bitcoinFeeRatePromise Maximum accepted fee rate from the LPs
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */

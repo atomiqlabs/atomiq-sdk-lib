@@ -35,6 +35,8 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         options.bitcoinBlocktime ??= 10 * 60;
         options.maxTransactionsDelta ??= 5;
         options.maxRawAmountAdjustmentDifferencePPM ??= 100;
+        options.maxBtcFeeOffset ??= 3;
+        options.maxBtcFeeMultiplier ??= 1.5;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
         this.TYPE = SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
         this.swapDeserializer = SpvFromBTCSwap_1.SpvFromBTCSwap;
@@ -182,14 +184,13 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
      * @param lp Intermediary
      * @param options Options as passed to the swap creation function
      * @param callerFeeShare
+     * @param bitcoinFeeRatePromise Maximum accepted fee rate from the LPs
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
-    async verifyReturnedData(resp, amountData, lp, options, callerFeeShare) {
-        if (options.maxAllowedNetworkFeeRate != null) {
-            if (resp.btcFeeRate > options.maxAllowedNetworkFeeRate)
-                throw new IntermediaryError_1.IntermediaryError("Bitcoin fee rate returned too high!");
-        }
+    async verifyReturnedData(resp, amountData, lp, options, callerFeeShare, bitcoinFeeRatePromise) {
+        if (resp.btcFeeRate > await bitcoinFeeRatePromise)
+            throw new IntermediaryError_1.IntermediaryError("Bitcoin fee rate returned too high!");
         //Vault related
         let vaultScript;
         let vaultAddressType;
@@ -348,6 +349,12 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             null :
             this.preFetchPrice({ token: nativeTokenAddress }, _abortController.signal);
         const callerFeePrefetchPromise = this.preFetchCallerFeeShare(signer, amountData, options, pricePrefetchPromise, gasTokenPricePrefetchPromise, _abortController);
+        const bitcoinFeeRatePromise = options.maxAllowedNetworkFeeRate != null ?
+            Promise.resolve(options.maxAllowedNetworkFeeRate) :
+            this.btcRpc.getFeeRate().then(x => this.options.maxBtcFeeOffset + (x * this.options.maxBtcFeeMultiplier)).catch(e => {
+                _abortController.abort(e);
+                return null;
+            });
         return lps.map(lp => {
             return {
                 intermediary: lp,
@@ -373,7 +380,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], false, resp.btcAmountSwap, resp.total * (100000n + callerFeeShare) / 100000n, amountData.token, {}, pricePrefetchPromise, abortController.signal),
                             options.gasAmount === 0n ? Promise.resolve() : this.verifyReturnedPrice({ ...lp.services[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], swapBaseFee: 0 }, //Base fee should be charged only on the amount, not on gas
                             false, resp.btcAmountGas, resp.totalGas * (100000n + callerFeeShare) / 100000n, nativeTokenAddress, {}, gasTokenPricePrefetchPromise, abortController.signal),
-                            this.verifyReturnedData(resp, amountData, lp, options, callerFeeShare)
+                            this.verifyReturnedData(resp, amountData, lp, options, callerFeeShare, bitcoinFeeRatePromise)
                         ]);
                         const swapInit = {
                             pricingInfo,

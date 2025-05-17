@@ -47,7 +47,9 @@ export type SpvFromBTCWrapperOptions = ISwapWrapperOptions & {
     bitcoinNetwork?: BTC_NETWORK,
     bitcoinBlocktime?: number,
     maxTransactionsDelta?: number, //Maximum accepted difference in state between SC state and bitcoin state, in terms of by how many transactions are they differing
-    maxRawAmountAdjustmentDifferencePPM?: number
+    maxRawAmountAdjustmentDifferencePPM?: number,
+    maxBtcFeeMultiplier?: number,
+    maxBtcFeeOffset?: number
 };
 
 export class SpvFromBTCWrapper<
@@ -100,6 +102,8 @@ export class SpvFromBTCWrapper<
         options.bitcoinBlocktime ??= 10*60;
         options.maxTransactionsDelta ??= 5;
         options.maxRawAmountAdjustmentDifferencePPM ??= 100;
+        options.maxBtcFeeOffset ??= 3;
+        options.maxBtcFeeMultiplier ??= 1.5;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
         this.spvWithdrawalDataDeserializer = spvWithdrawalDataDeserializer;
         this.contract = contract;
@@ -275,6 +279,7 @@ export class SpvFromBTCWrapper<
      * @param lp Intermediary
      * @param options Options as passed to the swap creation function
      * @param callerFeeShare
+     * @param bitcoinFeeRatePromise Maximum accepted fee rate from the LPs
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
@@ -283,14 +288,13 @@ export class SpvFromBTCWrapper<
         amountData: AmountData,
         lp: Intermediary,
         options: SpvFromBTCOptions,
-        callerFeeShare: bigint
+        callerFeeShare: bigint,
+        bitcoinFeeRatePromise: Promise<number>
     ): Promise<{
         vault: T["SpvVaultData"],
         vaultUtxoValue: number
     }> {
-        if(options.maxAllowedNetworkFeeRate!=null) {
-            if(resp.btcFeeRate > options.maxAllowedNetworkFeeRate) throw new IntermediaryError("Bitcoin fee rate returned too high!")
-        }
+        if(resp.btcFeeRate > await bitcoinFeeRatePromise) throw new IntermediaryError("Bitcoin fee rate returned too high!");
 
         //Vault related
         let vaultScript: Uint8Array;
@@ -456,6 +460,12 @@ export class SpvFromBTCWrapper<
             null :
             this.preFetchPrice({token: nativeTokenAddress}, _abortController.signal);
         const callerFeePrefetchPromise = this.preFetchCallerFeeShare(signer, amountData, options, pricePrefetchPromise, gasTokenPricePrefetchPromise, _abortController);
+        const bitcoinFeeRatePromise: Promise<number> = options.maxAllowedNetworkFeeRate!=null ?
+            Promise.resolve(options.maxAllowedNetworkFeeRate) :
+            this.btcRpc.getFeeRate().then(x => this.options.maxBtcFeeOffset + (x*this.options.maxBtcFeeMultiplier)).catch(e => {
+                _abortController.abort(e);
+                return null;
+            });
 
         return lps.map(lp => {
             return {
@@ -503,7 +513,7 @@ export class SpvFromBTCWrapper<
                                 resp.totalGas * (100_000n + callerFeeShare) / 100_000n,
                                 nativeTokenAddress, {}, gasTokenPricePrefetchPromise, abortController.signal
                             ),
-                            this.verifyReturnedData(resp, amountData, lp, options, callerFeeShare)
+                            this.verifyReturnedData(resp, amountData, lp, options, callerFeeShare, bitcoinFeeRatePromise)
                         ]);
 
                         const swapInit: SpvFromBTCSwapInit = {
