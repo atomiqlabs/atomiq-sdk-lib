@@ -169,7 +169,12 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
 
         this._bitcoinNetwork = options.bitcoinNetwork;
         this.bitcoinNetwork = options.bitcoinNetwork===BitcoinNetwork.MAINNET ? NETWORK :
-            (options.bitcoinNetwork===BitcoinNetwork.TESTNET || options.bitcoinNetwork===BitcoinNetwork.TESTNET4) ? TEST_NETWORK : null;
+            (options.bitcoinNetwork===BitcoinNetwork.TESTNET || options.bitcoinNetwork===BitcoinNetwork.TESTNET4) ? TEST_NETWORK : {
+                bech32: 'bcrt',
+                pubKeyHash: 111,
+                scriptHash: 196,
+                wif: 239
+            };
         this.Utils = new SwapperUtils(this);
 
         this.prices = pricing;
