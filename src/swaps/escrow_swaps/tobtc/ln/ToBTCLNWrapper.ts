@@ -188,7 +188,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                     preFetches.pricePreFetchPromise, abortController.signal
                 ),
                 this.verifyReturnedSignature(
-                    data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal
+                    signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal
                 ),
                 preFetches.reputationPromise
             ]);
@@ -377,7 +377,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                     preFetches.pricePreFetchPromise, abortSignal
                 ),
                 this.verifyReturnedSignature(
-                    data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal
+                    signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal
                 ),
                 reputationPromise
             ]);

@@ -243,7 +243,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                         const [pricingInfo, signatureExpiry] = await Promise.all([
                             //Get intermediary's liquidity
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.FROM_BTC], false, resp.amount, resp.total, amountData.token, {}, pricePrefetchPromise, abortController.signal),
-                            this.verifyReturnedSignature(data, resp, feeRatePromise, signDataPromise, abortController.signal),
+                            this.verifyReturnedSignature(signer, data, resp, feeRatePromise, signDataPromise, abortController.signal),
                             this.verifyIntermediaryLiquidity(data.getAmount(), liquidityPromise),
                         ]);
                         const quote = new FromBTCSwap_1.FromBTCSwap(this, {

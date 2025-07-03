@@ -1,5 +1,12 @@
 import {isISwapInit, ISwap, ISwapInit} from "../ISwap";
-import {ChainType, SignatureData, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
+import {
+    ChainType,
+    SignatureData,
+    SignatureVerificationError,
+    SwapCommitState,
+    SwapCommitStateType,
+    SwapData, SwapExpiredState, SwapNotCommitedState, SwapPaidState
+} from "@atomiqlabs/base";
 import {IEscrowSwapWrapper} from "./IEscrowSwapWrapper";
 import {timeoutPromise, tryWithRetries} from "../../utils/Utils";
 import {Buffer} from "buffer";
@@ -143,13 +150,13 @@ export abstract class IEscrowSwap<
      * @protected
      */
     protected async watchdogWaitTillCommited(abortSignal?: AbortSignal, interval: number = 5): Promise<boolean> {
-        let status: SwapCommitStatus = SwapCommitStatus.NOT_COMMITED;
-        while(status===SwapCommitStatus.NOT_COMMITED) {
+        let status: SwapCommitState = {type: SwapCommitStateType.NOT_COMMITED};
+        while(status?.type===SwapCommitStateType.NOT_COMMITED) {
             await timeoutPromise(interval*1000, abortSignal);
             try {
                 status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
                 if(
-                    status===SwapCommitStatus.NOT_COMMITED &&
+                    status?.type===SwapCommitStateType.NOT_COMMITED &&
                     await this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData)
                 ) return false;
             } catch (e) {
@@ -168,10 +175,10 @@ export abstract class IEscrowSwap<
      * @protected
      */
     protected async watchdogWaitTillResult(abortSignal?: AbortSignal, interval: number = 5): Promise<
-        SwapCommitStatus.PAID | SwapCommitStatus.EXPIRED | SwapCommitStatus.NOT_COMMITED
+        SwapPaidState | SwapExpiredState | SwapNotCommitedState
     > {
-        let status: SwapCommitStatus = SwapCommitStatus.COMMITED;
-        while(status===SwapCommitStatus.COMMITED || status===SwapCommitStatus.REFUNDABLE) {
+        let status: SwapCommitState = {type: SwapCommitStateType.COMMITED};
+        while(status?.type===SwapCommitStateType.COMMITED || status?.type===SwapCommitStateType.REFUNDABLE) {
             await timeoutPromise(interval*1000, abortSignal);
             try {
                 status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
@@ -205,7 +212,7 @@ export abstract class IEscrowSwap<
         try {
             await tryWithRetries(
                 () => this.wrapper.contract.isValidInitAuthorization(
-                    this.data, this.signatureData, this.feeRate
+                    this._getInitiator(), this.data, this.signatureData, this.feeRate
                 ),
                 null,
                 SignatureVerificationError

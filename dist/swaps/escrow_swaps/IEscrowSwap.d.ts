@@ -1,7 +1,7 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import { ISwap, ISwapInit } from "../ISwap";
-import { ChainType, SignatureData, SwapCommitStatus, SwapData } from "@atomiqlabs/base";
+import { ChainType, SignatureData, SwapData, SwapExpiredState, SwapNotCommitedState, SwapPaidState } from "@atomiqlabs/base";
 import { IEscrowSwapWrapper } from "./IEscrowSwapWrapper";
 import { Buffer } from "buffer";
 import { SCToken, TokenAmount } from "../../Tokens";
@@ -67,7 +67,7 @@ export declare abstract class IEscrowSwap<T extends ChainType = ChainType, S ext
      * @param interval How often to check (in seconds), default to 5s
      * @protected
      */
-    protected watchdogWaitTillResult(abortSignal?: AbortSignal, interval?: number): Promise<SwapCommitStatus.PAID | SwapCommitStatus.EXPIRED | SwapCommitStatus.NOT_COMMITED>;
+    protected watchdogWaitTillResult(abortSignal?: AbortSignal, interval?: number): Promise<SwapPaidState | SwapExpiredState | SwapNotCommitedState>;
     /**
      * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
      */

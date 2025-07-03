@@ -32,6 +32,7 @@ class IEscrowSwapWrapper extends ISwapWrapper_1.ISwapWrapper {
     /**
      * Verifies swap initialization signature returned by the intermediary
      *
+     * @param initiator A smart chain account initiating the swap
      * @param data Parsed swap data from the intermediary
      * @param signature Response of the intermediary
      * @param feeRatePromise Pre-fetched fee rate promise
@@ -41,9 +42,9 @@ class IEscrowSwapWrapper extends ISwapWrapper_1.ISwapWrapper {
      * @returns Swap initialization signature expiry
      * @throws {SignatureVerificationError} when swap init signature is invalid
      */
-    async verifyReturnedSignature(data, signature, feeRatePromise, preFetchSignatureVerificationData, abortSignal) {
+    async verifyReturnedSignature(initiator, data, signature, feeRatePromise, preFetchSignatureVerificationData, abortSignal) {
         const [feeRate, preFetchedSignatureData] = await Promise.all([feeRatePromise, preFetchSignatureVerificationData]);
-        await (0, Utils_1.tryWithRetries)(() => this.contract.isValidInitAuthorization(data, signature, feeRate, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
+        await (0, Utils_1.tryWithRetries)(() => this.contract.isValidInitAuthorization(initiator, data, signature, feeRate, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
         return await (0, Utils_1.tryWithRetries)(() => this.contract.getInitAuthorizationExpiry(data, signature, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
     }
     /**

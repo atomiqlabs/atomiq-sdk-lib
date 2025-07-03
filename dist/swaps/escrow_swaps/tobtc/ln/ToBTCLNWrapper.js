@@ -114,7 +114,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             await this.verifyReturnedData(resp, parsedPr, amountData.token, lp, options, data);
             const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                 this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTCLN], true, amountOut, data.getAmount(), amountData.token, { networkFee: resp.maxFee }, preFetches.pricePreFetchPromise, abortController.signal),
-                this.verifyReturnedSignature(data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal),
+                this.verifyReturnedSignature(signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal),
                 preFetches.reputationPromise
             ]);
             abortController.signal.throwIfAborted();
@@ -249,7 +249,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             await this.verifyReturnedData(resp, parsedInvoice, amountData.token, lp, options, data, amountData.amount);
             const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                 this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTCLN], true, prepareResp.amount, data.getAmount(), amountData.token, { networkFee: resp.maxFee }, preFetches.pricePreFetchPromise, abortSignal),
-                this.verifyReturnedSignature(data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal),
+                this.verifyReturnedSignature(signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal),
                 reputationPromise
             ]);
             abortController.signal.throwIfAborted();
