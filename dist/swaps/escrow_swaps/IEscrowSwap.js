@@ -104,12 +104,12 @@ class IEscrowSwap extends ISwap_1.ISwap {
      * @protected
      */
     async watchdogWaitTillCommited(abortSignal, interval = 5) {
-        let status = base_1.SwapCommitStatus.NOT_COMMITED;
-        while (status === base_1.SwapCommitStatus.NOT_COMMITED) {
+        let status = { type: base_1.SwapCommitStateType.NOT_COMMITED };
+        while (status?.type === base_1.SwapCommitStateType.NOT_COMMITED) {
             await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
             try {
                 status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
-                if (status === base_1.SwapCommitStatus.NOT_COMMITED &&
+                if (status?.type === base_1.SwapCommitStateType.NOT_COMMITED &&
                     await this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData))
                     return false;
             }
@@ -129,8 +129,8 @@ class IEscrowSwap extends ISwap_1.ISwap {
      * @protected
      */
     async watchdogWaitTillResult(abortSignal, interval = 5) {
-        let status = base_1.SwapCommitStatus.COMMITED;
-        while (status === base_1.SwapCommitStatus.COMMITED || status === base_1.SwapCommitStatus.REFUNDABLE) {
+        let status = { type: base_1.SwapCommitStateType.COMMITED };
+        while (status?.type === base_1.SwapCommitStateType.COMMITED || status?.type === base_1.SwapCommitStateType.REFUNDABLE) {
             await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
             try {
                 status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
@@ -156,7 +156,7 @@ class IEscrowSwap extends ISwap_1.ISwap {
      */
     async verifyQuoteValid() {
         try {
-            await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this.data, this.signatureData, this.feeRate), null, base_1.SignatureVerificationError);
+            await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this._getInitiator(), this.data, this.signatureData, this.feeRate), null, base_1.SignatureVerificationError);
             return true;
         }
         catch (e) {

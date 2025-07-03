@@ -255,9 +255,9 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         if (!data.isDepositToken(this.getSwapData().getDepositToken()))
             throw new IntermediaryError_1.IntermediaryError("Invalid deposit token used!");
         await Promise.all([
-            (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(data, signature, this.feeRate), null, base_1.SignatureVerificationError),
+            (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this._getInitiator(), data, signature, this.feeRate), null, base_1.SignatureVerificationError),
             (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(data.getClaimer(), data)).then(status => {
-                if (status !== base_1.SwapCommitStatus.NOT_COMMITED)
+                if (status?.type !== base_1.SwapCommitStateType.NOT_COMMITED)
                     throw new Error("Swap already committed on-chain!");
             })
         ]);
@@ -430,14 +430,18 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             throw new Error("Swap expired during claiming");
         }
         this.logger.debug("waitTillClaimed(): Resolved from watchdog");
-        if (res === base_1.SwapCommitStatus.PAID) {
-            if (this.state !== FromBTCLNSwapState.CLAIM_CLAIMED)
+        if (res?.type === base_1.SwapCommitStateType.PAID) {
+            if (this.state !== FromBTCLNSwapState.CLAIM_CLAIMED) {
+                this.claimTxId = await res.getClaimTxId();
                 await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
+            }
         }
-        if (res === base_1.SwapCommitStatus.NOT_COMMITED || res === base_1.SwapCommitStatus.EXPIRED) {
+        if (res?.type === base_1.SwapCommitStateType.NOT_COMMITED || res?.type === base_1.SwapCommitStateType.EXPIRED) {
             if (this.state !== FromBTCLNSwapState.CLAIM_CLAIMED &&
-                this.state !== FromBTCLNSwapState.FAILED)
+                this.state !== FromBTCLNSwapState.FAILED) {
+                this.refundTxId = res.getRefundTxId == null ? null : await res.getRefundTxId();
                 await this._saveAndEmit(FromBTCLNSwapState.FAILED);
+            }
         }
     }
     //////////////////////////////
@@ -572,11 +576,15 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         if (this.state === FromBTCLNSwapState.CLAIM_COMMITED || this.state === FromBTCLNSwapState.EXPIRED) {
             //Check if it's already successfully paid
             const commitStatus = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
-            if (commitStatus === base_1.SwapCommitStatus.PAID) {
+            if (commitStatus?.type === base_1.SwapCommitStateType.PAID) {
+                if (this.claimTxId == null)
+                    this.claimTxId = await commitStatus.getClaimTxId();
                 this.state = FromBTCLNSwapState.CLAIM_CLAIMED;
                 return true;
             }
-            if (commitStatus === base_1.SwapCommitStatus.NOT_COMMITED || commitStatus === base_1.SwapCommitStatus.EXPIRED) {
+            if (commitStatus?.type === base_1.SwapCommitStateType.NOT_COMMITED || commitStatus?.type === base_1.SwapCommitStateType.EXPIRED) {
+                if (this.refundTxId == null && commitStatus.getRefundTxId)
+                    this.refundTxId = await commitStatus.getRefundTxId();
                 this.state = FromBTCLNSwapState.FAILED;
                 return true;
             }
@@ -584,14 +592,18 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         if (this.state === FromBTCLNSwapState.PR_PAID || (this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData != null)) {
             //Check if it's already committed
             const status = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
-            switch (status) {
-                case base_1.SwapCommitStatus.COMMITED:
+            switch (status?.type) {
+                case base_1.SwapCommitStateType.COMMITED:
                     this.state = FromBTCLNSwapState.CLAIM_COMMITED;
                     return true;
-                case base_1.SwapCommitStatus.EXPIRED:
+                case base_1.SwapCommitStateType.EXPIRED:
+                    if (this.refundTxId == null && status.getRefundTxId)
+                        this.refundTxId = await status.getRefundTxId();
                     this.state = FromBTCLNSwapState.QUOTE_EXPIRED;
                     return true;
-                case base_1.SwapCommitStatus.PAID:
+                case base_1.SwapCommitStateType.PAID:
+                    if (this.claimTxId == null)
+                        this.claimTxId = await status.getClaimTxId();
                     this.state = FromBTCLNSwapState.CLAIM_CLAIMED;
                     return true;
             }

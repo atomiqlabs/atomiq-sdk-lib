@@ -31,6 +31,7 @@ export declare abstract class IEscrowSwapWrapper<T extends ChainType, S extends 
     /**
      * Verifies swap initialization signature returned by the intermediary
      *
+     * @param initiator A smart chain account initiating the swap
      * @param data Parsed swap data from the intermediary
      * @param signature Response of the intermediary
      * @param feeRatePromise Pre-fetched fee rate promise
@@ -40,7 +41,7 @@ export declare abstract class IEscrowSwapWrapper<T extends ChainType, S extends 
      * @returns Swap initialization signature expiry
      * @throws {SignatureVerificationError} when swap init signature is invalid
      */
-    protected verifyReturnedSignature(data: T["Data"], signature: SignatureData, feeRatePromise: Promise<any>, preFetchSignatureVerificationData: Promise<any>, abortSignal?: AbortSignal): Promise<number>;
+    protected verifyReturnedSignature(initiator: string, data: T["Data"], signature: SignatureData, feeRatePromise: Promise<any>, preFetchSignatureVerificationData: Promise<any>, abortSignal?: AbortSignal): Promise<number>;
     /**
      * Processes InitializeEvent for a given swap
      * @param swap

@@ -164,7 +164,7 @@ export abstract class IFromBTCSwap<
         }
 
         return await this.wrapper.contract.txsInit(
-            this.data, this.signatureData, skipChecks, this.feeRate
+            this._getInitiator(), this.data, this.signatureData, skipChecks, this.feeRate
         ).catch(e => Promise.reject(e instanceof SignatureVerificationError ? new Error("Request timed out") : e));
     }
 

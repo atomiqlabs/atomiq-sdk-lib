@@ -1,5 +1,5 @@
 import {IToBTCWrapper} from "./IToBTCWrapper";
-import {ChainType, SignatureVerificationError, SwapCommitStatus, SwapData} from "@atomiqlabs/base";
+import {ChainType, SignatureVerificationError, SwapCommitStateType, SwapData} from "@atomiqlabs/base";
 import {
     IntermediaryAPI,
     RefundAuthorizationResponse,
@@ -9,7 +9,7 @@ import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {extendAbortController, timeoutPromise, tryWithRetries} from "../../../utils/Utils";
 import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {IEscrowSwap, IEscrowSwapInit, isIEscrowSwapInit} from "../IEscrowSwap";
-import {Fee, FeeBreakdown, FeeType} from "../../fee/Fee";
+import {Fee, FeeType} from "../../fee/Fee";
 import {ppmToPercentage} from "../../ISwap";
 
 export type IToBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
@@ -263,7 +263,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         }
 
         return await this.wrapper.contract.txsInit(
-            this.data, this.signatureData, skipChecks, this.feeRate
+            this._getInitiator(), this.data, this.signatureData, skipChecks, this.feeRate
         ).catch(e => Promise.reject(e instanceof SignatureVerificationError ? new Error("Request timed out") : e));
     }
 
@@ -512,8 +512,8 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         if(abortSignal!=null) abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
         const res = await Promise.race([
             this.watchdogWaitTillResult(abortController.signal),
-            this.waitTillState(ToBTCSwapState.REFUNDED, "eq", abortController.signal).then(() => 0),
-            this.waitTillState(ToBTCSwapState.CLAIMED, "eq", abortController.signal).then(() => 1),
+            this.waitTillState(ToBTCSwapState.REFUNDED, "eq", abortController.signal).then(() => 0 as const),
+            this.waitTillState(ToBTCSwapState.CLAIMED, "eq", abortController.signal).then(() => 1 as const),
         ]);
         abortController.abort();
 
@@ -527,11 +527,13 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         }
         this.logger.debug("waitTillRefunded(): Resolved from watchdog");
 
-        if(res===SwapCommitStatus.PAID) {
+        if(res?.type===SwapCommitStateType.PAID) {
+            if(this.claimTxId==null) this.claimTxId = await res.getClaimTxId();
             await this._saveAndEmit(ToBTCSwapState.CLAIMED);
             throw new Error("Tried to refund swap, but claimer claimed it in the meantime!");
         }
-        if(res===SwapCommitStatus.NOT_COMMITED) {
+        if(res?.type===SwapCommitStateType.NOT_COMMITED) {
+            if(this.refundTxId==null && res.getRefundTxId!=null) this.refundTxId = await res.getRefundTxId();
             await this._saveAndEmit(ToBTCSwapState.REFUNDED);
         }
     }
@@ -575,23 +577,26 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
             }
 
             const res = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
-            switch(res) {
-                case SwapCommitStatus.PAID:
+            switch(res?.type) {
+                case SwapCommitStateType.PAID:
+                    if(this.claimTxId==null) this.claimTxId = await res.getClaimTxId();
                     this.state = ToBTCSwapState.CLAIMED;
                     return true;
-                case SwapCommitStatus.REFUNDABLE:
+                case SwapCommitStateType.REFUNDABLE:
                     this.state = ToBTCSwapState.REFUNDABLE;
                     return true;
-                case SwapCommitStatus.EXPIRED:
+                case SwapCommitStateType.EXPIRED:
+                    if(this.refundTxId==null && res.getRefundTxId) this.refundTxId = await res.getRefundTxId();
                     this.state = ToBTCSwapState.QUOTE_EXPIRED;
                     return true;
-                case SwapCommitStatus.NOT_COMMITED:
+                case SwapCommitStateType.NOT_COMMITED:
+                    if(this.refundTxId==null && res.getRefundTxId) this.refundTxId = await res.getRefundTxId();
                     if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.REFUNDABLE) {
                         this.state = ToBTCSwapState.REFUNDED;
                         return true;
                     }
                     break;
-                case SwapCommitStatus.COMMITED:
+                case SwapCommitStateType.COMMITED:
                     if(this.state!==ToBTCSwapState.COMMITED && this.state!==ToBTCSwapState.REFUNDABLE) {
                         this.state = ToBTCSwapState.COMMITED;
                         return true;
