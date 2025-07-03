@@ -165,7 +165,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                         this.verifyReturnedData(resp, amountData, lp, options, data, hash);
                         const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTC], true, resp.amount, data.getAmount(), amountData.token, resp, pricePreFetchPromise, abortController.signal),
-                            this.verifyReturnedSignature(data, resp, feeRatePromise, signDataPromise, abortController.signal),
+                            this.verifyReturnedSignature(signer, data, resp, feeRatePromise, signDataPromise, abortController.signal),
                             reputationPromise
                         ]);
                         abortController.signal.throwIfAborted();

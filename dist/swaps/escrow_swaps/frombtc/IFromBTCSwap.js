@@ -103,7 +103,7 @@ class IFromBTCSwap extends IEscrowSwap_1.IEscrowSwap {
             this.initiated = true;
             await this._saveAndEmit();
         }
-        return await this.wrapper.contract.txsInit(this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
+        return await this.wrapper.contract.txsInit(this._getInitiator(), this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
     }
     //////////////////////////////
     //// Claim

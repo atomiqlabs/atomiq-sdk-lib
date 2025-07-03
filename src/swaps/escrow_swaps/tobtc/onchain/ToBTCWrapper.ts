@@ -239,7 +239,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
                                 lp.services[SwapType.TO_BTC], true, resp.amount, data.getAmount(),
                                 amountData.token, resp, pricePreFetchPromise, abortController.signal
                             ),
-                            this.verifyReturnedSignature(data, resp, feeRatePromise, signDataPromise, abortController.signal),
+                            this.verifyReturnedSignature(signer, data, resp, feeRatePromise, signDataPromise, abortController.signal),
                             reputationPromise
                         ]);
                         abortController.signal.throwIfAborted();

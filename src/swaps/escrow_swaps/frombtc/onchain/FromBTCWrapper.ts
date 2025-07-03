@@ -376,7 +376,7 @@ export class FromBTCWrapper<
                                 lp.services[SwapType.FROM_BTC], false, resp.amount, resp.total,
                                 amountData.token, {}, pricePrefetchPromise, abortController.signal
                             ),
-                            this.verifyReturnedSignature(data, resp, feeRatePromise, signDataPromise, abortController.signal),
+                            this.verifyReturnedSignature(signer, data, resp, feeRatePromise, signDataPromise, abortController.signal),
                             this.verifyIntermediaryLiquidity(data.getAmount(), liquidityPromise),
                         ]);
 

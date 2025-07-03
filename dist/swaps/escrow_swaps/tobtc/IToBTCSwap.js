@@ -202,7 +202,7 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
             this.initiated = true;
             await this._saveAndEmit();
         }
-        return await this.wrapper.contract.txsInit(this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
+        return await this.wrapper.contract.txsInit(this._getInitiator(), this.data, this.signatureData, skipChecks, this.feeRate).catch(e => Promise.reject(e instanceof base_1.SignatureVerificationError ? new Error("Request timed out") : e));
     }
     /**
      * Commits the swap on-chain, initiating the swap
@@ -435,11 +435,15 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
             throw new Error("Tried to refund swap, but claimer claimed it in the meantime!");
         }
         this.logger.debug("waitTillRefunded(): Resolved from watchdog");
-        if (res === base_1.SwapCommitStatus.PAID) {
+        if (res?.type === base_1.SwapCommitStateType.PAID) {
+            if (this.claimTxId == null)
+                this.claimTxId = await res.getClaimTxId();
             await this._saveAndEmit(ToBTCSwapState.CLAIMED);
             throw new Error("Tried to refund swap, but claimer claimed it in the meantime!");
         }
-        if (res === base_1.SwapCommitStatus.NOT_COMMITED) {
+        if (res?.type === base_1.SwapCommitStateType.NOT_COMMITED) {
+            if (this.refundTxId == null && res.getRefundTxId != null)
+                this.refundTxId = await res.getRefundTxId();
             await this._saveAndEmit(ToBTCSwapState.REFUNDED);
         }
     }
@@ -473,23 +477,29 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
                 quoteExpired = await this.verifyQuoteDefinitelyExpired();
             }
             const res = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
-            switch (res) {
-                case base_1.SwapCommitStatus.PAID:
+            switch (res?.type) {
+                case base_1.SwapCommitStateType.PAID:
+                    if (this.claimTxId == null)
+                        this.claimTxId = await res.getClaimTxId();
                     this.state = ToBTCSwapState.CLAIMED;
                     return true;
-                case base_1.SwapCommitStatus.REFUNDABLE:
+                case base_1.SwapCommitStateType.REFUNDABLE:
                     this.state = ToBTCSwapState.REFUNDABLE;
                     return true;
-                case base_1.SwapCommitStatus.EXPIRED:
+                case base_1.SwapCommitStateType.EXPIRED:
+                    if (this.refundTxId == null && res.getRefundTxId)
+                        this.refundTxId = await res.getRefundTxId();
                     this.state = ToBTCSwapState.QUOTE_EXPIRED;
                     return true;
-                case base_1.SwapCommitStatus.NOT_COMMITED:
+                case base_1.SwapCommitStateType.NOT_COMMITED:
+                    if (this.refundTxId == null && res.getRefundTxId)
+                        this.refundTxId = await res.getRefundTxId();
                     if (this.state === ToBTCSwapState.COMMITED || this.state === ToBTCSwapState.REFUNDABLE) {
                         this.state = ToBTCSwapState.REFUNDED;
                         return true;
                     }
                     break;
-                case base_1.SwapCommitStatus.COMMITED:
+                case base_1.SwapCommitStateType.COMMITED:
                     if (this.state !== ToBTCSwapState.COMMITED && this.state !== ToBTCSwapState.REFUNDABLE) {
                         this.state = ToBTCSwapState.COMMITED;
                         return true;
