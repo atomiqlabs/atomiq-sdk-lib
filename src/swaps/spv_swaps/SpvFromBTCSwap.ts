@@ -429,7 +429,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             out1script,
             out2amount: this.btcAmount,
             out2script,
-            locktime: 0
+            locktime: 500_000_000 + Math.floor(Math.random() * 1_000_000_000) //Use this as a random salt to make the btc txId unique!
         };
     }
 

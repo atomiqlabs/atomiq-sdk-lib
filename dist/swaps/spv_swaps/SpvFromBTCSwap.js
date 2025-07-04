@@ -277,7 +277,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             out1script,
             out2amount: this.btcAmount,
             out2script,
-            locktime: 0
+            locktime: 500000000 + Math.floor(Math.random() * 1000000000) //Use this as a random salt to make the btc txId unique!
         };
     }
     async getPsbt() {
