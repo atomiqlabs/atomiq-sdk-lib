@@ -144,7 +144,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
      *  deplete more than half of the liquidity
      */
     async verifyLnNodeCapacity(lp, decodedPr, amountIn, lnCapacityPrefetchPromise, abortSignal) {
-        let result = await lnCapacityPrefetchPromise;
+        let result = lnCapacityPrefetchPromise == null ? null : await lnCapacityPrefetchPromise;
         if (result == null)
             result = await this.lnApi.getLNNodeLiquidity(decodedPr.payeeNodeKey);
         if (abortSignal != null)
@@ -201,7 +201,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                             additionalParams
                         }, this.options.postRequestTimeout, abortController.signal, retryCount > 0 ? false : null);
                         return {
-                            lnCapacityPromise: this.preFetchLnCapacity(lnPublicKey),
+                            lnCapacityPromise: options.unsafeSkipLnNodeCheck ? null : this.preFetchLnCapacity(lnPublicKey),
                             resp: await response
                         };
                     }, null, RequestError_1.RequestError, abortController.signal);
