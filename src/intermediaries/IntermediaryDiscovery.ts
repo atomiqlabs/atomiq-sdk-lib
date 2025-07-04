@@ -1,6 +1,6 @@
 import {Intermediary, ServicesType} from "./Intermediary";
 import {SwapType} from "../swaps/enums/SwapType";
-import {SwapContract} from "@atomiqlabs/base";
+import {SignatureVerificationError, SwapContract} from "@atomiqlabs/base";
 import {EventEmitter} from "events";
 import {Buffer} from "buffer";
 import {bigIntMax, bigIntMin, getLogger, httpGet, tryWithRetries} from "../utils/Utils";
@@ -158,7 +158,12 @@ export class IntermediaryDiscovery extends EventEmitter {
      * @param abortSignal
      */
     private async getNodeInfo(url: string, abortSignal?: AbortSignal) : Promise<{addresses: {[key: string]: string}, info: InfoHandlerResponseEnvelope}> {
-        const response = await IntermediaryAPI.getIntermediaryInfo(url);
+        const response = await tryWithRetries(
+            () => IntermediaryAPI.getIntermediaryInfo(url),
+            {maxRetries: 3, delay: 100, exponential: true},
+            undefined,
+            abortSignal
+        );
 
         //Handle legacy responses
         if(response.chains==null) response.chains = {
@@ -170,7 +175,12 @@ export class IntermediaryDiscovery extends EventEmitter {
             if(this.swapContracts[chain]!=null) {
                 const {signature, address} = response.chains[chain];
                 try {
-                    await this.swapContracts[chain].isValidDataSignature(Buffer.from(response.envelope), signature, address);
+                    await tryWithRetries(
+                        () => this.swapContracts[chain].isValidDataSignature(Buffer.from(response.envelope), signature, address),
+                        {maxRetries: 3, delay: 100, exponential: true},
+                        SignatureVerificationError,
+                        abortSignal
+                    );
                     addresses[chain] = address;
                 } catch (e) {
                     logger.warn("Failed to verify "+chain+" signature for intermediary: "+url);

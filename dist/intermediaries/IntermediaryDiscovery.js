@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.IntermediaryDiscovery = exports.SwapHandlerType = void 0;
 const Intermediary_1 = require("./Intermediary");
 const SwapType_1 = require("../swaps/enums/SwapType");
+const base_1 = require("@atomiqlabs/base");
 const events_1 = require("events");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../utils/Utils");
@@ -96,7 +97,7 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
      * @param abortSignal
      */
     async getNodeInfo(url, abortSignal) {
-        const response = await IntermediaryAPI_1.IntermediaryAPI.getIntermediaryInfo(url);
+        const response = await (0, Utils_1.tryWithRetries)(() => IntermediaryAPI_1.IntermediaryAPI.getIntermediaryInfo(url), { maxRetries: 3, delay: 100, exponential: true }, undefined, abortSignal);
         //Handle legacy responses
         if (response.chains == null)
             response.chains = {
@@ -107,7 +108,7 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
             if (this.swapContracts[chain] != null) {
                 const { signature, address } = response.chains[chain];
                 try {
-                    await this.swapContracts[chain].isValidDataSignature(buffer_1.Buffer.from(response.envelope), signature, address);
+                    await (0, Utils_1.tryWithRetries)(() => this.swapContracts[chain].isValidDataSignature(buffer_1.Buffer.from(response.envelope), signature, address), { maxRetries: 3, delay: 100, exponential: true }, base_1.SignatureVerificationError, abortSignal);
                     addresses[chain] = address;
                 }
                 catch (e) {
