@@ -28,7 +28,7 @@ const supportsRequestStreams: boolean = (() => {
 
         return duplexAccessed && !hasContentType;
     } catch (e) {
-        console.error("Error checking environment support for HTTP request stream", e);
+        logger.error("supportsRequestStreams: Error checking environment support for HTTP request stream", e);
         return false;
     }
 })();

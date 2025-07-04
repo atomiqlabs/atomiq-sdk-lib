@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.utils = exports.DUST_THRESHOLDS = void 0;
+const Utils_1 = require("../../utils/Utils");
+const logger = (0, Utils_1.getLogger)("CoinSelect: ");
 // baseline estimates, used to improve performance
 const TX_EMPTY_SIZE = 4 + 1 + 1 + 4;
 const TX_INPUT_BASE = 32 + 4 + 1 + 4;
@@ -86,17 +88,17 @@ function sumOrNaN(range) {
 }
 function finalize(inputs, outputs, feeRate, changeType, cpfpAddFee = 0) {
     const bytesAccum = transactionBytes(inputs, outputs, changeType);
-    console.log("CoinSelect: finalize(): Transaction bytes: ", bytesAccum);
+    logger.debug("finalize(): Transaction bytes: ", bytesAccum);
     const feeAfterExtraOutput = (feeRate * (bytesAccum + outputBytes({ type: changeType }))) + cpfpAddFee;
-    console.log("CoinSelect: finalize(): TX fee after adding change output: ", feeAfterExtraOutput);
+    logger.debug("finalize(): TX fee after adding change output: ", feeAfterExtraOutput);
     const remainderAfterExtraOutput = Math.floor(sumOrNaN(inputs) - (sumOrNaN(outputs) + feeAfterExtraOutput));
-    console.log("CoinSelect: finalize(): Leaves change (changeType=" + changeType + ") value: ", remainderAfterExtraOutput);
+    logger.debug("finalize(): Leaves change (changeType=" + changeType + ") value: ", remainderAfterExtraOutput);
     // is it worth a change output?
     if (remainderAfterExtraOutput >= dustThreshold({ type: changeType })) {
         outputs = outputs.concat({ value: remainderAfterExtraOutput, type: changeType });
     }
     const fee = sumOrNaN(inputs) - sumOrNaN(outputs);
-    console.log("CoinSelect: finalize(): Re-calculated total fee: ", fee);
+    logger.debug("finalize(): Re-calculated total fee: ", fee);
     if (!isFinite(fee))
         return { fee: (feeRate * bytesAccum) + cpfpAddFee };
     return {
