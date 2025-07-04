@@ -762,7 +762,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
      * @throws {Error} If the LP refunded sooner than we were able to claim
      */
     async waitTillClaimedOrFronted(abortSignal?: AbortSignal): Promise<void> {
-        if(this.state===SpvFromBTCSwapState.CLAIMED || SpvFromBTCSwapState.FRONTED) return Promise.resolve();
+        if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return Promise.resolve();
 
         const abortController = new AbortController();
         if(abortSignal!=null) abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
