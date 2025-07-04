@@ -720,7 +720,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
                 const btcTxHeight = btcTx.blockheight;
                 if (latestVaultTxHeight < btcTxHeight && !isFronted) {
                     //Definitely not claimed!
-                    this.logger.debug(`syncStateFromChain(): Skipped checking withdrawal state, latestVaultTxHeight: ${latestVaultTx}, btcTxHeight: ${btcTxHeight} and not fronted!`);
+                    this.logger.debug(`syncStateFromChain(): Skipped checking withdrawal state, latestVaultTxHeight: ${latestVaultTxHeight}, btcTxHeight: ${btcTxHeight} and not fronted!`);
                     checkWithdrawalState = false;
                 }
             }

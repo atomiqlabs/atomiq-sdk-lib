@@ -3,7 +3,7 @@ import {BTC_NETWORK} from "@scure/btc-signer/utils"
 import {p2wpkh, OutScript, Transaction, p2tr, Address} from "@scure/btc-signer";
 import {IBitcoinWallet} from "./IBitcoinWallet";
 import {Buffer} from "buffer";
-import {randomBytes, toCoinselectAddressType, toOutputScript} from "../../utils/Utils";
+import {getLogger, randomBytes, toCoinselectAddressType, toOutputScript} from "../../utils/Utils";
 import {BitcoinRpcWithAddressIndex} from "../BitcoinRpcWithAddressIndex";
 
 export type BitcoinWalletUtxo = {
@@ -36,6 +36,8 @@ export function identifyAddressType(address: string, network: BTC_NETWORK): Coin
             return null;
     }
 }
+
+const logger = getLogger("BitcoinWallet: ");
 
 export abstract class BitcoinWallet implements IBitcoinWallet {
 
@@ -99,7 +101,7 @@ export abstract class BitcoinWallet implements IBitcoinWallet {
             })
         }
 
-        console.log("Total spendable value: "+totalSpendable+" num utxos: "+utxoPool.length);
+        logger.debug("_getUtxoPool(): Total spendable value: "+totalSpendable+" num utxos: "+utxoPool.length);
 
         return utxoPool;
     }
@@ -135,7 +137,7 @@ export abstract class BitcoinWallet implements IBitcoinWallet {
 
         const utxoPool: BitcoinWalletUtxo[] = (await Promise.all(sendingAccounts.map(acc => this._getUtxoPool(acc.address, acc.addressType)))).flat();
 
-        console.log("_fundPsbt(): fee rate: "+feeRate+" utxo pool: ", utxoPool);
+        logger.debug("_fundPsbt(): fee rate: "+feeRate+" utxo pool: ", utxoPool);
 
         const accountPubkeys = {};
         sendingAccounts.forEach(acc => accountPubkeys[acc.address] = acc.pubkey);
@@ -161,10 +163,10 @@ export abstract class BitcoinWallet implements IBitcoinWallet {
                 script: Buffer.from(output.script)
             })
         }
-        console.log("Coinselect targets: ", targets);
+        logger.debug("_fundPsbt(): Coinselect targets: ", targets);
 
         let coinselectResult = coinSelect(utxoPool, targets, feeRate, sendingAccounts[0].addressType, requiredInputs);
-        console.log("Coinselect result: ", coinselectResult);
+        logger.debug("_fundPsbt(): Coinselect result: ", coinselectResult);
 
         if(coinselectResult.inputs==null || coinselectResult.outputs==null) {
             return {
@@ -183,8 +185,6 @@ export abstract class BitcoinWallet implements IBitcoinWallet {
             inputAddressIndexes[input.address] ??= [];
             inputAddressIndexes[input.address].push(index);
         });
-
-        console.log("Inputs: ", coinselectResult.inputs);
 
         const formattedInputs = await Promise.all(coinselectResult.inputs.map(async (input) => {
             switch(input.type) {
@@ -272,8 +272,6 @@ export abstract class BitcoinWallet implements IBitcoinWallet {
 
         const utxoPool: BitcoinWalletUtxo[] = (await Promise.all(sendingAccounts.map(acc => this._getUtxoPool(acc.address, acc.addressType)))).flat();
 
-        console.log("Utxo pool: ", utxoPool);
-
         const requiredInputs: CoinselectTxInput[] = [];
         if(psbt!=null) for(let i=0;i<psbt.inputsLength;i++) {
             const input = psbt.getInput(i);
@@ -286,7 +284,6 @@ export abstract class BitcoinWallet implements IBitcoinWallet {
                 type: toCoinselectAddressType(script)
             })
         }
-        console.log("Coinselect requiredInputs: ", requiredInputs);
 
         const additionalOutputs: {value: number, script: Buffer}[] = [];
         if(psbt!=null) for(let i=0;i<psbt.outputsLength;i++) {
@@ -296,7 +293,6 @@ export abstract class BitcoinWallet implements IBitcoinWallet {
                 script: Buffer.from(output.script)
             })
         }
-        console.log("Coinselect additionalOutputs: ", additionalOutputs);
 
         const target = OutScript.encode({
             type: "wsh",
@@ -305,7 +301,7 @@ export abstract class BitcoinWallet implements IBitcoinWallet {
 
         let coinselectResult = maxSendable(utxoPool, {script: Buffer.from(target), type: "p2wsh"}, feeRate, requiredInputs, additionalOutputs);
 
-        console.log("Max spendable result: ", coinselectResult);
+        logger.debug("_getSpendableBalance(): Max spendable result: ", coinselectResult);
 
         return {
             feeRate: feeRate,

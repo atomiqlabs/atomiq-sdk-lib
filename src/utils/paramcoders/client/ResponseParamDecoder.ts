@@ -1,5 +1,8 @@
 import {ParamDecoder} from "../ParamDecoder";
 import {Buffer} from "buffer";
+import {getLogger} from "../../Utils";
+
+const logger = getLogger("ResponseParamDecoder: ");
 
 export class ResponseParamDecoder extends ParamDecoder {
 
@@ -38,7 +41,7 @@ export class ResponseParamDecoder extends ParamDecoder {
     private async readResponse() {
         while(true) {
             const readResp = await this.reader.read().catch(e => {
-                console.error(e);
+                logger.error("readResponse(): Error reading response: ",e);
                 return null;
             });
             if(this.abortSignal!=null && this.abortSignal.aborted) return;

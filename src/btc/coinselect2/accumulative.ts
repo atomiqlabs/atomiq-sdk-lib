@@ -1,4 +1,7 @@
 import {CoinselectAddressTypes, CoinselectTxInput, CoinselectTxOutput, utils} from "./utils";
+import {getLogger} from "../../utils/Utils";
+
+const logger = getLogger("CoinSelect: ");
 
 // add inputs until we reach or surpass the target value (or deplete)
 // worst-case: O(n)
@@ -22,7 +25,7 @@ export function accumulative (
     let inAccum = utils.sumOrNaN(inputs);
     const outAccum = utils.sumOrNaN(outputs);
 
-    console.log("CoinSelect: accumulative(): total output: ",outAccum);
+    logger.debug("accumulative(): total output: ",outAccum);
 
     for (let i = 0; i < utxos.length; ++i) {
         const utxo = utxos[i];
@@ -35,7 +38,7 @@ export function accumulative (
 
         // skip detrimental input
         if (utxoFee + cpfpFee > utxo.value) {
-            console.log("CoinSelect: accumulative("+i+"): Skipping detrimental output, cpfpFee: "+cpfpFee+" utxoFee: "+utxoFee+" value: "+utxo.value);
+            logger.debug("accumulative("+i+"): Skipping detrimental output, cpfpFee: "+cpfpFee+" utxoFee: "+utxoFee+" value: "+utxo.value);
             if (i === utxos.length - 1) return { fee: (feeRate * (bytesAccum + utxoBytes)) + cpfpAddFee + cpfpFee };
             continue
         }
@@ -47,16 +50,16 @@ export function accumulative (
 
         fee = Math.ceil((feeRate * bytesAccum) + cpfpAddFee);
 
-        console.log("CoinSelect: accumulative("+i+"): total fee: ", fee);
-        console.log("CoinSelect: accumulative("+i+"): input value: ", inAccum);
-        console.log("CoinSelect: accumulative("+i+"): cpfpAddFee: ", cpfpAddFee);
+        logger.debug("accumulative("+i+"): total fee: ", fee);
+        logger.debug("accumulative("+i+"): input value: ", inAccum);
+        logger.debug("accumulative("+i+"): cpfpAddFee: ", cpfpAddFee);
 
         // go again?
         if (inAccum < outAccum + fee) continue;
 
-        console.log("CoinSelect: accumulative("+i+"): Finalizing transaction, inputs: ", inputs);
-        console.log("CoinSelect: accumulative("+i+"): Finalizing transaction, outputs: ", outputs);
-        console.log("CoinSelect: accumulative("+i+"): Finalizing transaction, feeRate: ", feeRate);
+        logger.debug("accumulative("+i+"): Finalizing transaction, inputs: ", inputs);
+        logger.debug("accumulative("+i+"): Finalizing transaction, outputs: ", outputs);
+        logger.debug("accumulative("+i+"): Finalizing transaction, feeRate: ", feeRate);
         return utils.finalize(inputs, outputs, feeRate, type, cpfpAddFee);
     }
 

@@ -1,3 +1,7 @@
+import {getLogger} from "../../utils/Utils";
+
+const logger = getLogger("CoinSelect: ");
+
 // baseline estimates, used to improve performance
 const TX_EMPTY_SIZE = 4 + 1 + 1 + 4;
 const TX_INPUT_BASE = 32 + 4 + 1 + 4;
@@ -148,12 +152,12 @@ function finalize(
     fee: number
 } {
   const bytesAccum = transactionBytes(inputs, outputs, changeType);
-  console.log("CoinSelect: finalize(): Transaction bytes: ", bytesAccum);
+  logger.debug("finalize(): Transaction bytes: ", bytesAccum);
 
   const feeAfterExtraOutput = (feeRate * (bytesAccum + outputBytes({type: changeType}))) + cpfpAddFee;
-  console.log("CoinSelect: finalize(): TX fee after adding change output: ", feeAfterExtraOutput);
+  logger.debug("finalize(): TX fee after adding change output: ", feeAfterExtraOutput);
   const remainderAfterExtraOutput = Math.floor(sumOrNaN(inputs) - (sumOrNaN(outputs) + feeAfterExtraOutput));
-  console.log("CoinSelect: finalize(): Leaves change (changeType="+changeType+") value: ", remainderAfterExtraOutput);
+  logger.debug("finalize(): Leaves change (changeType="+changeType+") value: ", remainderAfterExtraOutput);
 
   // is it worth a change output?
   if (remainderAfterExtraOutput >= dustThreshold({type: changeType})) {
@@ -161,7 +165,7 @@ function finalize(
   }
 
   const fee = sumOrNaN(inputs) - sumOrNaN(outputs);
-  console.log("CoinSelect: finalize(): Re-calculated total fee: ", fee);
+  logger.debug("finalize(): Re-calculated total fee: ", fee);
   if (!isFinite(fee)) return { fee: (feeRate * bytesAccum) + cpfpAddFee }
 
   return {
