@@ -711,23 +711,45 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
                 changed ||= true;
         }
         if (this.state === SpvFromBTCSwapState.BROADCASTED || this.state === SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
-            const status = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
-            this.logger.debug("syncStateFromChain(): status of " + this.data.btcTx.txid, status);
-            switch (status.type) {
-                case base_1.SpvWithdrawalStateType.FRONTED:
-                    this.frontTxId = status.txId;
-                    this.state = SpvFromBTCSwapState.FRONTED;
-                    changed ||= true;
-                    break;
-                case base_1.SpvWithdrawalStateType.CLAIMED:
-                    this.claimTxId = status.txId;
-                    this.state = SpvFromBTCSwapState.CLAIMED;
-                    changed ||= true;
-                    break;
-                case base_1.SpvWithdrawalStateType.CLOSED:
-                    this.state = SpvFromBTCSwapState.CLOSED;
-                    changed ||= true;
-                    break;
+            let checkWithdrawalState = true;
+            const [frontingAddress, vaultData] = await Promise.all([
+                this.wrapper.contract.getFronterAddress(this.vaultOwner, this.vaultId, this.data),
+                this.wrapper.contract.getVaultData(this.vaultOwner, this.vaultId)
+            ]);
+            const isFronted = frontingAddress != null;
+            if (vaultData.isOpened()) {
+                const [txId, _] = vaultData.getUtxo().split(":");
+                const [btcTx, latestVaultTx] = await Promise.all([
+                    this.wrapper.btcRpc.getTransaction(this.data.btcTx.txid),
+                    this.wrapper.btcRpc.getTransaction(txId)
+                ]);
+                const latestVaultTxHeight = latestVaultTx.blockheight;
+                const btcTxHeight = btcTx.blockheight;
+                if (latestVaultTxHeight < btcTxHeight && !isFronted) {
+                    //Definitely not claimed!
+                    this.logger.debug(`syncStateFromChain(): Skipped checking withdrawal state, latestVaultTxHeight: ${latestVaultTx}, btcTxHeight: ${btcTxHeight} and not fronted!`);
+                    checkWithdrawalState = false;
+                }
+            }
+            if (checkWithdrawalState) {
+                const status = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
+                this.logger.debug("syncStateFromChain(): status of " + this.data.btcTx.txid, status);
+                switch (status.type) {
+                    case base_1.SpvWithdrawalStateType.FRONTED:
+                        this.frontTxId = status.txId;
+                        this.state = SpvFromBTCSwapState.FRONTED;
+                        changed ||= true;
+                        break;
+                    case base_1.SpvWithdrawalStateType.CLAIMED:
+                        this.claimTxId = status.txId;
+                        this.state = SpvFromBTCSwapState.CLAIMED;
+                        changed ||= true;
+                        break;
+                    case base_1.SpvWithdrawalStateType.CLOSED:
+                        this.state = SpvFromBTCSwapState.CLOSED;
+                        changed ||= true;
+                        break;
+                }
             }
         }
         if (this.state === SpvFromBTCSwapState.CREATED ||
