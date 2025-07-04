@@ -198,7 +198,7 @@ export class FromBTCLNWrapper<
         lnCapacityPrefetchPromise: Promise<LNNodeLiquidity | null>,
         abortSignal?: AbortSignal
     ): Promise<void> {
-        let result: LNNodeLiquidity = await lnCapacityPrefetchPromise;
+        let result: LNNodeLiquidity = lnCapacityPrefetchPromise==null ? null : await lnCapacityPrefetchPromise;
         if(result==null) result = await this.lnApi.getLNNodeLiquidity(decodedPr.payeeNodeKey);
         if(abortSignal!=null) abortSignal.throwIfAborted();
 
@@ -278,7 +278,7 @@ export class FromBTCLNWrapper<
                         );
 
                         return {
-                            lnCapacityPromise: this.preFetchLnCapacity(lnPublicKey),
+                            lnCapacityPromise: options.unsafeSkipLnNodeCheck ? null : this.preFetchLnCapacity(lnPublicKey),
                             resp: await response
                         };
                     }, null, RequestError, abortController.signal);
