@@ -28,7 +28,8 @@ import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
 import {ISwap} from "../../../ISwap";
 
 export type FromBTCLNOptions = {
-    descriptionHash?: Buffer
+    descriptionHash?: Buffer,
+    unsafeSkipLnNodeCheck?: boolean
 };
 
 export class FromBTCLNWrapper<
@@ -293,7 +294,7 @@ export class FromBTCLNWrapper<
                                 amountData.token, {}, preFetches.pricePrefetchPromise, abortController.signal
                             ),
                             this.verifyIntermediaryLiquidity(resp.total, liquidityPromise),
-                            this.verifyLnNodeCapacity(lp, decodedPr, amountIn, lnCapacityPromise, abortController.signal)
+                            options.unsafeSkipLnNodeCheck ? Promise.resolve() : this.verifyLnNodeCapacity(lp, decodedPr, amountIn, lnCapacityPromise, abortController.signal)
                         ]);
 
                         const quote = new FromBTCLNSwap<T>(this, {

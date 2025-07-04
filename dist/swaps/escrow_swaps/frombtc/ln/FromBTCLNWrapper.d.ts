@@ -17,6 +17,7 @@ import { UnifiedSwapStorage } from "../../../../storage/UnifiedSwapStorage";
 import { ISwap } from "../../../ISwap";
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer;
+    unsafeSkipLnNodeCheck?: boolean;
 };
 export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapper<T, FromBTCLNSwap<T>> {
     readonly TYPE = SwapType.FROM_BTCLN;

@@ -212,7 +212,7 @@ class FromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                         const [pricingInfo] = await Promise.all([
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.FROM_BTCLN], false, amountIn, resp.total, amountData.token, {}, preFetches.pricePrefetchPromise, abortController.signal),
                             this.verifyIntermediaryLiquidity(resp.total, liquidityPromise),
-                            this.verifyLnNodeCapacity(lp, decodedPr, amountIn, lnCapacityPromise, abortController.signal)
+                            options.unsafeSkipLnNodeCheck ? Promise.resolve() : this.verifyLnNodeCapacity(lp, decodedPr, amountIn, lnCapacityPromise, abortController.signal)
                         ]);
                         const quote = new FromBTCLNSwap_1.FromBTCLNSwap(this, {
                             pricingInfo,
