@@ -236,19 +236,19 @@ export abstract class IEscrowSwap<
      * Get the estimated smart chain fee of the commit transaction
      */
     protected getCommitFee(): Promise<bigint> {
-        return this.wrapper.contract.getCommitFee(this.data, this.feeRate);
+        return this.wrapper.contract.getCommitFee(this._getInitiator(), this.data, this.feeRate);
     }
 
     /**
      * Returns the transaction fee paid on the smart chain
      */
     async getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>> {
-        const swapContract: T["Contract"] & {getRawCommitFee?: (data: T["Data"], feeRate?: string) => Promise<bigint>} = this.wrapper.contract;
+        const swapContract: T["Contract"] = this.wrapper.contract;
         return toTokenAmount(
             await (
                 swapContract.getRawCommitFee!=null ?
-                    swapContract.getRawCommitFee(this.data, this.feeRate) :
-                    swapContract.getCommitFee(this.data, this.feeRate)
+                    swapContract.getRawCommitFee(this._getInitiator(), this.data, this.feeRate) :
+                    swapContract.getCommitFee(this._getInitiator(), this.data, this.feeRate)
             ),
             this.wrapper.getNativeToken(),
             this.wrapper.prices

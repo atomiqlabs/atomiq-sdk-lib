@@ -317,7 +317,7 @@ class SwapperUtils {
         else {
             let [balance, commitFee] = await Promise.all([
                 chainInterface.getBalance(signer, token.address),
-                swapContract.getCommitFee(
+                swapContract.getCommitFee(signer, 
                 //Use large amount, such that the fee for wrapping more tokens is always included!
                 await swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token.address, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn, swapContract.getHashForHtlc((0, Utils_1.randomBytes)(32)).toString("hex"), base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(8)), BigInt(Math.floor(Date.now() / 1000)), true, false, base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(2)), base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(2))), options?.feeRate)
             ]);

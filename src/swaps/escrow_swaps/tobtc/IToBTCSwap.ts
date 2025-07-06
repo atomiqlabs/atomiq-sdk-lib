@@ -449,7 +449,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
      * Get the estimated smart chain transaction fee of the refund transaction
      */
     getRefundFee(): Promise<bigint> {
-        return this.wrapper.contract.getRefundFee(this.data);
+        return this.wrapper.contract.getRefundFee(this._getInitiator(), this.data);
     }
 
     /**
