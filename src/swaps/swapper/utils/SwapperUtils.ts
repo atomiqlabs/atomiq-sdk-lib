@@ -390,6 +390,7 @@ export class SwapperUtils<T extends MultiChain> {
             let [balance, commitFee] = await Promise.all([
                 chainInterface.getBalance(signer, token.address),
                 swapContract.getCommitFee(
+                    signer,
                     //Use large amount, such that the fee for wrapping more tokens is always included!
                     await swapContract.createSwapData(
                         ChainSwapType.HTLC, signer, null, token.address,

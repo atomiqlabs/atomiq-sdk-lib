@@ -171,7 +171,7 @@ class IEscrowSwap extends ISwap_1.ISwap {
      * Get the estimated smart chain fee of the commit transaction
      */
     getCommitFee() {
-        return this.wrapper.contract.getCommitFee(this.data, this.feeRate);
+        return this.wrapper.contract.getCommitFee(this._getInitiator(), this.data, this.feeRate);
     }
     /**
      * Returns the transaction fee paid on the smart chain
@@ -179,8 +179,8 @@ class IEscrowSwap extends ISwap_1.ISwap {
     async getSmartChainNetworkFee() {
         const swapContract = this.wrapper.contract;
         return (0, Tokens_1.toTokenAmount)(await (swapContract.getRawCommitFee != null ?
-            swapContract.getRawCommitFee(this.data, this.feeRate) :
-            swapContract.getCommitFee(this.data, this.feeRate)), this.wrapper.getNativeToken(), this.wrapper.prices);
+            swapContract.getRawCommitFee(this._getInitiator(), this.data, this.feeRate) :
+            swapContract.getCommitFee(this._getInitiator(), this.data, this.feeRate)), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
     serialize() {
         return {
