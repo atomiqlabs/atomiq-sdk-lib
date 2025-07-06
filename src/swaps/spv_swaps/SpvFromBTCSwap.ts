@@ -961,7 +961,8 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
                 ]);
                 const latestVaultTxHeight = latestVaultTx.blockheight;
                 const btcTxHeight = btcTx.blockheight;
-                if(latestVaultTxHeight < btcTxHeight && !isFronted) {
+                //We also need to cover the case where bitcoin tx isn't confirmed yet
+                if((btcTxHeight==null || latestVaultTxHeight < btcTxHeight) && !isFronted) {
                     //Definitely not claimed!
                     this.logger.debug(`syncStateFromChain(): Skipped checking withdrawal state, latestVaultTxHeight: ${latestVaultTx}, btcTxHeight: ${btcTxHeight} and not fronted!`);
                     checkWithdrawalState = false;
