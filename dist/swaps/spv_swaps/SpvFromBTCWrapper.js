@@ -137,7 +137,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                 (0, Utils_1.tryWithRetries)(() => this.btcRelay.getFeePerBlock(), null, null, abortController.signal),
                 (0, Utils_1.tryWithRetries)(() => this.btcRelay.getTipData(), null, null, abortController.signal),
                 this.btcRpc.getTipHeight(),
-                (0, Utils_1.tryWithRetries)(() => this.contract.getClaimFee(signer, null), null, null, abortController.signal),
+                (0, Utils_1.tryWithRetries)(() => this.contract.getClaimFee(this.chain.randomAddress(), null, null), null, null, abortController.signal),
                 nativeTokenPricePrefetch ?? (amountData.token === this.chain.getNativeCurrencyAddress() ?
                     pricePrefetch :
                     this.prices.preFetchPrice(this.chainIdentifier, this.chain.getNativeCurrencyAddress(), abortController.signal))
