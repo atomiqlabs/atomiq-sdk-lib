@@ -367,7 +367,7 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
      * Get the estimated smart chain transaction fee of the refund transaction
      */
     getRefundFee() {
-        return this.wrapper.contract.getRefundFee(this.data);
+        return this.wrapper.contract.getRefundFee(this._getInitiator(), this.data);
     }
     /**
      * Returns transactions for refunding the swap if the swap is in refundable state, you can check so with isRefundable()
