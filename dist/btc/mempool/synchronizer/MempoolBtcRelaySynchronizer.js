@@ -73,7 +73,7 @@ class MempoolBtcRelaySynchronizer {
                     headerCache = [];
                 }
             }
-            if (retrievedHeaders.length > 0) {
+            if (retrievedHeaders.length > 0 && spvTipBlockHeight !== retrievedHeaders[0].height) {
                 spvTipBlockHeight = retrievedHeaders[0].height;
                 await (0, Utils_1.timeoutPromise)(1000);
             }
