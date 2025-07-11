@@ -60,7 +60,7 @@ class MempoolBtcRelaySynchronizer {
         };
         let retrievedHeaders = null;
         let headerCache = [];
-        while (retrievedHeaders == null || retrievedHeaders.length > 0) {
+        while (retrievedHeaders == null || (retrievedHeaders.length > 0 && spvTipBlockHeight !== retrievedHeaders[0].height)) {
             retrievedHeaders = await this.bitcoinRpc.getPast15Blocks(spvTipBlockHeight + 15);
             for (let i = retrievedHeaders.length - 1; i >= 0; i--) {
                 const header = retrievedHeaders[i];
