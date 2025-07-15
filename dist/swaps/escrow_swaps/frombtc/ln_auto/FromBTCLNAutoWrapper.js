@@ -80,10 +80,14 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
             return 0n;
         const dummyAmount = BigInt(Math.floor(Math.random() * 0x1000000));
         const dummySwapData = await this.contract.createSwapData(base_1.ChainSwapType.CHAIN, this.chain.randomAddress(), signer, amountData.token, dummyAmount, this.contract.getHashForOnchain((0, Utils_1.randomBytes)(20), dummyAmount, 3).toString("hex"), this.getRandomSequence(), BigInt(Math.floor(Date.now() / 1000)), false, true, BigInt(Math.floor(Math.random() * 0x10000)), BigInt(Math.floor(Math.random() * 0x10000)));
-        return (0, Utils_1.tryWithRetries)(() => this.contract.getClaimFee(this.chain.randomAddress(), dummySwapData), null, null, abortController.signal).catch(e => {
+        try {
+            const result = await (0, Utils_1.tryWithRetries)(() => this.contract.getClaimFee(this.chain.randomAddress(), dummySwapData), null, null, abortController.signal);
+            return result * BigInt(Math.floor(options.feeSafetyFactor * 1000000)) / 1000000n;
+        }
+        catch (e) {
             abortController.abort(e);
             return null;
-        });
+        }
     }
     /**
      * Verifies response returned from intermediary
@@ -112,7 +116,7 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
             throw new IntermediaryError_1.IntermediaryError("Invalid total btc fee returned");
         if (resp.claimerBounty !== claimerBounty)
             throw new IntermediaryError_1.IntermediaryError("Invalid claimer bounty");
-        if (resp.totalGas !== claimerBounty + options.gasAmount)
+        if (resp.totalGas !== options.gasAmount)
             throw new IntermediaryError_1.IntermediaryError("Invalid total gas amount");
         if (!amountData.exactIn) {
             if (resp.total != amountData.amount)
@@ -138,6 +142,7 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
         if (options == null)
             options = {};
         options.gasAmount ??= 0n;
+        options.feeSafetyFactor ??= 2;
         if (preFetches == null)
             preFetches = {};
         if (options.descriptionHash != null && options.descriptionHash.length !== 32)
@@ -148,6 +153,8 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
         preFetches.pricePrefetchPromise ??= this.preFetchPrice(amountData, _abortController.signal);
         const nativeTokenAddress = this.chain.getNativeCurrencyAddress();
         preFetches.claimerBountyPrefetch ??= this.preFetchClaimerBounty(signer, amountData, options, _abortController);
+        if (options.gasAmount !== 0n || !options.unsafeZeroWatchtowerFee)
+            preFetches.gasTokenPricePrefetchPromise ??= this.preFetchPrice({ token: nativeTokenAddress }, _abortController.signal);
         return lps.map(lp => {
             return {
                 intermediary: lp,
@@ -178,7 +185,9 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
                     try {
                         this.verifyReturnedData(resp, amountData, lp, options, decodedPr, paymentHash, claimerBounty);
                         const [pricingInfo] = await Promise.all([
-                            this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.FROM_BTCLN], false, amountIn, resp.total, amountData.token, {}, preFetches.pricePrefetchPromise, abortController.signal),
+                            this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.FROM_BTCLN_AUTO], false, resp.btcAmountSwap, resp.total, amountData.token, {}, preFetches.pricePrefetchPromise, abortController.signal),
+                            options.gasAmount === 0n ? Promise.resolve() : this.verifyReturnedPrice({ ...lp.services[SwapType_1.SwapType.FROM_BTCLN_AUTO], swapBaseFee: 0 }, //Base fee should be charged only on the amount, not on gas
+                            false, resp.btcAmountGas, resp.totalGas + resp.claimerBounty, nativeTokenAddress, {}, preFetches.gasTokenPricePrefetchPromise, abortController.signal),
                             this.verifyIntermediaryLiquidity(resp.total, liquidityPromise),
                             options.unsafeSkipLnNodeCheck ? Promise.resolve() : this.verifyLnNodeCapacity(lp, decodedPr, lnCapacityPromise, abortController.signal)
                         ]);
@@ -192,7 +201,7 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
                             gasSwapFeeBtc: resp.gasSwapFeeBtc,
                             btcAmountGas: resp.btcAmountGas,
                             btcAmountSwap: resp.btcAmountSwap,
-                            initialSwapData: await this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, claimHash.toString("hex"), this.getRandomSequence(), BigInt(Math.floor(Date.now() / 1000)), false, true, options.gasAmount + claimerBounty, claimerBounty, nativeTokenAddress),
+                            initialSwapData: await this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, claimHash.toString("hex"), this.getRandomSequence(), BigInt(Math.floor(Date.now() / 1000)), false, true, options.gasAmount + resp.claimerBounty, resp.claimerBounty, nativeTokenAddress),
                             pr: resp.pr,
                             secret: secret.toString("hex"),
                             exactIn: amountData.exactIn ?? true
@@ -226,7 +235,10 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
         const abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const preFetches = {
             pricePrefetchPromise: this.preFetchPrice(amountData, abortController.signal),
-            feeRatePromise: this.preFetchFeeRate(signer, amountData, null, abortController)
+            gasTokenPricePrefetchPromise: options.gasAmount == null && options.unsafeZeroWatchtowerFee ?
+                null :
+                this.preFetchPrice({ token: this.chain.getNativeCurrencyAddress() }, abortController.signal),
+            claimerBountyPrefetch: this.preFetchClaimerBounty(signer, amountData, options, abortController)
         };
         try {
             const exactOutAmountPromise = !amountData.exactIn ? preFetches.pricePrefetchPromise.then(price => this.prices.getToBtcSwapAmount(this.chainIdentifier, amountData.amount, amountData.token, abortController.signal, price)).catch(e => {

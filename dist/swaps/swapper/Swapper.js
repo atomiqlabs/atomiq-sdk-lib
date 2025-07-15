@@ -243,6 +243,7 @@ class Swapper extends events_1.EventEmitter {
                 await wrappers[key].stop();
             }
             await unifiedChainEvents.stop();
+            await this.messenger.stop();
         }
     }
     /**
