@@ -25,8 +25,9 @@ const UnifiedSwapStorage_1 = require("../../storage/UnifiedSwapStorage");
 const UnifiedSwapEventListener_1 = require("../../events/UnifiedSwapEventListener");
 const SpvFromBTCWrapper_1 = require("../spv_swaps/SpvFromBTCWrapper");
 const SwapperUtils_1 = require("./utils/SwapperUtils");
+const FromBTCLNAutoWrapper_1 = require("../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoWrapper");
 class Swapper extends events_1.EventEmitter {
-    constructor(bitcoinRpc, chainsData, pricing, tokens, options) {
+    constructor(bitcoinRpc, chainsData, pricing, tokens, messenger, options) {
         super();
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
         this.SwapTypeInfo = {
@@ -81,6 +82,7 @@ class Swapper extends events_1.EventEmitter {
         this.prices = pricing;
         this.bitcoinRpc = bitcoinRpc;
         this.mempoolApi = bitcoinRpc.api;
+        this.messenger = messenger;
         this.options = options;
         this.tokens = {};
         for (let tokenData of tokens) {
@@ -141,6 +143,12 @@ class Swapper extends events_1.EventEmitter {
                     getRequestTimeout: options.getRequestTimeout,
                     postRequestTimeout: options.postRequestTimeout,
                     bitcoinNetwork: this.bitcoinNetwork
+                });
+            }
+            if (swapContract.supportsInitWithoutClaimer) {
+                wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO] = new FromBTCLNAutoWrapper_1.FromBTCLNAutoWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, swapContract, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, this.messenger, {
+                    getRequestTimeout: options.getRequestTimeout,
+                    postRequestTimeout: options.postRequestTimeout
                 });
             }
             Object.keys(wrappers).forEach(key => wrappers[key].events.on("swapState", this.swapStateListener));
@@ -222,6 +230,8 @@ class Swapper extends events_1.EventEmitter {
         if (this.options.defaultTrustedIntermediaryUrl != null) {
             this.defaultTrustedIntermediary = await this.intermediaryDiscovery.getIntermediary(this.options.defaultTrustedIntermediaryUrl);
         }
+        this.logger.debug("init(): Initializing messenger");
+        await this.messenger.init();
     }
     /**
      * Stops listening for onchain events and closes this Swapper instance
@@ -571,6 +581,55 @@ class Swapper extends events_1.EventEmitter {
         return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.wrappers[SwapType_1.SwapType.FROM_BTCLN].createViaLNURL(signer, typeof (lnurl) === "string" ? (lnurl.startsWith("lightning:") ? lnurl.substring(10) : lnurl) : lnurl.params, amountData, candidates, additionalParams, abortSignal), amountData, SwapType_1.SwapType.FROM_BTCLN);
     }
     /**
+     * Creates From BTCLN swap using new protocol
+     *
+     * @param chainIdentifier
+     * @param signer
+     * @param tokenAddress      Token address to receive
+     * @param amount            Amount to receive, in satoshis (bitcoin's smallest denomination)
+     * @param exactOut          Whether to use exact out instead of exact in
+     * @param additionalParams  Additional parameters sent to the LP when creating the swap
+     * @param options
+     */
+    async createFromBTCLNSwapNew(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
+        const amountData = {
+            amount,
+            token: tokenAddress,
+            exactIn: !exactOut
+        };
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => Promise.resolve(chain.wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO].create(signer, amountData, candidates, options, additionalParams, abortSignal)), amountData, SwapType_1.SwapType.FROM_BTCLN_AUTO);
+    }
+    /**
+     * Creates From BTCLN swap using new protocol, withdrawing from LNURL-withdraw
+     *
+     * @param chainIdentifier
+     * @param signer
+     * @param tokenAddress      Token address to receive
+     * @param lnurl             LNURL-withdraw to pull the funds from
+     * @param amount            Amount to receive, in satoshis (bitcoin's smallest denomination)
+     * @param exactOut          Whether to use exact out instead of exact in
+     * @param additionalParams  Additional parameters sent to the LP when creating the swap
+     * @param options
+     */
+    async createFromBTCLNSwapNewViaLNURL(chainIdentifier, signer, tokenAddress, lnurl, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        if (typeof (lnurl) === "string" && !this.Utils.isValidLNURL(lnurl))
+            throw new Error("Invalid LNURL-withdraw link");
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
+        const amountData = {
+            amount,
+            token: tokenAddress,
+            exactIn: !exactOut
+        };
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO].createViaLNURL(signer, typeof (lnurl) === "string" ? (lnurl.startsWith("lightning:") ? lnurl.substring(10) : lnurl) : lnurl.params, amountData, candidates, options, additionalParams, abortSignal), amountData, SwapType_1.SwapType.FROM_BTCLN_AUTO);
+    }
+    /**
      * Creates trusted LN for Gas swap
      *
      * @param chainId
@@ -654,10 +713,14 @@ class Swapper extends events_1.EventEmitter {
                     if (src != null) {
                         if (typeof (src) !== "string" && !(0, LNURL_1.isLNURLWithdraw)(src))
                             throw new Error("LNURL must be a string or LNURLWithdraw object!");
-                        return this.createFromBTCLNSwapViaLNURL(dstToken.chainId, dst, dstToken.address, src, amount, !exactIn);
+                        return this.supportsSwapType(dstToken.chainId, SwapType_1.SwapType.FROM_BTCLN_AUTO) ?
+                            this.createFromBTCLNSwapNewViaLNURL(dstToken.chainId, dst, dstToken.address, src, amount, !exactIn, undefined, options) :
+                            this.createFromBTCLNSwapViaLNURL(dstToken.chainId, dst, dstToken.address, src, amount, !exactIn);
                     }
                     else {
-                        return this.createFromBTCLNSwap(dstToken.chainId, dst, dstToken.address, amount, !exactIn, undefined, options);
+                        return this.supportsSwapType(dstToken.chainId, SwapType_1.SwapType.FROM_BTCLN_AUTO) ?
+                            this.createFromBTCLNSwapNew(dstToken.chainId, dst, dstToken.address, amount, !exactIn, undefined, options) :
+                            this.createFromBTCLNSwap(dstToken.chainId, dst, dstToken.address, amount, !exactIn, undefined, options);
                     }
                 }
                 else {

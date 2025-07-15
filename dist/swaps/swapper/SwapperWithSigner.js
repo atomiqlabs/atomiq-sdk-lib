@@ -52,6 +52,14 @@ class SwapperWithSigner {
         return this.swapper.createFromBTCLNSwapViaLNURL(this.signer.getAddress(), tokenAddress, lnurl, amount, exactOut, additionalParams)
             .then(swap => (0, SwapWithSigner_1.wrapSwapWithSigner)(swap, this.signer));
     }
+    createFromBTCLNSwapNew(tokenAddress, amount, exactOut, additionalParams, options) {
+        return this.swapper.createFromBTCLNSwapNew(this.signer.getAddress(), tokenAddress, amount, exactOut, additionalParams, options)
+            .then(swap => (0, SwapWithSigner_1.wrapSwapWithSigner)(swap, this.signer));
+    }
+    createFromBTCLNSwapNewViaLNURL(tokenAddress, lnurl, amount, exactOut, additionalParams, options) {
+        return this.swapper.createFromBTCLNSwapNewViaLNURL(this.signer.getAddress(), tokenAddress, lnurl, amount, exactOut, additionalParams, options)
+            .then(swap => (0, SwapWithSigner_1.wrapSwapWithSigner)(swap, this.signer));
+    }
     createTrustedLNForGasSwap(amount, trustedIntermediaryUrl) {
         return this.swapper.createTrustedLNForGasSwap(this.signer.getAddress(), amount, trustedIntermediaryUrl);
     }

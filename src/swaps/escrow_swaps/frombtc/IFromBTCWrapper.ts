@@ -5,10 +5,11 @@ import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {randomBytes, tryWithRetries} from "../../../utils/Utils";
 import {BigIntBufferUtils, ChainType} from "@atomiqlabs/base";
 import {IEscrowSwapWrapper} from "../IEscrowSwapWrapper";
+import {ISwap} from "../../ISwap";
 
 export abstract class IFromBTCWrapper<
     T extends ChainType,
-    S extends IFromBTCSwap<T, any>,
+    S extends ISwap<T> & {commitTxId: string, claimTxId?: string, refundTxId?: string},
     O extends ISwapWrapperOptions = ISwapWrapperOptions
 > extends IEscrowSwapWrapper<T, S, O> {
 
