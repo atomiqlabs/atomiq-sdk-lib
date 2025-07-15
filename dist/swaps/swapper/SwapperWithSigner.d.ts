@@ -23,6 +23,8 @@ import { SpvFromBTCSwap } from "../spv_swaps/SpvFromBTCSwap";
 import { SwapperWithChain } from "./SwapperWithChain";
 import { SwapWithSigner } from "./SwapWithSigner";
 import { OnchainForGasSwap } from "../trusted/onchain/OnchainForGasSwap";
+import { FromBTCLNAutoSwap } from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
+import { FromBTCLNAutoOptions } from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoWrapper";
 export declare class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends ChainIds<T>> {
     readonly chainIdentifier: ChainIdentifier;
     readonly swapper: SwapperWithChain<T, ChainIdentifier>;
@@ -79,9 +81,11 @@ export declare class SwapperWithSigner<T extends MultiChain, ChainIdentifier ext
     createFromBTCSwap(tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCOptions): Promise<SwapWithSigner<FromBTCSwap<T[ChainIdentifier]>>>;
     createFromBTCLNSwap(tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNOptions): Promise<SwapWithSigner<FromBTCLNSwap<T[ChainIdentifier]>>>;
     createFromBTCLNSwapViaLNURL(tokenAddress: string, lnurl: string | LNURLWithdraw, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>): Promise<SwapWithSigner<FromBTCLNSwap<T[ChainIdentifier]>>>;
+    createFromBTCLNSwapNew(tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNAutoOptions): Promise<SwapWithSigner<FromBTCLNAutoSwap<T[ChainIdentifier]>>>;
+    createFromBTCLNSwapNewViaLNURL(tokenAddress: string, lnurl: string | LNURLWithdraw, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNAutoOptions): Promise<SwapWithSigner<FromBTCLNAutoSwap<T[ChainIdentifier]>>>;
     createTrustedLNForGasSwap(amount: bigint, trustedIntermediaryUrl?: string): Promise<LnForGasSwap<T[ChainIdentifier]>>;
     createTrustedOnchainForGasSwap(amount: bigint, refundAddress?: string, trustedIntermediaryUrl?: string): Promise<OnchainForGasSwap<T[ChainIdentifier]>>;
-    create(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean, lnurlWithdraw?: string | LNURLWithdraw): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
+    create(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean, lnurlWithdraw?: string | LNURLWithdraw): Promise<(SupportsSwapType<T[ChainIdentifier], SwapType.FROM_BTCLN_AUTO> extends true ? FromBTCLNAutoSwap<T[ChainIdentifier]> : FromBTCLNSwap<T[ChainIdentifier]>)>;
     create(srcToken: BtcToken<false>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean): Promise<(SupportsSwapType<T[ChainIdentifier], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T[ChainIdentifier]> : FromBTCSwap<T[ChainIdentifier]>)>;
     create(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<false>, amount: bigint, exactIn: boolean, address: string): Promise<ToBTCSwap<T[ChainIdentifier]>>;
     create(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: bigint, exactIn: boolean, lnurlPay: string | LNURLPay): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;

@@ -18,7 +18,7 @@ import {IEscrowSwap} from "./IEscrowSwap";
 
 export abstract class IEscrowSwapWrapper<
     T extends ChainType,
-    S extends IEscrowSwap<T>,
+    S extends ISwap<T> & {commitTxId: string, claimTxId?: string, refundTxId?: string},
     O extends ISwapWrapperOptions = ISwapWrapperOptions
 > extends ISwapWrapper<T, S, O> {
     readonly abstract TYPE: SwapType;

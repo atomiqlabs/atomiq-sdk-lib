@@ -1,8 +1,7 @@
 /// <reference types="node" />
 /// <reference types="node" />
 /// <reference types="node" />
-import { FromBTCLNSwap, FromBTCLNSwapState } from "./FromBTCLNSwap";
-import { ChainType, ClaimEvent, InitializeEvent, RefundEvent } from "@atomiqlabs/base";
+import { ChainType, ClaimEvent, InitializeEvent, Messenger, RefundEvent } from "@atomiqlabs/base";
 import { Intermediary } from "../../../../intermediaries/Intermediary";
 import { Buffer } from "buffer";
 import { SwapType } from "../../../enums/SwapType";
@@ -14,14 +13,20 @@ import { LNURLWithdrawParamsWithUrl } from "../../../../utils/LNURL";
 import { UnifiedSwapEventListener } from "../../../../events/UnifiedSwapEventListener";
 import { UnifiedSwapStorage } from "../../../../storage/UnifiedSwapStorage";
 import { ISwap } from "../../../ISwap";
+import { FromBTCLNAutoSwap, FromBTCLNAutoSwapState } from "./FromBTCLNAutoSwap";
 import { IFromBTCLNWrapper } from "../IFromBTCLNWrapper";
-export type FromBTCLNOptions = {
+export type FromBTCLNAutoOptions = {
     descriptionHash?: Buffer;
     unsafeSkipLnNodeCheck?: boolean;
+    gasAmount?: bigint;
+    unsafeZeroWatchtowerFee?: boolean;
+    feeSafetyFactor?: number;
 };
-export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNSwap<T>> {
-    readonly TYPE = SwapType.FROM_BTCLN;
-    readonly swapDeserializer: typeof FromBTCLNSwap;
+export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNAutoSwap<T>> {
+    readonly TYPE = SwapType.FROM_BTCLN_AUTO;
+    readonly swapDeserializer: typeof FromBTCLNAutoSwap;
+    protected readonly lnApi: LightningNetworkApi;
+    readonly messenger: Messenger;
     /**
      * @param chainIdentifier
      * @param unifiedStorage Storage interface for the current environment
@@ -32,17 +37,29 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWra
      * @param tokens
      * @param swapDataDeserializer Deserializer for SwapData
      * @param lnApi
+     * @param messenger
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: ISwapWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, messenger: Messenger, options: ISwapWrapperOptions, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
-    readonly pendingSwapStates: FromBTCLNSwapState[];
-    readonly tickSwapState: FromBTCLNSwapState[];
-    protected processEventInitialize(swap: FromBTCLNSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean>;
-    protected processEventClaim(swap: FromBTCLNSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean>;
-    protected processEventRefund(swap: FromBTCLNSwap<T>, event: RefundEvent<T["Data"]>): Promise<boolean>;
+    readonly pendingSwapStates: FromBTCLNAutoSwapState[];
+    readonly tickSwapState: FromBTCLNAutoSwapState[];
+    protected processEventInitialize(swap: FromBTCLNAutoSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean>;
+    protected processEventClaim(swap: FromBTCLNAutoSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean>;
+    protected processEventRefund(swap: FromBTCLNAutoSwap<T>, event: RefundEvent<T["Data"]>): Promise<boolean>;
+    /**
+     * Pre-fetches claimer (watchtower) bounty data for the swap. Doesn't throw, instead returns null and aborts the
+     *  provided abortController
+     *
+     * @param signer Smartchain signer address initiating the swap
+     * @param amountData
+     * @param options Options as passed to the swap creation function
+     * @param abortController
+     * @private
+     */
+    private preFetchClaimerBounty;
     /**
      * Verifies response returned from intermediary
      *
@@ -52,6 +69,7 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWra
      * @param options Options as passed to the swap creation function
      * @param decodedPr Decoded bolt11 lightning network invoice
      * @param paymentHash Expected payment hash of the bolt11 lightning network invoice
+     * @param claimerBounty Claimer bounty as request by the user
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
@@ -67,11 +85,11 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWra
      * @param abortSignal           Abort signal for aborting the process
      * @param preFetches
      */
-    create(signer: string, amountData: AmountData, lps: Intermediary[], options: FromBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
+    create(signer: string, amountData: AmountData, lps: Intermediary[], options: FromBTCLNAutoOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
         pricePrefetchPromise?: Promise<bigint>;
-        feeRatePromise?: Promise<any>;
+        claimerBountyPrefetch?: Promise<bigint>;
     }): {
-        quote: Promise<FromBTCLNSwap<T>>;
+        quote: Promise<FromBTCLNAutoSwap<T>>;
         intermediary: Intermediary;
     }[];
     /**
@@ -81,11 +99,12 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWra
      * @param lnurl                 LNURL-withdraw to withdraw funds from
      * @param amountData            Amount of token & amount to swap
      * @param lps                   LPs (liquidity providers) to get the quotes from
+     * @param options
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      * @param abortSignal           Abort signal for aborting the process
      */
-    createViaLNURL(signer: string, lnurl: string | LNURLWithdrawParamsWithUrl, amountData: AmountData, lps: Intermediary[], additionalParams?: Record<string, any>, abortSignal?: AbortSignal): Promise<{
-        quote: Promise<FromBTCLNSwap<T>>;
+    createViaLNURL(signer: string, lnurl: string | LNURLWithdrawParamsWithUrl, amountData: AmountData, lps: Intermediary[], options: FromBTCLNAutoOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal): Promise<{
+        quote: Promise<FromBTCLNAutoSwap<T>>;
         intermediary: Intermediary;
     }[]>;
 }

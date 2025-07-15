@@ -24,6 +24,12 @@ export declare enum PaymentAuthorizationResponseCodes {
     PENDING = 10003,
     ALREADY_COMMITTED = 10004
 }
+export declare enum InvoiceStatusResponseCodes {
+    PAID = 10000,
+    EXPIRED = 10001,
+    SETTLED = 10002,
+    PENDING = 10003
+}
 export type RefundAuthorizationResponse = {
     code: RefundAuthorizationResponseCodes.PAID;
     msg: string;
@@ -58,6 +64,16 @@ export type PaymentAuthorizationResponse = {
 } | {
     code: Exclude<PaymentAuthorizationResponseCodes, PaymentAuthorizationResponseCodes.AUTH_DATA>;
     msg: string;
+};
+export type InvoiceStatusResponse = {
+    code: Exclude<InvoiceStatusResponseCodes, InvoiceStatusResponseCodes.PAID>;
+    msg: string;
+} | {
+    code: InvoiceStatusResponseCodes.PAID;
+    msg: string;
+    data: {
+        data: any;
+    };
 };
 export type SwapInit = {
     token: string;
@@ -171,6 +187,28 @@ export type FromBTCLNInit = BaseFromBTCSwapInit & {
     paymentHash: Buffer;
     descriptionHash?: Buffer;
 };
+declare const FromBTCLNAutoResponseSchema: {
+    readonly intermediaryKey: FieldTypeEnum.String;
+    readonly pr: FieldTypeEnum.String;
+    readonly btcAmountSwap: FieldTypeEnum.BigInt;
+    readonly btcAmountGas: FieldTypeEnum.BigInt;
+    readonly total: FieldTypeEnum.BigInt;
+    readonly totalGas: FieldTypeEnum.BigInt;
+    readonly totalFeeBtc: FieldTypeEnum.BigInt;
+    readonly swapFeeBtc: FieldTypeEnum.BigInt;
+    readonly swapFee: FieldTypeEnum.BigInt;
+    readonly gasSwapFeeBtc: FieldTypeEnum.BigInt;
+    readonly gasSwapFee: FieldTypeEnum.BigInt;
+    readonly claimerBounty: FieldTypeEnum.BigInt;
+};
+export type FromBTCLNAutoResponseType = RequestSchemaResult<typeof FromBTCLNAutoResponseSchema>;
+export type FromBTCLNAutoInit = Omit<BaseFromBTCSwapInit, "feeRate"> & {
+    paymentHash: Buffer;
+    gasToken: string;
+    descriptionHash?: Buffer;
+    gasAmount?: bigint;
+    claimerBounty?: Promise<bigint>;
+};
 declare const SpvFromBTCPrepareResponseSchema: {
     readonly quoteId: FieldTypeEnum.String;
     readonly expiry: FieldTypeEnum.Number;
@@ -248,6 +286,17 @@ export declare class IntermediaryAPI {
      */
     static getPaymentAuthorization(url: string, paymentHash: string, timeout?: number, abortSignal?: AbortSignal): Promise<PaymentAuthorizationResponse>;
     /**
+     * Returns the status of the payment of the From BTCLN swaps
+     *
+     * @param url URL of the intermediary
+     * @param paymentHash Payment hash of the swap
+     * @param timeout Timeout in milliseconds for the HTTP request
+     * @param abortSignal
+     *
+     * @throws {RequestError} If non-200 http response code is returned
+     */
+    static getInvoiceStatus(url: string, paymentHash: string, timeout?: number, abortSignal?: AbortSignal): Promise<InvoiceStatusResponse>;
+    /**
      * Initiate To BTC swap with an intermediary
      *
      * @param chainIdentifier
@@ -296,6 +345,22 @@ export declare class IntermediaryAPI {
     static initFromBTCLN(chainIdentifier: string, baseUrl: string, depositToken: string, init: FromBTCLNInit, timeout?: number, abortSignal?: AbortSignal, streamRequest?: boolean): {
         lnPublicKey: Promise<string>;
         response: Promise<FromBTCLNResponseType>;
+    };
+    /**
+     * Initiate From BTCLN swap with auto-initilization by an intermediary
+     *
+     * @param chainIdentifier
+     * @param baseUrl Base URL of the intermediary
+     * @param init Swap initialization parameters
+     * @param timeout Timeout in milliseconds for the HTTP request
+     * @param abortSignal
+     * @param streamRequest Whether to force streaming (or not streaming) the request, default is autodetect
+     *
+     * @throws {RequestError} If non-200 http response code is returned
+     */
+    static initFromBTCLNAuto(chainIdentifier: string, baseUrl: string, init: FromBTCLNAutoInit, timeout?: number, abortSignal?: AbortSignal, streamRequest?: boolean): {
+        lnPublicKey: Promise<string>;
+        response: Promise<FromBTCLNAutoResponseType>;
     };
     /**
      * Initiate To BTCLN swap with an intermediary
