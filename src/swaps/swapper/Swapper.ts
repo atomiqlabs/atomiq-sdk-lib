@@ -474,6 +474,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 await wrappers[key].stop();
             }
             await unifiedChainEvents.stop();
+            await this.messenger.stop();
         }
     }
 

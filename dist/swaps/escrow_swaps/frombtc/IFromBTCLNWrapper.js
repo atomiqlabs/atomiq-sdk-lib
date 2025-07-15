@@ -4,10 +4,10 @@ exports.IFromBTCLNWrapper = void 0;
 const IFromBTCWrapper_1 = require("./IFromBTCWrapper");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../../../utils/Utils");
-const sha2_1 = require("@noble/hashes/esm/sha2");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const LNURL_1 = require("../../../utils/LNURL");
 const UserError_1 = require("../../../errors/UserError");
+const sha256_1 = require("@noble/hashes/sha256");
 class IFromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
     /**
      * @param chainIdentifier
@@ -42,7 +42,7 @@ class IFromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
      */
     getSecretAndHash() {
         const secret = (0, Utils_1.randomBytes)(32);
-        const paymentHash = buffer_1.Buffer.from((0, sha2_1.sha256)(secret));
+        const paymentHash = buffer_1.Buffer.from((0, sha256_1.sha256)(secret));
         return { secret, paymentHash };
     }
     /**
