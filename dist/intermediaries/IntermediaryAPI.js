@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.IntermediaryAPI = exports.PaymentAuthorizationResponseCodes = exports.RefundAuthorizationResponseCodes = void 0;
+exports.IntermediaryAPI = exports.InvoiceStatusResponseCodes = exports.PaymentAuthorizationResponseCodes = exports.RefundAuthorizationResponseCodes = void 0;
 const RequestError_1 = require("../errors/RequestError");
 const SchemaVerifier_1 = require("../utils/paramcoders/SchemaVerifier");
 const StreamingFetchPromise_1 = require("../utils/paramcoders/client/StreamingFetchPromise");
@@ -21,6 +21,13 @@ var PaymentAuthorizationResponseCodes;
     PaymentAuthorizationResponseCodes[PaymentAuthorizationResponseCodes["PENDING"] = 10003] = "PENDING";
     PaymentAuthorizationResponseCodes[PaymentAuthorizationResponseCodes["ALREADY_COMMITTED"] = 10004] = "ALREADY_COMMITTED";
 })(PaymentAuthorizationResponseCodes = exports.PaymentAuthorizationResponseCodes || (exports.PaymentAuthorizationResponseCodes = {}));
+var InvoiceStatusResponseCodes;
+(function (InvoiceStatusResponseCodes) {
+    InvoiceStatusResponseCodes[InvoiceStatusResponseCodes["PAID"] = 10000] = "PAID";
+    InvoiceStatusResponseCodes[InvoiceStatusResponseCodes["EXPIRED"] = 10001] = "EXPIRED";
+    InvoiceStatusResponseCodes[InvoiceStatusResponseCodes["SETTLED"] = 10002] = "SETTLED";
+    InvoiceStatusResponseCodes[InvoiceStatusResponseCodes["PENDING"] = 10003] = "PENDING";
+})(InvoiceStatusResponseCodes = exports.InvoiceStatusResponseCodes || (exports.InvoiceStatusResponseCodes = {}));
 const SwapResponseSchema = {
     data: SchemaVerifier_1.FieldTypeEnum.Any,
     prefix: SchemaVerifier_1.FieldTypeEnum.String,
@@ -74,6 +81,22 @@ const FromBTCLNResponseSchema = {
     total: SchemaVerifier_1.FieldTypeEnum.BigInt,
     intermediaryKey: SchemaVerifier_1.FieldTypeEnum.String,
     securityDeposit: SchemaVerifier_1.FieldTypeEnum.BigInt
+};
+/////////////////////////
+///// From BTCLN Auto
+const FromBTCLNAutoResponseSchema = {
+    intermediaryKey: SchemaVerifier_1.FieldTypeEnum.String,
+    pr: SchemaVerifier_1.FieldTypeEnum.String,
+    btcAmountSwap: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    btcAmountGas: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    total: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    totalGas: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    totalFeeBtc: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    swapFeeBtc: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    swapFee: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    gasSwapFeeBtc: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    gasSwapFee: SchemaVerifier_1.FieldTypeEnum.BigInt,
+    claimerBounty: SchemaVerifier_1.FieldTypeEnum.BigInt
 };
 /////////////////////////
 ///// Spv vault from BTC
@@ -152,6 +175,20 @@ class IntermediaryAPI {
      */
     static async getPaymentAuthorization(url, paymentHash, timeout, abortSignal) {
         return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getInvoicePaymentAuth" +
+            "?paymentHash=" + encodeURIComponent(paymentHash), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+    }
+    /**
+     * Returns the status of the payment of the From BTCLN swaps
+     *
+     * @param url URL of the intermediary
+     * @param paymentHash Payment hash of the swap
+     * @param timeout Timeout in milliseconds for the HTTP request
+     * @param abortSignal
+     *
+     * @throws {RequestError} If non-200 http response code is returned
+     */
+    static async getInvoiceStatus(url, paymentHash, timeout, abortSignal) {
+        return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getInvoiceStatus" +
             "?paymentHash=" + encodeURIComponent(paymentHash), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
     }
     /**
@@ -289,6 +326,50 @@ class IntermediaryAPI {
                     throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
                 }
                 return (0, SchemaVerifier_1.verifySchema)(data, FromBTCLNResponseSchema);
+            })
+        };
+    }
+    /**
+     * Initiate From BTCLN swap with auto-initilization by an intermediary
+     *
+     * @param chainIdentifier
+     * @param baseUrl Base URL of the intermediary
+     * @param init Swap initialization parameters
+     * @param timeout Timeout in milliseconds for the HTTP request
+     * @param abortSignal
+     * @param streamRequest Whether to force streaming (or not streaming) the request, default is autodetect
+     *
+     * @throws {RequestError} If non-200 http response code is returned
+     */
+    static initFromBTCLNAuto(chainIdentifier, baseUrl, init, timeout, abortSignal, streamRequest) {
+        const responseBodyPromise = (0, StreamingFetchPromise_1.streamingFetchPromise)(baseUrl + "/frombtcln_auto/createInvoice?chain=" + encodeURIComponent(chainIdentifier), {
+            ...init.additionalParams,
+            paymentHash: init.paymentHash.toString("hex"),
+            amount: init.amount.toString(),
+            address: init.claimer,
+            token: init.token,
+            descriptionHash: init.descriptionHash == null ? null : init.descriptionHash.toString("hex"),
+            exactOut: init.exactOut,
+            gasToken: init.gasToken,
+            gasAmount: (init.gasAmount ?? 0n).toString(10),
+            claimerBounty: (init.claimerBounty ?? 0n).toString(10)
+        }, {
+            code: SchemaVerifier_1.FieldTypeEnum.Number,
+            msg: SchemaVerifier_1.FieldTypeEnum.String,
+            data: SchemaVerifier_1.FieldTypeEnum.AnyOptional,
+            lnPublicKey: SchemaVerifier_1.FieldTypeEnum.StringOptional
+        }, timeout, abortSignal, streamRequest);
+        return {
+            lnPublicKey: responseBodyPromise.then(responseBody => responseBody.lnPublicKey),
+            response: responseBodyPromise.then((responseBody) => Promise.all([
+                responseBody.code,
+                responseBody.msg,
+                responseBody.data,
+            ])).then(([code, msg, data]) => {
+                if (code !== 20000) {
+                    throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
+                }
+                return (0, SchemaVerifier_1.verifySchema)(data, FromBTCLNAutoResponseSchema);
             })
         };
     }

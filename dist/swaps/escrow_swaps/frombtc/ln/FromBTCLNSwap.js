@@ -242,12 +242,16 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
      */
     async checkIntermediaryReturnedAuthData(signer, data, signature) {
         data.setClaimer(signer);
+        if (data.getType() !== base_1.ChainSwapType.HTLC)
+            throw new IntermediaryError_1.IntermediaryError("Invalid swap type");
         if (data.getOfferer() !== this.getSwapData().getOfferer())
             throw new IntermediaryError_1.IntermediaryError("Invalid offerer used");
         if (!data.isToken(this.getSwapData().getToken()))
             throw new IntermediaryError_1.IntermediaryError("Invalid token used");
         if (data.getSecurityDeposit() > this.getSwapData().getSecurityDeposit())
             throw new IntermediaryError_1.IntermediaryError("Invalid security deposit!");
+        if (data.getClaimerBounty() !== 0n)
+            throw new IntermediaryError_1.IntermediaryError("Invalid claimer bounty!");
         if (data.getAmount() < this.getSwapData().getAmount())
             throw new IntermediaryError_1.IntermediaryError("Invalid amount received!");
         if (data.getClaimHash() !== this.getSwapData().getClaimHash())
