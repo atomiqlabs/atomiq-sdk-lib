@@ -352,7 +352,7 @@ class IntermediaryAPI {
             exactOut: init.exactOut,
             gasToken: init.gasToken,
             gasAmount: (init.gasAmount ?? 0n).toString(10),
-            claimerBounty: (init.claimerBounty ?? 0n).toString(10)
+            claimerBounty: init.claimerBounty.then(val => val.toString(10)) ?? "0"
         }, {
             code: SchemaVerifier_1.FieldTypeEnum.Number,
             msg: SchemaVerifier_1.FieldTypeEnum.String,
