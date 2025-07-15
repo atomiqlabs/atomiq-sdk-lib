@@ -87,6 +87,7 @@ export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCL
      */
     create(signer: string, amountData: AmountData, lps: Intermediary[], options: FromBTCLNAutoOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
         pricePrefetchPromise?: Promise<bigint>;
+        gasTokenPricePrefetchPromise?: Promise<bigint>;
         claimerBountyPrefetch?: Promise<bigint>;
     }): {
         quote: Promise<FromBTCLNAutoSwap<T>>;

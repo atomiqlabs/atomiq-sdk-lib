@@ -9,12 +9,12 @@ import {ISwapPrice} from "../../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {Buffer} from "buffer";
 import {randomBytes} from "../../../utils/Utils";
-import {sha256} from "@noble/hashes/esm/sha2";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {PaymentRequestObject, TagsObject} from "@atomiqlabs/bolt11";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {LNURL, LNURLWithdrawParamsWithUrl} from "../../../utils/LNURL";
 import {UserError} from "../../../errors/UserError";
+import { sha256 } from "@noble/hashes/sha256";
 
 export abstract class IFromBTCLNWrapper<
     T extends ChainType,

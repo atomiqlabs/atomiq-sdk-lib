@@ -3,7 +3,7 @@ import {SwapType} from "../../../enums/SwapType";
 import {
     ChainSwapType,
     ChainType,
-    SignatureVerificationError, SwapClaimWitnessMessage,
+    SwapClaimWitnessMessage,
     SwapCommitState,
     SwapCommitStateType,
     SwapData,
@@ -136,6 +136,39 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
 
     protected upgradeVersion() { /*NOOP*/ }
 
+    /**
+     * In case swapFee in BTC is not supplied it recalculates it based on swap price
+     * @protected
+     */
+    protected tryRecomputeSwapPrice() {
+        if(this.pricingInfo.swapPriceUSatPerToken==null) {
+            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
+                this.chainIdentifier,
+                this.btcAmountSwap,
+                this.pricingInfo.satsBaseFee,
+                this.pricingInfo.feePPM,
+                this.getOutputAmountWithoutFee(),
+                this.getSwapData().getToken()
+            );
+        }
+    }
+
+
+    //////////////////////////////
+    //// Pricing
+
+    async refreshPriceData(): Promise<void> {
+        if(this.pricingInfo==null) return null;
+        this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(
+            this.chainIdentifier,
+            this.btcAmountSwap,
+            this.pricingInfo.satsBaseFee,
+            this.pricingInfo.feePPM,
+            this.getOutputAmountWithoutFee(),
+            this.getSwapData().getToken()
+        );
+    }
+
 
     //////////////////////////////
     //// Getters & utils
@@ -244,6 +277,10 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         return (BigInt(parsed.millisatoshis) + 999n) / 1000n;
     }
 
+    protected getWatchtowerFeeAmountBtc() {
+        return (this.btcAmountGas - this.gasSwapFeeBtc) * this.getSwapData().getClaimerBounty() / this.getSwapData().getTotalDeposit();
+    }
+
     protected getInputSwapAmountWithoutFee(): bigint {
         return this.btcAmountSwap - this.swapFeeBtc;
     }
@@ -253,7 +290,11 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     }
 
     protected getInputAmountWithoutFee(): bigint {
-        return this.getInputSwapAmountWithoutFee() + this.getInputGasAmountWithoutFee();
+        return this.getInputSwapAmountWithoutFee() + this.getInputGasAmountWithoutFee() - this.getWatchtowerFeeAmountBtc();
+    }
+
+    protected getOutputAmountWithoutFee(): bigint {
+        return this.getSwapData().getAmount() + this.swapFee;
     }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>> {
@@ -298,7 +339,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     }
 
     protected getWatchtowerFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>> {
-        const btcWatchtowerFee = (this.btcAmountGas - this.gasSwapFeeBtc) * this.getSwapData().getClaimerBounty() / this.getSwapData().getTotalDeposit();
+        const btcWatchtowerFee = this.getWatchtowerFeeAmountBtc();
         const outputToken = this.wrapper.tokens[this.getSwapData().getToken()];
         const watchtowerFeeInOutputToken = btcWatchtowerFee
             * (10n ** BigInt(outputToken.decimals))
@@ -415,6 +456,10 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
      * @param checkIntervalSeconds How often to poll the intermediary for answer
      */
     async waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds: number = 5): Promise<boolean> {
+        if(this.state===FromBTCLNAutoSwapState.PR_PAID) {
+            await this.waitTillCommited(abortSignal, checkIntervalSeconds);
+            return true;
+        }
         if(
             this.state!==FromBTCLNAutoSwapState.PR_CREATED
         ) throw new Error("Must be in PR_CREATED state!");
@@ -460,14 +505,14 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
                 this.data = swapData;
                 await this._saveAndEmit(FromBTCLNAutoSwapState.PR_PAID);
             }
-            return true;
+            await this.waitTillCommited(abortSignal, checkIntervalSeconds);
+            return this.state >= FromBTCLNAutoSwapState.CLAIM_COMMITED;
         }
 
         if(this.state===FromBTCLNAutoSwapState.PR_CREATED) {
             if(resp.code===InvoiceStatusResponseCodes.EXPIRED) {
                 await this._saveAndEmit(FromBTCLNAutoSwapState.QUOTE_EXPIRED);
             }
-
             return false;
         }
     }
@@ -501,13 +546,13 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         return true;
     }
 
-    async waitTillCommited(abortSignal?: AbortSignal): Promise<void> {
+    protected async waitTillCommited(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void> {
         if(this.state===FromBTCLNAutoSwapState.CLAIM_COMMITED || this.state===FromBTCLNAutoSwapState.CLAIM_CLAIMED) return Promise.resolve();
         if(this.state!==FromBTCLNAutoSwapState.PR_PAID) throw new Error("Invalid state");
 
         const abortController = extendAbortController(abortSignal);
         const result = await Promise.race([
-            this.watchdogWaitTillCommited(abortController.signal),
+            this.watchdogWaitTillCommited(abortController.signal, checkIntervalSeconds),
             this.waitTillState(FromBTCLNAutoSwapState.CLAIM_COMMITED, "gte", abortController.signal).then(() => 0)
         ]);
         abortController.abort();
@@ -775,10 +820,12 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
                     if(save) await this._saveAndEmit();
                     return true;
                 }
-                //Broadcast the secret over the provided messenger channel
-                await this.wrapper.messenger.broadcast(new SwapClaimWitnessMessage(this.data, this.secret)).catch(e => {
-                    this.logger.warn("_tick(): Error when broadcasting swap secret: ", e);
-                });
+                if(this.state===FromBTCLNAutoSwapState.CLAIM_COMMITED) {
+                    //Broadcast the secret over the provided messenger channel
+                    await this.wrapper.messenger.broadcast(new SwapClaimWitnessMessage(this.data, this.secret)).catch(e => {
+                        this.logger.warn("_tick(): Error when broadcasting swap secret: ", e);
+                    });
+                }
                 break;
         }
     }

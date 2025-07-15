@@ -71,6 +71,22 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         this.logger = (0, Utils_1.getLogger)("FromBTCLNAuto(" + this.getIdentifierHashString() + "): ");
     }
     upgradeVersion() { }
+    /**
+     * In case swapFee in BTC is not supplied it recalculates it based on swap price
+     * @protected
+     */
+    tryRecomputeSwapPrice() {
+        if (this.pricingInfo.swapPriceUSatPerToken == null) {
+            this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputAmountWithoutFee(), this.getSwapData().getToken());
+        }
+    }
+    //////////////////////////////
+    //// Pricing
+    async refreshPriceData() {
+        if (this.pricingInfo == null)
+            return null;
+        this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputAmountWithoutFee(), this.getSwapData().getToken());
+    }
     //////////////////////////////
     //// Getters & utils
     _getEscrowHash() {
@@ -157,6 +173,9 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         const parsed = (0, bolt11_1.decode)(this.pr);
         return (BigInt(parsed.millisatoshis) + 999n) / 1000n;
     }
+    getWatchtowerFeeAmountBtc() {
+        return (this.btcAmountGas - this.gasSwapFeeBtc) * this.getSwapData().getClaimerBounty() / this.getSwapData().getTotalDeposit();
+    }
     getInputSwapAmountWithoutFee() {
         return this.btcAmountSwap - this.swapFeeBtc;
     }
@@ -164,7 +183,10 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         return this.btcAmountGas - this.gasSwapFeeBtc;
     }
     getInputAmountWithoutFee() {
-        return this.getInputSwapAmountWithoutFee() + this.getInputGasAmountWithoutFee();
+        return this.getInputSwapAmountWithoutFee() + this.getInputGasAmountWithoutFee() - this.getWatchtowerFeeAmountBtc();
+    }
+    getOutputAmountWithoutFee() {
+        return this.getSwapData().getAmount() + this.swapFee;
     }
     getInput() {
         return (0, Tokens_1.toTokenAmount)(this.getLightningInvoiceSats(), this.inputToken, this.wrapper.prices);
@@ -197,7 +219,7 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         };
     }
     getWatchtowerFee() {
-        const btcWatchtowerFee = (this.btcAmountGas - this.gasSwapFeeBtc) * this.getSwapData().getClaimerBounty() / this.getSwapData().getTotalDeposit();
+        const btcWatchtowerFee = this.getWatchtowerFeeAmountBtc();
         const outputToken = this.wrapper.tokens[this.getSwapData().getToken()];
         const watchtowerFeeInOutputToken = btcWatchtowerFee
             * (10n ** BigInt(outputToken.decimals))
@@ -314,6 +336,10 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
      * @param checkIntervalSeconds How often to poll the intermediary for answer
      */
     async waitForPayment(abortSignal, checkIntervalSeconds = 5) {
+        if (this.state === FromBTCLNAutoSwapState.PR_PAID) {
+            await this.waitTillCommited(abortSignal, checkIntervalSeconds);
+            return true;
+        }
         if (this.state !== FromBTCLNAutoSwapState.PR_CREATED)
             throw new Error("Must be in PR_CREATED state!");
         const abortController = new AbortController();
@@ -352,7 +378,8 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
                 this.data = swapData;
                 await this._saveAndEmit(FromBTCLNAutoSwapState.PR_PAID);
             }
-            return true;
+            await this.waitTillCommited(abortSignal, checkIntervalSeconds);
+            return this.state >= FromBTCLNAutoSwapState.CLAIM_COMMITED;
         }
         if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
             if (resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.EXPIRED) {
@@ -388,14 +415,14 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
             abortSignal.throwIfAborted();
         return true;
     }
-    async waitTillCommited(abortSignal) {
+    async waitTillCommited(abortSignal, checkIntervalSeconds) {
         if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED || this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED)
             return Promise.resolve();
         if (this.state !== FromBTCLNAutoSwapState.PR_PAID)
             throw new Error("Invalid state");
         const abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const result = await Promise.race([
-            this.watchdogWaitTillCommited(abortController.signal),
+            this.watchdogWaitTillCommited(abortController.signal, checkIntervalSeconds),
             this.waitTillState(FromBTCLNAutoSwapState.CLAIM_COMMITED, "gte", abortController.signal).then(() => 0)
         ]);
         abortController.abort();
@@ -638,10 +665,12 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
                         await this._saveAndEmit();
                     return true;
                 }
-                //Broadcast the secret over the provided messenger channel
-                await this.wrapper.messenger.broadcast(new base_1.SwapClaimWitnessMessage(this.data, this.secret)).catch(e => {
-                    this.logger.warn("_tick(): Error when broadcasting swap secret: ", e);
-                });
+                if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED) {
+                    //Broadcast the secret over the provided messenger channel
+                    await this.wrapper.messenger.broadcast(new base_1.SwapClaimWitnessMessage(this.data, this.secret)).catch(e => {
+                        this.logger.warn("_tick(): Error when broadcasting swap secret: ", e);
+                    });
+                }
                 break;
         }
     }

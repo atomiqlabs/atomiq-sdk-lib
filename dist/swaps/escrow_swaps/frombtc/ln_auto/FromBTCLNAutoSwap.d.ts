@@ -54,6 +54,12 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     constructor(wrapper: FromBTCLNAutoWrapper<T>, init: FromBTCLNAutoSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNAutoWrapper<T>, obj: any);
     protected upgradeVersion(): void;
+    /**
+     * In case swapFee in BTC is not supplied it recalculates it based on swap price
+     * @protected
+     */
+    protected tryRecomputeSwapPrice(): void;
+    refreshPriceData(): Promise<void>;
     _getEscrowHash(): string | null;
     _getInitiator(): string;
     getId(): string;
@@ -84,9 +90,11 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     isQuoteSoftExpired(): boolean;
     verifyQuoteValid(): Promise<boolean>;
     protected getLightningInvoiceSats(): bigint;
+    protected getWatchtowerFeeAmountBtc(): bigint;
     protected getInputSwapAmountWithoutFee(): bigint;
     protected getInputGasAmountWithoutFee(): bigint;
     protected getInputAmountWithoutFee(): bigint;
+    protected getOutputAmountWithoutFee(): bigint;
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>>;
     getInputWithoutFee(): TokenAmount;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
@@ -136,7 +144,7 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
      * @protected
      */
     protected watchdogWaitTillCommited(abortSignal?: AbortSignal, interval?: number): Promise<boolean>;
-    waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
+    protected waitTillCommited(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void>;
     /**
      * Periodically checks the chain to see whether the swap was finished (claimed or refunded)
      *
