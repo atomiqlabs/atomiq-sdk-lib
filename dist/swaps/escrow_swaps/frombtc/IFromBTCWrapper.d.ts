@@ -1,9 +1,13 @@
-import { IFromBTCSwap } from "./IFromBTCSwap";
 import { AmountData, ISwapWrapperOptions } from "../../ISwapWrapper";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { ChainType } from "@atomiqlabs/base";
 import { IEscrowSwapWrapper } from "../IEscrowSwapWrapper";
-export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IFromBTCSwap<T, any>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends IEscrowSwapWrapper<T, S, O> {
+import { ISwap } from "../../ISwap";
+export declare abstract class IFromBTCWrapper<T extends ChainType, S extends ISwap<T> & {
+    commitTxId: string;
+    claimTxId?: string;
+    refundTxId?: string;
+}, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends IEscrowSwapWrapper<T, S, O> {
     /**
      * Returns a random sequence to be used for swaps
      *

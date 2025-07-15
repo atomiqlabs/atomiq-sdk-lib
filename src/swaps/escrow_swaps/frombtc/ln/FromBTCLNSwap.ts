@@ -3,6 +3,7 @@ import {FromBTCLNWrapper} from "./FromBTCLNWrapper";
 import {IFromBTCSwap} from "../IFromBTCSwap";
 import {SwapType} from "../../../enums/SwapType";
 import {
+    ChainSwapType,
     ChainType,
     SignatureData,
     SignatureVerificationError,
@@ -311,9 +312,11 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     protected async checkIntermediaryReturnedAuthData(signer: string, data: T["Data"], signature: SignatureData): Promise<void> {
         data.setClaimer(signer);
 
+        if (data.getType() !== ChainSwapType.HTLC) throw new IntermediaryError("Invalid swap type");
         if (data.getOfferer() !== this.getSwapData().getOfferer()) throw new IntermediaryError("Invalid offerer used");
         if (!data.isToken(this.getSwapData().getToken())) throw new IntermediaryError("Invalid token used");
         if (data.getSecurityDeposit() > this.getSwapData().getSecurityDeposit()) throw new IntermediaryError("Invalid security deposit!");
+        if (data.getClaimerBounty() !== 0n) throw new IntermediaryError("Invalid claimer bounty!");
         if (data.getAmount() < this.getSwapData().getAmount()) throw new IntermediaryError("Invalid amount received!");
         if (data.getClaimHash() !== this.getSwapData().getClaimHash()) throw new IntermediaryError("Invalid payment hash used!");
         if (!data.isDepositToken(this.getSwapData().getDepositToken())) throw new IntermediaryError("Invalid deposit token used!");

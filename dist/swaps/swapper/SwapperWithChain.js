@@ -47,6 +47,12 @@ class SwapperWithChain {
     createFromBTCLNSwapViaLNURL(signer, tokenAddress, lnurl, amount, exactOut, additionalParams) {
         return this.swapper.createFromBTCLNSwapViaLNURL(this.chainIdentifier, signer, tokenAddress, lnurl, amount, exactOut, additionalParams);
     }
+    createFromBTCLNSwapNew(signer, tokenAddress, amount, exactOut, additionalParams, options) {
+        return this.swapper.createFromBTCLNSwapNew(this.chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams, options);
+    }
+    createFromBTCLNSwapNewViaLNURL(signer, tokenAddress, lnurl, amount, exactOut, additionalParams, options) {
+        return this.swapper.createFromBTCLNSwapNewViaLNURL(this.chainIdentifier, signer, tokenAddress, lnurl, amount, exactOut, additionalParams, options);
+    }
     createTrustedLNForGasSwap(signer, amount, trustedIntermediaryUrl) {
         return this.swapper.createTrustedLNForGasSwap(this.chainIdentifier, signer, amount, trustedIntermediaryUrl);
     }
