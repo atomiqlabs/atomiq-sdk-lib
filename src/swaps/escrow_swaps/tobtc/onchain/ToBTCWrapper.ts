@@ -109,6 +109,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
     /**
      * Verifies returned LP data
      *
+     * @param signer
      * @param resp LP's response
      * @param amountData
      * @param lp
@@ -119,6 +120,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
      * @throws {IntermediaryError} if returned data are not correct
      */
     private verifyReturnedData(
+        signer: string,
         resp: ToBTCResponseType,
         amountData: AmountData,
         lp: Intermediary,
@@ -155,7 +157,9 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
             data.getType()!==ChainSwapType.CHAIN_NONCED ||
             !data.isPayIn() ||
             !data.isToken(amountData.token) ||
-            data.getClaimer()!==lp.getAddress(this.chainIdentifier)
+            !data.isClaimer(lp.getAddress(this.chainIdentifier)) ||
+            !data.isOfferer(signer) ||
+            data.getTotalDeposit() !== 0n
         ) {
             throw new IntermediaryError("Invalid data returned");
         }
@@ -233,7 +237,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
                         const data: T["Data"] = new this.swapDataDeserializer(resp.data);
                         data.setOfferer(signer);
 
-                        this.verifyReturnedData(resp, amountData, lp, options, data, hash);
+                        this.verifyReturnedData(signer, resp, amountData, lp, options, data, hash);
                         const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                             this.verifyReturnedPrice(
                                 lp.services[SwapType.TO_BTC], true, resp.amount, data.getAmount(),
