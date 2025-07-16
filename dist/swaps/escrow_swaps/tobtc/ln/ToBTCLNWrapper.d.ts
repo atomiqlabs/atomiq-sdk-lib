@@ -43,6 +43,7 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
     /**
      * Verifies returned LP data
      *
+     * @param signer
      * @param resp Response as returned by the LP
      * @param parsedPr Parsed bolt11 lightning invoice
      * @param token Smart chain token to be used in the swap
