@@ -125,7 +125,6 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
      * @param data Parsed swap data as returned by the intermediary
      * @protected
      * @throws {IntermediaryError} If the returned are not valid
-     * @throws {SignatureVerificationError} If the returned signature is not valid
      * @throws {Error} If the swap is already committed on-chain
      */
     protected checkIntermediaryReturnedData(signer: string, data: T["Data"]): Promise<void>;
