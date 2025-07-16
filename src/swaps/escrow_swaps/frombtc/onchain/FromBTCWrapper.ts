@@ -232,6 +232,7 @@ export class FromBTCWrapper<
     /**
      * Verifies response returned from intermediary
      *
+     * @param signer
      * @param resp Response as returned by the intermediary
      * @param amountData
      * @param lp Intermediary
@@ -244,6 +245,7 @@ export class FromBTCWrapper<
      * @throws {IntermediaryError} in case the response is invalid
      */
     private verifyReturnedData(
+        signer: string,
         resp: FromBTCResponseType,
         amountData: AmountData,
         lp: Intermediary,
@@ -277,8 +279,10 @@ export class FromBTCWrapper<
             data.getAmount() !== resp.total ||
             data.isPayIn() ||
             !data.isToken(amountData.token) ||
-            data.getOfferer()!==lp.getAddress(this.chainIdentifier) ||
-            !data.isDepositToken(depositToken)
+            !data.isOfferer(lp.getAddress(this.chainIdentifier)) ||
+            !data.isClaimer(signer) ||
+            !data.isDepositToken(depositToken) ||
+            data.hasSuccessAction()
         ) {
             throw new IntermediaryError("Invalid data returned");
         }
@@ -369,7 +373,7 @@ export class FromBTCWrapper<
                         const data: T["Data"] = new this.swapDataDeserializer(resp.data);
                         data.setClaimer(signer);
 
-                        this.verifyReturnedData(resp, amountData, lp, options, data, sequence, await claimerBountyPrefetchPromise, nativeTokenAddress);
+                        this.verifyReturnedData(signer, resp, amountData, lp, options, data, sequence, await claimerBountyPrefetchPromise, nativeTokenAddress);
                         const [pricingInfo, signatureExpiry] = await Promise.all([
                             //Get intermediary's liquidity
                             this.verifyReturnedPrice(

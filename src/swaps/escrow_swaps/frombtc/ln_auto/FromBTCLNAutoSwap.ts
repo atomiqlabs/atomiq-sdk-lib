@@ -431,20 +431,22 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
      * @param data Parsed swap data as returned by the intermediary
      * @protected
      * @throws {IntermediaryError} If the returned are not valid
-     * @throws {SignatureVerificationError} If the returned signature is not valid
      * @throws {Error} If the swap is already committed on-chain
      */
     protected async checkIntermediaryReturnedData(signer: string, data: T["Data"]): Promise<void> {
         if (data.getClaimer() !== signer) throw new IntermediaryError("Invalid claimer used");
         if (!data.isPayOut()) throw new IntermediaryError("Invalid not pay out");
         if (data.getType() !== ChainSwapType.HTLC) throw new IntermediaryError("Invalid swap type");
-        if (data.getOfferer() !== this.getSwapData().getOfferer()) throw new IntermediaryError("Invalid offerer used");
+        if (!data.isOfferer(this.getSwapData().getOfferer())) throw new IntermediaryError("Invalid offerer used");
+        if (!data.isClaimer(this._getInitiator())) throw new IntermediaryError("Invalid claimer used");
         if (!data.isToken(this.getSwapData().getToken())) throw new IntermediaryError("Invalid token used");
         if (data.getSecurityDeposit() !== this.getSwapData().getSecurityDeposit()) throw new IntermediaryError("Invalid security deposit!");
         if (data.getClaimerBounty() !== this.getSwapData().getClaimerBounty()) throw new IntermediaryError("Invalid security deposit!");
         if (data.getAmount() < this.getSwapData().getAmount()) throw new IntermediaryError("Invalid amount received!");
         if (data.getClaimHash() !== this.getSwapData().getClaimHash()) throw new IntermediaryError("Invalid payment hash used!");
         if (!data.isDepositToken(this.getSwapData().getDepositToken())) throw new IntermediaryError("Invalid deposit token used!");
+        if (data.hasSuccessAction()) throw new IntermediaryError("Invalid has success action");
+
         if (await this.wrapper.contract.isExpired(signer, data)) throw new IntermediaryError("Not enough time to claim!");
         if (this.wrapper.getHtlcTimeout(data) <= (Date.now()/1000)) throw new IntermediaryError("HTLC expires too soon!");
     }

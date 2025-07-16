@@ -67,6 +67,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     /**
      * Verifies returned LP data
      *
+     * @param signer
      * @param resp LP's response
      * @param amountData
      * @param lp
@@ -76,7 +77,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @private
      * @throws {IntermediaryError} if returned data are not correct
      */
-    verifyReturnedData(resp, amountData, lp, options, data, hash) {
+    verifyReturnedData(signer, resp, amountData, lp, options, data, hash) {
         if (resp.totalFee !== (resp.swapFee + resp.networkFee))
             throw new IntermediaryError_1.IntermediaryError("Invalid totalFee returned");
         if (amountData.exactIn) {
@@ -103,7 +104,9 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             data.getType() !== base_1.ChainSwapType.CHAIN_NONCED ||
             !data.isPayIn() ||
             !data.isToken(amountData.token) ||
-            data.getClaimer() !== lp.getAddress(this.chainIdentifier)) {
+            !data.isClaimer(lp.getAddress(this.chainIdentifier)) ||
+            !data.isOfferer(signer) ||
+            data.getTotalDeposit() !== 0n) {
             throw new IntermediaryError_1.IntermediaryError("Invalid data returned");
         }
     }
@@ -162,7 +165,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                             _hash;
                         const data = new this.swapDataDeserializer(resp.data);
                         data.setOfferer(signer);
-                        this.verifyReturnedData(resp, amountData, lp, options, data, hash);
+                        this.verifyReturnedData(signer, resp, amountData, lp, options, data, hash);
                         const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTC], true, resp.amount, data.getAmount(), amountData.token, resp, pricePreFetchPromise, abortController.signal),
                             this.verifyReturnedSignature(signer, data, resp, feeRatePromise, signDataPromise, abortController.signal),
