@@ -84,6 +84,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
     /**
      * Verifies returned LP data
      *
+     * @param signer
      * @param resp Response as returned by the LP
      * @param parsedPr Parsed bolt11 lightning invoice
      * @param token Smart chain token to be used in the swap
@@ -95,6 +96,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
      * @throws {IntermediaryError} In case the response is not valid
      */
     private async verifyReturnedData(
+        signer: string,
         resp: ToBTCLNResponseType,
         parsedPr: PaymentRequestObject & {tagsObject: TagsObject},
         token: string,
@@ -117,7 +119,9 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
             data.getType()!==ChainSwapType.HTLC ||
             !data.isPayIn() ||
             !data.isToken(token) ||
-            data.getClaimer()!==lp.getAddress(this.chainIdentifier)
+            !data.isClaimer(lp.getAddress(this.chainIdentifier)) ||
+            !data.isOfferer(signer) ||
+            data.getTotalDeposit() !== 0n
         ) {
             throw new IntermediaryError("Invalid data returned");
         }
@@ -179,7 +183,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
             const data: T["Data"] = new this.swapDataDeserializer(resp.data);
             data.setOfferer(signer);
 
-            await this.verifyReturnedData(resp, parsedPr, amountData.token, lp, options, data);
+            await this.verifyReturnedData(signer, resp, parsedPr, amountData.token, lp, options, data);
 
             const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                 this.verifyReturnedPrice(
@@ -368,7 +372,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
             const data: T["Data"] = new this.swapDataDeserializer(resp.data);
             data.setOfferer(signer);
 
-            await this.verifyReturnedData(resp, parsedInvoice, amountData.token, lp, options, data, amountData.amount);
+            await this.verifyReturnedData(signer, resp, parsedInvoice, amountData.token, lp, options, data, amountData.amount);
 
             const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                 this.verifyReturnedPrice(

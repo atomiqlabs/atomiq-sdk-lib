@@ -84,6 +84,7 @@ export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper
     /**
      * Verifies response returned from intermediary
      *
+     * @param signer
      * @param resp Response as returned by the intermediary
      * @param amountData
      * @param lp Intermediary

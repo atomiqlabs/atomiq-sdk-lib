@@ -244,8 +244,10 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         data.setClaimer(signer);
         if (data.getType() !== base_1.ChainSwapType.HTLC)
             throw new IntermediaryError_1.IntermediaryError("Invalid swap type");
-        if (data.getOfferer() !== this.getSwapData().getOfferer())
+        if (!data.isOfferer(this.getSwapData().getOfferer()))
             throw new IntermediaryError_1.IntermediaryError("Invalid offerer used");
+        if (!data.isClaimer(this._getInitiator()))
+            throw new IntermediaryError_1.IntermediaryError("Invalid claimer used");
         if (!data.isToken(this.getSwapData().getToken()))
             throw new IntermediaryError_1.IntermediaryError("Invalid token used");
         if (data.getSecurityDeposit() > this.getSwapData().getSecurityDeposit())
@@ -258,6 +260,8 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             throw new IntermediaryError_1.IntermediaryError("Invalid payment hash used!");
         if (!data.isDepositToken(this.getSwapData().getDepositToken()))
             throw new IntermediaryError_1.IntermediaryError("Invalid deposit token used!");
+        if (data.hasSuccessAction())
+            throw new IntermediaryError_1.IntermediaryError("Invalid has success action");
         await Promise.all([
             (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this._getInitiator(), data, signature, this.feeRate), null, base_1.SignatureVerificationError),
             (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(data.getClaimer(), data)).then(status => {
