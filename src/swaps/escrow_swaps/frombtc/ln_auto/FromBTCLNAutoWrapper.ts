@@ -27,6 +27,7 @@ import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
 import {ISwap} from "../../../ISwap";
 import {FromBTCLNAutoSwap, FromBTCLNAutoSwapInit, FromBTCLNAutoSwapState} from "./FromBTCLNAutoSwap";
 import { IFromBTCLNWrapper } from "../IFromBTCLNWrapper";
+import {BTC_NETWORK} from "@scure/btc-signer/utils";
 
 export type FromBTCLNAutoOptions = {
     descriptionHash?: Buffer,
@@ -36,9 +37,14 @@ export type FromBTCLNAutoOptions = {
     feeSafetyFactor?: number
 };
 
+export type FromBTCLNAutoWrapperOptions = ISwapWrapperOptions & {
+    safetyFactor?: number,
+    bitcoinBlocktime?: number
+};
+
 export class FromBTCLNAutoWrapper<
     T extends ChainType
-> extends IFromBTCLNWrapper<T, FromBTCLNAutoSwap<T>> {
+> extends IFromBTCLNWrapper<T, FromBTCLNAutoSwap<T>, FromBTCLNAutoWrapperOptions> {
     public readonly TYPE = SwapType.FROM_BTCLN_AUTO;
     public readonly swapDeserializer = FromBTCLNAutoSwap;
 
@@ -70,27 +76,31 @@ export class FromBTCLNAutoWrapper<
         swapDataDeserializer: new (data: any) => T["Data"],
         lnApi: LightningNetworkApi,
         messenger: Messenger,
-        options: ISwapWrapperOptions,
+        options: FromBTCLNAutoWrapperOptions,
         events?: EventEmitter<{swapState: [ISwap]}>
     ) {
+        options.safetyFactor ??= 2;
+        options.bitcoinBlocktime ??= 10*60;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, lnApi, options, events);
         this.messenger = messenger;
     }
 
     public readonly pendingSwapStates = [
         FromBTCLNAutoSwapState.PR_CREATED,
+        FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED,
         FromBTCLNAutoSwapState.PR_PAID,
         FromBTCLNAutoSwapState.CLAIM_COMMITED,
         FromBTCLNAutoSwapState.EXPIRED
     ];
     public readonly tickSwapState = [
         FromBTCLNAutoSwapState.PR_CREATED,
+        FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED,
         FromBTCLNAutoSwapState.PR_PAID,
         FromBTCLNAutoSwapState.CLAIM_COMMITED
     ];
 
     protected processEventInitialize(swap: FromBTCLNAutoSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean> {
-        if(swap.state===FromBTCLNAutoSwapState.PR_PAID || swap.state===FromBTCLNAutoSwapState.PR_CREATED) {
+        if(swap.state===FromBTCLNAutoSwapState.PR_PAID || swap.state===FromBTCLNAutoSwapState.PR_CREATED || swap.state===FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
             swap.state = FromBTCLNAutoSwapState.CLAIM_COMMITED;
             return Promise.resolve(true);
         }

@@ -28,24 +28,28 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
      * @param events Instance to use for emitting events
      */
     constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, lnApi, messenger, options, events) {
+        options.safetyFactor ??= 2;
+        options.bitcoinBlocktime ??= 10 * 60;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, lnApi, options, events);
         this.TYPE = SwapType_1.SwapType.FROM_BTCLN_AUTO;
         this.swapDeserializer = FromBTCLNAutoSwap_1.FromBTCLNAutoSwap;
         this.pendingSwapStates = [
             FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_CREATED,
+            FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED,
             FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_PAID,
             FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_COMMITED,
             FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.EXPIRED
         ];
         this.tickSwapState = [
             FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_CREATED,
+            FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED,
             FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_PAID,
             FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_COMMITED
         ];
         this.messenger = messenger;
     }
     processEventInitialize(swap, event) {
-        if (swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_PAID || swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_CREATED) {
+        if (swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_PAID || swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_CREATED || swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
             swap.state = FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_COMMITED;
             return Promise.resolve(true);
         }
