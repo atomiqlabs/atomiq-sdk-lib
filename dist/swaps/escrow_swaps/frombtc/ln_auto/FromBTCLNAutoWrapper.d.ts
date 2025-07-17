@@ -22,7 +22,11 @@ export type FromBTCLNAutoOptions = {
     unsafeZeroWatchtowerFee?: boolean;
     feeSafetyFactor?: number;
 };
-export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNAutoSwap<T>> {
+export type FromBTCLNAutoWrapperOptions = ISwapWrapperOptions & {
+    safetyFactor?: number;
+    bitcoinBlocktime?: number;
+};
+export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNAutoSwap<T>, FromBTCLNAutoWrapperOptions> {
     readonly TYPE = SwapType.FROM_BTCLN_AUTO;
     readonly swapDeserializer: typeof FromBTCLNAutoSwap;
     protected readonly lnApi: LightningNetworkApi;
@@ -41,7 +45,7 @@ export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCL
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, messenger: Messenger, options: ISwapWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, messenger: Messenger, options: FromBTCLNAutoWrapperOptions, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     readonly pendingSwapStates: FromBTCLNAutoSwapState[];

@@ -230,7 +230,7 @@ export abstract class ISwap<
             Number(this.pricingInfo.swapPriceUSatPerToken)/100_000_000_000_000;
         const marketPrice = this.getDirection()===SwapDirection.TO_BTC ?
             100_000_000_000_000/Number(this.pricingInfo.realPriceUSatPerToken) :
-            Number(this.pricingInfo.swapPriceUSatPerToken)/100_000_000_000_000;
+            Number(this.pricingInfo.realPriceUSatPerToken)/100_000_000_000_000;
 
         return {
             marketPrice,
