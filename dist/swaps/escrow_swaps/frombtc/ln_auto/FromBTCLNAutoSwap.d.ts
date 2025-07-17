@@ -10,8 +10,9 @@ import { Fee, FeeType } from "../../../fee/Fee";
 import { IAddressSwap } from "../../../IAddressSwap";
 import { FromBTCLNAutoWrapper } from "./FromBTCLNAutoWrapper";
 export declare enum FromBTCLNAutoSwapState {
-    FAILED = -3,
-    QUOTE_EXPIRED = -2,
+    FAILED = -4,
+    QUOTE_EXPIRED = -3,
+    QUOTE_SOFT_EXPIRED = -2,
     EXPIRED = -1,
     PR_CREATED = 0,
     PR_PAID = 1,
@@ -75,13 +76,14 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     getAddress(): string;
     getHyperlink(): string;
     /**
-     * Returns timeout time (in UNIX milliseconds) when the LN invoice will expire
+     * Returns the timeout time (in UNIX milliseconds) when the swap will definitelly be considered as expired
+     *  if the LP doesn't make it expired sooner
      */
-    getTimeoutTime(): number;
+    getDefinitiveExpiryTime(): number;
     /**
      * Returns timeout time (in UNIX milliseconds) when the swap htlc will expire
      */
-    getHtlcTimeoutTime(): number;
+    getHtlcTimeoutTime(): number | null;
     isFinished(): boolean;
     isClaimable(): boolean;
     isSuccessful(): boolean;

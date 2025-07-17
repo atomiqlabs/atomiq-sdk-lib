@@ -15,8 +15,9 @@ const ISwap_1 = require("../../../ISwap");
 const Fee_1 = require("../../../fee/Fee");
 var FromBTCLNAutoSwapState;
 (function (FromBTCLNAutoSwapState) {
-    FromBTCLNAutoSwapState[FromBTCLNAutoSwapState["FAILED"] = -3] = "FAILED";
-    FromBTCLNAutoSwapState[FromBTCLNAutoSwapState["QUOTE_EXPIRED"] = -2] = "QUOTE_EXPIRED";
+    FromBTCLNAutoSwapState[FromBTCLNAutoSwapState["FAILED"] = -4] = "FAILED";
+    FromBTCLNAutoSwapState[FromBTCLNAutoSwapState["QUOTE_EXPIRED"] = -3] = "QUOTE_EXPIRED";
+    FromBTCLNAutoSwapState[FromBTCLNAutoSwapState["QUOTE_SOFT_EXPIRED"] = -2] = "QUOTE_SOFT_EXPIRED";
     FromBTCLNAutoSwapState[FromBTCLNAutoSwapState["EXPIRED"] = -1] = "EXPIRED";
     FromBTCLNAutoSwapState[FromBTCLNAutoSwapState["PR_CREATED"] = 0] = "PR_CREATED";
     FromBTCLNAutoSwapState[FromBTCLNAutoSwapState["PR_PAID"] = 1] = "PR_PAID";
@@ -132,19 +133,22 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         return "lightning:" + this.pr.toUpperCase();
     }
     /**
-     * Returns timeout time (in UNIX milliseconds) when the LN invoice will expire
+     * Returns the timeout time (in UNIX milliseconds) when the swap will definitelly be considered as expired
+     *  if the LP doesn't make it expired sooner
      */
-    getTimeoutTime() {
+    getDefinitiveExpiryTime() {
         if (this.pr == null)
             return null;
         const decoded = (0, bolt11_1.decode)(this.pr);
-        return (decoded.timeExpireDate * 1000);
+        const finalCltvExpiryDelta = decoded.tagsObject.min_final_cltv_expiry ?? 144;
+        const finalCltvExpiryDelay = finalCltvExpiryDelta * this.wrapper.options.bitcoinBlocktime * this.wrapper.options.safetyFactor;
+        return (decoded.timeExpireDate + finalCltvExpiryDelay) * 1000;
     }
     /**
      * Returns timeout time (in UNIX milliseconds) when the swap htlc will expire
      */
     getHtlcTimeoutTime() {
-        return Number(this.wrapper.getHtlcTimeout(this.data)) * 1000;
+        return this.data == null ? null : Number(this.wrapper.getHtlcTimeout(this.data)) * 1000;
     }
     isFinished() {
         return this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED || this.state === FromBTCLNAutoSwapState.QUOTE_EXPIRED || this.state === FromBTCLNAutoSwapState.FAILED;
@@ -165,7 +169,7 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         return this.state === FromBTCLNAutoSwapState.QUOTE_EXPIRED;
     }
     verifyQuoteValid() {
-        return Promise.resolve(this.getTimeoutTime() > Date.now());
+        return Promise.resolve(this.getQuoteExpiry() > Date.now());
     }
     //////////////////////////////
     //// Amounts & fees
@@ -271,17 +275,18 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         switch (resp.code) {
             case IntermediaryAPI_1.InvoiceStatusResponseCodes.PAID:
                 const data = new this.wrapper.swapDataDeserializer(resp.data.data);
-                try {
-                    await this.checkIntermediaryReturnedData(this._getInitiator(), data);
-                    this.state = FromBTCLNAutoSwapState.PR_PAID;
-                    delete this.initialSwapData;
-                    this.data = data;
-                    this.initiated = true;
-                    if (save)
-                        await this._saveAndEmit();
-                    return true;
-                }
-                catch (e) { }
+                if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED)
+                    try {
+                        await this.checkIntermediaryReturnedData(this._getInitiator(), data);
+                        this.state = FromBTCLNAutoSwapState.PR_PAID;
+                        delete this.initialSwapData;
+                        this.data = data;
+                        this.initiated = true;
+                        if (save)
+                            await this._saveAndEmit();
+                        return true;
+                    }
+                    catch (e) { }
                 return null;
             case IntermediaryAPI_1.InvoiceStatusResponseCodes.EXPIRED:
                 this.state = FromBTCLNAutoSwapState.QUOTE_EXPIRED;
@@ -376,15 +381,16 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         if (resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.PAID) {
             const swapData = new this.wrapper.swapDataDeserializer(resp.data.data);
             await this.checkIntermediaryReturnedData(this._getInitiator(), swapData);
-            if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
+            if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
                 delete this.initialSwapData;
                 this.data = swapData;
                 await this._saveAndEmit(FromBTCLNAutoSwapState.PR_PAID);
+                await this.waitTillCommited(abortSignal, checkIntervalSeconds);
+                return this.state >= FromBTCLNAutoSwapState.CLAIM_COMMITED;
             }
-            await this.waitTillCommited(abortSignal, checkIntervalSeconds);
-            return this.state >= FromBTCLNAutoSwapState.CLAIM_COMMITED;
+            return false;
         }
-        if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
+        if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
             if (resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.EXPIRED) {
                 await this._saveAndEmit(FromBTCLNAutoSwapState.QUOTE_EXPIRED);
             }
@@ -634,9 +640,9 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
     }
     async _sync(save) {
         let changed = false;
-        if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
-            if (this.getTimeoutTime() < Date.now()) {
-                this.state = FromBTCLNAutoSwapState.QUOTE_EXPIRED;
+        if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
+            if (this.state !== FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED && this.getQuoteExpiry() < Date.now()) {
+                this.state = FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED;
                 changed ||= true;
             }
             const result = await this.checkIntermediaryPaymentReceived(false);
@@ -645,6 +651,12 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         }
         if (await this.syncStateFromChain())
             changed = true;
+        if (this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
+            if (this.getDefinitiveExpiryTime() < Date.now()) {
+                this.state = FromBTCLNAutoSwapState.QUOTE_EXPIRED;
+                changed ||= true;
+            }
+        }
         if (save && changed)
             await this._saveAndEmit();
         return changed;
@@ -652,7 +664,15 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
     async _tick(save) {
         switch (this.state) {
             case FromBTCLNAutoSwapState.PR_CREATED:
-                if (this.getTimeoutTime() < Date.now()) {
+                if (this.getQuoteExpiry() < Date.now()) {
+                    this.state = FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED;
+                    if (save)
+                        await this._saveAndEmit();
+                    return true;
+                }
+                break;
+            case FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED:
+                if (this.getDefinitiveExpiryTime() < Date.now()) {
                     this.state = FromBTCLNAutoSwapState.QUOTE_EXPIRED;
                     if (save)
                         await this._saveAndEmit();

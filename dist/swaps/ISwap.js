@@ -140,7 +140,7 @@ class ISwap {
             Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
         const marketPrice = this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC ?
             100000000000000 / Number(this.pricingInfo.realPriceUSatPerToken) :
-            Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
+            Number(this.pricingInfo.realPriceUSatPerToken) / 100000000000000;
         return {
             marketPrice,
             swapPrice,
