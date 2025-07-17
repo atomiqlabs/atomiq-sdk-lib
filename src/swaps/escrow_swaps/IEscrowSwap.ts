@@ -167,7 +167,7 @@ export abstract class IEscrowSwap<
             }
         }
         if(abortSignal!=null) abortSignal.throwIfAborted();
-        return true;
+        return status?.type!==SwapCommitStateType.EXPIRED;
     }
 
     /**

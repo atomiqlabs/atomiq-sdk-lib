@@ -119,7 +119,7 @@ class IEscrowSwap extends ISwap_1.ISwap {
         }
         if (abortSignal != null)
             abortSignal.throwIfAborted();
-        return true;
+        return status?.type !== base_1.SwapCommitStateType.EXPIRED;
     }
     /**
      * Periodically checks the chain to see whether the swap was finished (claimed or refunded)
