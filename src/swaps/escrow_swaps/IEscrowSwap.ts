@@ -5,7 +5,10 @@ import {
     SignatureVerificationError,
     SwapCommitState,
     SwapCommitStateType,
-    SwapData, SwapExpiredState, SwapNotCommitedState, SwapPaidState
+    SwapData,
+    SwapExpiredState,
+    SwapNotCommitedState,
+    SwapPaidState
 } from "@atomiqlabs/base";
 import {IEscrowSwapWrapper} from "./IEscrowSwapWrapper";
 import {timeoutPromise, tryWithRetries} from "../../utils/Utils";
@@ -164,7 +167,7 @@ export abstract class IEscrowSwap<
             }
         }
         if(abortSignal!=null) abortSignal.throwIfAborted();
-        return true;
+        return status?.type!==SwapCommitStateType.EXPIRED;
     }
 
     /**

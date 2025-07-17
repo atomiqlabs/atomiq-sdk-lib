@@ -543,16 +543,12 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
             await timeoutPromise(interval*1000, abortSignal);
             try {
                 status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
-                if(
-                    status?.type===SwapCommitStateType.NOT_COMMITED &&
-                    await this.wrapper.contract.isExpired(this._getInitiator(), this.data)
-                ) return false;
             } catch (e) {
                 this.logger.error("watchdogWaitTillCommited(): Error when fetching commit status or signature expiry: ", e);
             }
         }
         if(abortSignal!=null) abortSignal.throwIfAborted();
-        return true;
+        return status?.type!==SwapCommitStateType.EXPIRED;
     }
 
     protected async waitTillCommited(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void> {
