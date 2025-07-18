@@ -86,7 +86,7 @@ export type CtorMultiChainData<T extends MultiChain> = {
 };
 export type ChainIds<T extends MultiChain> = keyof T & string;
 type NotNever<T> = [T] extends [never] ? false : true;
-export type SupportsSwapType<C extends ChainType, Type extends SwapType> = Type extends SwapType.SPV_VAULT_FROM_BTC ? NotNever<C["SpvVaultContract"]> : Type extends (SwapType.TRUSTED_FROM_BTCLN | SwapType.TRUSTED_FROM_BTC) ? true : Type extends SwapType.FROM_BTCLN_AUTO ? C["Contract"]["supportsInitWithoutClaimer"] : NotNever<C["Contract"]>;
+export type SupportsSwapType<C extends ChainType, Type extends SwapType> = Type extends SwapType.SPV_VAULT_FROM_BTC ? NotNever<C["SpvVaultContract"]> : Type extends (SwapType.TRUSTED_FROM_BTCLN | SwapType.TRUSTED_FROM_BTC) ? true : Type extends SwapType.FROM_BTCLN_AUTO ? (C["Contract"]["supportsInitWithoutClaimer"] extends true ? true : false) : NotNever<C["Contract"]>;
 export declare class Swapper<T extends MultiChain> extends EventEmitter<{
     lpsRemoved: [Intermediary[]];
     lpsAdded: [Intermediary[]];
@@ -344,11 +344,11 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param srcToken
      * @param dstToken
      */
-    getSwapType<C extends ChainIds<T>>(srcToken: BtcToken<true>, dstToken: SCToken<C>): SwapType.FROM_BTCLN;
+    getSwapType<C extends ChainIds<T>>(srcToken: BtcToken<true>, dstToken: SCToken<C>): (SupportsSwapType<T[C], SwapType.FROM_BTCLN_AUTO> extends true ? SwapType.FROM_BTCLN_AUTO : SwapType.FROM_BTCLN);
     getSwapType<C extends ChainIds<T>>(srcToken: BtcToken<false>, dstToken: SCToken<C>): (SupportsSwapType<T[C], SwapType.SPV_VAULT_FROM_BTC> extends true ? SwapType.SPV_VAULT_FROM_BTC : SwapType.FROM_BTC);
     getSwapType<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<false>): SwapType.TO_BTC;
     getSwapType<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<true>): SwapType.TO_BTCLN;
-    getSwapType<C extends ChainIds<T>>(srcToken: Token<C>, dstToken: Token<C>): SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN;
+    getSwapType<C extends ChainIds<T>>(srcToken: Token<C>, dstToken: Token<C>): SwapType.FROM_BTCLN_AUTO | SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN;
     readonly SwapTypeInfo: {
         readonly 2: {
             readonly requiresInputWallet: true;
@@ -372,6 +372,11 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
         };
         readonly 6: {
             readonly requiresInputWallet: true;
+            readonly requiresOutputWallet: false;
+            readonly supportsGasDrop: true;
+        };
+        readonly 7: {
+            readonly requiresInputWallet: false;
             readonly requiresOutputWallet: false;
             readonly supportsGasDrop: true;
         };
