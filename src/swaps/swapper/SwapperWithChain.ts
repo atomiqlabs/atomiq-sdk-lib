@@ -257,12 +257,12 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
      * @param srcToken
      * @param dstToken
      */
-    getSwapType(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>): SwapType.FROM_BTCLN;
+    getSwapType(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>): (SupportsSwapType<T[ChainIdentifier], SwapType.FROM_BTCLN_AUTO> extends true ? SwapType.FROM_BTCLN_AUTO : SwapType.FROM_BTCLN);
     getSwapType(srcToken: BtcToken<false>, dstToken: SCToken<ChainIdentifier>): (SupportsSwapType<T[ChainIdentifier], SwapType.SPV_VAULT_FROM_BTC> extends true ? SwapType.SPV_VAULT_FROM_BTC : SwapType.FROM_BTC);
     getSwapType(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<false>): SwapType.TO_BTC;
     getSwapType(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>): SwapType.TO_BTCLN;
-    getSwapType(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>): SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN;
-    getSwapType(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>): SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN {
+    getSwapType(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>): SwapType.FROM_BTCLN_AUTO | SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN;
+    getSwapType(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>): SwapType.FROM_BTCLN_AUTO | SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN {
         return this.swapper.getSwapType(srcToken, dstToken);
     }
 
@@ -288,6 +288,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
         const tokens: SCToken<ChainIdentifier>[] = [];
         this.intermediaryDiscovery.intermediaries.forEach(lp => {
             let swapType = _swapType;
+            if(swapType===SwapType.FROM_BTCLN && this.supportsSwapType(SwapType.FROM_BTCLN_AUTO)) swapType = SwapType.FROM_BTCLN_AUTO;
             if(swapType===SwapType.FROM_BTC && this.supportsSwapType(SwapType.SPV_VAULT_FROM_BTC)) swapType = SwapType.SPV_VAULT_FROM_BTC;
             if(lp.services[swapType]==null) return;
             if(lp.services[swapType].chainTokens==null) return;
@@ -331,7 +332,8 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
                 }
             } else {
                 //FROM_BTC or FROM_BTCLN
-                if(this.getSupportedTokenAddresses(SwapType.FROM_BTCLN).has(token.address)) {
+                const fromLightningSwapType = this.supportsSwapType(SwapType.FROM_BTCLN_AUTO) ? SwapType.FROM_BTCLN_AUTO : SwapType.FROM_BTCLN;
+                if(this.getSupportedTokenAddresses(fromLightningSwapType).has(token.address)) {
                     result.push(BitcoinTokens.BTCLN);
                 }
                 const fromOnchainSwapType = this.supportsSwapType(SwapType.SPV_VAULT_FROM_BTC) ? SwapType.SPV_VAULT_FROM_BTC : SwapType.FROM_BTC;
