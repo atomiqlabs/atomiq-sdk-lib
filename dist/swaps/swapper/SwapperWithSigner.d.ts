@@ -61,6 +61,11 @@ export declare class SwapperWithSigner<T extends MultiChain, ChainIdentifier ext
             readonly requiresOutputWallet: false;
             readonly supportsGasDrop: true;
         };
+        readonly 7: {
+            readonly requiresInputWallet: false;
+            readonly requiresOutputWallet: false;
+            readonly supportsGasDrop: true;
+        };
         readonly 4: {
             readonly requiresInputWallet: false;
             readonly requiresOutputWallet: false;
@@ -117,11 +122,11 @@ export declare class SwapperWithSigner<T extends MultiChain, ChainIdentifier ext
      * @param srcToken
      * @param dstToken
      */
-    getSwapType(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>): SwapType.FROM_BTCLN;
+    getSwapType(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>): (SupportsSwapType<T[ChainIdentifier], SwapType.FROM_BTCLN_AUTO> extends true ? SwapType.FROM_BTCLN_AUTO : SwapType.FROM_BTCLN);
     getSwapType(srcToken: BtcToken<false>, dstToken: SCToken<ChainIdentifier>): (SupportsSwapType<T[ChainIdentifier], SwapType.SPV_VAULT_FROM_BTC> extends true ? SwapType.SPV_VAULT_FROM_BTC : SwapType.FROM_BTC);
     getSwapType(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<false>): SwapType.TO_BTC;
     getSwapType(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>): SwapType.TO_BTCLN;
-    getSwapType(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>): SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN;
+    getSwapType(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>): SwapType.FROM_BTCLN_AUTO | SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN;
     /**
      * Returns minimum/maximum limits for inputs and outputs for a swap between given tokens
      *

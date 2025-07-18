@@ -146,6 +146,8 @@ class SwapperWithChain {
         const tokens = [];
         this.intermediaryDiscovery.intermediaries.forEach(lp => {
             let swapType = _swapType;
+            if (swapType === SwapType_1.SwapType.FROM_BTCLN && this.supportsSwapType(SwapType_1.SwapType.FROM_BTCLN_AUTO))
+                swapType = SwapType_1.SwapType.FROM_BTCLN_AUTO;
             if (swapType === SwapType_1.SwapType.FROM_BTC && this.supportsSwapType(SwapType_1.SwapType.SPV_VAULT_FROM_BTC))
                 swapType = SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
             if (lp.services[swapType] == null)
@@ -194,7 +196,8 @@ class SwapperWithChain {
             }
             else {
                 //FROM_BTC or FROM_BTCLN
-                if (this.getSupportedTokenAddresses(SwapType_1.SwapType.FROM_BTCLN).has(token.address)) {
+                const fromLightningSwapType = this.supportsSwapType(SwapType_1.SwapType.FROM_BTCLN_AUTO) ? SwapType_1.SwapType.FROM_BTCLN_AUTO : SwapType_1.SwapType.FROM_BTCLN;
+                if (this.getSupportedTokenAddresses(fromLightningSwapType).has(token.address)) {
                     result.push(Tokens_1.BitcoinTokens.BTCLN);
                 }
                 const fromOnchainSwapType = this.supportsSwapType(SwapType_1.SwapType.SPV_VAULT_FROM_BTC) ? SwapType_1.SwapType.SPV_VAULT_FROM_BTC : SwapType_1.SwapType.FROM_BTC;
