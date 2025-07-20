@@ -97,7 +97,7 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
      * @param abortSignal
      */
     async getNodeInfo(url, abortSignal) {
-        const response = await (0, Utils_1.tryWithRetries)(() => IntermediaryAPI_1.IntermediaryAPI.getIntermediaryInfo(url), { maxRetries: 3, delay: 100, exponential: true }, undefined, abortSignal);
+        const response = await (0, Utils_1.tryWithRetries)(() => IntermediaryAPI_1.IntermediaryAPI.getIntermediaryInfo(url, this.httpRequestTimeout, abortSignal), { maxRetries: 3, delay: 100, exponential: true }, undefined, abortSignal);
         //Handle legacy responses
         if (response.chains == null)
             response.chains = {

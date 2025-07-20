@@ -159,7 +159,7 @@ export class IntermediaryDiscovery extends EventEmitter {
      */
     private async getNodeInfo(url: string, abortSignal?: AbortSignal) : Promise<{addresses: {[key: string]: string}, info: InfoHandlerResponseEnvelope}> {
         const response = await tryWithRetries(
-            () => IntermediaryAPI.getIntermediaryInfo(url),
+            () => IntermediaryAPI.getIntermediaryInfo(url, this.httpRequestTimeout, abortSignal),
             {maxRetries: 3, delay: 100, exponential: true},
             undefined,
             abortSignal
