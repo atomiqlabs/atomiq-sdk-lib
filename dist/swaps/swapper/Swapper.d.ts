@@ -50,6 +50,7 @@ export type SwapperOptions = {
     noSwapCache?: boolean;
     dontCheckPastSwaps?: boolean;
     dontFetchLPs?: boolean;
+    saveUninitializedSwaps?: boolean;
 };
 export type MultiChain = {
     [chainIdentifier in string]: ChainType;

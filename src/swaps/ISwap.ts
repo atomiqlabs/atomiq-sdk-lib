@@ -308,6 +308,10 @@ export abstract class ISwap<
         return this.initiated;
     }
 
+    _setInitiated(): void {
+        this.initiated = true;
+    }
+
     /**
      * Returns quote expiry in UNIX millis
      */

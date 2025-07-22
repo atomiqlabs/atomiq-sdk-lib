@@ -158,6 +158,9 @@ class ISwap {
     isInitiated() {
         return this.initiated;
     }
+    _setInitiated() {
+        this.initiated = true;
+    }
     /**
      * Returns quote expiry in UNIX millis
      */

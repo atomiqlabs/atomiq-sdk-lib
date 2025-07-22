@@ -76,7 +76,8 @@ export type SwapperOptions = {
     noEvents?: boolean,
     noSwapCache?: boolean,
     dontCheckPastSwaps?: boolean,
-    dontFetchLPs?: boolean
+    dontFetchLPs?: boolean,
+    saveUninitializedSwaps?: boolean //automatically persist all created swaps - by default only initiated swaps are persisted
 };
 
 export type MultiChain = {
@@ -602,7 +603,13 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             this.logger.debug("createSwap(): Sorted quotes, best price to worst: ", quotes);
 
             if(swapLimitsChanged) this.emit("swapLimitsChanged");
-            return quotes[0].quote;
+
+            const quote = quotes[0].quote;
+            if(this.options.saveUninitializedSwaps) {
+                quote._setInitiated();
+                await quote._save();
+            }
+            return quote;
         } catch (e) {
             if(swapLimitsChanged) this.emit("swapLimitsChanged");
             throw e;

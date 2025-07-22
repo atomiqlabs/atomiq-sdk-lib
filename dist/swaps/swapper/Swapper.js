@@ -373,7 +373,12 @@ class Swapper extends events_1.EventEmitter {
             this.logger.debug("createSwap(): Sorted quotes, best price to worst: ", quotes);
             if (swapLimitsChanged)
                 this.emit("swapLimitsChanged");
-            return quotes[0].quote;
+            const quote = quotes[0].quote;
+            if (this.options.saveUninitializedSwaps) {
+                quote._setInitiated();
+                await quote._save();
+            }
+            return quote;
         }
         catch (e) {
             if (swapLimitsChanged)

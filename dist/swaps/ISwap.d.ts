@@ -127,6 +127,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      */
     abstract _getInitiator(): string;
     isInitiated(): boolean;
+    _setInitiated(): void;
     /**
      * Returns quote expiry in UNIX millis
      */
