@@ -740,12 +740,14 @@ class Swapper extends events_1.EventEmitter {
             for (let key in this.chains[chainId].wrappers) {
                 const wrapper = this.chains[chainId].wrappers[key];
                 const result = wrapper.pendingSwaps.get(id)?.deref();
-                if (signer != null) {
-                    if (result._getInitiator() === signer)
+                if (result != null) {
+                    if (signer != null) {
+                        if (result._getInitiator() === signer)
+                            return result;
+                    }
+                    else {
                         return result;
-                }
-                else {
-                    return result;
+                    }
                 }
             }
         }

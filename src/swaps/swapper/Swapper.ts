@@ -1157,10 +1157,12 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             for(let key in this.chains[chainId].wrappers) {
                 const wrapper: ISwapWrapper<any, ISwap> = this.chains[chainId].wrappers[key];
                 const result = wrapper.pendingSwaps.get(id)?.deref();
-                if(signer!=null) {
-                    if(result._getInitiator()===signer) return result;
-                } else {
-                    return result;
+                if(result!=null) {
+                    if (signer != null) {
+                        if (result._getInitiator() === signer) return result;
+                    } else {
+                        return result;
+                    }
                 }
             }
         } else {
