@@ -279,7 +279,7 @@ export abstract class ISwapWrapper<
 
     removeSwapData(swap: S): Promise<void> {
         this.pendingSwaps.delete(swap.getId());
-        if(!swap.isInitiated) return Promise.resolve();
+        if(!swap.isInitiated()) return Promise.resolve();
         return this.unifiedStorage.remove(swap);
     }
 
