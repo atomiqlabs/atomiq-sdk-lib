@@ -229,7 +229,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     }
 
     verifyQuoteValid(): Promise<boolean> {
-        return Promise.resolve(this.expiry<Date.now() && this.state===SpvFromBTCSwapState.CREATED);
+        return Promise.resolve(this.expiry>Date.now() && this.state===SpvFromBTCSwapState.CREATED);
     }
 
     getOutputAddress(): string | null {

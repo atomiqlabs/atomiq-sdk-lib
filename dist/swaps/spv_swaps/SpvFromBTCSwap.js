@@ -133,7 +133,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         return this.expiry - 20 * 1000;
     }
     verifyQuoteValid() {
-        return Promise.resolve(this.expiry < Date.now() && this.state === SpvFromBTCSwapState.CREATED);
+        return Promise.resolve(this.expiry > Date.now() && this.state === SpvFromBTCSwapState.CREATED);
     }
     getOutputAddress() {
         return this.recipient;
