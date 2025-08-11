@@ -100,7 +100,7 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         return this.getIdentifierHashString();
     }
     getOutputAddress() {
-        return this.getAddress();
+        return this._getInitiator();
     }
     getOutputTxId() {
         return this.claimTxId;
@@ -585,6 +585,10 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
             data: this.data == null ? null : this.data.serialize(),
             commitTxId: this.commitTxId,
             claimTxId: this.claimTxId,
+            btcAmountSwap: this.btcAmountSwap == null ? null : this.btcAmountSwap.toString(10),
+            btcAmountGas: this.btcAmountGas == null ? null : this.btcAmountGas.toString(10),
+            gasSwapFeeBtc: this.gasSwapFeeBtc == null ? null : this.gasSwapFeeBtc.toString(10),
+            gasSwapFee: this.gasSwapFee == null ? null : this.gasSwapFee.toString(10),
             pr: this.pr,
             secret: this.secret,
             lnurl: this.lnurl,
