@@ -349,9 +349,9 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         }
         //Ensure all inputs except the 1st are finalized
         for (let i = 1; i < psbt.inputsLength; i++) {
-            psbt.finalizeIdx(i);
             if ((0, btc_signer_1.getInputType)(psbt.getInput(i)).txType === "legacy")
                 throw new Error("Legacy (non-segwit) inputs are not allowed in the transaction!");
+            psbt.finalizeIdx(i);
         }
         const btcTx = await this.wrapper.btcRpc.parseTransaction(buffer_1.Buffer.from(psbt.toBytes(true)).toString("hex"));
         const data = await this.wrapper.contract.getWithdrawalData(btcTx);

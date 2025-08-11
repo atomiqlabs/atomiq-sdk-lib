@@ -503,9 +503,9 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
 
         //Ensure all inputs except the 1st are finalized
         for(let i=1;i<psbt.inputsLength;i++) {
-            psbt.finalizeIdx(i);
             if(getInputType(psbt.getInput(i)).txType==="legacy")
                 throw new Error("Legacy (non-segwit) inputs are not allowed in the transaction!");
+            psbt.finalizeIdx(i);
         }
         const btcTx = await this.wrapper.btcRpc.parseTransaction(Buffer.from(psbt.toBytes(true)).toString("hex"));
         const data = await this.wrapper.contract.getWithdrawalData(btcTx);
