@@ -26,6 +26,7 @@ import {isISwapInit, ISwap, ISwapInit, ppmToPercentage} from "../../../ISwap";
 import {Fee, FeeType} from "../../../fee/Fee";
 import {IAddressSwap} from "../../../IAddressSwap";
 import {FromBTCLNAutoWrapper} from "./FromBTCLNAutoWrapper";
+import {ISwapWithGasDrop} from "../../../ISwapWithGasDrop";
 
 export enum FromBTCLNAutoSwapState {
     FAILED = -4,
@@ -69,7 +70,7 @@ export function isFromBTCLNAutoSwapInit<T extends SwapData>(obj: any): obj is Fr
 
 export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     extends ISwap<T, FromBTCLNAutoSwapState>
-    implements IAddressSwap {
+    implements IAddressSwap, ISwapWithGasDrop<T> {
 
     protected readonly inputToken: BtcToken<true> = BitcoinTokens.BTCLN;
     protected readonly TYPE = SwapType.FROM_BTCLN_AUTO;
@@ -187,7 +188,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     }
 
     getOutputAddress(): string | null {
-        return this.getAddress();
+        return this._getInitiator();
     }
 
     getOutputTxId(): string | null {
@@ -328,7 +329,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
             * 1_000_000n
             / this.pricingInfo.swapPriceUSatPerToken;
 
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        const feeWithoutBaseFee = this.gasSwapFeeBtc + this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / (this.getLightningInvoiceSats() - this.swapFeeBtc - this.gasSwapFeeBtc);
 
         return {
@@ -734,6 +735,10 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
             data: this.data==null ? null : this.data.serialize(),
             commitTxId: this.commitTxId,
             claimTxId: this.claimTxId,
+            btcAmountSwap: this.btcAmountSwap==null ? null : this.btcAmountSwap.toString(10),
+            btcAmountGas: this.btcAmountGas==null ? null : this.btcAmountGas.toString(10),
+            gasSwapFeeBtc: this.gasSwapFeeBtc==null ? null : this.gasSwapFeeBtc.toString(10),
+            gasSwapFee: this.gasSwapFee==null ? null : this.gasSwapFee.toString(10),
             pr: this.pr,
             secret: this.secret,
             lnurl: this.lnurl,
