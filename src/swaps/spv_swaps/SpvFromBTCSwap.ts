@@ -18,6 +18,7 @@ import {IBitcoinWallet, isIBitcoinWallet} from "../../btc/wallet/IBitcoinWallet"
 import {IntermediaryAPI} from "../../intermediaries/IntermediaryAPI";
 import {IBTCWalletSwap} from "../IBTCWalletSwap";
 import {SingleAddressBitcoinWallet} from "../../btc/wallet/SingleAddressBitcoinWallet";
+import {ISwapWithGasDrop} from "../ISwapWithGasDrop";
 
 export enum SpvFromBTCSwapState {
     CLOSED = -5,
@@ -88,7 +89,10 @@ export function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit {
         isISwapInit(obj);
 }
 
-export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> implements IBTCWalletSwap {
+export class SpvFromBTCSwap<T extends ChainType>
+    extends ISwap<T, SpvFromBTCSwapState>
+    implements IBTCWalletSwap, ISwapWithGasDrop<T> {
+
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
 
     readonly wrapper: SpvFromBTCWrapper<T>;
