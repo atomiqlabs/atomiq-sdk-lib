@@ -341,7 +341,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
     create(signer, amountData, lps, options, additionalParams, abortSignal) {
         options ??= {};
         options.gasAmount ??= 0n;
-        options.feeSafetyFactor ??= 2;
+        options.feeSafetyFactor ??= 1.5;
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePrefetchPromise = this.preFetchPrice(amountData, _abortController.signal);
         const nativeTokenAddress = this.chain.getNativeCurrencyAddress();
