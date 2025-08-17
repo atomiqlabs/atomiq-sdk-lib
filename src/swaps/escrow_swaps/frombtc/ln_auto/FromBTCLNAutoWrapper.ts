@@ -232,7 +232,7 @@ export class FromBTCLNAutoWrapper<
     }[] {
         if(options==null) options = {};
         options.gasAmount ??= 0n;
-        options.feeSafetyFactor ??= 2;
+        options.feeSafetyFactor ??= 1.25; //No need to add much of a margin, since the claim should happen rather soon
         if(preFetches==null) preFetches = {};
 
         if(options.descriptionHash!=null && options.descriptionHash.length!==32)
