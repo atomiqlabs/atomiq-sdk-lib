@@ -452,7 +452,7 @@ export class SpvFromBTCWrapper<
     }[] {
         options ??= {};
         options.gasAmount ??= 0n;
-        options.feeSafetyFactor ??= 2;
+        options.feeSafetyFactor ??= 1.5;
 
         const _abortController = extendAbortController(abortSignal);
         const pricePrefetchPromise: Promise<bigint> = this.preFetchPrice(amountData, _abortController.signal);
