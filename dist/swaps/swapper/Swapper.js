@@ -399,9 +399,15 @@ class Swapper extends events_1.EventEmitter {
      * @param options
      */
     createToBTCSwap(chainIdentifier, signer, tokenAddress, address, amount, exactIn, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
         if (address.startsWith("bitcoin:")) {
             address = address.substring(8).split("?")[0];
         }
+        if (!this.Utils.isValidBitcoinAddress(address))
+            throw new Error("Invalid bitcoin address");
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
         options ??= {};
         options.confirmationTarget ??= 3;
         options.confirmations ??= 2;
@@ -423,9 +429,15 @@ class Swapper extends events_1.EventEmitter {
      * @param options
      */
     async createToBTCLNSwap(chainIdentifier, signer, tokenAddress, paymentRequest, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
         options ??= {};
         if (paymentRequest.startsWith("lightning:"))
             paymentRequest = paymentRequest.substring(10);
+        if (!this.Utils.isValidLightningInvoice(paymentRequest))
+            throw new Error("Invalid lightning network invoice");
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
         const parsedPR = (0, bolt11_1.decode)(paymentRequest);
         const amountData = {
             amount: (BigInt(parsedPR.millisatoshis) + 999n) / 1000n,
@@ -448,6 +460,12 @@ class Swapper extends events_1.EventEmitter {
      * @param options
      */
     async createToBTCLNSwapViaLNURL(chainIdentifier, signer, tokenAddress, lnurlPay, amount, exactIn, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        if (typeof (lnurlPay) === "string" && !this.Utils.isValidLNURL(lnurlPay))
+            throw new Error("Invalid LNURL-pay link");
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
         options ??= {};
         const amountData = {
             amount,
@@ -469,6 +487,10 @@ class Swapper extends events_1.EventEmitter {
      * @param options
      */
     async createFromBTCSwapNew(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
         const amountData = {
             amount,
             token: tokenAddress,
@@ -488,6 +510,10 @@ class Swapper extends events_1.EventEmitter {
      * @param options
      */
     async createFromBTCSwap(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
         const amountData = {
             amount,
             token: tokenAddress,
@@ -507,6 +533,10 @@ class Swapper extends events_1.EventEmitter {
      * @param options
      */
     async createFromBTCLNSwap(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
         const amountData = {
             amount,
             token: tokenAddress,
@@ -526,6 +556,12 @@ class Swapper extends events_1.EventEmitter {
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
      */
     async createFromBTCLNSwapViaLNURL(chainIdentifier, signer, tokenAddress, lnurl, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        if (typeof (lnurl) === "string" && !this.Utils.isValidLNURL(lnurl))
+            throw new Error("Invalid LNURL-withdraw link");
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
         const amountData = {
             amount,
             token: tokenAddress,
@@ -545,6 +581,8 @@ class Swapper extends events_1.EventEmitter {
     createTrustedLNForGasSwap(chainId, signer, amount, trustedIntermediaryOrUrl) {
         if (this.chains[chainId] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainId);
+        if (!this.chains[chainId].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainId + " address");
         const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary ?? this.options.defaultTrustedIntermediaryUrl;
         if (useUrl == null)
             throw new Error("No trusted intermediary specified!");
@@ -563,6 +601,8 @@ class Swapper extends events_1.EventEmitter {
     createTrustedOnchainForGasSwap(chainId, signer, amount, refundAddress, trustedIntermediaryOrUrl) {
         if (this.chains[chainId] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainId);
+        if (!this.chains[chainId].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainId + " address");
         const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary ?? this.options.defaultTrustedIntermediaryUrl;
         if (useUrl == null)
             throw new Error("No trusted intermediary specified!");

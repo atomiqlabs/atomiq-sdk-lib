@@ -57,6 +57,7 @@ import {IToBTCSwap} from "../escrow_swaps/tobtc/IToBTCSwap";
 import {SpvFromBTCOptions, SpvFromBTCWrapper} from "../spv_swaps/SpvFromBTCWrapper";
 import {SpvFromBTCSwap} from "../spv_swaps/SpvFromBTCSwap";
 import {SwapperUtils} from "./utils/SwapperUtils";
+import {UserError} from "../../errors/UserError";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -638,9 +639,12 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
         options?: ToBTCOptions
     ): Promise<ToBTCSwap<T[ChainIdentifier]>> {
+        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         if(address.startsWith("bitcoin:")) {
             address = address.substring(8).split("?")[0];
         }
+        if(!this.Utils.isValidBitcoinAddress(address)) throw new Error("Invalid bitcoin address");
+        if(!this.chains[chainIdentifier].chainInterface.isValidAddress(signer)) throw new Error("Invalid "+chainIdentifier+" address");
         options ??= {};
         options.confirmationTarget ??= 3;
         options.confirmations ??= 2;
@@ -683,8 +687,11 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
         options?: ToBTCLNOptions
     ): Promise<ToBTCLNSwap<T[ChainIdentifier]>> {
+        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         options ??= {};
         if(paymentRequest.startsWith("lightning:")) paymentRequest = paymentRequest.substring(10);
+        if(!this.Utils.isValidLightningInvoice(paymentRequest)) throw new Error("Invalid lightning network invoice");
+        if(!this.chains[chainIdentifier].chainInterface.isValidAddress(signer)) throw new Error("Invalid "+chainIdentifier+" address");
         const parsedPR = bolt11Decode(paymentRequest);
         const amountData = {
             amount: (BigInt(parsedPR.millisatoshis) + 999n) / 1000n,
@@ -730,6 +737,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         additionalParams: Record<string, any>  = this.options.defaultAdditionalParameters,
         options?: ToBTCLNOptions & {comment?: string}
     ): Promise<ToBTCLNSwap<T[ChainIdentifier]>> {
+        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+        if(typeof(lnurlPay)==="string" && !this.Utils.isValidLNURL(lnurlPay)) throw new Error("Invalid LNURL-pay link");
+        if(!this.chains[chainIdentifier].chainInterface.isValidAddress(signer)) throw new Error("Invalid "+chainIdentifier+" address");
         options ??= {};
         const amountData = {
             amount,
@@ -773,6 +783,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
         options?: SpvFromBTCOptions
     ): Promise<SpvFromBTCSwap<T[ChainIdentifier]>> {
+        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+        if(!this.chains[chainIdentifier].chainInterface.isValidAddress(signer)) throw new Error("Invalid "+chainIdentifier+" address");
         const amountData = {
             amount,
             token: tokenAddress,
@@ -813,6 +825,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
         options?: FromBTCOptions
     ): Promise<FromBTCSwap<T[ChainIdentifier]>> {
+        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+        if(!this.chains[chainIdentifier].chainInterface.isValidAddress(signer)) throw new Error("Invalid "+chainIdentifier+" address");
         const amountData = {
             amount,
             token: tokenAddress,
@@ -853,6 +867,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         additionalParams: Record<string, any> = this.options.defaultAdditionalParameters,
         options?: FromBTCLNOptions
     ): Promise<FromBTCLNSwap<T[ChainIdentifier]>> {
+        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+        if(!this.chains[chainIdentifier].chainInterface.isValidAddress(signer)) throw new Error("Invalid "+chainIdentifier+" address");
         const amountData = {
             amount,
             token: tokenAddress,
@@ -893,6 +909,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         exactOut?: boolean,
         additionalParams: Record<string, any> = this.options.defaultAdditionalParameters
     ): Promise<FromBTCLNSwap<T[ChainIdentifier]>> {
+        if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+        if(typeof(lnurl)==="string" && !this.Utils.isValidLNURL(lnurl)) throw new Error("Invalid LNURL-withdraw link");
+        if(!this.chains[chainIdentifier].chainInterface.isValidAddress(signer)) throw new Error("Invalid "+chainIdentifier+" address");
         const amountData = {
             amount,
             token: tokenAddress,
@@ -924,6 +943,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
      */
     createTrustedLNForGasSwap<C extends ChainIds<T>>(chainId: C, signer: string, amount: bigint, trustedIntermediaryOrUrl?: Intermediary | string): Promise<LnForGasSwap<T[C]>> {
         if(this.chains[chainId]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainId);
+        if(!this.chains[chainId].chainInterface.isValidAddress(signer)) throw new Error("Invalid "+chainId+" address");
         const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary ?? this.options.defaultTrustedIntermediaryUrl;
         if(useUrl==null) throw new Error("No trusted intermediary specified!");
         return this.chains[chainId as C].wrappers[SwapType.TRUSTED_FROM_BTCLN].create(signer, amount, useUrl);
@@ -945,6 +965,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         trustedIntermediaryOrUrl?: Intermediary | string
     ): Promise<OnchainForGasSwap<T[C]>> {
         if(this.chains[chainId]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainId);
+        if(!this.chains[chainId].chainInterface.isValidAddress(signer)) throw new Error("Invalid "+chainId+" address");
         const useUrl = trustedIntermediaryOrUrl ?? this.defaultTrustedIntermediary ?? this.options.defaultTrustedIntermediaryUrl;
         if(useUrl==null) throw new Error("No trusted intermediary specified!");
         return this.chains[chainId as C].wrappers[SwapType.TRUSTED_FROM_BTC].create(signer, amount, useUrl, refundAddress);
