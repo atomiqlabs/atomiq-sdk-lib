@@ -597,6 +597,10 @@ class Swapper extends events_1.EventEmitter {
      * @param options
      */
     async createFromBTCLNSwapNew(chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
         const amountData = {
             amount,
             token: tokenAddress,
@@ -617,6 +621,12 @@ class Swapper extends events_1.EventEmitter {
      * @param options
      */
     async createFromBTCLNSwapNewViaLNURL(chainIdentifier, signer, tokenAddress, lnurl, amount, exactOut, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        if (typeof (lnurl) === "string" && !this.Utils.isValidLNURL(lnurl))
+            throw new Error("Invalid LNURL-withdraw link");
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer))
+            throw new Error("Invalid " + chainIdentifier + " address");
         const amountData = {
             amount,
             token: tokenAddress,
