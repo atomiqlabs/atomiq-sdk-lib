@@ -380,7 +380,7 @@ export class SpvFromBTCWrapper<
         const vaultUtxoValue = btcTx.outs[vout].value;
 
         //Require vault UTXO is unspent
-        if(await this.btcRpc.isSpent(utxo)) throw new IntermediaryError("Returned spv vault UTXO is already spent");
+        if(await this.btcRpc.isSpent(utxo)) throw new IntermediaryError("Returned spv vault UTXO is already spent", true);
 
         this.logger.debug("verifyReturnedData(): Vault UTXO: "+vault.getUtxo()+" current utxo: "+utxo);
 
@@ -471,7 +471,7 @@ export class SpvFromBTCWrapper<
         return lps.map(lp => {
             return {
                 intermediary: lp,
-                quote: (async () => {
+                quote: tryWithRetries(async () => {
                     const abortController = extendAbortController(_abortController.signal);
 
                     try {
@@ -561,7 +561,7 @@ export class SpvFromBTCWrapper<
                         abortController.abort(e);
                         throw e;
                     }
-                })()
+                }, null, err => !(err instanceof IntermediaryError && err.recoverable), _abortController.signal)
             }
         });
     }

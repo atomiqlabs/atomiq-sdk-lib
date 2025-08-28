@@ -283,7 +283,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         const vaultUtxoValue = btcTx.outs[vout].value;
         //Require vault UTXO is unspent
         if (await this.btcRpc.isSpent(utxo))
-            throw new IntermediaryError_1.IntermediaryError("Returned spv vault UTXO is already spent");
+            throw new IntermediaryError_1.IntermediaryError("Returned spv vault UTXO is already spent", true);
         this.logger.debug("verifyReturnedData(): Vault UTXO: " + vault.getUtxo() + " current utxo: " + utxo);
         //Trace returned utxo back to what's saved on-chain
         let pendingWithdrawals = [];
@@ -359,7 +359,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         return lps.map(lp => {
             return {
                 intermediary: lp,
-                quote: (async () => {
+                quote: (0, Utils_1.tryWithRetries)(async () => {
                     const abortController = (0, Utils_1.extendAbortController)(_abortController.signal);
                     try {
                         const resp = await (0, Utils_1.tryWithRetries)(async (retryCount) => {
@@ -422,7 +422,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                         abortController.abort(e);
                         throw e;
                     }
-                })()
+                }, null, err => !(err instanceof IntermediaryError_1.IntermediaryError && err.recoverable), _abortController.signal)
             };
         });
     }

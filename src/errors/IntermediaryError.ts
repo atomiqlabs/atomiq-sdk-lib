@@ -3,8 +3,11 @@
  */
 export class IntermediaryError extends Error {
 
-    constructor(msg: string) {
+    recoverable: boolean;
+
+    constructor(msg: string, recoverable: boolean = false) {
         super(msg);
+        this.recoverable = recoverable;
         // Set the prototype explicitly.
         Object.setPrototypeOf(this, IntermediaryError.prototype);
     }
