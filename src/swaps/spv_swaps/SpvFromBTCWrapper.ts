@@ -307,7 +307,7 @@ export class SpvFromBTCWrapper<
             vaultAddressType = toCoinselectAddressType(vaultScript);
             btcAddressScript = toOutputScript(this.options.bitcoinNetwork, resp.btcAddress);
         } catch (e) {
-            throw new IntermediaryError("Invalid btc address data returned!");
+            throw new IntermediaryError("Invalid btc address data returned", e);
         }
         const decodedUtxo = resp.btcUtxo.split(":");
         if(
@@ -340,7 +340,7 @@ export class SpvFromBTCWrapper<
             vault = await this.contract.getVaultData(resp.address, resp.vaultId);
         } catch (e) {
             this.logger.error("Error getting spv vault (owner: "+resp.address+" vaultId: "+resp.vaultId.toString(10)+"): ", e);
-            throw new IntermediaryError("Spv swap vault not found!");
+            throw new IntermediaryError("Spv swap vault not found", e);
         }
         //Make sure vault is opened
         if(!vault.isOpened()) throw new IntermediaryError("Returned spv swap vault is not opened!");
@@ -380,7 +380,7 @@ export class SpvFromBTCWrapper<
         const vaultUtxoValue = btcTx.outs[vout].value;
 
         //Require vault UTXO is unspent
-        if(await this.btcRpc.isSpent(utxo)) throw new IntermediaryError("Returned spv vault UTXO is already spent", true);
+        if(await this.btcRpc.isSpent(utxo)) throw new IntermediaryError("Returned spv vault UTXO is already spent", null, true);
 
         this.logger.debug("verifyReturnedData(): Vault UTXO: "+vault.getUtxo()+" current utxo: "+utxo);
 
@@ -404,7 +404,7 @@ export class SpvFromBTCWrapper<
             vaultBalances = vault.calculateStateAfter(pendingWithdrawals);
         } catch (e) {
             this.logger.error("Error calculating spv vault balance (owner: "+resp.address+" vaultId: "+resp.vaultId.toString(10)+"): ", e);
-            throw new IntermediaryError("Spv swap vault balance prediction failed!");
+            throw new IntermediaryError("Spv swap vault balance prediction failed", e);
         }
         if(vaultBalances.balances[0].scaledAmount < resp.total)
             throw new IntermediaryError("SPV swap vault, insufficient balance, required: "+resp.total.toString(10)+
@@ -420,7 +420,7 @@ export class SpvFromBTCWrapper<
             }
         } catch (e) {
             this.logger.error("Error calculating spv vault balance (owner: "+resp.address+" vaultId: "+resp.vaultId.toString(10)+"): ", e);
-            throw new IntermediaryError("Spv swap vault balance prediction failed!");
+            throw new IntermediaryError("Spv swap vault balance prediction failed", e);
         }
 
         return {
