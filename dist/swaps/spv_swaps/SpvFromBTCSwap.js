@@ -786,34 +786,34 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             }
         }
     }
-    async _shouldCheckWithdrawalState() {
-        const [frontingAddress, vaultData] = await Promise.all([
-            this.wrapper.contract.getFronterAddress(this.vaultOwner, this.vaultId, this.data),
-            this.wrapper.contract.getVaultData(this.vaultOwner, this.vaultId)
-        ]);
+    async _shouldCheckWithdrawalState(frontingAddress, vaultDataUtxo) {
+        if (frontingAddress === undefined)
+            frontingAddress = await this.wrapper.contract.getFronterAddress(this.vaultOwner, this.vaultId, this.data);
+        if (vaultDataUtxo === undefined)
+            vaultDataUtxo = await this.wrapper.contract.getVaultLatestUtxo(this.vaultOwner, this.vaultId);
         if (frontingAddress != null)
             return true; //In case the swap is fronted there will for sure be a fronted event
-        if (vaultData.isOpened()) {
-            const [txId, _] = vaultData.getUtxo().split(":");
-            const [btcTx, latestVaultTx] = await Promise.all([
-                this.wrapper.btcRpc.getTransaction(this.data.btcTx.txid),
-                this.wrapper.btcRpc.getTransaction(txId)
-            ]);
-            if (btcTx != null) {
-                const btcTxHeight = btcTx.blockheight;
-                const latestVaultTxHeight = latestVaultTx.blockheight;
-                //We also need to cover the case where bitcoin tx isn't confirmed yet (hence btxTxHeight==null)
-                if (btcTxHeight == null || latestVaultTxHeight < btcTxHeight) {
-                    //Definitely not claimed!
-                    this.logger.debug(`_shouldCheckWithdrawalState(): Skipped checking withdrawal state, latestVaultTxHeight: ${latestVaultTx}, btcTxHeight: ${btcTxHeight} and not fronted!`);
-                    return false;
-                }
-            }
-            else {
-                //Definitely not claimed because the transaction was probably double-spent (or evicted from mempool)
-                this.logger.debug(`_shouldCheckWithdrawalState(): Skipped checking withdrawal state, btc tx probably replaced or evicted: ${this.data.btcTx.txid} and not fronted`);
+        if (vaultDataUtxo == null)
+            return true; //Vault UTXO is null (the vault closed)
+        const [txId, _] = vaultDataUtxo.split(":");
+        const [btcTx, latestVaultTx] = await Promise.all([
+            this.wrapper.btcRpc.getTransaction(this.data.btcTx.txid),
+            this.wrapper.btcRpc.getTransaction(txId)
+        ]);
+        if (btcTx != null) {
+            const btcTxHeight = btcTx.blockheight;
+            const latestVaultTxHeight = latestVaultTx.blockheight;
+            //We also need to cover the case where bitcoin tx isn't confirmed yet (hence btxTxHeight==null)
+            if (btcTxHeight == null || latestVaultTxHeight < btcTxHeight) {
+                //Definitely not claimed!
+                this.logger.debug(`_shouldCheckWithdrawalState(): Skipped checking withdrawal state, latestVaultTxHeight: ${latestVaultTx.blockheight}, btcTxHeight: ${btcTxHeight} and not fronted!`);
                 return false;
             }
+        }
+        else {
+            //Definitely not claimed because the transaction was probably double-spent (or evicted from mempool)
+            this.logger.debug(`_shouldCheckWithdrawalState(): Skipped checking withdrawal state, btc tx probably replaced or evicted: ${this.data.btcTx.txid} and not fronted`);
+            return false;
         }
         return true;
     }

@@ -216,5 +216,5 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     private syncStateFromChain;
     _sync(save?: boolean): Promise<boolean>;
     _tick(save?: boolean): Promise<boolean>;
-    _shouldCheckWithdrawalState(): Promise<boolean>;
+    _shouldCheckWithdrawalState(frontingAddress?: string, vaultDataUtxo?: string): Promise<boolean>;
 }
