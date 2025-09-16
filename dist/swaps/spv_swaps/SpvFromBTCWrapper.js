@@ -462,5 +462,79 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         });
         return psbt;
     }
+    async _checkPastSwaps(pastSwaps) {
+        const changedSwaps = new Set();
+        const removeSwaps = [];
+        const checkWithdrawalStateSwaps = [];
+        for (let pastSwap of pastSwaps) {
+            let changed = false;
+            if (pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.SIGNED ||
+                pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.POSTED ||
+                pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.BROADCASTED ||
+                pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED ||
+                pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.DECLINED ||
+                pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
+                //Check BTC transaction
+                if (await pastSwap._syncStateFromBitcoin(false))
+                    changed ||= true;
+            }
+            if (pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.BROADCASTED || pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
+                if (await pastSwap._shouldCheckWithdrawalState()) {
+                    checkWithdrawalStateSwaps.push(pastSwap);
+                }
+            }
+            else if (pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.CREATED ||
+                pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.SIGNED ||
+                pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.POSTED) {
+                if (pastSwap.expiry < Date.now()) {
+                    if (pastSwap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.CREATED) {
+                        pastSwap.state = SpvFromBTCSwap_1.SpvFromBTCSwapState.QUOTE_EXPIRED;
+                    }
+                    else {
+                        pastSwap.state = SpvFromBTCSwap_1.SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
+                    }
+                    changed ||= true;
+                }
+            }
+            if (pastSwap.isQuoteExpired()) {
+                removeSwaps.push(pastSwap);
+                continue;
+            }
+            if (changed)
+                changedSwaps.add(pastSwap);
+        }
+        const withdrawalStates = await this.contract.getWithdrawalStates(checkWithdrawalStateSwaps.map(val => val.data.getTxId()));
+        for (const pastSwap of checkWithdrawalStateSwaps) {
+            const status = withdrawalStates[pastSwap.data.getTxId()];
+            if (status == null) {
+                this.logger.warn(`_checkPastSwaps(): No withdrawal state returned for ${pastSwap.data.getTxId()}`);
+                continue;
+            }
+            this.logger.debug("syncStateFromChain(): status of " + pastSwap.data.btcTx.txid, status?.type);
+            let changed = false;
+            switch (status.type) {
+                case base_1.SpvWithdrawalStateType.FRONTED:
+                    pastSwap.frontTxId = status.txId;
+                    pastSwap.state = SpvFromBTCSwap_1.SpvFromBTCSwapState.FRONTED;
+                    changed ||= true;
+                    break;
+                case base_1.SpvWithdrawalStateType.CLAIMED:
+                    pastSwap.claimTxId = status.txId;
+                    pastSwap.state = SpvFromBTCSwap_1.SpvFromBTCSwapState.CLAIMED;
+                    changed ||= true;
+                    break;
+                case base_1.SpvWithdrawalStateType.CLOSED:
+                    pastSwap.state = SpvFromBTCSwap_1.SpvFromBTCSwapState.CLOSED;
+                    changed ||= true;
+                    break;
+            }
+            if (changed)
+                changedSwaps.add(pastSwap);
+        }
+        return {
+            changedSwaps: Array.from(changedSwaps),
+            removeSwaps
+        };
+    }
 }
 exports.SpvFromBTCWrapper = SpvFromBTCWrapper;

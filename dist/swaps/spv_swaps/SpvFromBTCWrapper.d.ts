@@ -106,4 +106,8 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
      * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
      */
     getDummySwapPsbt(includeGasToken?: boolean): Transaction;
+    protected _checkPastSwaps(pastSwaps: SpvFromBTCSwap<T>[]): Promise<{
+        changedSwaps: SpvFromBTCSwap<T>[];
+        removeSwaps: SpvFromBTCSwap<T>[];
+    }>;
 }
