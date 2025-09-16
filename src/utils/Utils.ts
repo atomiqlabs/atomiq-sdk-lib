@@ -1,9 +1,10 @@
 import {RequestError} from "../errors/RequestError";
-import {BTC_NETWORK} from "@scure/btc-signer/utils";
+import {BTC_NETWORK, isBytes, PubT, validatePubkey} from "@scure/btc-signer/utils";
 import {Buffer} from "buffer";
 import {Address, OutScript} from "@scure/btc-signer";
 import {randomBytes as randomBytesNoble} from "@noble/hashes/utils";
 import {CoinselectAddressTypes} from "../btc/coinselect2";
+import {IntermediaryError} from "../errors/IntermediaryError";
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
@@ -327,10 +328,29 @@ export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
                 hash: outputScript.hash
             }));
         case "tr":
-            return Buffer.from(OutScript.encode({
-                type: "tr",
-                pubkey: outputScript.pubkey
-            }));
+            try {
+                throw new Error('OutScript/tr: wrong taproot public key')
+                // return Buffer.from(OutScript.encode({
+                //     type: "tr",
+                //     pubkey: outputScript.pubkey
+                // }));
+            } catch (e) {
+                let msg = "";
+                if(e.name!=null) msg += ": "+e.name;
+                if(e.message!=null) msg += ": "+e.message;
+                if(typeof(e)==="string") msg += ": "+e;
+                msg += ", isBytes: "+isBytes(outputScript.pubkey);
+                try {
+                    validatePubkey(outputScript.pubkey, PubT.schnorr)
+                    msg += ", validatePubkey: success";
+                } catch (e) {
+                    msg += ", validatePubkeyError: ";
+                    if(e.name!=null) msg += ": "+e.name;
+                    if(e.message!=null) msg += ": "+e.message;
+                    if(typeof(e)==="string") msg += ": "+e;
+                }
+                throw new Error(msg);
+            }
     }
 }
 
