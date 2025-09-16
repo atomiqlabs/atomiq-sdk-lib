@@ -225,13 +225,7 @@ export abstract class ISwapWrapper<
         }, 1000);
     }
 
-    async checkPastSwaps(pastSwaps?: S[]): Promise<void> {
-        if(pastSwaps==null) pastSwaps = await this.unifiedStorage.query<S>(
-            [[{key: "type", value: this.TYPE}, {key: "state", value: this.pendingSwapStates}]],
-            (val: any) => new this.swapDeserializer(this, val)
-        );
-
-        //Check past swaps
+    protected async _checkPastSwaps(pastSwaps: S[]): Promise<{changedSwaps: S[], removeSwaps: S[]}> {
         const changedSwaps: S[] = [];
         const removeSwaps: S[] = [];
 
@@ -245,6 +239,18 @@ export abstract class ISwapWrapper<
                 }
             }).catch(e => this.logger.error("init(): Error when checking swap "+swap.getId()+": ", e))
         ));
+
+        return {changedSwaps, removeSwaps};
+    }
+
+    async checkPastSwaps(pastSwaps?: S[]): Promise<void> {
+        if(pastSwaps==null) pastSwaps = await this.unifiedStorage.query<S>(
+            [[{key: "type", value: this.TYPE}, {key: "state", value: this.pendingSwapStates}]],
+            (val: any) => new this.swapDeserializer(this, val)
+        );
+
+        //Check past swaps
+        const {removeSwaps, changedSwaps} = await this._checkPastSwaps(pastSwaps);
 
         await this.unifiedStorage.removeAll(removeSwaps);
         await this.unifiedStorage.saveAll(changedSwaps);

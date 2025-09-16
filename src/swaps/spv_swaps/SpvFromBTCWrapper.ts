@@ -6,7 +6,7 @@ import {
     RelaySynchronizer,
     SpvVaultClaimEvent,
     SpvVaultCloseEvent,
-    SpvVaultFrontEvent, SpvVaultTokenBalance
+    SpvVaultFrontEvent, SpvVaultTokenBalance, SpvWithdrawalStateType
 } from "@atomiqlabs/base";
 import {SpvFromBTCSwap, SpvFromBTCSwapInit, SpvFromBTCSwapState} from "./SpvFromBTCSwap";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
@@ -610,6 +610,90 @@ export class SpvFromBTCWrapper<
         });
 
         return psbt;
+    }
+
+    protected async _checkPastSwaps(pastSwaps: SpvFromBTCSwap<T>[]): Promise<{
+        changedSwaps: SpvFromBTCSwap<T>[];
+        removeSwaps: SpvFromBTCSwap<T>[]
+    }> {
+        const changedSwaps: Set<SpvFromBTCSwap<T>> = new Set();
+        const removeSwaps: SpvFromBTCSwap<T>[] = [];
+
+        const checkWithdrawalStateSwaps: SpvFromBTCSwap<T>[] = [];
+
+        for(let pastSwap of pastSwaps) {
+            let changed: boolean = false;
+
+            if(
+                pastSwap.state===SpvFromBTCSwapState.SIGNED ||
+                pastSwap.state===SpvFromBTCSwapState.POSTED ||
+                pastSwap.state===SpvFromBTCSwapState.BROADCASTED ||
+                pastSwap.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED ||
+                pastSwap.state===SpvFromBTCSwapState.DECLINED ||
+                pastSwap.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED
+            ) {
+                //Check BTC transaction
+                if(await pastSwap._syncStateFromBitcoin(false)) changed ||= true;
+            }
+
+            if(pastSwap.state===SpvFromBTCSwapState.BROADCASTED || pastSwap.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
+                if(await pastSwap._shouldCheckWithdrawalState()) {
+                    checkWithdrawalStateSwaps.push(pastSwap);
+                }
+            } else if(
+                pastSwap.state===SpvFromBTCSwapState.CREATED ||
+                pastSwap.state===SpvFromBTCSwapState.SIGNED ||
+                pastSwap.state===SpvFromBTCSwapState.POSTED
+            ) {
+                if(pastSwap.expiry<Date.now()) {
+                    if(pastSwap.state===SpvFromBTCSwapState.CREATED) {
+                        pastSwap.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
+                    } else {
+                        pastSwap.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
+                    }
+                    changed ||= true;
+                }
+            }
+
+            if(pastSwap.isQuoteExpired()) {
+                removeSwaps.push(pastSwap);
+                continue;
+            }
+            if(changed) changedSwaps.add(pastSwap);
+        }
+
+        const withdrawalStates = await this.contract.getWithdrawalStates(checkWithdrawalStateSwaps.map(val => val.data.getTxId()));
+        for(const pastSwap of checkWithdrawalStateSwaps) {
+            const status = withdrawalStates[pastSwap.data.getTxId()];
+            if(status==null) {
+                this.logger.warn(`_checkPastSwaps(): No withdrawal state returned for ${pastSwap.data.getTxId()}`);
+                continue;
+            }
+            this.logger.debug("syncStateFromChain(): status of "+pastSwap.data.btcTx.txid, status?.type);
+            let changed = false;
+            switch(status.type) {
+                case SpvWithdrawalStateType.FRONTED:
+                    pastSwap.frontTxId = status.txId;
+                    pastSwap.state = SpvFromBTCSwapState.FRONTED;
+                    changed ||= true;
+                    break;
+                case SpvWithdrawalStateType.CLAIMED:
+                    pastSwap.claimTxId = status.txId;
+                    pastSwap.state = SpvFromBTCSwapState.CLAIMED;
+                    changed ||= true;
+                    break;
+                case SpvWithdrawalStateType.CLOSED:
+                    pastSwap.state = SpvFromBTCSwapState.CLOSED;
+                    changed ||= true;
+                    break;
+            }
+            if(changed) changedSwaps.add(pastSwap);
+        }
+
+        return {
+            changedSwaps: Array.from(changedSwaps),
+            removeSwaps
+        };
     }
 
 }

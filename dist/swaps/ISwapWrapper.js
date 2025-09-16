@@ -125,10 +125,7 @@ class ISwapWrapper {
             this.tick();
         }, 1000);
     }
-    async checkPastSwaps(pastSwaps) {
-        if (pastSwaps == null)
-            pastSwaps = await this.unifiedStorage.query([[{ key: "type", value: this.TYPE }, { key: "state", value: this.pendingSwapStates }]], (val) => new this.swapDeserializer(this, val));
-        //Check past swaps
+    async _checkPastSwaps(pastSwaps) {
         const changedSwaps = [];
         const removeSwaps = [];
         await Promise.all(pastSwaps.map((swap) => swap._sync(false).then(changed => {
@@ -141,6 +138,13 @@ class ISwapWrapper {
                     changedSwaps.push(swap);
             }
         }).catch(e => this.logger.error("init(): Error when checking swap " + swap.getId() + ": ", e))));
+        return { changedSwaps, removeSwaps };
+    }
+    async checkPastSwaps(pastSwaps) {
+        if (pastSwaps == null)
+            pastSwaps = await this.unifiedStorage.query([[{ key: "type", value: this.TYPE }, { key: "state", value: this.pendingSwapStates }]], (val) => new this.swapDeserializer(this, val));
+        //Check past swaps
+        const { removeSwaps, changedSwaps } = await this._checkPastSwaps(pastSwaps);
         await this.unifiedStorage.removeAll(removeSwaps);
         await this.unifiedStorage.saveAll(changedSwaps);
     }

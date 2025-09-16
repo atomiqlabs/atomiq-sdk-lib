@@ -645,7 +645,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Swap ticks & sync
-    async syncStateFromBitcoin(save) {
+    async _syncStateFromBitcoin(save) {
         if (this.data?.btcTx == null)
             return false;
         //Check if bitcoin payment was confirmed
@@ -709,39 +709,11 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             this.state === SpvFromBTCSwapState.DECLINED ||
             this.state === SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
             //Check BTC transaction
-            if (await this.syncStateFromBitcoin(false))
+            if (await this._syncStateFromBitcoin(false))
                 changed ||= true;
         }
         if (this.state === SpvFromBTCSwapState.BROADCASTED || this.state === SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
-            let checkWithdrawalState = true;
-            const [frontingAddress, vaultData] = await Promise.all([
-                this.wrapper.contract.getFronterAddress(this.vaultOwner, this.vaultId, this.data),
-                this.wrapper.contract.getVaultData(this.vaultOwner, this.vaultId)
-            ]);
-            const isFronted = frontingAddress != null;
-            if (!isFronted && vaultData.isOpened()) {
-                const [txId, _] = vaultData.getUtxo().split(":");
-                const [btcTx, latestVaultTx] = await Promise.all([
-                    this.wrapper.btcRpc.getTransaction(this.data.btcTx.txid),
-                    this.wrapper.btcRpc.getTransaction(txId)
-                ]);
-                if (btcTx != null) {
-                    const btcTxHeight = btcTx.blockheight;
-                    const latestVaultTxHeight = latestVaultTx.blockheight;
-                    //We also need to cover the case where bitcoin tx isn't confirmed yet (hence btxTxHeight==null)
-                    if (btcTxHeight == null || latestVaultTxHeight < btcTxHeight) {
-                        //Definitely not claimed!
-                        this.logger.debug(`syncStateFromChain(): Skipped checking withdrawal state, latestVaultTxHeight: ${latestVaultTx}, btcTxHeight: ${btcTxHeight} and not fronted!`);
-                        checkWithdrawalState = false;
-                    }
-                }
-                else {
-                    //Definitely not claimed because the transaction was probably double-spent (or evicted from mempool)
-                    this.logger.debug(`syncStateFromChain(): Skipped checking withdrawal state, btc tx probably replaced or evicted: ${this.data.btcTx.txid} and not fronted`);
-                    checkWithdrawalState = false;
-                }
-            }
-            if (checkWithdrawalState) {
+            if (await this._shouldCheckWithdrawalState()) {
                 const status = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
                 this.logger.debug("syncStateFromChain(): status of " + this.data.btcTx.txid, status);
                 switch (status.type) {
@@ -806,13 +778,44 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
                 this.state === SpvFromBTCSwapState.BROADCASTED) {
                 try {
                     //Check if bitcoin payment was confirmed
-                    return await this.syncStateFromBitcoin(save);
+                    return await this._syncStateFromBitcoin(save);
                 }
                 catch (e) {
                     this.logger.error("tickSwap(" + this.getId() + "): ", e);
                 }
             }
         }
+    }
+    async _shouldCheckWithdrawalState() {
+        const [frontingAddress, vaultData] = await Promise.all([
+            this.wrapper.contract.getFronterAddress(this.vaultOwner, this.vaultId, this.data),
+            this.wrapper.contract.getVaultData(this.vaultOwner, this.vaultId)
+        ]);
+        if (frontingAddress != null)
+            return true; //In case the swap is fronted there will for sure be a fronted event
+        if (vaultData.isOpened()) {
+            const [txId, _] = vaultData.getUtxo().split(":");
+            const [btcTx, latestVaultTx] = await Promise.all([
+                this.wrapper.btcRpc.getTransaction(this.data.btcTx.txid),
+                this.wrapper.btcRpc.getTransaction(txId)
+            ]);
+            if (btcTx != null) {
+                const btcTxHeight = btcTx.blockheight;
+                const latestVaultTxHeight = latestVaultTx.blockheight;
+                //We also need to cover the case where bitcoin tx isn't confirmed yet (hence btxTxHeight==null)
+                if (btcTxHeight == null || latestVaultTxHeight < btcTxHeight) {
+                    //Definitely not claimed!
+                    this.logger.debug(`_shouldCheckWithdrawalState(): Skipped checking withdrawal state, latestVaultTxHeight: ${latestVaultTx}, btcTxHeight: ${btcTxHeight} and not fronted!`);
+                    return false;
+                }
+            }
+            else {
+                //Definitely not claimed because the transaction was probably double-spent (or evicted from mempool)
+                this.logger.debug(`_shouldCheckWithdrawalState(): Skipped checking withdrawal state, btc tx probably replaced or evicted: ${this.data.btcTx.txid} and not fronted`);
+                return false;
+            }
+        }
+        return true;
     }
 }
 exports.SpvFromBTCSwap = SpvFromBTCSwap;
