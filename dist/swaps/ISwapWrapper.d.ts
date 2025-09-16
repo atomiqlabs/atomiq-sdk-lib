@@ -109,6 +109,10 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      */
     init(noTimers?: boolean, noCheckPastSwaps?: boolean): Promise<void>;
     protected startTickInterval(): void;
+    protected _checkPastSwaps(pastSwaps: S[]): Promise<{
+        changedSwaps: S[];
+        removeSwaps: S[];
+    }>;
     checkPastSwaps(pastSwaps?: S[]): Promise<void>;
     tick(swaps?: S[]): Promise<void>;
     saveSwapData(swap: S): Promise<void>;
