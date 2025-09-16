@@ -2,9 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.randomBytes = exports.toCoinselectAddressType = exports.toOutputScript = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
 const RequestError_1 = require("../errors/RequestError");
+const utils_1 = require("@scure/btc-signer/utils");
 const buffer_1 = require("buffer");
 const btc_signer_1 = require("@scure/btc-signer");
-const utils_1 = require("@noble/hashes/utils");
+const utils_2 = require("@noble/hashes/utils");
 function isConstructor(fn) {
     return (typeof fn === 'function' &&
         fn.prototype != null &&
@@ -303,10 +304,37 @@ function toOutputScript(network, address) {
                 hash: outputScript.hash
             }));
         case "tr":
-            return buffer_1.Buffer.from(btc_signer_1.OutScript.encode({
-                type: "tr",
-                pubkey: outputScript.pubkey
-            }));
+            try {
+                throw new Error('OutScript/tr: wrong taproot public key');
+                // return Buffer.from(OutScript.encode({
+                //     type: "tr",
+                //     pubkey: outputScript.pubkey
+                // }));
+            }
+            catch (e) {
+                let msg = "";
+                if (e.name != null)
+                    msg += ": " + e.name;
+                if (e.message != null)
+                    msg += ": " + e.message;
+                if (typeof (e) === "string")
+                    msg += ": " + e;
+                msg += ", isBytes: " + (0, utils_1.isBytes)(outputScript.pubkey);
+                try {
+                    (0, utils_1.validatePubkey)(outputScript.pubkey, utils_1.PubT.schnorr);
+                    msg += ", validatePubkey: success";
+                }
+                catch (e) {
+                    msg += ", validatePubkeyError: ";
+                    if (e.name != null)
+                        msg += ": " + e.name;
+                    if (e.message != null)
+                        msg += ": " + e.message;
+                    if (typeof (e) === "string")
+                        msg += ": " + e;
+                }
+                throw new Error(msg);
+            }
     }
 }
 exports.toOutputScript = toOutputScript;
@@ -328,6 +356,6 @@ function toCoinselectAddressType(outputScript) {
 }
 exports.toCoinselectAddressType = toCoinselectAddressType;
 function randomBytes(bytesLength) {
-    return buffer_1.Buffer.from((0, utils_1.randomBytes)(bytesLength));
+    return buffer_1.Buffer.from((0, utils_2.randomBytes)(bytesLength));
 }
 exports.randomBytes = randomBytes;
