@@ -329,11 +329,10 @@ export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
             }));
         case "tr":
             try {
-                throw new Error('OutScript/tr: wrong taproot public key')
-                // return Buffer.from(OutScript.encode({
-                //     type: "tr",
-                //     pubkey: outputScript.pubkey
-                // }));
+                return Buffer.from(OutScript.encode({
+                    type: "tr",
+                    pubkey: outputScript.pubkey
+                }));
             } catch (e) {
                 let msg = "";
                 if(e.name!=null) msg += ": "+e.name;
