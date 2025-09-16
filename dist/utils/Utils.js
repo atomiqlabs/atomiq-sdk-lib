@@ -305,11 +305,10 @@ function toOutputScript(network, address) {
             }));
         case "tr":
             try {
-                throw new Error('OutScript/tr: wrong taproot public key');
-                // return Buffer.from(OutScript.encode({
-                //     type: "tr",
-                //     pubkey: outputScript.pubkey
-                // }));
+                return buffer_1.Buffer.from(btc_signer_1.OutScript.encode({
+                    type: "tr",
+                    pubkey: outputScript.pubkey
+                }));
             }
             catch (e) {
                 let msg = "";
