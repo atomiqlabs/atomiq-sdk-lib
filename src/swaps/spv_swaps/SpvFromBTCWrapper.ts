@@ -619,7 +619,7 @@ export class SpvFromBTCWrapper<
         const changedSwaps: Set<SpvFromBTCSwap<T>> = new Set();
         const removeSwaps: SpvFromBTCSwap<T>[] = [];
 
-        const checkWithdrawalStateSwaps: SpvFromBTCSwap<T>[] = [];
+        const broadcastedOrConfirmedSwaps: SpvFromBTCSwap<T>[] = [];
 
         for(let pastSwap of pastSwaps) {
             let changed: boolean = false;
@@ -636,11 +636,7 @@ export class SpvFromBTCWrapper<
                 if(await pastSwap._syncStateFromBitcoin(false)) changed ||= true;
             }
 
-            if(pastSwap.state===SpvFromBTCSwapState.BROADCASTED || pastSwap.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
-                if(await pastSwap._shouldCheckWithdrawalState()) {
-                    checkWithdrawalStateSwaps.push(pastSwap);
-                }
-            } else if(
+            if(
                 pastSwap.state===SpvFromBTCSwapState.CREATED ||
                 pastSwap.state===SpvFromBTCSwapState.SIGNED ||
                 pastSwap.state===SpvFromBTCSwapState.POSTED
@@ -660,6 +656,28 @@ export class SpvFromBTCWrapper<
                 continue;
             }
             if(changed) changedSwaps.add(pastSwap);
+
+            if(pastSwap.state===SpvFromBTCSwapState.BROADCASTED || pastSwap.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
+                broadcastedOrConfirmedSwaps.push(pastSwap);
+            }
+        }
+
+        const checkWithdrawalStateSwaps: SpvFromBTCSwap<T>[] = [];
+        const _fronts = await this.contract.getFronterAddresses(broadcastedOrConfirmedSwaps.map(val => ({
+            owner: val.vaultOwner,
+            vaultId: val.vaultId,
+            withdrawal: val.data
+        })));
+        const _vaultUtxos = await this.contract.getVaultLatestUtxos(broadcastedOrConfirmedSwaps.map(val => ({
+            owner: val.vaultOwner,
+            vaultId: val.vaultId
+        })));
+        for(const pastSwap of broadcastedOrConfirmedSwaps) {
+            const fronterAddress = _fronts[pastSwap.data.getTxId()];
+            const latestVaultUtxo = _vaultUtxos[pastSwap.vaultOwner]?.[pastSwap.vaultId.toString(10)];
+            if(fronterAddress===undefined) this.logger.warn(`_checkPastSwaps(): No fronter address returned for ${pastSwap.data.getTxId()}`);
+            if(latestVaultUtxo===undefined) this.logger.warn(`_checkPastSwaps(): No last vault utxo returned for ${pastSwap.data.getTxId()}`);
+            if(await pastSwap._shouldCheckWithdrawalState(fronterAddress, latestVaultUtxo)) checkWithdrawalStateSwaps.push(pastSwap);
         }
 
         const withdrawalStates = await this.contract.getWithdrawalStates(checkWithdrawalStateSwaps.map(val => val.data.getTxId()));
