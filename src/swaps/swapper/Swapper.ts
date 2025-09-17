@@ -399,10 +399,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         });
     }
 
-    /**
-     * Initializes the swap storage and loads existing swaps, needs to be called before any other action
-     */
-    async init(): Promise<void> {
+    private async _init(): Promise<void> {
         const promises = [];
         for(let chainIdentifier in this.chains) {
             promises.push((async() => {
@@ -465,10 +462,33 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         await this.messenger.init();
     }
 
+    private initPromise: Promise<void>;
+    private initialized: boolean = false;
+
+    /**
+     * Initializes the swap storage and loads existing swaps, needs to be called before any other action
+     */
+    async init(): Promise<void> {
+        if(this.initialized) return;
+        if(this.initPromise!=null) await this.initPromise;
+
+        try {
+            const promise = this._init();
+            this.initPromise = promise;
+            await promise;
+            delete this.initPromise;
+            this.initialized = true;
+        } catch (e) {
+            delete this.initPromise;
+            throw e;
+        }
+    }
+
     /**
      * Stops listening for onchain events and closes this Swapper instance
      */
     async stop() {
+        if(this.initPromise) await this.initPromise;
         for(let chainIdentifier in this.chains) {
             const {
                 wrappers,
@@ -481,6 +501,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             await unifiedChainEvents.stop();
             await this.messenger.stop();
         }
+        this.initialized = false;
     }
 
     /**

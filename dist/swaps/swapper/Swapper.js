@@ -30,6 +30,7 @@ class Swapper extends events_1.EventEmitter {
     constructor(bitcoinRpc, chainsData, pricing, tokens, messenger, options) {
         super();
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
+        this.initialized = false;
         this.SwapTypeInfo = {
             [SwapType_1.SwapType.TO_BTC]: {
                 requiresInputWallet: true,
@@ -190,10 +191,7 @@ class Swapper extends events_1.EventEmitter {
             this.emit("lpsAdded", intermediaries);
         });
     }
-    /**
-     * Initializes the swap storage and loads existing swaps, needs to be called before any other action
-     */
-    async init() {
+    async _init() {
         const promises = [];
         for (let chainIdentifier in this.chains) {
             promises.push((async () => {
@@ -243,9 +241,31 @@ class Swapper extends events_1.EventEmitter {
         await this.messenger.init();
     }
     /**
+     * Initializes the swap storage and loads existing swaps, needs to be called before any other action
+     */
+    async init() {
+        if (this.initialized)
+            return;
+        if (this.initPromise != null)
+            await this.initPromise;
+        try {
+            const promise = this._init();
+            this.initPromise = promise;
+            await promise;
+            delete this.initPromise;
+            this.initialized = true;
+        }
+        catch (e) {
+            delete this.initPromise;
+            throw e;
+        }
+    }
+    /**
      * Stops listening for onchain events and closes this Swapper instance
      */
     async stop() {
+        if (this.initPromise)
+            await this.initPromise;
         for (let chainIdentifier in this.chains) {
             const { wrappers, unifiedChainEvents } = this.chains[chainIdentifier];
             for (let key in wrappers) {
@@ -255,6 +275,7 @@ class Swapper extends events_1.EventEmitter {
             await unifiedChainEvents.stop();
             await this.messenger.stop();
         }
+        this.initialized = false;
     }
     /**
      * Creates swap & handles intermediary, quote selection
