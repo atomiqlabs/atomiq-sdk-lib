@@ -182,7 +182,14 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
         await this._saveAndEmit();
         return result.tx.txid;
     }
-    async getFundedPsbt(_bitcoinWallet, feeRate) {
+    /**
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use)
+     *
+     * @param _bitcoinWallet Sender's bitcoin wallet
+     * @param feeRate Optional fee rate for the transaction
+     * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
+     */
+    async getFundedPsbt(_bitcoinWallet, feeRate, additionalOutputs) {
         if (this.state !== FromBTCSwapState.CLAIM_COMMITED)
             throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
         let bitcoinWallet;
@@ -204,6 +211,13 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             amount: this.amount,
             script: (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.address)
         });
+        if (additionalOutputs != null)
+            additionalOutputs.forEach(output => {
+                basePsbt.addOutput({
+                    amount: output.amount,
+                    script: output.outputScript ?? (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, output.address)
+                });
+            });
         const psbt = await bitcoinWallet.fundPsbt(basePsbt, feeRate);
         //Sign every input
         const signInputs = [];
