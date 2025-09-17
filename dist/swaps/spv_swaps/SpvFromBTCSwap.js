@@ -316,7 +316,14 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             in1sequence: res.in1sequence
         };
     }
-    async getFundedPsbt(_bitcoinWallet, feeRate) {
+    /**
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use)
+     *
+     * @param _bitcoinWallet Sender's bitcoin wallet
+     * @param feeRate Optional fee rate for the transaction, needs to be at least as big as {minimumBtcFeeRate} field
+     * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
+     */
+    async getFundedPsbt(_bitcoinWallet, feeRate, additionalOutputs) {
         let bitcoinWallet;
         if ((0, IBitcoinWallet_1.isIBitcoinWallet)(_bitcoinWallet)) {
             bitcoinWallet = _bitcoinWallet;
@@ -332,6 +339,13 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             feeRate = Math.max(this.minimumBtcFeeRate, await bitcoinWallet.getFeeRate());
         }
         let { psbt, in1sequence } = await this.getPsbt();
+        if (additionalOutputs != null)
+            additionalOutputs.forEach(output => {
+                psbt.addOutput({
+                    amount: output.amount,
+                    script: output.outputScript ?? (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, output.address)
+                });
+            });
         psbt = await bitcoinWallet.fundPsbt(psbt, feeRate);
         psbt.updateInput(1, { sequence: in1sequence });
         //Sign every input except the first one

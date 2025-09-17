@@ -241,7 +241,18 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         return result.tx.txid;
     }
 
-    async getFundedPsbt(_bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string }, feeRate?: number): Promise<{psbt: Transaction, signInputs: number[]}> {
+    /**
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use)
+     *
+     * @param _bitcoinWallet Sender's bitcoin wallet
+     * @param feeRate Optional fee rate for the transaction
+     * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
+     */
+    async getFundedPsbt(
+        _bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string },
+        feeRate?: number,
+        additionalOutputs?: ({amount: bigint, outputScript: Uint8Array} | {amount: bigint, address: string})[]
+    ): Promise<{psbt: Transaction, signInputs: number[]}> {
         if(this.state!==FromBTCSwapState.CLAIM_COMMITED)
             throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
 
@@ -263,6 +274,12 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         basePsbt.addOutput({
             amount: this.amount,
             script: toOutputScript(this.wrapper.options.bitcoinNetwork, this.address)
+        });
+        if(additionalOutputs!=null) additionalOutputs.forEach(output => {
+            basePsbt.addOutput({
+                amount: output.amount,
+                script: (output as {outputScript: Uint8Array}).outputScript ?? toOutputScript(this.wrapper.options.bitcoinNetwork, (output as {address: string}).address)
+            });
         });
 
         const psbt = await bitcoinWallet.fundPsbt(basePsbt, feeRate);

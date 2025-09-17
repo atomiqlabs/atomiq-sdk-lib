@@ -139,10 +139,23 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         psbt: Transaction;
         in1sequence: number;
     }>;
+    /**
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use)
+     *
+     * @param _bitcoinWallet Sender's bitcoin wallet
+     * @param feeRate Optional fee rate for the transaction, needs to be at least as big as {minimumBtcFeeRate} field
+     * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
+     */
     getFundedPsbt(_bitcoinWallet: IBitcoinWallet | {
         address: string;
         publicKey: string;
-    }, feeRate?: number): Promise<{
+    }, feeRate?: number, additionalOutputs?: ({
+        amount: bigint;
+        outputScript: Uint8Array;
+    } | {
+        amount: bigint;
+        address: string;
+    })[]): Promise<{
         psbt: Transaction;
         signInputs: number[];
     }>;

@@ -5,7 +5,13 @@ export interface IBTCWalletSwap {
     getFundedPsbt(_bitcoinWallet: IBitcoinWallet | {
         address: string;
         publicKey: string;
-    }, feeRate?: number): Promise<{
+    }, feeRate?: number, additionalOutputs?: ({
+        amount: bigint;
+        outputScript: Uint8Array;
+    } | {
+        amount: bigint;
+        address: string;
+    })[]): Promise<{
         psbt: Transaction;
         signInputs: number[];
     }>;

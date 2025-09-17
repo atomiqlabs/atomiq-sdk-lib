@@ -78,10 +78,23 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
+    /**
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use)
+     *
+     * @param _bitcoinWallet Sender's bitcoin wallet
+     * @param feeRate Optional fee rate for the transaction
+     * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
+     */
     getFundedPsbt(_bitcoinWallet: IBitcoinWallet | {
         address: string;
         publicKey: string;
-    }, feeRate?: number): Promise<{
+    }, feeRate?: number, additionalOutputs?: ({
+        amount: bigint;
+        outputScript: Uint8Array;
+    } | {
+        amount: bigint;
+        address: string;
+    })[]): Promise<{
         psbt: Transaction;
         signInputs: number[];
     }>;

@@ -4,7 +4,11 @@ import {Transaction} from "@scure/btc-signer";
 
 export interface IBTCWalletSwap {
 
-    getFundedPsbt(_bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string }, feeRate?: number): Promise<{psbt: Transaction, signInputs: number[]}>;
+    getFundedPsbt(
+        _bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string },
+        feeRate?: number,
+        additionalOutputs?: ({amount: bigint, outputScript: Uint8Array} | {amount: bigint, address: string})[]
+    ): Promise<{psbt: Transaction, signInputs: number[]}>;
     submitPsbt(psbt: Transaction): Promise<string>;
     estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
     sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
