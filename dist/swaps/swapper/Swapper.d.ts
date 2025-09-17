@@ -112,6 +112,9 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
     readonly Utils: SwapperUtils<T>;
     readonly messenger: Messenger;
     constructor(bitcoinRpc: MempoolBitcoinRpc, chainsData: CtorMultiChainData<T>, pricing: ISwapPrice<T>, tokens: WrapperCtorTokens<T>, messenger: Messenger, options?: SwapperOptions);
+    private _init;
+    private initPromise;
+    private initialized;
     /**
      * Initializes the swap storage and loads existing swaps, needs to be called before any other action
      */
