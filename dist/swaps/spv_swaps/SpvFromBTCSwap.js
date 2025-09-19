@@ -579,12 +579,16 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         this.logger.debug("waitTillClaimedOrFronted(): Resolved from watchdog");
         if (res.type === base_1.SpvWithdrawalStateType.FRONTED) {
             if (this.state !== SpvFromBTCSwapState.FRONTED ||
-                this.state !== SpvFromBTCSwapState.CLAIMED)
+                this.state !== SpvFromBTCSwapState.CLAIMED) {
+                this.frontTxId = res.txId;
                 await this._saveAndEmit(SpvFromBTCSwapState.FRONTED);
+            }
         }
         if (res.type === base_1.SpvWithdrawalStateType.CLAIMED) {
-            if (this.state !== SpvFromBTCSwapState.CLAIMED)
+            if (this.state !== SpvFromBTCSwapState.CLAIMED) {
+                this.claimTxId = res.txId;
                 await this._saveAndEmit(SpvFromBTCSwapState.FRONTED);
+            }
         }
         if (res.type === base_1.SpvWithdrawalStateType.CLOSED) {
             if (this.state !== SpvFromBTCSwapState.CLOSED)

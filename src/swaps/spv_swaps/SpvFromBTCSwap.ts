@@ -795,12 +795,18 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             if(
                 (this.state as SpvFromBTCSwapState)!==SpvFromBTCSwapState.FRONTED ||
                 (this.state as SpvFromBTCSwapState)!==SpvFromBTCSwapState.CLAIMED
-            ) await this._saveAndEmit(SpvFromBTCSwapState.FRONTED);
+            ) {
+                this.frontTxId = res.txId;
+                await this._saveAndEmit(SpvFromBTCSwapState.FRONTED);
+            }
         }
         if(res.type===SpvWithdrawalStateType.CLAIMED) {
             if(
                 (this.state as SpvFromBTCSwapState)!==SpvFromBTCSwapState.CLAIMED
-            ) await this._saveAndEmit(SpvFromBTCSwapState.FRONTED);
+            ) {
+                this.claimTxId = res.txId;
+                await this._saveAndEmit(SpvFromBTCSwapState.FRONTED);
+            }
         }
         if(res.type===SpvWithdrawalStateType.CLOSED) {
             if(
