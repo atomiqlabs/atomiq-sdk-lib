@@ -216,11 +216,11 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
     async commit(signer, abortSignal, skipChecks) {
         this.checkSigner(signer);
         const result = await this.wrapper.chain.sendAndConfirm(signer, await this.txsCommit(skipChecks), true, abortSignal);
-        this.commitTxId = result[0];
+        this.commitTxId = result[result.length - 1];
         if (this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state === ToBTCSwapState.QUOTE_EXPIRED) {
             await this._saveAndEmit(ToBTCSwapState.COMMITED);
         }
-        return result[0];
+        return this.commitTxId;
     }
     /**
      * Waits till a swap is committed, should be called after sending the commit transactions manually
@@ -247,6 +247,7 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
             this.logger.debug("waitTillCommited(): Resolved from watchdog - signature expiry");
             if (this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state === ToBTCSwapState.CREATED) {
                 await this._saveAndEmit(ToBTCSwapState.QUOTE_EXPIRED);
+                throw new Error("Quote expired while waiting for transaction confirmation!");
             }
             return;
         }

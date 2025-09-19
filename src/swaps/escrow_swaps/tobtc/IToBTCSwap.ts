@@ -282,11 +282,11 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
             signer, await this.txsCommit(skipChecks), true, abortSignal
         );
 
-        this.commitTxId = result[0];
+        this.commitTxId = result[result.length-1];
         if(this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state===ToBTCSwapState.QUOTE_EXPIRED) {
             await this._saveAndEmit(ToBTCSwapState.COMMITED);
         }
-        return result[0];
+        return this.commitTxId;
     }
 
     /**
@@ -312,6 +312,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
             this.logger.debug("waitTillCommited(): Resolved from watchdog - signature expiry");
             if(this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state===ToBTCSwapState.CREATED) {
                 await this._saveAndEmit(ToBTCSwapState.QUOTE_EXPIRED);
+                throw new Error("Quote expired while waiting for transaction confirmation!");
             }
             return;
         }
