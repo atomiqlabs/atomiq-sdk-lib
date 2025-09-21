@@ -36,6 +36,7 @@ export * from "./swaps/swapper/Swapper";
 export * from "./swaps/swapper/SwapperWithChain";
 export * from "./swaps/swapper/SwapperWithSigner";
 export * from "./swaps/swapper/utils/SwapperUtils";
+export * from "./swaps/enums/SwapAmountType";
 export * from "./swaps/enums/SwapType";
 export * from "./swaps/enums/SwapDirection";
 export * from "./swaps/escrow_swaps/IEscrowSwapWrapper";

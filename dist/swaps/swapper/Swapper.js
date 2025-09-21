@@ -26,6 +26,7 @@ const UnifiedSwapEventListener_1 = require("../../events/UnifiedSwapEventListene
 const SpvFromBTCWrapper_1 = require("../spv_swaps/SpvFromBTCWrapper");
 const SwapperUtils_1 = require("./utils/SwapperUtils");
 const FromBTCLNAutoWrapper_1 = require("../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoWrapper");
+const UserError_1 = require("../../errors/UserError");
 class Swapper extends events_1.EventEmitter {
     constructor(bitcoinRpc, chainsData, pricing, tokens, messenger, options) {
         super();
@@ -95,7 +96,8 @@ class Swapper extends events_1.EventEmitter {
             for (let chainId in tokenData.chains) {
                 const chainData = tokenData.chains[chainId];
                 this.tokens[chainId] ??= {};
-                this.tokens[chainId][chainData.address] = {
+                this.tokensByTicker[chainId] ??= {};
+                this.tokens[chainId][chainData.address] = this.tokensByTicker[chainId][tokenData.ticker] = {
                     chain: "SC",
                     chainId,
                     ticker: tokenData.ticker,
@@ -726,15 +728,18 @@ class Swapper extends events_1.EventEmitter {
      *  or output amount (exactIn=false), NOTE: For regular SmartChain -> BTC-LN (lightning) swaps the passed amount is ignored and
      *  invoice's pre-set amount is used instead, use LNURL-pay for dynamic amounts
      *
-     * @param srcToken Source token of the swap, user pays this token
-     * @param dstToken Destination token of the swap, user receives this token
-     * @param amount Amount of the swap
+     * @param _srcToken Source token of the swap, user pays this token
+     * @param _dstToken Destination token of the swap, user receives this token
+     * @param _amount Amount of the swap either in base units as {bigint} or in human readable format (with decimals) as {string}
      * @param exactIn Whether the amount specified is an input amount (exactIn=true) or an output amount (exactIn=false)
      * @param src Source wallet/lnurl-withdraw of the swap
      * @param dst Destination smart chain address, bitcoin on-chain address, lightning invoice, LNURL-pay
      * @param options Options for the swap
      */
-    swap(srcToken, dstToken, amount, exactIn, src, dst, options) {
+    swap(_srcToken, _dstToken, _amount, exactIn, src, dst, options) {
+        const srcToken = typeof (_srcToken) === "string" ? this.getToken(_srcToken) : _srcToken;
+        const dstToken = typeof (_dstToken) === "string" ? this.getToken(_dstToken) : _dstToken;
+        const amount = typeof (_amount) === "bigint" ? _amount : (0, Tokens_1.fromDecimal)(_amount, exactIn ? srcToken.decimals : dstToken.decimals);
         if (srcToken.chain === "BTC") {
             if (dstToken.chain === "SC") {
                 if (typeof (dst) !== "string")
@@ -774,7 +779,7 @@ class Swapper extends events_1.EventEmitter {
                     if (typeof (dst) !== "string" && !(0, LNURL_1.isLNURLPay)(dst))
                         throw new Error("Destination LNURL link/lightning invoice must be a string or LNURLPay object!");
                     if ((0, LNURL_1.isLNURLPay)(dst) || this.Utils.isValidLNURL(dst)) {
-                        return this.createToBTCLNSwapViaLNURL(srcToken.chainId, src, srcToken.address, dst, amount, exactIn, undefined, options);
+                        return this.createToBTCLNSwapViaLNURL(srcToken.chainId, src, srcToken.address, dst, amount, !!exactIn, undefined, options);
                     }
                     else if (this.Utils.isLightningInvoice(dst)) {
                         if (!this.Utils.isValidLightningInvoice(dst))
@@ -791,7 +796,7 @@ class Swapper extends events_1.EventEmitter {
                     //TO_BTC
                     if (typeof (dst) !== "string")
                         throw new Error("Destination bitcoin address must be a string!");
-                    return this.createToBTCSwap(srcToken.chainId, src, srcToken.address, dst, amount, exactIn, undefined, options);
+                    return this.createToBTCSwap(srcToken.chainId, src, srcToken.address, dst, amount, !!exactIn, undefined, options);
                 }
             }
         }
@@ -924,6 +929,38 @@ class Swapper extends events_1.EventEmitter {
             return (await unifiedSwapStorage.query([queryParams], reviver))[0];
         }
     }
+    async syncSwapsForChain(chainId, signer) {
+        const { unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
+        const queryParams = [];
+        for (let key in wrappers) {
+            const wrapper = wrappers[key];
+            const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
+            if (signer != null)
+                swapTypeQueryParams.push({ key: "intiator", value: signer });
+            swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });
+            queryParams.push(swapTypeQueryParams);
+        }
+        this.logger.debug("_syncSwaps(): Querying swaps swaps for chain " + chainId + "!");
+        const swaps = await unifiedSwapStorage.query(queryParams, reviver);
+        this.logger.debug("_syncSwaps(): Syncing " + swaps.length + " swaps!");
+        const changedSwaps = [];
+        const removeSwaps = [];
+        const assortedSwaps = {};
+        swaps.forEach(swap => {
+            assortedSwaps[swap.getType()] ??= [];
+            assortedSwaps[swap.getType()].push(swap);
+        });
+        for (let swapType in assortedSwaps) {
+            const wrapperSwaps = assortedSwaps[swapType];
+            const wrapper = wrappers[swapType];
+            const result = await wrapper.checkPastSwaps(wrapperSwaps, true);
+            changedSwaps.push(...result.changedSwaps);
+            removeSwaps.push(...result.removeSwaps);
+        }
+        this.logger.debug("_syncSwaps(): Done syncing " + swaps.length + " swaps, saving " + changedSwaps.length + " changed swaps, removing " + removeSwaps.length + " swaps!");
+        await unifiedSwapStorage.saveAll(changedSwaps);
+        await unifiedSwapStorage.removeAll(removeSwaps);
+    }
     /**
      * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes
      *
@@ -932,71 +969,50 @@ class Swapper extends events_1.EventEmitter {
      */
     async _syncSwaps(chainId, signer) {
         if (chainId == null) {
-            await Promise.all(Object.keys(this.chains).map(async (chainId) => {
-                const { unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
-                const queryParams = [];
-                for (let key in wrappers) {
-                    const wrapper = wrappers[key];
-                    const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
-                    if (signer != null)
-                        swapTypeQueryParams.push({ key: "intiator", value: signer });
-                    swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });
-                    queryParams.push(swapTypeQueryParams);
-                }
-                this.logger.debug("_syncSwaps(): Querying swaps swaps for chain " + chainId + "!");
-                const swaps = await unifiedSwapStorage.query(queryParams, reviver);
-                this.logger.debug("_syncSwaps(): Syncing " + swaps.length + " swaps!");
-                const changedSwaps = [];
-                const removeSwaps = [];
-                for (let swap of swaps) {
-                    this.logger.debug("_syncSwaps(): Syncing swap: " + swap.getId());
-                    const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: " + swap.getId(), e));
-                    this.logger.debug("_syncSwaps(): Synced swap: " + swap.getId());
-                    if (swap.isQuoteExpired()) {
-                        removeSwaps.push(swap);
-                    }
-                    else {
-                        if (swapChanged)
-                            changedSwaps.push(swap);
-                    }
-                }
-                this.logger.debug("_syncSwaps(): Done syncing " + swaps.length + " swaps, saving " + changedSwaps.length + " changed swaps, removing " + removeSwaps.length + " swaps!");
-                await unifiedSwapStorage.saveAll(changedSwaps);
-                await unifiedSwapStorage.removeAll(removeSwaps);
+            await Promise.all(Object.keys(this.chains).map((chainId) => {
+                return this.syncSwapsForChain(chainId, signer);
             }));
         }
         else {
-            const { unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
-            const queryParams = [];
-            for (let key in wrappers) {
-                const wrapper = wrappers[key];
-                const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
-                if (signer != null)
-                    swapTypeQueryParams.push({ key: "intiator", value: signer });
-                swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });
-                queryParams.push(swapTypeQueryParams);
-            }
-            this.logger.debug("_syncSwaps(): Querying swaps swaps for chain " + chainId + "!");
-            const swaps = await unifiedSwapStorage.query(queryParams, reviver);
-            this.logger.debug("_syncSwaps(): Syncing " + swaps.length + " swaps!");
-            const changedSwaps = [];
-            const removeSwaps = [];
-            for (let swap of swaps) {
-                this.logger.debug("_syncSwaps(): Syncing swap: " + swap.getId());
-                const swapChanged = await swap._sync(false).catch(e => this.logger.warn("_syncSwaps(): Error in swap: " + swap.getId(), e));
-                this.logger.debug("_syncSwaps(): Synced swap: " + swap.getId());
-                if (swap.isQuoteExpired()) {
-                    removeSwaps.push(swap);
-                }
-                else {
-                    if (swapChanged)
-                        changedSwaps.push(swap);
-                }
-            }
-            this.logger.debug("_syncSwaps(): Done syncing " + swaps.length + " swaps, saving " + changedSwaps.length + " changed swaps, removing " + removeSwaps.length + " swaps!");
-            await unifiedSwapStorage.saveAll(changedSwaps);
-            await unifiedSwapStorage.removeAll(removeSwaps);
+            await this.syncSwapsForChain(chainId, signer);
         }
+    }
+    getToken(tickerOrAddress) {
+        //Btc tokens - BTC, BTCLN, BTC-LN
+        if (tickerOrAddress === "BTC")
+            return Tokens_1.BitcoinTokens.BTC;
+        if (tickerOrAddress === "BTCLN" || tickerOrAddress === "BTC-LN")
+            return Tokens_1.BitcoinTokens.BTCLN;
+        //Check if the ticker is in format <chainId>-<ticker>, i.e. SOLANA-USDC, STARKNET-WBTC
+        if (tickerOrAddress.includes("-")) {
+            const [chainId, ticker] = tickerOrAddress.split("-");
+            const token = this.tokens[chainId]?.[ticker];
+            if (token == null)
+                throw new UserError_1.UserError(`Not found ticker: ${ticker} for chainId: ${chainId}`);
+            return token;
+        }
+        const possibleTokens = [];
+        for (let chainId in this.chains) {
+            const chain = this.chains[chainId];
+            if (chain.chainInterface.isValidToken(tickerOrAddress)) {
+                //Try to find in known token addresses
+                const token = this.tokens[chainId]?.[tickerOrAddress];
+                if (token != null)
+                    return token;
+            }
+            else {
+                //Check in known tickers
+                const token = this.tokensByTicker[chainId]?.[tickerOrAddress];
+                if (token != null)
+                    possibleTokens.push(token);
+            }
+        }
+        if (possibleTokens.length === 0)
+            throw new UserError_1.UserError(`Specified token address or ticker ${tickerOrAddress} not found!`);
+        //In case we've found the token in multiple chains
+        if (possibleTokens.length > 1)
+            throw new UserError_1.UserError(`A ticker ${tickerOrAddress} has been found in multiple chains, narrow it down by using <chainId>-${tickerOrAddress} notation`);
+        return possibleTokens[0];
     }
     /**
      * Creates a child swapper instance with a given smart chain

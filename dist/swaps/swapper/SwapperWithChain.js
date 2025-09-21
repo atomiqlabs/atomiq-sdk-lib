@@ -5,6 +5,7 @@ const SwapType_1 = require("../enums/SwapType");
 const SwapPriceWithChain_1 = require("../../prices/SwapPriceWithChain");
 const Tokens_1 = require("../../Tokens");
 const SwapperWithSigner_1 = require("./SwapperWithSigner");
+const UserError_1 = require("../../errors/UserError");
 class SwapperWithChain {
     get intermediaryDiscovery() {
         return this.swapper.intermediaryDiscovery;
@@ -90,6 +91,10 @@ class SwapperWithChain {
      * @param options Options for the swap
      */
     swap(srcToken, dstToken, amount, exactIn, src, dst, options) {
+        if (typeof (srcToken) === "string")
+            srcToken = this.getToken(srcToken);
+        if (typeof (dstToken) === "string")
+            dstToken = this.getToken(dstToken);
         return this.swapper.swap(srcToken, dstToken, amount, exactIn, src, dst, options);
     }
     /**
@@ -115,6 +120,37 @@ class SwapperWithChain {
      */
     getSwapById(id, signer) {
         return this.swapper.getSwapById(id, this.chainIdentifier, signer);
+    }
+    getToken(tickerOrAddress) {
+        //Btc tokens - BTC, BTCLN, BTC-LN
+        if (tickerOrAddress === "BTC")
+            return Tokens_1.BitcoinTokens.BTC;
+        if (tickerOrAddress === "BTCLN" || tickerOrAddress === "BTC-LN")
+            return Tokens_1.BitcoinTokens.BTCLN;
+        //Check if the ticker is in format <chainId>-<ticker>, i.e. SOLANA-USDC, STARKNET-WBTC
+        if (tickerOrAddress.includes("-")) {
+            const [chainId, ticker] = tickerOrAddress.split("-");
+            if (chainId !== this.chainIdentifier)
+                throw new UserError_1.UserError(`Invalid chainId specified in ticker: ${chainId}, swapper chainId: ${this.chainIdentifier}`);
+            const token = this.swapper.tokens[this.chainIdentifier]?.[ticker];
+            if (token == null)
+                throw new UserError_1.UserError(`Not found ticker: ${ticker} for chainId: ${chainId}`);
+            return token;
+        }
+        const chain = this.swapper.chains[this.chainIdentifier];
+        if (chain.chainInterface.isValidToken(tickerOrAddress)) {
+            //Try to find in known token addresses
+            const token = this.swapper.tokens[this.chainIdentifier]?.[tickerOrAddress];
+            if (token != null)
+                return token;
+        }
+        else {
+            //Check in known tickers
+            const token = this.swapper.tokensByTicker[this.chainIdentifier]?.[tickerOrAddress];
+            if (token != null)
+                return token;
+        }
+        throw new UserError_1.UserError(`Specified token address or ticker ${tickerOrAddress} not found for chainId: ${this.chainIdentifier}!`);
     }
     /**
      * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes
