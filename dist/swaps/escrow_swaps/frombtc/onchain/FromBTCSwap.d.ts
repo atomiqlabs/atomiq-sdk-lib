@@ -7,6 +7,7 @@ import { IEscrowSwapInit } from "../../IEscrowSwap";
 import { IBitcoinWallet } from "../../../../btc/wallet/IBitcoinWallet";
 import { IBTCWalletSwap } from "../../../IBTCWalletSwap";
 import { Transaction } from "@scure/btc-signer";
+import { MinimalBitcoinWalletInterface, MinimalBitcoinWalletInterfaceWithSigner } from "../../../../btc/wallet/MinimalBitcoinWalletInterface";
 export declare enum FromBTCSwapState {
     FAILED = -4,
     EXPIRED = -3,
@@ -79,16 +80,15 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      */
     waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
     /**
-     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use)
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use),
+     *  also returns inputs indices that need to be signed by the wallet before submitting the PSBT back to the SDK with
+     *  `swap.submitPsbt()`
      *
      * @param _bitcoinWallet Sender's bitcoin wallet
-     * @param feeRate Optional fee rate for the transaction
+     * @param feeRate Optional fee rate for the transaction, needs to be at least as big as {minimumBtcFeeRate} field
      * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
      */
-    getFundedPsbt(_bitcoinWallet: IBitcoinWallet | {
-        address: string;
-        publicKey: string;
-    }, feeRate?: number, additionalOutputs?: ({
+    getFundedPsbt(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number, additionalOutputs?: ({
         amount: bigint;
         outputScript: Uint8Array;
     } | {
@@ -96,21 +96,28 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
         address: string;
     })[]): Promise<{
         psbt: Transaction;
+        psbtHex: string;
+        psbtBase64: string;
         signInputs: number[];
     }>;
-    submitPsbt(psbt: Transaction): Promise<string>;
-    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
-    sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
+    /**
+     * Submits a PSBT signed by the wallet back to the SDK
+     *
+     * @param _psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
+     */
+    submitPsbt(_psbt: Transaction | string): Promise<string>;
+    estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
+    sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in a PTLC
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    commit(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
+    commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
     waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
     /**
      * Returns transactions required to claim the swap on-chain (and possibly also sync the bitcoin light client)
@@ -122,10 +129,10 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     /**
      * Claims and finishes the swap
      *
-     * @param signer Signer to sign the transactions with, can also be different to the initializer
+     * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    claim(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
+    claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string>;
     /**
      * Waits till the swap is successfully claimed
      *

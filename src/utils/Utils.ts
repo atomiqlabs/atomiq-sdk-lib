@@ -1,10 +1,13 @@
 import {RequestError} from "../errors/RequestError";
 import {BTC_NETWORK, isBytes, PubT, validatePubkey} from "@scure/btc-signer/utils";
 import {Buffer} from "buffer";
-import {Address, OutScript} from "@scure/btc-signer";
+import {Address, OutScript, Transaction} from "@scure/btc-signer";
 import {randomBytes as randomBytesNoble} from "@noble/hashes/utils";
 import {CoinselectAddressTypes} from "../btc/coinselect2";
 import {IntermediaryError} from "../errors/IntermediaryError";
+import {IBitcoinWallet, isIBitcoinWallet} from "../btc/wallet/IBitcoinWallet";
+import {SingleAddressBitcoinWallet} from "../btc/wallet/SingleAddressBitcoinWallet";
+import {BitcoinRpcWithAddressIndex} from "../btc/BitcoinRpcWithAddressIndex";
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
@@ -372,4 +375,41 @@ export function toCoinselectAddressType(outputScript: Uint8Array): CoinselectAdd
 
 export function randomBytes(bytesLength: number): Buffer {
     return Buffer.from(randomBytesNoble(bytesLength));
+}
+
+/**
+ * General parsers for PSBTs, can parse hex or base64 encoded PSBTs
+ * @param _psbt
+ */
+export function parsePsbtTransaction(_psbt: Transaction | string): Transaction {
+    if(typeof(_psbt)==="string") {
+        let rawPsbt: Buffer;
+        if(/[0-9a-f]+/i.test(_psbt)) {
+            //Hex
+            rawPsbt = Buffer.from(_psbt, "hex");
+        } else {
+            //Base64
+            rawPsbt = Buffer.from(_psbt, "base64");
+        }
+        return Transaction.fromPSBT(rawPsbt, {
+            allowUnknownOutputs: true,
+            allowUnknownInputs: true,
+            allowLegacyWitnessUtxo: true,
+            allowUnknown: true
+        })
+    } else {
+        return _psbt;
+    }
+}
+
+export function toBitcoinWallet(
+    _bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string },
+    btcRpc: BitcoinRpcWithAddressIndex<any>,
+    bitcoinNetwork: BTC_NETWORK
+): IBitcoinWallet {
+    if(isIBitcoinWallet(_bitcoinWallet)) {
+        return _bitcoinWallet;
+    } else {
+        return new SingleAddressBitcoinWallet(btcRpc, bitcoinNetwork, _bitcoinWallet);
+    }
 }

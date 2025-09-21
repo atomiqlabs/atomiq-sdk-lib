@@ -4,6 +4,8 @@ export * from "./btc/mempool/MempoolBitcoinRpc";
 export * from "./btc/mempool/MempoolBitcoinBlock";
 export * from "./btc/BitcoinRpcWithAddressIndex";
 export * from "./btc/LightningNetworkApi";
+export * from "./btc/wallet/MinimalBitcoinWalletInterface";
+export * from "./btc/wallet/MinimalLightningNetworkWalletInterface";
 export * from "./btc/wallet/IBitcoinWallet";
 export * from "./btc/wallet/BitcoinWallet";
 export * from "./btc/wallet/SingleAddressBitcoinWallet";

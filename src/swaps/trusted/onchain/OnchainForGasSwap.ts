@@ -1,7 +1,7 @@
 import {SwapType} from "../../enums/SwapType";
 import {ChainType} from "@atomiqlabs/base";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
-import {getLogger, timeoutPromise, toOutputScript} from "../../../utils/Utils";
+import {getLogger, parsePsbtTransaction, timeoutPromise, toBitcoinWallet, toOutputScript} from "../../../utils/Utils";
 import {isISwapInit, ISwap, ISwapInit, ppmToPercentage} from "../../ISwap";
 import {
     AddressStatusResponseCodes,
@@ -17,6 +17,10 @@ import {IBTCWalletSwap} from "../../IBTCWalletSwap";
 import {Transaction} from "@scure/btc-signer";
 import {SingleAddressBitcoinWallet} from "../../../btc/wallet/SingleAddressBitcoinWallet";
 import {Buffer} from "buffer";
+import {
+    MinimalBitcoinWalletInterface,
+    MinimalBitcoinWalletInterfaceWithSigner
+} from "../../../btc/wallet/MinimalBitcoinWalletInterface";
 
 export enum OnchainForGasSwapState {
     EXPIRED = -3,
@@ -229,7 +233,20 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         return 1;
     }
 
-    async getFundedPsbt(_bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string }, feeRate?: number): Promise<{psbt: Transaction, signInputs: number[]}> {
+    /**
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use),
+     *  also returns inputs indices that need to be signed by the wallet before submitting the PSBT back to the SDK with
+     *  `swap.submitPsbt()`
+     *
+     * @param _bitcoinWallet Sender's bitcoin wallet
+     * @param feeRate Optional fee rate for the transaction, needs to be at least as big as {minimumBtcFeeRate} field
+     * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
+     */
+    async getFundedPsbt(
+        _bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface,
+        feeRate?: number,
+        additionalOutputs?: ({amount: bigint, outputScript: Uint8Array} | {amount: bigint, address: string})[]
+    ): Promise<{psbt: Transaction, psbtHex: string, psbtBase64: string, signInputs: number[]}> {
         if(this.state!==OnchainForGasSwapState.PR_CREATED)
             throw new Error("Swap already paid for!");
 
@@ -252,6 +269,12 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             amount: this.outputAmount,
             script: toOutputScript(this.wrapper.options.bitcoinNetwork, this.address)
         });
+        if(additionalOutputs!=null) additionalOutputs.forEach(output => {
+            basePsbt.addOutput({
+                amount: output.amount,
+                script: (output as {outputScript: Uint8Array}).outputScript ?? toOutputScript(this.wrapper.options.bitcoinNetwork, (output as {address: string}).address)
+            });
+        });
 
         const psbt = await bitcoinWallet.fundPsbt(basePsbt, feeRate);
         //Sign every input
@@ -259,10 +282,22 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         for(let i=0;i<psbt.inputsLength;i++) {
             signInputs.push(i);
         }
-        return {psbt, signInputs};
+        const serializedPsbt = Buffer.from(psbt.toPSBT());
+        return {
+            psbt,
+            psbtHex: serializedPsbt.toString("hex"),
+            psbtBase64: serializedPsbt.toString("base64"),
+            signInputs
+        };
     }
 
-    async submitPsbt(psbt: Transaction): Promise<string> {
+    /**
+     * Submits a PSBT signed by the wallet back to the SDK
+     *
+     * @param _psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
+     */
+    async submitPsbt(_psbt: Transaction | string): Promise<string> {
+        const psbt = parsePsbtTransaction(_psbt);
         if(this.state!==OnchainForGasSwapState.PR_CREATED)
             throw new Error("Swap already paid for!");
 
@@ -283,15 +318,30 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         return await this.wrapper.btcRpc.sendRawTransaction(Buffer.from(psbt.toBytes(true, true)).toString("hex"));
     }
 
-    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
-        const txFee = await wallet.getTransactionFee(this.address, this.inputAmount, feeRate);
+    async estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
+        const bitcoinWallet: IBitcoinWallet = toBitcoinWallet(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
+        const txFee = await bitcoinWallet.getTransactionFee(this.address, this.inputAmount, feeRate);
         return toTokenAmount(txFee==null ? null : BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
     }
 
-    async sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string> {
+    async sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string> {
         if(this.state!==OnchainForGasSwapState.PR_CREATED)
             throw new Error("Swap already paid for!");
-        return await wallet.sendTransaction(this.address, this.inputAmount, feeRate);
+
+        //Ensure not expired
+        if(this.expiry<Date.now()) {
+            throw new Error("Swap expired!");
+        }
+
+        if(isIBitcoinWallet(wallet)) {
+            return await wallet.sendTransaction(this.address, this.inputAmount, feeRate);
+        } else {
+            const {psbt, psbtHex, psbtBase64, signInputs} = await this.getFundedPsbt(wallet, feeRate);
+            const signedPsbt = await wallet.signPsbt({
+                psbt, psbtHex, psbtBase64
+            }, signInputs);
+            return await this.submitPsbt(signedPsbt);
+        }
     }
 
 

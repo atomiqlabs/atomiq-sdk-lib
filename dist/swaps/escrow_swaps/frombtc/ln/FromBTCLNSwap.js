@@ -337,13 +337,14 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in an HTLC
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    async commit(signer, abortSignal, skipChecks) {
+    async commit(_signer, abortSignal, skipChecks) {
+        const signer = (0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         this.checkSigner(signer);
         const result = await this.wrapper.chain.sendAndConfirm(signer, await this.txsCommit(skipChecks), true, abortSignal);
         this.commitTxId = result[0];
@@ -386,24 +387,27 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
      * Returns transactions required for claiming the HTLC and finishing the swap by revealing the HTLC secret
      *  (hash preimage)
      *
-     * @param signer Optional signer address to use for claiming the swap, can also be different from the initializer
+     * @param _signer Optional signer address to use for claiming the swap, can also be different from the initializer
      * @throws {Error} If in invalid state (must be CLAIM_COMMITED)
      */
-    txsClaim(signer) {
+    async txsClaim(_signer) {
         if (this.state !== FromBTCLNSwapState.CLAIM_COMMITED)
             throw new Error("Must be in CLAIM_COMMITED state!");
-        return this.wrapper.contract.txsClaimWithSecret(signer ?? this._getInitiator(), this.data, this.secret, true, true);
+        return await this.wrapper.contract.txsClaimWithSecret(_signer == null ?
+            this._getInitiator() :
+            ((0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer)), this.data, this.secret, true, true);
     }
     /**
      * Claims and finishes the swap
      *
-     * @param signer Signer to sign the transactions with, can also be different to the initializer
+     * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    async claim(signer, abortSignal) {
+    async claim(_signer, abortSignal) {
+        const signer = (0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         const result = await this.wrapper.chain.sendAndConfirm(signer, await this.txsClaim(), true, abortSignal);
         this.claimTxId = result[0];
-        if (FromBTCLNSwapState.CLAIM_COMMITED || FromBTCLNSwapState.EXPIRED || FromBTCLNSwapState.FAILED) {
+        if (this.state === FromBTCLNSwapState.CLAIM_COMMITED || this.state === FromBTCLNSwapState.EXPIRED || this.state === FromBTCLNSwapState.FAILED) {
             await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
         }
         return result[0];
@@ -495,14 +499,15 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
      * Commits and claims the swap, in a way that the transactions can be signed together by the underlying provider and
      *  then sent sequentially
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
      * @throws {Error} If in invalid state (must be PR_PAID or CLAIM_COMMITED)
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    async commitAndClaim(signer, abortSignal, skipChecks) {
+    async commitAndClaim(_signer, abortSignal, skipChecks) {
+        const signer = (0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         if (!this.canCommitAndClaimInOneShot())
             throw new Error("Cannot commitAndClaim in single action, please run commit and claim separately!");
         this.checkSigner(signer);

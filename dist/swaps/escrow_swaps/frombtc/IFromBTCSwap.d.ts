@@ -66,7 +66,7 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    abstract commit(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
+    abstract commit(signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
     abstract waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
     getClaimFee(): Promise<bigint>;
     abstract txsClaim(signer?: T["Signer"]): Promise<T["TX"][]>;
@@ -76,7 +76,7 @@ export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S ex
      * @param signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    abstract claim(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
+    abstract claim(signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string>;
     /**
      * Waits till the swap is successfully claimed
      *

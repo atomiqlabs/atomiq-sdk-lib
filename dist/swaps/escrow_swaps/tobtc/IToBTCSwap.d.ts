@@ -86,6 +86,25 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
         required: TokenAmount;
     }>;
     /**
+     * Executes the swap with the provided smart chain wallet/signer
+     *
+     * @param signer Smart chain wallet/signer to use to sign the transaction on the source chain
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether the swap was successfully processed by the LP, in case `false` is returned
+     *  the user can refund their funds back on the source chain by calling `swap.refund()`
+     */
+    execute(signer: T["Signer"] | T["NativeSigner"], callbacks?: {
+        onSourceTransactionSent?: (sourceTxId: string) => void;
+        onSourceTransactionConfirmed?: (sourceTxId: string) => void;
+        onSwapSettled?: (destinationTxId: string) => void;
+    }, options?: {
+        abortSignal?: AbortSignal;
+        paymentCheckIntervalSeconds?: number;
+        maxWaitTillSwapProcessedSeconds?: number;
+    }): Promise<boolean>;
+    /**
      * Returns transactions for committing the swap on-chain, initiating the swap
      *
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
@@ -97,13 +116,14 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
     /**
      * Commits the swap on-chain, initiating the swap
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal Abort signal
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled on swap creation, if you commit right after quoting, you can skipChecks)`
+     * @param onBeforeTxSent
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    commit(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
+    commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean, onBeforeTxSent?: (txId: string) => void): Promise<string>;
     /**
      * Waits till a swap is committed, should be called after sending the commit transactions manually
      *
@@ -151,11 +171,11 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
     /**
      * Refunds the swap if the swap is in refundable state, you can check so with isRefundable()
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal               Abort signal
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    refund(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
+    refund(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string>;
     /**
      * Waits till a swap is refunded, should be called after sending the refund transactions manually
      *

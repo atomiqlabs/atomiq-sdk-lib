@@ -102,29 +102,29 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in an HTLC
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    commit(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
+    commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
     waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
     /**
      * Returns transactions required for claiming the HTLC and finishing the swap by revealing the HTLC secret
      *  (hash preimage)
      *
-     * @param signer Optional signer address to use for claiming the swap, can also be different from the initializer
+     * @param _signer Optional signer address to use for claiming the swap, can also be different from the initializer
      * @throws {Error} If in invalid state (must be CLAIM_COMMITED)
      */
-    txsClaim(signer?: T["Signer"]): Promise<T["TX"][]>;
+    txsClaim(_signer?: T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]>;
     /**
      * Claims and finishes the swap
      *
-     * @param signer Signer to sign the transactions with, can also be different to the initializer
+     * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    claim(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
+    claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string>;
     /**
      * Waits till the swap is successfully claimed
      *
@@ -154,14 +154,14 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * Commits and claims the swap, in a way that the transactions can be signed together by the underlying provider and
      *  then sent sequentially
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
      * @throws {Error} If in invalid state (must be PR_PAID or CLAIM_COMMITED)
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    commitAndClaim(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string[]>;
+    commitAndClaim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string[]>;
     /**
      * Is this an LNURL-withdraw swap?
      */

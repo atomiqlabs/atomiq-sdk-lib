@@ -1,11 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.randomBytes = exports.toCoinselectAddressType = exports.toOutputScript = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
+exports.toBitcoinWallet = exports.parsePsbtTransaction = exports.randomBytes = exports.toCoinselectAddressType = exports.toOutputScript = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
 const RequestError_1 = require("../errors/RequestError");
 const utils_1 = require("@scure/btc-signer/utils");
 const buffer_1 = require("buffer");
 const btc_signer_1 = require("@scure/btc-signer");
 const utils_2 = require("@noble/hashes/utils");
+const IBitcoinWallet_1 = require("../btc/wallet/IBitcoinWallet");
+const SingleAddressBitcoinWallet_1 = require("../btc/wallet/SingleAddressBitcoinWallet");
 function isConstructor(fn) {
     return (typeof fn === 'function' &&
         fn.prototype != null &&
@@ -358,3 +360,39 @@ function randomBytes(bytesLength) {
     return buffer_1.Buffer.from((0, utils_2.randomBytes)(bytesLength));
 }
 exports.randomBytes = randomBytes;
+/**
+ * General parsers for PSBTs, can parse hex or base64 encoded PSBTs
+ * @param _psbt
+ */
+function parsePsbtTransaction(_psbt) {
+    if (typeof (_psbt) === "string") {
+        let rawPsbt;
+        if (/[0-9a-f]+/i.test(_psbt)) {
+            //Hex
+            rawPsbt = buffer_1.Buffer.from(_psbt, "hex");
+        }
+        else {
+            //Base64
+            rawPsbt = buffer_1.Buffer.from(_psbt, "base64");
+        }
+        return btc_signer_1.Transaction.fromPSBT(rawPsbt, {
+            allowUnknownOutputs: true,
+            allowUnknownInputs: true,
+            allowLegacyWitnessUtxo: true,
+            allowUnknown: true
+        });
+    }
+    else {
+        return _psbt;
+    }
+}
+exports.parsePsbtTransaction = parsePsbtTransaction;
+function toBitcoinWallet(_bitcoinWallet, btcRpc, bitcoinNetwork) {
+    if ((0, IBitcoinWallet_1.isIBitcoinWallet)(_bitcoinWallet)) {
+        return _bitcoinWallet;
+    }
+    else {
+        return new SingleAddressBitcoinWallet_1.SingleAddressBitcoinWallet(btcRpc, bitcoinNetwork, _bitcoinWallet);
+    }
+}
+exports.toBitcoinWallet = toBitcoinWallet;
