@@ -53,10 +53,8 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * @param unifiedStorage
      * @param unifiedChainEvents
      * @param chain
-     * @param contract Underlying contract handling the swaps
      * @param prices Swap pricing handler
      * @param tokens Chain specific token data
-     * @param swapDataDeserializer Deserializer for SwapData
      * @param options
      * @param events Instance to use for emitting events
      */
@@ -113,7 +111,10 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
         changedSwaps: S[];
         removeSwaps: S[];
     }>;
-    checkPastSwaps(pastSwaps?: S[]): Promise<void>;
+    checkPastSwaps(pastSwaps?: S[], noSave?: boolean): Promise<{
+        removeSwaps: S[];
+        changedSwaps: S[];
+    }>;
     tick(swaps?: S[]): Promise<void>;
     saveSwapData(swap: S): Promise<void>;
     removeSwapData(swap: S): Promise<void>;
