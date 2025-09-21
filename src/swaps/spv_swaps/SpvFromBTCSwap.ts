@@ -1,6 +1,6 @@
 import {isISwapInit, ISwap, ISwapInit, ppmToPercentage} from "../ISwap";
 import {
-    ChainType, SpvVaultData,
+    ChainType, isAbstractSigner,
     SpvWithdrawalClaimedState,
     SpvWithdrawalClosedState,
     SpvWithdrawalFrontedState,
@@ -9,7 +9,13 @@ import {
 } from "@atomiqlabs/base";
 import {SwapType} from "../enums/SwapType";
 import {SpvFromBTCWrapper} from "./SpvFromBTCWrapper";
-import {getLogger, timeoutPromise, toCoinselectAddressType, toOutputScript} from "../../utils/Utils";
+import {
+    getLogger,
+    parsePsbtTransaction,
+    timeoutPromise, timeoutSignal, toBitcoinWallet,
+    toCoinselectAddressType,
+    toOutputScript
+} from "../../utils/Utils";
 import {getInputType, Transaction} from "@scure/btc-signer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
 import {Buffer} from "buffer";
@@ -17,8 +23,11 @@ import {Fee, FeeType} from "../fee/Fee";
 import {IBitcoinWallet, isIBitcoinWallet} from "../../btc/wallet/IBitcoinWallet";
 import {IntermediaryAPI} from "../../intermediaries/IntermediaryAPI";
 import {IBTCWalletSwap} from "../IBTCWalletSwap";
-import {SingleAddressBitcoinWallet} from "../../btc/wallet/SingleAddressBitcoinWallet";
 import {ISwapWithGasDrop} from "../ISwapWithGasDrop";
+import {
+    MinimalBitcoinWalletInterface,
+    MinimalBitcoinWalletInterfaceWithSigner
+} from "../../btc/wallet/MinimalBitcoinWalletInterface";
 
 export enum SpvFromBTCSwapState {
     CLOSED = -5,
@@ -441,7 +450,17 @@ export class SpvFromBTCSwap<T extends ChainType>
         };
     }
 
-    async getPsbt(): Promise<{psbt: Transaction, in1sequence: number}> {
+    /**
+     * Returns the raw PSBT (not funded), the wallet should fund the PSBT (add its inputs), set the nSequence field of the
+     *  2nd input (input 1 - indexing from 0) to the value returned in `in1sequence`, sign the PSBT and then pass
+     *  it back to the SDK with `swap.submitPsbt()`
+     */
+    async getPsbt(): Promise<{
+        psbt: Transaction,
+        psbtHex: string,
+        psbtBase64: string,
+        in1sequence: number
+    }> {
         const res = await this.getTransactionDetails();
         const psbt = new Transaction({
             allowUnknownOutputs: true,
@@ -469,30 +488,35 @@ export class SpvFromBTCSwap<T extends ChainType>
             amount: res.out2amount,
             script: res.out2script
         });
+        const serializedPsbt = Buffer.from(psbt.toPSBT());
         return {
             psbt,
+            psbtHex: serializedPsbt.toString("hex"),
+            psbtBase64: serializedPsbt.toString("base64"),
             in1sequence: res.in1sequence
         };
     }
 
     /**
-     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use)
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use),
+     *  also returns inputs indices that need to be signed by the wallet before submitting the PSBT back to the SDK with
+     *  `swap.submitPsbt()`
      *
      * @param _bitcoinWallet Sender's bitcoin wallet
      * @param feeRate Optional fee rate for the transaction, needs to be at least as big as {minimumBtcFeeRate} field
      * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
      */
     async getFundedPsbt(
-        _bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string },
+        _bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface,
         feeRate?: number,
         additionalOutputs?: ({amount: bigint, outputScript: Uint8Array} | {amount: bigint, address: string})[]
-    ): Promise<{psbt: Transaction, signInputs: number[]}> {
-        let bitcoinWallet: IBitcoinWallet;
-        if(isIBitcoinWallet(_bitcoinWallet)) {
-            bitcoinWallet = _bitcoinWallet;
-        } else {
-            bitcoinWallet = new SingleAddressBitcoinWallet(this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork, _bitcoinWallet);
-        }
+    ): Promise<{
+        psbt: Transaction,
+        psbtHex: string,
+        psbtBase64: string,
+        signInputs: number[]
+    }> {
+        const bitcoinWallet: IBitcoinWallet = toBitcoinWallet(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
         if(feeRate!=null) {
             if(feeRate<this.minimumBtcFeeRate) throw new Error("Bitcoin tx fee needs to be at least "+this.minimumBtcFeeRate+" sats/vB");
         } else {
@@ -512,10 +536,23 @@ export class SpvFromBTCSwap<T extends ChainType>
         for(let i=1;i<psbt.inputsLength;i++) {
             signInputs.push(i);
         }
-        return {psbt, signInputs};
+        const serializedPsbt = Buffer.from(psbt.toPSBT());
+        return {
+            psbt,
+            psbtHex: serializedPsbt.toString("hex"),
+            psbtBase64: serializedPsbt.toString("base64"),
+            signInputs
+        };
     }
 
-    async submitPsbt(psbt: Transaction): Promise<string> {
+    /**
+     * Submits a PSBT signed by the wallet back to the SDK
+     *
+     * @param _psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
+     */
+    async submitPsbt(_psbt: Transaction | string): Promise<string> {
+        const psbt = parsePsbtTransaction(_psbt);
+
         //Ensure not expired
         if(this.expiry<Date.now()) {
             throw new Error("Quote expired!");
@@ -601,15 +638,86 @@ export class SpvFromBTCSwap<T extends ChainType>
         return this.data.getTxId();
     }
 
-    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
-        const txFee = await wallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
+    async estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
+        const bitcoinWallet: IBitcoinWallet = toBitcoinWallet(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
+        const txFee = await bitcoinWallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
         return toTokenAmount(txFee==null ? null : BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
     }
 
-    async sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string> {
-        let {psbt, signInputs} = await this.getFundedPsbt(wallet, feeRate);
-        psbt = await wallet.signPsbt(psbt, signInputs);
-        return await this.submitPsbt(psbt);
+    async sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string> {
+        const {psbt, psbtBase64, psbtHex, signInputs} = await this.getFundedPsbt(wallet, feeRate);
+        let signedPsbt: Transaction | string;
+        if(isIBitcoinWallet(wallet)) {
+            signedPsbt = await wallet.signPsbt(psbt, signInputs);
+        } else {
+            signedPsbt = await wallet.signPsbt({
+                psbt, psbtHex, psbtBase64
+            }, signInputs);
+        }
+        return await this.submitPsbt(signedPsbt);
+    }
+
+    /**
+     * Executes the swap with the provided bitcoin wallet,
+     *
+     * @param wallet Bitcoin wallet to use to sign the bitcoin transaction
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
+     *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
+     */
+    async execute(
+        wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner,
+        callbacks?: {
+            onSourceTransactionSent?: (sourceTxId: string) => void,
+            onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void,
+            onSourceTransactionConfirmed?: (sourceTxId: string) => void,
+            onSwapSettled?: (destinationTxId: string) => void
+        },
+        options?: {
+            feeRate?: number,
+            abortSignal?: AbortSignal,
+            btcTxCheckIntervalSeconds?: number,
+            maxWaitTillAutomaticSettlementSeconds?: number
+        }
+    ): Promise<boolean> {
+        if(this.state===SpvFromBTCSwapState.CLOSED) throw new Error("Swap encountered a catastrophic failure!");
+        if(this.state===SpvFromBTCSwapState.FAILED) throw new Error("Swap failed!");
+        if(this.state===SpvFromBTCSwapState.DECLINED) throw new Error("Swap execution already declined by the LP!");
+        if(this.state===SpvFromBTCSwapState.QUOTE_EXPIRED || this.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED) throw new Error("Swap quote expired!");
+        if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) throw new Error("Swap already settled or fronted!");
+
+        if(this.state===SpvFromBTCSwapState.CREATED) {
+            const txId = await this.sendBitcoinTransaction(wallet, options?.feeRate);
+            if(callbacks?.onSourceTransactionSent!=null) callbacks.onSourceTransactionSent(txId);
+        }
+        if(this.state===SpvFromBTCSwapState.POSTED || this.state===SpvFromBTCSwapState.BROADCASTED) {
+            const txId = await this.waitForBitcoinTransaction(options?.abortSignal, options?.btcTxCheckIntervalSeconds, callbacks?.onSourceTransactionConfirmationStatus);
+            if (callbacks?.onSourceTransactionConfirmed != null) callbacks.onSourceTransactionConfirmed(txId);
+        }
+        // @ts-ignore
+        if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return true;
+        if(this.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
+            const _abortSignal = timeoutSignal(
+                options?.maxWaitTillAutomaticSettlementSeconds==null ?
+                    60*1000 :
+                    options.maxWaitTillAutomaticSettlementSeconds * 1000,
+                undefined, options?.abortSignal
+            )
+            try {
+                await this.waitTillClaimedOrFronted(_abortSignal);
+                if(callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
+                return true;
+            } catch (e) {
+                if(_abortSignal.aborted && (options?.abortSignal==null || !options.abortSignal.aborted)) {
+                    //Timed out waiting for claim or front
+                    return false;
+                } else {
+                    throw e;
+                }
+            }
+        }
     }
 
 
@@ -691,7 +799,11 @@ export class SpvFromBTCSwap<T extends ChainType>
      *
      * @throws {Error} If the swap is in invalid state (must be BTC_TX_CONFIRMED)
      */
-    async txsClaim(signer?: T["Signer"]): Promise<T["TX"][]> {
+    async txsClaim(_signer?: T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]> {
+        const signer = _signer==null ?
+            null :
+            (isAbstractSigner(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer));
+
         if(!this.isClaimable()) throw new Error("Must be in BTC_TX_CONFIRMED state!");
 
         const vaultData = await this.wrapper.contract.getVaultData(this.vaultOwner, this.vaultId);
@@ -720,10 +832,11 @@ export class SpvFromBTCSwap<T extends ChainType>
     /**
      * Claims and finishes the swap
      *
-     * @param signer Signer to sign the transactions with, can also be different to the initializer
+     * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    async claim(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string> {
+    async claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string> {
+        const signer = isAbstractSigner(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         let txIds: string[];
         try {
             txIds = await this.wrapper.chain.sendAndConfirm(

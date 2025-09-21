@@ -8,6 +8,7 @@ import { Fee, FeeType } from "../fee/Fee";
 import { IBitcoinWallet } from "../../btc/wallet/IBitcoinWallet";
 import { IBTCWalletSwap } from "../IBTCWalletSwap";
 import { ISwapWithGasDrop } from "../ISwapWithGasDrop";
+import { MinimalBitcoinWalletInterface, MinimalBitcoinWalletInterfaceWithSigner } from "../../btc/wallet/MinimalBitcoinWalletInterface";
 export declare enum SpvFromBTCSwapState {
     CLOSED = -5,
     FAILED = -4,
@@ -135,21 +136,27 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         out2script: Uint8Array;
         locktime: number;
     }>;
+    /**
+     * Returns the raw PSBT (not funded), the wallet should fund the PSBT (add its inputs), set the nSequence field of the
+     *  2nd input (input 1 - indexing from 0) to the value returned in `in1sequence`, sign the PSBT and then pass
+     *  it back to the SDK with `swap.submitPsbt()`
+     */
     getPsbt(): Promise<{
         psbt: Transaction;
+        psbtHex: string;
+        psbtBase64: string;
         in1sequence: number;
     }>;
     /**
-     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use)
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use),
+     *  also returns inputs indices that need to be signed by the wallet before submitting the PSBT back to the SDK with
+     *  `swap.submitPsbt()`
      *
      * @param _bitcoinWallet Sender's bitcoin wallet
      * @param feeRate Optional fee rate for the transaction, needs to be at least as big as {minimumBtcFeeRate} field
      * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
      */
-    getFundedPsbt(_bitcoinWallet: IBitcoinWallet | {
-        address: string;
-        publicKey: string;
-    }, feeRate?: number, additionalOutputs?: ({
+    getFundedPsbt(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number, additionalOutputs?: ({
         amount: bigint;
         outputScript: Uint8Array;
     } | {
@@ -157,11 +164,39 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         address: string;
     })[]): Promise<{
         psbt: Transaction;
+        psbtHex: string;
+        psbtBase64: string;
         signInputs: number[];
     }>;
-    submitPsbt(psbt: Transaction): Promise<string>;
-    estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
-    sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string>;
+    /**
+     * Submits a PSBT signed by the wallet back to the SDK
+     *
+     * @param _psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
+     */
+    submitPsbt(_psbt: Transaction | string): Promise<string>;
+    estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
+    sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string>;
+    /**
+     * Executes the swap with the provided bitcoin wallet,
+     *
+     * @param wallet Bitcoin wallet to use to sign the bitcoin transaction
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
+     *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
+     */
+    execute(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, callbacks?: {
+        onSourceTransactionSent?: (sourceTxId: string) => void;
+        onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void;
+        onSourceTransactionConfirmed?: (sourceTxId: string) => void;
+        onSwapSettled?: (destinationTxId: string) => void;
+    }, options?: {
+        feeRate?: number;
+        abortSignal?: AbortSignal;
+        btcTxCheckIntervalSeconds?: number;
+        maxWaitTillAutomaticSettlementSeconds?: number;
+    }): Promise<boolean>;
     /**
      * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
      */
@@ -185,14 +220,14 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      *
      * @throws {Error} If the swap is in invalid state (must be BTC_TX_CONFIRMED)
      */
-    txsClaim(signer?: T["Signer"]): Promise<T["TX"][]>;
+    txsClaim(_signer?: T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]>;
     /**
      * Claims and finishes the swap
      *
-     * @param signer Signer to sign the transactions with, can also be different to the initializer
+     * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    claim(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
+    claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string>;
     /**
      * Periodically checks the chain to see whether the swap was finished (claimed or refunded)
      *

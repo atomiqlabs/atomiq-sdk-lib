@@ -10,6 +10,7 @@ import { Fee, FeeType } from "../../../fee/Fee";
 import { IAddressSwap } from "../../../IAddressSwap";
 import { FromBTCLNAutoWrapper } from "./FromBTCLNAutoWrapper";
 import { ISwapWithGasDrop } from "../../../ISwapWithGasDrop";
+import { MinimalLightningNetworkWalletInterface } from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
 export declare enum FromBTCLNAutoSwapState {
     FAILED = -4,
     QUOTE_EXPIRED = -3,
@@ -116,6 +117,25 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
         }
     ];
     /**
+     * Executes the swap with the provided bitcoin lightning network wallet
+     *
+     * @param wallet Bitcoin lightning wallet to use to sign the bitcoin transaction
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
+     *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
+     */
+    execute(wallet: MinimalLightningNetworkWalletInterface, callbacks?: {
+        onSourceTransactionSent?: (sourceTxId: string) => void;
+        onSwapSettled?: (destinationTxId: string) => void;
+    }, options?: {
+        feeRate?: number;
+        abortSignal?: AbortSignal;
+        lightningTxCheckIntervalSeconds?: number;
+        maxWaitTillAutomaticSettlementSeconds?: number;
+    }): Promise<boolean>;
+    /**
      * Checks whether the LP received the LN payment and we can continue by committing & claiming the HTLC on-chain
      *
      * @param save If the new swap state should be saved
@@ -159,17 +179,17 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
      * Returns transactions required for claiming the HTLC and finishing the swap by revealing the HTLC secret
      *  (hash preimage)
      *
-     * @param signer Optional signer address to use for claiming the swap, can also be different from the initializer
+     * @param _signer Optional signer address to use for claiming the swap, can also be different from the initializer
      * @throws {Error} If in invalid state (must be CLAIM_COMMITED)
      */
-    txsClaim(signer?: T["Signer"]): Promise<T["TX"][]>;
+    txsClaim(_signer?: T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]>;
     /**
      * Claims and finishes the swap
      *
-     * @param signer Signer to sign the transactions with, can also be different to the initializer
+     * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    claim(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
+    claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string>;
     /**
      * Waits till the swap is successfully claimed
      *

@@ -183,10 +183,12 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
         return result.tx.txid;
     }
     /**
-     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use)
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use),
+     *  also returns inputs indices that need to be signed by the wallet before submitting the PSBT back to the SDK with
+     *  `swap.submitPsbt()`
      *
      * @param _bitcoinWallet Sender's bitcoin wallet
-     * @param feeRate Optional fee rate for the transaction
+     * @param feeRate Optional fee rate for the transaction, needs to be at least as big as {minimumBtcFeeRate} field
      * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
      */
     async getFundedPsbt(_bitcoinWallet, feeRate, additionalOutputs) {
@@ -224,9 +226,21 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
         for (let i = 0; i < psbt.inputsLength; i++) {
             signInputs.push(i);
         }
-        return { psbt, signInputs };
+        const serializedPsbt = buffer_1.Buffer.from(psbt.toPSBT());
+        return {
+            psbt,
+            psbtHex: serializedPsbt.toString("hex"),
+            psbtBase64: serializedPsbt.toString("base64"),
+            signInputs
+        };
     }
-    async submitPsbt(psbt) {
+    /**
+     * Submits a PSBT signed by the wallet back to the SDK
+     *
+     * @param _psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
+     */
+    async submitPsbt(_psbt) {
+        const psbt = (0, Utils_1.parsePsbtTransaction)(_psbt);
         if (this.state !== FromBTCSwapState.CLAIM_COMMITED)
             throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
         //Ensure not expired
@@ -243,27 +257,42 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             psbt.finalize();
         return await this.wrapper.btcRpc.sendRawTransaction(buffer_1.Buffer.from(psbt.toBytes(true, true)).toString("hex"));
     }
-    async estimateBitcoinFee(wallet, feeRate) {
-        const txFee = await wallet.getTransactionFee(this.address, this.amount, feeRate);
+    async estimateBitcoinFee(_bitcoinWallet, feeRate) {
+        const bitcoinWallet = (0, Utils_1.toBitcoinWallet)(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
+        const txFee = await bitcoinWallet.getTransactionFee(this.address, this.amount, feeRate);
         return (0, Tokens_1.toTokenAmount)(txFee == null ? null : BigInt(txFee), Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
     }
     async sendBitcoinTransaction(wallet, feeRate) {
         if (this.state !== FromBTCSwapState.CLAIM_COMMITED)
             throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
-        return await wallet.sendTransaction(this.address, this.amount, feeRate);
+        //Ensure not expired
+        if (this.getTimeoutTime() < Date.now()) {
+            throw new Error("Swap address expired!");
+        }
+        if ((0, IBitcoinWallet_1.isIBitcoinWallet)(wallet)) {
+            return await wallet.sendTransaction(this.address, this.amount, feeRate);
+        }
+        else {
+            const { psbt, psbtHex, psbtBase64, signInputs } = await this.getFundedPsbt(wallet, feeRate);
+            const signedPsbt = await wallet.signPsbt({
+                psbt, psbtHex, psbtBase64
+            }, signInputs);
+            return await this.submitPsbt(signedPsbt);
+        }
     }
     //////////////////////////////
     //// Commit
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in a PTLC
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    async commit(signer, abortSignal, skipChecks) {
+    async commit(_signer, abortSignal, skipChecks) {
+        const signer = (0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         this.checkSigner(signer);
         const result = await this.wrapper.chain.sendAndConfirm(signer, await this.txsCommit(skipChecks), true, abortSignal);
         this.commitTxId = result[0];
@@ -321,10 +350,11 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
     /**
      * Claims and finishes the swap
      *
-     * @param signer Signer to sign the transactions with, can also be different to the initializer
+     * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    async claim(signer, abortSignal) {
+    async claim(_signer, abortSignal) {
+        const signer = (0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         let txIds;
         try {
             txIds = await this.wrapper.chain.sendAndConfirm(signer, await this.txsClaim(signer), true, abortSignal);
