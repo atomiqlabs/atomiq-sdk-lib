@@ -257,6 +257,67 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         ];
     }
     //////////////////////////////
+    //// Execution
+    /**
+     * Executes the swap with the provided bitcoin lightning network wallet
+     *
+     * @param wallet Bitcoin lightning wallet to use to sign the bitcoin transaction
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
+     *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
+     */
+    async execute(wallet, callbacks, options) {
+        if (this.state === FromBTCLNAutoSwapState.FAILED)
+            throw new Error("Swap failed!");
+        if (this.state === FromBTCLNAutoSwapState.EXPIRED)
+            throw new Error("Swap HTLC expired!");
+        if (this.state === FromBTCLNAutoSwapState.QUOTE_EXPIRED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED)
+            throw new Error("Swap quote expired!");
+        if (this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED)
+            throw new Error("Swap already settled!");
+        let abortSignal = options?.abortSignal;
+        if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
+            const paymentPromise = wallet.payInvoice(this.pr);
+            if (callbacks?.onSourceTransactionSent != null)
+                callbacks.onSourceTransactionSent(this.getInputTxId());
+            const abortController = new AbortController();
+            paymentPromise.catch(e => abortController.abort(e));
+            if (options?.abortSignal != null)
+                options.abortSignal.addEventListener("abort", () => abortController.abort(options.abortSignal.reason));
+            abortSignal = abortController.signal;
+        }
+        if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.PR_PAID) {
+            const paymentSuccess = await this.waitForPayment(abortSignal, options?.lightningTxCheckIntervalSeconds);
+            if (!paymentSuccess)
+                throw new Error("Failed to receive lightning network payment");
+        }
+        // @ts-ignore
+        if (this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED)
+            return true;
+        if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED) {
+            const _abortSignal = (0, Utils_1.timeoutSignal)(options?.maxWaitTillAutomaticSettlementSeconds == null ?
+                60 * 1000 :
+                options.maxWaitTillAutomaticSettlementSeconds * 1000, undefined, options?.abortSignal);
+            try {
+                await this.waitTillClaimed(_abortSignal);
+                if (callbacks?.onSwapSettled != null)
+                    callbacks.onSwapSettled(this.getOutputTxId());
+                return true;
+            }
+            catch (e) {
+                if (_abortSignal.aborted && (options?.abortSignal == null || !options.abortSignal.aborted)) {
+                    //Timed out waiting for claim or front
+                    return false;
+                }
+                else {
+                    throw e;
+                }
+            }
+        }
+    }
+    //////////////////////////////
     //// Payment
     /**
      * Checks whether the LP received the LN payment and we can continue by committing & claiming the HTLC on-chain
@@ -475,24 +536,27 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
      * Returns transactions required for claiming the HTLC and finishing the swap by revealing the HTLC secret
      *  (hash preimage)
      *
-     * @param signer Optional signer address to use for claiming the swap, can also be different from the initializer
+     * @param _signer Optional signer address to use for claiming the swap, can also be different from the initializer
      * @throws {Error} If in invalid state (must be CLAIM_COMMITED)
      */
-    txsClaim(signer) {
+    async txsClaim(_signer) {
         if (this.state !== FromBTCLNAutoSwapState.CLAIM_COMMITED)
             throw new Error("Must be in CLAIM_COMMITED state!");
-        return this.wrapper.contract.txsClaimWithSecret(signer ?? this._getInitiator(), this.data, this.secret, true, true);
+        return await this.wrapper.contract.txsClaimWithSecret(_signer == null ?
+            this._getInitiator() :
+            ((0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer)), this.data, this.secret, true, true);
     }
     /**
      * Claims and finishes the swap
      *
-     * @param signer Signer to sign the transactions with, can also be different to the initializer
+     * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    async claim(signer, abortSignal) {
+    async claim(_signer, abortSignal) {
+        const signer = (0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         const result = await this.wrapper.chain.sendAndConfirm(signer, await this.txsClaim(), true, abortSignal);
         this.claimTxId = result[0];
-        if (FromBTCLNAutoSwapState.CLAIM_COMMITED || FromBTCLNAutoSwapState.EXPIRED || FromBTCLNAutoSwapState.FAILED) {
+        if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED || this.state === FromBTCLNAutoSwapState.EXPIRED || this.state === FromBTCLNAutoSwapState.FAILED) {
             await this._saveAndEmit(FromBTCLNAutoSwapState.CLAIM_CLAIMED);
         }
         return result[0];
@@ -537,6 +601,7 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
             if (this.state !== FromBTCLNAutoSwapState.CLAIM_CLAIMED &&
                 this.state !== FromBTCLNAutoSwapState.FAILED) {
                 await this._saveAndEmit(FromBTCLNAutoSwapState.FAILED);
+                throw new Error("Swap expired during claiming");
             }
         }
     }

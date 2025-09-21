@@ -20,6 +20,8 @@ __exportStar(require("./btc/mempool/MempoolBitcoinRpc"), exports);
 __exportStar(require("./btc/mempool/MempoolBitcoinBlock"), exports);
 __exportStar(require("./btc/BitcoinRpcWithAddressIndex"), exports);
 __exportStar(require("./btc/LightningNetworkApi"), exports);
+__exportStar(require("./btc/wallet/MinimalBitcoinWalletInterface"), exports);
+__exportStar(require("./btc/wallet/MinimalLightningNetworkWalletInterface"), exports);
 __exportStar(require("./btc/wallet/IBitcoinWallet"), exports);
 __exportStar(require("./btc/wallet/BitcoinWallet"), exports);
 __exportStar(require("./btc/wallet/SingleAddressBitcoinWallet"), exports);

@@ -1,6 +1,6 @@
 {
   "name": "@atomiqlabs/sdk-lib",
-  "version": "14.0.0-dev.44",
+  "version": "14.0.0-dev.45",
   "description": "Basic SDK functionality library for atomiq",
   "main": "./dist/index.js",
   "types:": "./dist/index.d.ts",
@@ -22,7 +22,7 @@
   "author": "adambor",
   "license": "ISC",
   "dependencies": {
-    "@atomiqlabs/base": "^10.0.0-dev.13",
+    "@atomiqlabs/base": "^10.0.0-dev.16",
     "@atomiqlabs/bolt11": "1.6.1",
     "@noble/ciphers": "^1.2.1",
     "@noble/hashes": "^1.7.1",

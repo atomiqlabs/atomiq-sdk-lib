@@ -186,6 +186,62 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
         };
     }
     //////////////////////////////
+    //// Execution
+    /**
+     * Executes the swap with the provided smart chain wallet/signer
+     *
+     * @param signer Smart chain wallet/signer to use to sign the transaction on the source chain
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether the swap was successfully processed by the LP, in case `false` is returned
+     *  the user can refund their funds back on the source chain by calling `swap.refund()`
+     */
+    async execute(signer, callbacks, options) {
+        if (this.state === ToBTCSwapState.QUOTE_EXPIRED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED)
+            throw new Error("Quote expired");
+        if (this.state === ToBTCSwapState.REFUNDED)
+            throw new Error("Swap already refunded");
+        if (this.state === ToBTCSwapState.REFUNDABLE)
+            throw new Error("Swap refundable, refund with swap.refund()");
+        if (this.state === ToBTCSwapState.SOFT_CLAIMED || this.state === ToBTCSwapState.CLAIMED)
+            throw new Error("Swap already settled!");
+        if (this.state === ToBTCSwapState.CREATED) {
+            const txId = await this.commit(signer, options?.abortSignal, false, callbacks?.onSourceTransactionSent);
+            if (callbacks?.onSourceTransactionConfirmed != null)
+                callbacks.onSourceTransactionConfirmed(txId);
+        }
+        // @ts-ignore
+        if (this.state === ToBTCSwapState.CLAIMED || this.state === ToBTCSwapState.SOFT_CLAIMED)
+            return true;
+        if (this.state === ToBTCSwapState.COMMITED) {
+            const _abortSignal = (0, Utils_1.timeoutSignal)(options?.maxWaitTillSwapProcessedSeconds == null ?
+                120 * 1000 :
+                options.maxWaitTillSwapProcessedSeconds * 1000, undefined, options?.abortSignal);
+            try {
+                const success = await this.waitForPayment(_abortSignal, options?.paymentCheckIntervalSeconds);
+                if (success) {
+                    if (callbacks?.onSwapSettled != null)
+                        callbacks.onSwapSettled(this.getOutputTxId());
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+            catch (e) {
+                if (_abortSignal.aborted && (options?.abortSignal == null || !options.abortSignal.aborted)) {
+                    //Timed out waiting for claim or front
+                    throw new Error("Timed out while waiting for LP to process the swap, the LP might be unresponsive or offline!" +
+                        ` Please check later or wait till ${new Date(Number(this.data.getExpiry()) * 1000).toLocaleString()} to refund unilaterally!`);
+                }
+                else {
+                    throw e;
+                }
+            }
+        }
+    }
+    //////////////////////////////
     //// Commit
     /**
      * Returns transactions for committing the swap on-chain, initiating the swap
@@ -207,15 +263,24 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
     /**
      * Commits the swap on-chain, initiating the swap
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal Abort signal
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled on swap creation, if you commit right after quoting, you can skipChecks)`
+     * @param onBeforeTxSent
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    async commit(signer, abortSignal, skipChecks) {
+    async commit(_signer, abortSignal, skipChecks, onBeforeTxSent) {
+        const signer = (0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         this.checkSigner(signer);
-        const result = await this.wrapper.chain.sendAndConfirm(signer, await this.txsCommit(skipChecks), true, abortSignal);
+        const txs = await this.txsCommit(skipChecks);
+        let txCount = 0;
+        const result = await this.wrapper.chain.sendAndConfirm(signer, txs, true, abortSignal, false, (txId, rawTx) => {
+            txCount++;
+            if (onBeforeTxSent != null && txCount === txs.length)
+                onBeforeTxSent(txId);
+            return Promise.resolve();
+        });
         this.commitTxId = result[result.length - 1];
         if (this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED || this.state === ToBTCSwapState.QUOTE_EXPIRED) {
             await this._saveAndEmit(ToBTCSwapState.COMMITED);
@@ -394,11 +459,12 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
     /**
      * Refunds the swap if the swap is in refundable state, you can check so with isRefundable()
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal               Abort signal
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    async refund(signer, abortSignal) {
+    async refund(_signer, abortSignal) {
+        const signer = (0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         const result = await this.wrapper.chain.sendAndConfirm(signer, await this.txsRefund(signer.getAddress()), true, abortSignal);
         this.refundTxId = result[0];
         if (this.state === ToBTCSwapState.COMMITED || this.state === ToBTCSwapState.REFUNDABLE || this.state === ToBTCSwapState.SOFT_CLAIMED) {
