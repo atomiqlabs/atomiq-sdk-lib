@@ -789,10 +789,17 @@ export class SpvFromBTCSwap<T extends ChainType>
      *
      * @throws {Error} If the swap is in invalid state (must be BTC_TX_CONFIRMED)
      */
-    async txsClaim(_signer?: T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]> {
-        const signer = _signer==null ?
-            null :
-            (isAbstractSigner(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer));
+    async txsClaim(_signer?: string | T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]> {
+        let address: string;
+        if(_signer!=null) {
+            if (typeof (_signer) === "string") {
+                address = _signer;
+            } else if (isAbstractSigner(_signer)) {
+                address = _signer.getAddress();
+            } else {
+                address = (await this.wrapper.chain.wrapSigner(_signer)).getAddress();
+            }
+        }
 
         if(!this.isClaimable()) throw new Error("Must be in BTC_TX_CONFIRMED state!");
 
@@ -813,7 +820,7 @@ export class SpvFromBTCSwap<T extends ChainType>
         }
 
         return await this.wrapper.contract.txsClaim(
-            signer==null ? this._getInitiator() : signer.getAddress(), vaultData,
+            address ?? this._getInitiator(), vaultData,
             withdrawalData.map(tx => {return {tx}}),
             this.wrapper.synchronizer, true
         );

@@ -220,7 +220,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      *
      * @throws {Error} If the swap is in invalid state (must be BTC_TX_CONFIRMED)
      */
-    txsClaim(_signer?: T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]>;
+    txsClaim(_signer?: string | T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]>;
     /**
      * Claims and finishes the swap
      *
