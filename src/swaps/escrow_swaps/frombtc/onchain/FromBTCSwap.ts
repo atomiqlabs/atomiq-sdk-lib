@@ -368,6 +368,72 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
 
 
     //////////////////////////////
+    //// Execution
+
+    /**
+     * Executes the swap with the provided bitcoin wallet,
+     *
+     * @param dstSigner Signer on the destination network, needs to have the same address as the one specified when
+     *  quote was created, this is required for legacy swaps because the destination wallet needs to actively open
+     *  a bitcoin swap address to which the BTC is then sent, this means that the address also needs to have enough
+     *  native tokens to pay for gas on the destination network
+     * @param wallet Bitcoin wallet to use to sign the bitcoin transaction
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
+     *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
+     */
+    async execute(
+        dstSigner: T["Signer"] | T["NativeSigner"],
+        wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner,
+        callbacks?: {
+            onDestinationCommitSent?: (destinationCommitTxId: string) => void,
+            onSourceTransactionSent?: (sourceTxId: string) => void,
+            onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void,
+            onSourceTransactionConfirmed?: (sourceTxId: string) => void,
+            onSwapSettled?: (destinationTxId: string) => void
+        },
+        options?: {
+            feeRate?: number,
+            abortSignal?: AbortSignal,
+            btcTxCheckIntervalSeconds?: number,
+            maxWaitTillAutomaticSettlementSeconds?: number
+        }
+    ): Promise<boolean> {
+        if(this.state===FromBTCSwapState.FAILED) throw new Error("Swap failed!");
+        if(this.state===FromBTCSwapState.EXPIRED) throw new Error("Swap address expired!");
+        if(this.state===FromBTCSwapState.QUOTE_EXPIRED || this.state===FromBTCSwapState.QUOTE_SOFT_EXPIRED) throw new Error("Swap quote expired!");
+        if(this.state===FromBTCSwapState.CLAIM_CLAIMED) throw new Error("Swap already settled!");
+
+        if(this.state===FromBTCSwapState.PR_CREATED) {
+            await this.commit(dstSigner, options?.abortSignal, undefined, callbacks?.onDestinationCommitSent);
+        }
+        if(this.state===FromBTCSwapState.CLAIM_COMMITED) {
+            const bitcoinPaymentSent = await this.getBitcoinPayment();
+
+            if(bitcoinPaymentSent==null) {
+                //Send btc tx
+                const txId = await this.sendBitcoinTransaction(wallet, options?.feeRate);
+                if(callbacks?.onSourceTransactionSent!=null) callbacks.onSourceTransactionSent(txId);
+            }
+
+            const txId = await this.waitForBitcoinTransaction(callbacks?.onSourceTransactionConfirmationStatus, options?.btcTxCheckIntervalSeconds, options?.abortSignal);
+            if (callbacks?.onSourceTransactionConfirmed != null) callbacks.onSourceTransactionConfirmed(txId);
+        }
+
+        // @ts-ignore
+        if(this.state===FromBTCSwapState.CLAIM_CLAIMED) return true;
+
+        if(this.state===FromBTCSwapState.BTC_TX_CONFIRMED) {
+            const success = await this.waitTillClaimed(options?.maxWaitTillAutomaticSettlementSeconds ?? 60, options?.abortSignal);
+            if(success && callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
+            return success;
+        }
+    }
+
+
+    //////////////////////////////
     //// Commit
 
     /**
@@ -377,20 +443,27 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
+     * @param onBeforeTxSent
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    async commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string> {
+    async commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean, onBeforeTxSent?: (txId: string) => void): Promise<string> {
         const signer = isAbstractSigner(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         this.checkSigner(signer);
+        let txCount = 0;
+        const txs = await this.txsCommit(skipChecks);
         const result = await this.wrapper.chain.sendAndConfirm(
-            signer, await this.txsCommit(skipChecks), true, abortSignal
+            signer, txs, true, abortSignal, undefined, (txId: string) => {
+                txCount++;
+                if(onBeforeTxSent!=null && txCount===txs.length) onBeforeTxSent(txId);
+                return Promise.resolve();
+            }
         );
 
-        this.commitTxId = result[0];
+        this.commitTxId = result[result.length - 1];
         if(this.state===FromBTCSwapState.PR_CREATED || this.state===FromBTCSwapState.QUOTE_SOFT_EXPIRED) {
             await this._saveAndEmit(FromBTCSwapState.CLAIM_COMMITED);
         }
-        return result[0];
+        return this.commitTxId;
     }
 
     async waitTillCommited(abortSignal?: AbortSignal): Promise<void> {
@@ -448,13 +521,20 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
      *
      * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
+     * @param onBeforeTxSent
      */
-    async claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string> {
+    async claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, onBeforeTxSent?: (txId: string) => void): Promise<string> {
         const signer = isAbstractSigner(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         let txIds: string[];
         try {
+            let txCount = 0;
+            const txs = await this.txsClaim(signer);
             txIds = await this.wrapper.chain.sendAndConfirm(
-                signer, await this.txsClaim(signer), true, abortSignal
+                signer, txs, true, abortSignal, undefined, (txId: string) => {
+                    txCount++;
+                    if(onBeforeTxSent!=null && txCount===txs.length) onBeforeTxSent(txId);
+                    return Promise.resolve();
+                }
             );
         } catch (e) {
             this.logger.info("claim(): Failed to claim ourselves, checking swap claim state...");
@@ -479,7 +559,7 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
         ) {
             await this._saveAndEmit(FromBTCSwapState.CLAIM_CLAIMED);
         }
-        return txIds[0];
+        return txIds[txIds.length - 1];
     }
 
     /**

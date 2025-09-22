@@ -109,15 +109,42 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
     sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string>;
     /**
+     * Executes the swap with the provided bitcoin wallet,
+     *
+     * @param dstSigner Signer on the destination network, needs to have the same address as the one specified when
+     *  quote was created, this is required for legacy swaps because the destination wallet needs to actively open
+     *  a bitcoin swap address to which the BTC is then sent, this means that the address also needs to have enough
+     *  native tokens to pay for gas on the destination network
+     * @param wallet Bitcoin wallet to use to sign the bitcoin transaction
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
+     *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
+     */
+    execute(dstSigner: T["Signer"] | T["NativeSigner"], wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, callbacks?: {
+        onDestinationCommitSent?: (destinationCommitTxId: string) => void;
+        onSourceTransactionSent?: (sourceTxId: string) => void;
+        onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void;
+        onSourceTransactionConfirmed?: (sourceTxId: string) => void;
+        onSwapSettled?: (destinationTxId: string) => void;
+    }, options?: {
+        feeRate?: number;
+        abortSignal?: AbortSignal;
+        btcTxCheckIntervalSeconds?: number;
+        maxWaitTillAutomaticSettlementSeconds?: number;
+    }): Promise<boolean>;
+    /**
      * Commits the swap on-chain, locking the tokens from the intermediary in a PTLC
      *
      * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
+     * @param onBeforeTxSent
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
+    commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean, onBeforeTxSent?: (txId: string) => void): Promise<string>;
     waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
     /**
      * Returns transactions required to claim the swap on-chain (and possibly also sync the bitcoin light client)
@@ -131,8 +158,9 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      *
      * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
+     * @param onBeforeTxSent
      */
-    claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string>;
+    claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, onBeforeTxSent?: (txId: string) => void): Promise<string>;
     /**
      * Waits till the swap is successfully claimed
      *
