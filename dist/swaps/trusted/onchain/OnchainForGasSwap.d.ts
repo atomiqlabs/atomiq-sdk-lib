@@ -117,8 +117,8 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
      * @throws {PaymentAuthError} If swap expired or failed
      * @throws {Error} When in invalid state (not PR_CREATED)
      */
-    waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
-    waitTillRefunded(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void>;
+    waitForBitcoinTransaction(updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
+    waitTillRefunded(checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<void>;
     requestRefund(refundAddress?: string, abortSignal?: AbortSignal): Promise<void>;
     serialize(): any;
     _getInitiator(): string;

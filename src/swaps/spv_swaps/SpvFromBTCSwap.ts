@@ -698,13 +698,13 @@ export class SpvFromBTCSwap<T extends ChainType>
             if(callbacks?.onSourceTransactionSent!=null) callbacks.onSourceTransactionSent(txId);
         }
         if(this.state===SpvFromBTCSwapState.POSTED || this.state===SpvFromBTCSwapState.BROADCASTED) {
-            const txId = await this.waitForBitcoinTransaction(options?.abortSignal, options?.btcTxCheckIntervalSeconds, callbacks?.onSourceTransactionConfirmationStatus);
+            const txId = await this.waitForBitcoinTransaction(callbacks?.onSourceTransactionConfirmationStatus, options?.btcTxCheckIntervalSeconds, options?.abortSignal);
             if (callbacks?.onSourceTransactionConfirmed != null) callbacks.onSourceTransactionConfirmed(txId);
         }
         // @ts-ignore
         if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return true;
         if(this.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
-            const success = await this.waitTillClaimedOrFronted(options?.abortSignal, options?.maxWaitTillAutomaticSettlementSeconds ?? 60);
+            const success = await this.waitTillClaimedOrFronted(options?.maxWaitTillAutomaticSettlementSeconds ?? 60, options?.abortSignal);
             if(success && callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
             return success;
         }
@@ -737,15 +737,15 @@ export class SpvFromBTCSwap<T extends ChainType>
     /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
      *
-     * @param abortSignal Abort signal
-     * @param checkIntervalSeconds How often to check the bitcoin transaction
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
+     * @param checkIntervalSeconds How often to check the bitcoin transaction
+     * @param abortSignal Abort signal
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     async waitForBitcoinTransaction(
-        abortSignal?: AbortSignal,
+        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
         checkIntervalSeconds?: number,
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
+        abortSignal?: AbortSignal
     ): Promise<string> {
         if(
             this.state!==SpvFromBTCSwapState.POSTED &&
@@ -885,14 +885,14 @@ export class SpvFromBTCSwap<T extends ChainType>
     /**
      * Waits till the swap is successfully executed
      *
-     * @param abortSignal AbortSignal
      * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
+     * @param abortSignal
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
      * @returns {boolean} whether the swap was claimed or fronted automatically or not, if the swap was not claimed
      *  the user can claim manually through `swap.claim()`
      */
-    async waitTillClaimedOrFronted(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean> {
+    async waitTillClaimedOrFronted(maxWaitTimeSeconds?: number, abortSignal?: AbortSignal): Promise<boolean> {
         if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return Promise.resolve(true);
 
         const abortController = extendAbortController(abortSignal);
@@ -972,12 +972,12 @@ export class SpvFromBTCSwap<T extends ChainType>
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     async waitTillExecuted(
-        abortSignal?: AbortSignal,
+        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
         checkIntervalSeconds?: number,
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
+        abortSignal?: AbortSignal
     ): Promise<void> {
-        await this.waitForBitcoinTransaction(abortSignal, checkIntervalSeconds, updateCallback);
-        await this.waitTillClaimedOrFronted(abortSignal);
+        await this.waitForBitcoinTransaction(updateCallback, checkIntervalSeconds, abortSignal);
+        await this.waitTillClaimedOrFronted(undefined, abortSignal);
     }
 
 

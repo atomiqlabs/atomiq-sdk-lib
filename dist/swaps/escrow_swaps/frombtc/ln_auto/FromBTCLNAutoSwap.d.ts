@@ -155,28 +155,28 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     /**
      * Waits till an LN payment is received by the intermediary and client can continue commiting & claiming the HTLC
      *
-     * @param abortSignal Abort signal to stop waiting for payment
-     * @param checkIntervalSeconds How often to poll the intermediary for answer
      * @param onPaymentReceived Callback as for when the LP reports having received the ln payment
+     * @param checkIntervalSeconds How often to poll the intermediary for answer (default 5 seconds)
+     * @param abortSignal Abort signal to stop waiting for payment
      */
-    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number, onPaymentReceived?: (txId: string) => void): Promise<boolean>;
+    waitForPayment(onPaymentReceived?: (txId: string) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     /**
      * Periodically checks the chain to see whether the swap is committed
      *
+     * @param intervalSeconds How often to check (in seconds), default to 5s
      * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
      * @protected
      */
-    protected watchdogWaitTillCommited(abortSignal?: AbortSignal, interval?: number): Promise<boolean>;
-    protected waitTillCommited(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<void>;
+    protected watchdogWaitTillCommited(intervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
+    protected waitTillCommited(checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<void>;
     /**
      * Periodically checks the chain to see whether the swap was finished (claimed or refunded)
      *
+     * @param intervalSeconds How often to check (in seconds), default to 5s
      * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
      * @protected
      */
-    protected watchdogWaitTillResult(abortSignal?: AbortSignal, interval?: number): Promise<SwapPaidState | SwapExpiredState | SwapNotCommitedState>;
+    protected watchdogWaitTillResult(intervalSeconds?: number, abortSignal?: AbortSignal): Promise<SwapPaidState | SwapExpiredState | SwapNotCommitedState>;
     /**
      * Returns transactions required for claiming the HTLC and finishing the swap by revealing the HTLC secret
      *  (hash preimage)
@@ -195,13 +195,13 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     /**
      * Waits till the swap is successfully claimed
      *
-     * @param abortSignal AbortSignal
      * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
+     * @param abortSignal AbortSignal
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
      * @returns {boolean} whether the swap was claimed in time or not
      */
-    waitTillClaimed(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean>;
+    waitTillClaimed(maxWaitTimeSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     /**
      * Is this an LNURL-withdraw swap?
      */
