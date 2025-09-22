@@ -157,7 +157,8 @@ class Swapper extends events_1.EventEmitter {
             if (swapContract.supportsInitWithoutClaimer) {
                 wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO] = new FromBTCLNAutoWrapper_1.FromBTCLNAutoWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, swapContract, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, this.messenger, {
                     getRequestTimeout: options.getRequestTimeout,
-                    postRequestTimeout: options.postRequestTimeout
+                    postRequestTimeout: options.postRequestTimeout,
+                    unsafeSkipLnNodeCheck: this._bitcoinNetwork === base_1.BitcoinNetwork.TESTNET4 || this._bitcoinNetwork === base_1.BitcoinNetwork.REGTEST
                 });
             }
             Object.keys(wrappers).forEach(key => wrappers[key].events.on("swapState", this.swapStateListener));

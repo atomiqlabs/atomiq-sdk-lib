@@ -27,7 +27,6 @@ import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
 import {ISwap} from "../../../ISwap";
 import {FromBTCLNAutoSwap, FromBTCLNAutoSwapInit, FromBTCLNAutoSwapState} from "./FromBTCLNAutoSwap";
 import { IFromBTCLNWrapper } from "../IFromBTCLNWrapper";
-import {BTC_NETWORK} from "@scure/btc-signer/utils";
 
 export type FromBTCLNAutoOptions = {
     descriptionHash?: Buffer,
@@ -39,7 +38,8 @@ export type FromBTCLNAutoOptions = {
 
 export type FromBTCLNAutoWrapperOptions = ISwapWrapperOptions & {
     safetyFactor?: number,
-    bitcoinBlocktime?: number
+    bitcoinBlocktime?: number,
+    unsafeSkipLnNodeCheck?: boolean
 };
 
 export class FromBTCLNAutoWrapper<
@@ -233,6 +233,7 @@ export class FromBTCLNAutoWrapper<
         intermediary: Intermediary
     }[] {
         if(options==null) options = {};
+        options.unsafeSkipLnNodeCheck ??= this.options.unsafeSkipLnNodeCheck;
         options.gasAmount ??= 0n;
         options.feeSafetyFactor ??= 1.25; //No need to add much of a margin, since the claim should happen rather soon
         if(preFetches==null) preFetches = {};
