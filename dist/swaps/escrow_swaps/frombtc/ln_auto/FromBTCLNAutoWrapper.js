@@ -147,6 +147,7 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
     create(signer, amountData, lps, options, additionalParams, abortSignal, preFetches) {
         if (options == null)
             options = {};
+        options.unsafeSkipLnNodeCheck ??= this.options.unsafeSkipLnNodeCheck;
         options.gasAmount ??= 0n;
         options.feeSafetyFactor ??= 1.25; //No need to add much of a margin, since the claim should happen rather soon
         if (preFetches == null)

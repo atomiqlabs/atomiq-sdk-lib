@@ -25,6 +25,7 @@ export type FromBTCLNAutoOptions = {
 export type FromBTCLNAutoWrapperOptions = ISwapWrapperOptions & {
     safetyFactor?: number;
     bitcoinBlocktime?: number;
+    unsafeSkipLnNodeCheck?: boolean;
 };
 export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNAutoSwap<T>, FromBTCLNAutoWrapperOptions> {
     readonly TYPE = SwapType.FROM_BTCLN_AUTO;
