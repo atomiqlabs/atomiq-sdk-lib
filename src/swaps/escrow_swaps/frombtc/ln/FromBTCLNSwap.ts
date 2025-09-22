@@ -344,7 +344,8 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * @param abortSignal Abort signal to stop waiting for payment
      * @param checkIntervalSeconds How often to poll the intermediary for answer
      */
-    async waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds: number = 5): Promise<boolean> {
+    async waitForPayment(checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean> {
+        checkIntervalSeconds ??= 5;
         if(
             this.state!==FromBTCLNSwapState.PR_CREATED &&
             (this.state!==FromBTCLNSwapState.QUOTE_SOFT_EXPIRED || this.signatureData!=null)
@@ -515,13 +516,13 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     /**
      * Waits till the swap is successfully claimed
      *
-     * @param abortSignal AbortSignal
      * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
+     * @param abortSignal AbortSignal
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
      * @returns {boolean} whether the swap was claimed in time or not
      */
-    async waitTillClaimed(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean> {
+    async waitTillClaimed(maxWaitTimeSeconds?: number, abortSignal?: AbortSignal): Promise<boolean> {
         if(this.state===FromBTCLNSwapState.CLAIM_CLAIMED) return Promise.resolve(true);
         if(this.state!==FromBTCLNSwapState.CLAIM_COMMITED) throw new Error("Invalid state (not CLAIM_COMMITED)");
 

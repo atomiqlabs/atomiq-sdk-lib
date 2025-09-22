@@ -73,12 +73,12 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
      *
-     * @param abortSignal Abort signal
-     * @param checkIntervalSeconds How often to check the bitcoin transaction
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
+     * @param checkIntervalSeconds How often to check the bitcoin transaction
+     * @param abortSignal Abort signal
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
+    waitForBitcoinTransaction(updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
     /**
      * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use),
      *  also returns inputs indices that need to be signed by the wallet before submitting the PSBT back to the SDK with
@@ -136,13 +136,13 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     /**
      * Waits till the swap is successfully claimed
      *
-     * @param abortSignal AbortSignal
      * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
+     * @param abortSignal AbortSignal
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
      * @returns {boolean} whether the swap was claimed in time or not
      */
-    waitTillClaimed(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean>;
+    waitTillClaimed(maxWaitTimeSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     serialize(): any;
     /**
      * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain

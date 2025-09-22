@@ -208,12 +208,12 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
      *
-     * @param abortSignal Abort signal
-     * @param checkIntervalSeconds How often to check the bitcoin transaction
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
+     * @param checkIntervalSeconds How often to check the bitcoin transaction
+     * @param abortSignal Abort signal
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
+    waitForBitcoinTransaction(updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
     /**
      * Returns transactions required to claim the swap on-chain (and possibly also sync the bitcoin light client)
      *  after a bitcoin transaction was sent and confirmed
@@ -239,14 +239,14 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     /**
      * Waits till the swap is successfully executed
      *
-     * @param abortSignal AbortSignal
      * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
+     * @param abortSignal
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
      * @returns {boolean} whether the swap was claimed or fronted automatically or not, if the swap was not claimed
      *  the user can claim manually through `swap.claim()`
      */
-    waitTillClaimedOrFronted(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean>;
+    waitTillClaimedOrFronted(maxWaitTimeSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     /**
      * Waits till the bitcoin transaction confirms and swap is claimed
      *
@@ -255,7 +255,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitTillExecuted(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<void>;
+    waitTillExecuted(updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<void>;
     serialize(): any;
     _syncStateFromBitcoin(save: boolean): Promise<boolean>;
     /**

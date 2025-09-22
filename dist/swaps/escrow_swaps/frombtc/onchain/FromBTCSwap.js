@@ -161,12 +161,12 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
     /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
      *
-     * @param abortSignal Abort signal
-     * @param checkIntervalSeconds How often to check the bitcoin transaction
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
+     * @param checkIntervalSeconds How often to check the bitcoin transaction
+     * @param abortSignal Abort signal
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    async waitForBitcoinTransaction(abortSignal, checkIntervalSeconds, updateCallback) {
+    async waitForBitcoinTransaction(updateCallback, checkIntervalSeconds, abortSignal) {
         if (this.state !== FromBTCSwapState.CLAIM_COMMITED && this.state !== FromBTCSwapState.EXPIRED)
             throw new Error("Must be in COMMITED state!");
         const result = await this.wrapper.btcRpc.waitForAddressTxo(this.address, buffer_1.Buffer.from(this.data.getTxoHashHint(), "hex"), this.requiredConfirmations, (confirmations, txId, vout, txEtaMs) => {
@@ -387,13 +387,13 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
     /**
      * Waits till the swap is successfully claimed
      *
-     * @param abortSignal AbortSignal
      * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
+     * @param abortSignal AbortSignal
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
      * @returns {boolean} whether the swap was claimed in time or not
      */
-    async waitTillClaimed(abortSignal, maxWaitTimeSeconds) {
+    async waitTillClaimed(maxWaitTimeSeconds, abortSignal) {
         if (this.state === FromBTCSwapState.CLAIM_CLAIMED)
             return Promise.resolve(true);
         if (this.state !== FromBTCSwapState.BTC_TX_CONFIRMED)

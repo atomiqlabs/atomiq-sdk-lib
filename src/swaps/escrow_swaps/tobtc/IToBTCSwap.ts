@@ -283,7 +283,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         if(this.state===ToBTCSwapState.CLAIMED || this.state===ToBTCSwapState.SOFT_CLAIMED) return true;
 
         if(this.state===ToBTCSwapState.COMMITED) {
-            const success = await this.waitForPayment(options?.abortSignal, options?.paymentCheckIntervalSeconds, options?.maxWaitTillSwapProcessedSeconds ?? 120);
+            const success = await this.waitForPayment(options?.maxWaitTillSwapProcessedSeconds ?? 120, options?.paymentCheckIntervalSeconds, options?.abortSignal);
             if(success) {
                 if(callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
                 return true;
@@ -391,9 +391,10 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
     //// Payment
 
     protected async waitTillIntermediarySwapProcessed(
-        abortSignal?: AbortSignal,
-        checkIntervalSeconds: number = 5
+        checkIntervalSeconds?: number,
+        abortSignal?: AbortSignal
     ): Promise<RefundAuthorizationResponse> {
+        checkIntervalSeconds ??= 5;
         let resp: RefundAuthorizationResponse = {code: RefundAuthorizationResponseCodes.PENDING, msg: ""};
         while(!abortSignal.aborted && (
             resp.code===RefundAuthorizationResponseCodes.PENDING || resp.code===RefundAuthorizationResponseCodes.NOT_FOUND
@@ -456,17 +457,17 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
      * A blocking promise resolving when swap was concluded by the intermediary,
      *  rejecting in case of failure
      *
-     * @param abortSignal           Abort signal
-     * @param checkIntervalSeconds  How often to poll the intermediary for answer
      * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled, an error is thrown if the
      *  swap is taking too long to claim
+     * @param checkIntervalSeconds  How often to poll the intermediary for answer
+     * @param abortSignal           Abort signal
      * @returns {Promise<boolean>}  Was the payment successful? If not we can refund.
      * @throws {IntermediaryError} If a swap is determined expired by the intermediary, but it is actually still valid
      * @throws {SignatureVerificationError} If the swap should be cooperatively refundable but the intermediary returned
      *  invalid refund signature
      * @throws {Error} When swap expires or if the swap has invalid state (must be COMMITED)
      */
-    async waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number, maxWaitTimeSeconds?: number): Promise<boolean> {
+    async waitForPayment(maxWaitTimeSeconds?: number, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean> {
         if(this.state===ToBTCSwapState.CLAIMED) return Promise.resolve(true);
         if(this.state!==ToBTCSwapState.COMMITED && this.state!==ToBTCSwapState.SOFT_CLAIMED) throw new Error("Invalid state (not COMMITED)");
 
@@ -485,7 +486,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         try {
             result = await Promise.race([
                 this.waitTillState(ToBTCSwapState.CLAIMED, "gte", abortController.signal),
-                this.waitTillIntermediarySwapProcessed(abortController.signal, checkIntervalSeconds)
+                this.waitTillIntermediarySwapProcessed(checkIntervalSeconds, abortController.signal)
             ]);
             abortController.abort();
         } catch (e) {

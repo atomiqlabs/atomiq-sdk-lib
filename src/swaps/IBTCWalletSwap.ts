@@ -42,15 +42,15 @@ export interface IBTCWalletSwap {
     /**
      * Waits till the bitcoin transaction confirms
      *
-     * @param abortSignal Abort signal
-     * @param checkIntervalSeconds How often to check the bitcoin transaction
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
+     * @param checkIntervalSeconds How often to check the bitcoin transaction
+     * @param abortSignal Abort signal
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     waitForBitcoinTransaction(
-        abortSignal?: AbortSignal,
+        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
         checkIntervalSeconds?: number,
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
+        abortSignal?: AbortSignal,
     ): Promise<string>;
 
     getRequiredConfirmationsCount(): number;
