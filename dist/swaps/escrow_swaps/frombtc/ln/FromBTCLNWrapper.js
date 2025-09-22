@@ -107,6 +107,7 @@ class FromBTCLNWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
     create(signer, amountData, lps, options, additionalParams, abortSignal, preFetches) {
         if (options == null)
             options = {};
+        options.unsafeSkipLnNodeCheck ??= this.options.unsafeSkipLnNodeCheck;
         if (preFetches == null)
             preFetches = {};
         if (options.descriptionHash != null && options.descriptionHash.length !== 32)

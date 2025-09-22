@@ -1,11 +1,5 @@
 import {ISwapPrice} from "../../prices/abstract/ISwapPrice";
-import {
-    BitcoinNetwork,
-    BtcRelay,
-    ChainData,
-    ChainType, Messenger,
-    RelaySynchronizer
-} from "@atomiqlabs/base";
+import {BitcoinNetwork, BtcRelay, ChainData, ChainType, Messenger, RelaySynchronizer} from "@atomiqlabs/base";
 import {ToBTCLNOptions, ToBTCLNWrapper} from "../escrow_swaps/tobtc/ln/ToBTCLNWrapper";
 import {ToBTCOptions, ToBTCWrapper} from "../escrow_swaps/tobtc/onchain/ToBTCWrapper";
 import {FromBTCLNOptions, FromBTCLNWrapper} from "../escrow_swaps/frombtc/ln/FromBTCLNWrapper";
@@ -34,7 +28,8 @@ import {OutOfBoundsError} from "../../errors/RequestError";
 import {SwapperWithChain} from "./SwapperWithChain";
 import {
     BitcoinTokens,
-    BtcToken, fromDecimal,
+    BtcToken,
+    fromDecimal,
     isBtcToken,
     isSCToken,
     SCToken,
@@ -361,7 +356,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                     this.messenger,
                     {
                         getRequestTimeout: options.getRequestTimeout,
-                        postRequestTimeout: options.postRequestTimeout
+                        postRequestTimeout: options.postRequestTimeout,
+                        unsafeSkipLnNodeCheck: this._bitcoinNetwork===BitcoinNetwork.TESTNET4 || this._bitcoinNetwork===BitcoinNetwork.REGTEST
                     }
                 );
             }
