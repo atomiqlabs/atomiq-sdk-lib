@@ -12,7 +12,7 @@ import {
     SwapData
 } from "@atomiqlabs/base";
 import {Buffer} from "buffer";
-import {LNURL, LNURLWithdraw, LNURLWithdrawParamsWithUrl} from "../../../../utils/LNURL";
+import {isLNURLWithdraw, LNURL, LNURLWithdraw, LNURLWithdrawParamsWithUrl} from "../../../../utils/LNURL";
 import {UserError} from "../../../../errors/UserError";
 import {
     IntermediaryAPI,
@@ -23,6 +23,8 @@ import {IntermediaryError} from "../../../../errors/IntermediaryError";
 import {extendAbortController, getLogger, timeoutPromise, tryWithRetries} from "../../../../utils/Utils";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../../Tokens";
 import {IEscrowSwapInit, isIEscrowSwapInit} from "../../IEscrowSwap";
+import {MinimalLightningNetworkWalletInterface} from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
+import {FromBTCLNAutoSwapState} from "../ln_auto/FromBTCLNAutoSwap";
 
 export enum FromBTCLNSwapState {
     FAILED = -4,
@@ -250,6 +252,81 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
 
 
     //////////////////////////////
+    //// Execution
+
+    /**
+     * Executes the swap with the provided bitcoin lightning network wallet or LNURL
+     *
+     * @param dstSigner Signer on the destination network, needs to have the same address as the one specified when
+     *  quote was created, this is required for legacy swaps because the destination wallet needs to actively claim
+     *  the swap funds on the destination (this also means you need native token to cover gas costs)
+     * @param walletOrLnurlWithdraw Bitcoin lightning wallet to use to pay the lightning network invoice, or an LNURL-withdraw
+     *  link, if the quote was created using LNURL-withdraw you don't need to pass any wallet or lnurl
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     */
+    async execute(
+        dstSigner: T["Signer"] | T["NativeSigner"],
+        walletOrLnurlWithdraw?: MinimalLightningNetworkWalletInterface | LNURLWithdraw | string,
+        callbacks?: {
+            onSourceTransactionReceived?: (sourceTxId: string) => void,
+            onDestinationCommitSent?: (destinationCommitTxId: string) => void,
+            onDestinationClaimSent?: (destinationClaimTxId: string) => void,
+            onSwapSettled?: (destinationTxId: string) => void
+        },
+        options?: {
+            abortSignal?: AbortSignal,
+            lightningTxCheckIntervalSeconds?: number,
+            delayBetweenCommitAndClaimSeconds?: number
+        }
+    ): Promise<void> {
+        if(this.state===FromBTCLNSwapState.FAILED) throw new Error("Swap failed!");
+        if(this.state===FromBTCLNSwapState.EXPIRED) throw new Error("Swap HTLC expired!");
+        if(this.state===FromBTCLNSwapState.QUOTE_EXPIRED || this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) throw new Error("Swap quote expired!");
+        if(this.state===FromBTCLNSwapState.CLAIM_CLAIMED) throw new Error("Swap already settled!");
+
+        let abortSignal = options?.abortSignal;
+
+        if(this.state===FromBTCLNSwapState.PR_CREATED) {
+            if(this.lnurl==null) {
+                if(typeof(walletOrLnurlWithdraw)==="string" || isLNURLWithdraw(walletOrLnurlWithdraw)) {
+                    await this.settleWithLNURLWithdraw(walletOrLnurlWithdraw);
+                } else {
+                    const paymentPromise = walletOrLnurlWithdraw.payInvoice(this.pr);
+
+                    const abortController = new AbortController();
+                    paymentPromise.catch(e => abortController.abort(e));
+                    if(options?.abortSignal!=null) options.abortSignal.addEventListener("abort", () => abortController.abort(options.abortSignal.reason));
+                    abortSignal = abortController.signal;
+                }
+            }
+            const paymentSuccess = await this.waitForPayment(options?.lightningTxCheckIntervalSeconds, abortSignal);
+            if(callbacks?.onSourceTransactionReceived!=null) callbacks.onSourceTransactionReceived(this.getInputTxId());
+            if (!paymentSuccess) throw new Error("Failed to receive lightning network payment");
+        }
+
+        if(this.state===FromBTCLNSwapState.PR_PAID || this.state===FromBTCLNSwapState.CLAIM_COMMITED) {
+            if(this.canCommitAndClaimInOneShot()) {
+                await this.commitAndClaim(dstSigner, options?.abortSignal, undefined, callbacks?.onDestinationCommitSent, callbacks?.onDestinationClaimSent);
+            } else {
+                if(this.state===FromBTCLNSwapState.PR_PAID) {
+                    await this.commit(dstSigner, options?.abortSignal, undefined, callbacks?.onDestinationCommitSent);
+                    if(options?.delayBetweenCommitAndClaimSeconds!=null) await timeoutPromise(options.delayBetweenCommitAndClaimSeconds * 1000, options?.abortSignal);
+                }
+                if(this.state===FromBTCLNSwapState.CLAIM_COMMITED) {
+                    await this.claim(dstSigner, options?.abortSignal, callbacks?.onDestinationClaimSent);
+                }
+            }
+        }
+
+        // @ts-ignore
+        if(this.state===FromBTCLNSwapState.CLAIM_CLAIMED) {
+            if(callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
+        }
+    }
+
+
+    //////////////////////////////
     //// Payment
 
     /**
@@ -425,20 +502,27 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
+     * @param onBeforeTxSent
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    async commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string> {
+    async commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean, onBeforeTxSent?: (txId: string) => void): Promise<string> {
         const signer = isAbstractSigner(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         this.checkSigner(signer);
+        let txCount = 0;
+        const txs = await this.txsCommit(skipChecks);
         const result = await this.wrapper.chain.sendAndConfirm(
-            signer, await this.txsCommit(skipChecks), true, abortSignal
+            signer, txs, true, abortSignal, undefined, (txId: string) => {
+                txCount++;
+                if(onBeforeTxSent!=null && txCount===txs.length) onBeforeTxSent(txId);
+                return Promise.resolve();
+            }
         );
 
-        this.commitTxId = result[0];
+        this.commitTxId = result[result.length-1];
         if(this.state===FromBTCLNSwapState.PR_PAID || this.state===FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
             await this._saveAndEmit(FromBTCLNSwapState.CLAIM_COMMITED);
         }
-        return result[0];
+        return this.commitTxId;
     }
 
     async waitTillCommited(abortSignal?: AbortSignal): Promise<void> {
@@ -499,11 +583,17 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      *
      * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
+     * @param onBeforeTxSent
      */
-    async claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string> {
+    async claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, onBeforeTxSent?: (txId: string) => void): Promise<string> {
         const signer = isAbstractSigner(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
+        let txCount = 0;
         const result = await this.wrapper.chain.sendAndConfirm(
-            signer, await this.txsClaim(), true, abortSignal
+            signer, await this.txsClaim(), true, abortSignal, undefined, (txId: string) => {
+                txCount++;
+                if(onBeforeTxSent!=null && txCount===1) onBeforeTxSent(txId);
+                return Promise.resolve();
+            }
         );
 
         this.claimTxId = result[0];
@@ -641,21 +731,33 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
+     * @param onBeforeCommitTxSent
+     * @param onBeforeClaimTxSent
      * @throws {Error} If in invalid state (must be PR_PAID or CLAIM_COMMITED)
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    async commitAndClaim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string[]> {
+    async commitAndClaim(
+        _signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean,
+        onBeforeCommitTxSent?: (txId: string) => void, onBeforeClaimTxSent?: (txId: string) => void
+    ): Promise<string[]> {
         const signer = isAbstractSigner(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         if(!this.canCommitAndClaimInOneShot()) throw new Error("Cannot commitAndClaim in single action, please run commit and claim separately!");
         this.checkSigner(signer);
-        if(this.state===FromBTCLNSwapState.CLAIM_COMMITED) return [null, await this.claim(signer)];
+        if(this.state===FromBTCLNSwapState.CLAIM_COMMITED) return [null, await this.claim(signer, abortSignal, onBeforeClaimTxSent)];
 
+        let txCount = 0;
+        const txs = await this.txsCommitAndClaim(skipChecks);
         const result = await this.wrapper.chain.sendAndConfirm(
-            signer, await this.txsCommitAndClaim(skipChecks), true, abortSignal
+            signer, txs, true, abortSignal, undefined, (txId: string) => {
+                txCount++;
+                if(onBeforeCommitTxSent!=null && txCount===1) onBeforeCommitTxSent(txId);
+                if(onBeforeClaimTxSent!=null && txCount===txs.length) onBeforeClaimTxSent(txId);
+                return Promise.resolve();
+            }
         );
 
-        this.commitTxId = result[0] || this.commitTxId;
-        this.claimTxId = result[result.length-1] || this.claimTxId;
+        this.commitTxId = result[0] ?? this.commitTxId;
+        this.claimTxId = result[result.length-1] ?? this.claimTxId;
         if(this.state!==FromBTCLNSwapState.CLAIM_CLAIMED) {
             await this._saveAndEmit(FromBTCLNSwapState.CLAIM_CLAIMED);
         }

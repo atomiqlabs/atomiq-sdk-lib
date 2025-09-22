@@ -259,7 +259,7 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
     //////////////////////////////
     //// Execution
     /**
-     * Executes the swap with the provided bitcoin lightning network wallet
+     * Executes the swap with the provided bitcoin lightning network wallet or LNURL
      *
      * @param walletOrLnurlWithdraw Bitcoin lightning wallet to use to pay the lightning network invoice, or an LNURL-withdraw
      *  link, if the quote was created using LNURL-withdraw you don't need to pass any wallet or lnurl

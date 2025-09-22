@@ -283,6 +283,56 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
         }
     }
     //////////////////////////////
+    //// Execution
+    /**
+     * Executes the swap with the provided bitcoin wallet,
+     *
+     * @param dstSigner Signer on the destination network, needs to have the same address as the one specified when
+     *  quote was created, this is required for legacy swaps because the destination wallet needs to actively open
+     *  a bitcoin swap address to which the BTC is then sent, this means that the address also needs to have enough
+     *  native tokens to pay for gas on the destination network
+     * @param wallet Bitcoin wallet to use to sign the bitcoin transaction
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
+     *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
+     */
+    async execute(dstSigner, wallet, callbacks, options) {
+        if (this.state === FromBTCSwapState.FAILED)
+            throw new Error("Swap failed!");
+        if (this.state === FromBTCSwapState.EXPIRED)
+            throw new Error("Swap address expired!");
+        if (this.state === FromBTCSwapState.QUOTE_EXPIRED || this.state === FromBTCSwapState.QUOTE_SOFT_EXPIRED)
+            throw new Error("Swap quote expired!");
+        if (this.state === FromBTCSwapState.CLAIM_CLAIMED)
+            throw new Error("Swap already settled!");
+        if (this.state === FromBTCSwapState.PR_CREATED) {
+            await this.commit(dstSigner, options?.abortSignal, undefined, callbacks?.onDestinationCommitSent);
+        }
+        if (this.state === FromBTCSwapState.CLAIM_COMMITED) {
+            const bitcoinPaymentSent = await this.getBitcoinPayment();
+            if (bitcoinPaymentSent == null) {
+                //Send btc tx
+                const txId = await this.sendBitcoinTransaction(wallet, options?.feeRate);
+                if (callbacks?.onSourceTransactionSent != null)
+                    callbacks.onSourceTransactionSent(txId);
+            }
+            const txId = await this.waitForBitcoinTransaction(callbacks?.onSourceTransactionConfirmationStatus, options?.btcTxCheckIntervalSeconds, options?.abortSignal);
+            if (callbacks?.onSourceTransactionConfirmed != null)
+                callbacks.onSourceTransactionConfirmed(txId);
+        }
+        // @ts-ignore
+        if (this.state === FromBTCSwapState.CLAIM_CLAIMED)
+            return true;
+        if (this.state === FromBTCSwapState.BTC_TX_CONFIRMED) {
+            const success = await this.waitTillClaimed(options?.maxWaitTillAutomaticSettlementSeconds ?? 60, options?.abortSignal);
+            if (success && callbacks?.onSwapSettled != null)
+                callbacks.onSwapSettled(this.getOutputTxId());
+            return success;
+        }
+    }
+    //////////////////////////////
     //// Commit
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in a PTLC
@@ -291,17 +341,25 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
      * @param abortSignal Abort signal to stop waiting for the transaction confirmation and abort
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
+     * @param onBeforeTxSent
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    async commit(_signer, abortSignal, skipChecks) {
+    async commit(_signer, abortSignal, skipChecks, onBeforeTxSent) {
         const signer = (0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         this.checkSigner(signer);
-        const result = await this.wrapper.chain.sendAndConfirm(signer, await this.txsCommit(skipChecks), true, abortSignal);
-        this.commitTxId = result[0];
+        let txCount = 0;
+        const txs = await this.txsCommit(skipChecks);
+        const result = await this.wrapper.chain.sendAndConfirm(signer, txs, true, abortSignal, undefined, (txId) => {
+            txCount++;
+            if (onBeforeTxSent != null && txCount === txs.length)
+                onBeforeTxSent(txId);
+            return Promise.resolve();
+        });
+        this.commitTxId = result[result.length - 1];
         if (this.state === FromBTCSwapState.PR_CREATED || this.state === FromBTCSwapState.QUOTE_SOFT_EXPIRED) {
             await this._saveAndEmit(FromBTCSwapState.CLAIM_COMMITED);
         }
-        return result[0];
+        return this.commitTxId;
     }
     async waitTillCommited(abortSignal) {
         if (this.state === FromBTCSwapState.CLAIM_COMMITED || this.state === FromBTCSwapState.CLAIM_CLAIMED)
@@ -354,12 +412,20 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
      *
      * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
+     * @param onBeforeTxSent
      */
-    async claim(_signer, abortSignal) {
+    async claim(_signer, abortSignal, onBeforeTxSent) {
         const signer = (0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         let txIds;
         try {
-            txIds = await this.wrapper.chain.sendAndConfirm(signer, await this.txsClaim(signer), true, abortSignal);
+            let txCount = 0;
+            const txs = await this.txsClaim(signer);
+            txIds = await this.wrapper.chain.sendAndConfirm(signer, txs, true, abortSignal, undefined, (txId) => {
+                txCount++;
+                if (onBeforeTxSent != null && txCount === txs.length)
+                    onBeforeTxSent(txId);
+                return Promise.resolve();
+            });
         }
         catch (e) {
             this.logger.info("claim(): Failed to claim ourselves, checking swap claim state...");
@@ -382,7 +448,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             this.state === FromBTCSwapState.EXPIRED || this.state === FromBTCSwapState.FAILED) {
             await this._saveAndEmit(FromBTCSwapState.CLAIM_CLAIMED);
         }
-        return txIds[0];
+        return txIds[txIds.length - 1];
     }
     /**
      * Waits till the swap is successfully claimed

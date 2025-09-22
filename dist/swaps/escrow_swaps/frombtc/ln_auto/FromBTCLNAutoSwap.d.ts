@@ -117,7 +117,7 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
         }
     ];
     /**
-     * Executes the swap with the provided bitcoin lightning network wallet
+     * Executes the swap with the provided bitcoin lightning network wallet or LNURL
      *
      * @param walletOrLnurlWithdraw Bitcoin lightning wallet to use to pay the lightning network invoice, or an LNURL-withdraw
      *  link, if the quote was created using LNURL-withdraw you don't need to pass any wallet or lnurl
@@ -131,7 +131,6 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
         onSourceTransactionReceived?: (sourceTxId: string) => void;
         onSwapSettled?: (destinationTxId: string) => void;
     }, options?: {
-        feeRate?: number;
         abortSignal?: AbortSignal;
         lightningTxCheckIntervalSeconds?: number;
         maxWaitTillAutomaticSettlementSeconds?: number;
