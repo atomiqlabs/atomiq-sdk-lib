@@ -55,7 +55,7 @@ export abstract class ISwap<
     protected readonly wrapper: ISwapWrapper<T, ISwap<T, S>>;
     readonly url: string;
 
-    readonly chainIdentifier: string;
+    readonly chainIdentifier: T["ChainId"];
     readonly exactIn: boolean;
     readonly createdAt: number;
 
