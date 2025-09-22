@@ -20,10 +20,12 @@ import {Intermediary} from "../../intermediaries/Intermediary";
 import {
     extendAbortController,
     randomBytes,
-    toCoinselectAddressType,
-    toOutputScript,
     tryWithRetries
 } from "../../utils/Utils";
+import {
+    toCoinselectAddressType,
+    toOutputScript
+} from "../../utils/BitcoinUtils";
 import {
     IntermediaryAPI,
     SpvFromBTCPrepareResponseType

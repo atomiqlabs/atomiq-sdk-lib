@@ -3,7 +3,8 @@ import {BTC_NETWORK} from "@scure/btc-signer/utils"
 import {p2wpkh, OutScript, Transaction, p2tr, Address} from "@scure/btc-signer";
 import {IBitcoinWallet} from "./IBitcoinWallet";
 import {Buffer} from "buffer";
-import {getLogger, randomBytes, toCoinselectAddressType, toOutputScript} from "../../utils/Utils";
+import {getLogger, randomBytes} from "../../utils/Utils";
+import {toCoinselectAddressType, toOutputScript} from "../../utils/BitcoinUtils";
 import {BitcoinRpcWithAddressIndex} from "../BitcoinRpcWithAddressIndex";
 
 export type BitcoinWalletUtxo = {

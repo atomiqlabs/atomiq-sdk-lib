@@ -148,14 +148,15 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      *
      * @param abortSignal           Abort signal
      * @param checkIntervalSeconds  How often to poll the intermediary for answer
-     *
+     * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled, an error is thrown if the
+     *  swap is taking too long to claim
      * @returns {Promise<boolean>}  Was the payment successful? If not we can refund.
      * @throws {IntermediaryError} If a swap is determined expired by the intermediary, but it is actually still valid
      * @throws {SignatureVerificationError} If the swap should be cooperatively refundable but the intermediary returned
      *  invalid refund signature
      * @throws {Error} When swap expires or if the swap has invalid state (must be COMMITED)
      */
-    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<boolean>;
+    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number, maxWaitTimeSeconds?: number): Promise<boolean>;
     /**
      * Get the estimated smart chain transaction fee of the refund transaction
      */

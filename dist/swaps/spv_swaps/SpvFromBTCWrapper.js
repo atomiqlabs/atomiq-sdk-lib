@@ -7,6 +7,7 @@ const SpvFromBTCSwap_1 = require("./SpvFromBTCSwap");
 const utils_1 = require("@scure/btc-signer/utils");
 const SwapType_1 = require("../enums/SwapType");
 const Utils_1 = require("../../utils/Utils");
+const BitcoinUtils_1 = require("../../utils/BitcoinUtils");
 const IntermediaryAPI_1 = require("../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../errors/RequestError");
 const IntermediaryError_1 = require("../../errors/IntermediaryError");
@@ -198,9 +199,9 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         let btcAddressScript;
         //Ensure valid btc addresses returned
         try {
-            vaultScript = (0, Utils_1.toOutputScript)(this.options.bitcoinNetwork, resp.vaultBtcAddress);
-            vaultAddressType = (0, Utils_1.toCoinselectAddressType)(vaultScript);
-            btcAddressScript = (0, Utils_1.toOutputScript)(this.options.bitcoinNetwork, resp.btcAddress);
+            vaultScript = (0, BitcoinUtils_1.toOutputScript)(this.options.bitcoinNetwork, resp.vaultBtcAddress);
+            vaultAddressType = (0, BitcoinUtils_1.toCoinselectAddressType)(vaultScript);
+            btcAddressScript = (0, BitcoinUtils_1.toOutputScript)(this.options.bitcoinNetwork, resp.btcAddress);
         }
         catch (e) {
             throw new IntermediaryError_1.IntermediaryError("Invalid btc address data returned", e);

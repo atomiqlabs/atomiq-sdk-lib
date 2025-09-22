@@ -18,14 +18,14 @@ import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../../ISwap
 import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../../errors/IntermediaryError";
 import {SwapType} from "../../../enums/SwapType";
-import {extendAbortController, randomBytes, toOutputScript, tryWithRetries} from "../../../../utils/Utils";
+import {extendAbortController, randomBytes, tryWithRetries} from "../../../../utils/Utils";
+import { toOutputScript} from "../../../../utils/BitcoinUtils";
 import {FromBTCResponseType, IntermediaryAPI} from "../../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../../errors/RequestError";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {UnifiedSwapEventListener} from "../../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
 import {ISwap} from "../../../ISwap";
-import {MempoolApi} from "../../../../btc/mempool/MempoolApi";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint,

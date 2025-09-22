@@ -101,6 +101,7 @@ export class FromBTCLNAutoWrapper<
 
     protected processEventInitialize(swap: FromBTCLNAutoSwap<T>, event: InitializeEvent<T["Data"]>): Promise<boolean> {
         if(swap.state===FromBTCLNAutoSwapState.PR_PAID || swap.state===FromBTCLNAutoSwapState.PR_CREATED || swap.state===FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
+            swap.commitTxId = event.meta.txId;
             swap.state = FromBTCLNAutoSwapState.CLAIM_COMMITED;
             return Promise.resolve(true);
         }
@@ -109,6 +110,7 @@ export class FromBTCLNAutoWrapper<
 
     protected processEventClaim(swap: FromBTCLNAutoSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean> {
         if(swap.state!==FromBTCLNAutoSwapState.FAILED && swap.state!==FromBTCLNAutoSwapState.CLAIM_CLAIMED) {
+            swap.claimTxId = event.meta.txId;
             swap.state = FromBTCLNAutoSwapState.CLAIM_CLAIMED;
             return Promise.resolve(true);
         }

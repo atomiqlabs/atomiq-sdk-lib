@@ -261,14 +261,15 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
     /**
      * Executes the swap with the provided bitcoin lightning network wallet
      *
-     * @param wallet Bitcoin lightning wallet to use to sign the bitcoin transaction
+     * @param walletOrLnurlWithdraw Bitcoin lightning wallet to use to pay the lightning network invoice, or an LNURL-withdraw
+     *  link, if the quote was created using LNURL-withdraw you don't need to pass any wallet or lnurl
      * @param callbacks Callbacks to track the progress of the swap
      * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
      *
      * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
      *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
      */
-    async execute(wallet, callbacks, options) {
+    async execute(walletOrLnurlWithdraw, callbacks, options) {
         if (this.state === FromBTCLNAutoSwapState.FAILED)
             throw new Error("Swap failed!");
         if (this.state === FromBTCLNAutoSwapState.EXPIRED)
@@ -279,17 +280,22 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
             throw new Error("Swap already settled!");
         let abortSignal = options?.abortSignal;
         if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
-            const paymentPromise = wallet.payInvoice(this.pr);
-            if (callbacks?.onSourceTransactionSent != null)
-                callbacks.onSourceTransactionSent(this.getInputTxId());
-            const abortController = new AbortController();
-            paymentPromise.catch(e => abortController.abort(e));
-            if (options?.abortSignal != null)
-                options.abortSignal.addEventListener("abort", () => abortController.abort(options.abortSignal.reason));
-            abortSignal = abortController.signal;
+            if (this.lnurl == null) {
+                if (typeof (walletOrLnurlWithdraw) === "string" || (0, LNURL_1.isLNURLWithdraw)(walletOrLnurlWithdraw)) {
+                    await this.settleWithLNURLWithdraw(walletOrLnurlWithdraw);
+                }
+                else {
+                    const paymentPromise = walletOrLnurlWithdraw.payInvoice(this.pr);
+                    const abortController = new AbortController();
+                    paymentPromise.catch(e => abortController.abort(e));
+                    if (options?.abortSignal != null)
+                        options.abortSignal.addEventListener("abort", () => abortController.abort(options.abortSignal.reason));
+                    abortSignal = abortController.signal;
+                }
+            }
         }
         if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.PR_PAID) {
-            const paymentSuccess = await this.waitForPayment(abortSignal, options?.lightningTxCheckIntervalSeconds);
+            const paymentSuccess = await this.waitForPayment(abortSignal, options?.lightningTxCheckIntervalSeconds, callbacks?.onSourceTransactionReceived);
             if (!paymentSuccess)
                 throw new Error("Failed to receive lightning network payment");
         }
@@ -297,24 +303,10 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         if (this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED)
             return true;
         if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED) {
-            const _abortSignal = (0, Utils_1.timeoutSignal)(options?.maxWaitTillAutomaticSettlementSeconds == null ?
-                60 * 1000 :
-                options.maxWaitTillAutomaticSettlementSeconds * 1000, undefined, options?.abortSignal);
-            try {
-                await this.waitTillClaimed(_abortSignal);
-                if (callbacks?.onSwapSettled != null)
-                    callbacks.onSwapSettled(this.getOutputTxId());
-                return true;
-            }
-            catch (e) {
-                if (_abortSignal.aborted && (options?.abortSignal == null || !options.abortSignal.aborted)) {
-                    //Timed out waiting for claim or front
-                    return false;
-                }
-                else {
-                    throw e;
-                }
-            }
+            const success = await this.waitTillClaimed(options?.abortSignal, options?.maxWaitTillAutomaticSettlementSeconds ?? 60);
+            if (success && callbacks?.onSwapSettled != null)
+                callbacks.onSwapSettled(this.getOutputTxId());
+            return success;
         }
     }
     //////////////////////////////
@@ -403,8 +395,9 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
      *
      * @param abortSignal Abort signal to stop waiting for payment
      * @param checkIntervalSeconds How often to poll the intermediary for answer
+     * @param onPaymentReceived Callback as for when the LP reports having received the ln payment
      */
-    async waitForPayment(abortSignal, checkIntervalSeconds = 5) {
+    async waitForPayment(abortSignal, checkIntervalSeconds = 5, onPaymentReceived) {
         if (this.state === FromBTCLNAutoSwapState.PR_PAID) {
             await this.waitTillCommited(abortSignal, checkIntervalSeconds);
             return true;
@@ -442,6 +435,8 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         if (resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.PAID) {
             const swapData = new this.wrapper.swapDataDeserializer(resp.data.data);
             await this.checkIntermediaryReturnedData(this._getInitiator(), swapData);
+            if (onPaymentReceived != null)
+                onPaymentReceived(this.getInputTxId());
             if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
                 delete this.initialSwapData;
                 this.data = swapData;
@@ -488,11 +483,18 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         if (this.state !== FromBTCLNAutoSwapState.PR_PAID)
             throw new Error("Invalid state");
         const abortController = (0, Utils_1.extendAbortController)(abortSignal);
-        const result = await Promise.race([
-            this.watchdogWaitTillCommited(abortController.signal, checkIntervalSeconds),
-            this.waitTillState(FromBTCLNAutoSwapState.CLAIM_COMMITED, "gte", abortController.signal).then(() => 0)
-        ]);
-        abortController.abort();
+        let result;
+        try {
+            result = await Promise.race([
+                this.watchdogWaitTillCommited(abortController.signal, checkIntervalSeconds),
+                this.waitTillState(FromBTCLNAutoSwapState.CLAIM_COMMITED, "gte", abortController.signal).then(() => 0)
+            ]);
+            abortController.abort();
+        }
+        catch (e) {
+            abortController.abort();
+            throw e;
+        }
         if (result === 0)
             this.logger.debug("waitTillCommited(): Resolved from state changed");
         if (result === true)
@@ -565,26 +567,45 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
      * Waits till the swap is successfully claimed
      *
      * @param abortSignal AbortSignal
+     * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
+     * @returns {boolean} whether the swap was claimed in time or not
      */
-    async waitTillClaimed(abortSignal) {
+    async waitTillClaimed(abortSignal, maxWaitTimeSeconds) {
         if (this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED)
-            return Promise.resolve();
+            return Promise.resolve(true);
         if (this.state !== FromBTCLNAutoSwapState.CLAIM_COMMITED)
             throw new Error("Invalid state (not CLAIM_COMMITED)");
         const abortController = new AbortController();
         if (abortSignal != null)
             abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
-        const res = await Promise.race([
-            this.watchdogWaitTillResult(abortController.signal),
-            this.waitTillState(FromBTCLNAutoSwapState.CLAIM_CLAIMED, "eq", abortController.signal).then(() => 0),
-            this.waitTillState(FromBTCLNAutoSwapState.EXPIRED, "eq", abortController.signal).then(() => 1),
-        ]);
-        abortController.abort();
+        let timedOut = false;
+        if (maxWaitTimeSeconds != null) {
+            const timeout = setTimeout(() => {
+                timedOut = true;
+                abortController.abort();
+            }, maxWaitTimeSeconds * 1000);
+            abortController.signal.addEventListener("abort", () => clearTimeout(timeout));
+        }
+        let res;
+        try {
+            res = await Promise.race([
+                this.watchdogWaitTillResult(abortController.signal),
+                this.waitTillState(FromBTCLNAutoSwapState.CLAIM_CLAIMED, "eq", abortController.signal).then(() => 0),
+                this.waitTillState(FromBTCLNAutoSwapState.EXPIRED, "eq", abortController.signal).then(() => 1),
+            ]);
+            abortController.abort();
+        }
+        catch (e) {
+            abortController.abort();
+            if (timedOut)
+                return false;
+            throw e;
+        }
         if (res === 0) {
             this.logger.debug("waitTillClaimed(): Resolved from state change (CLAIM_CLAIMED)");
-            return;
+            return true;
         }
         if (res === 1) {
             this.logger.debug("waitTillClaimed(): Resolved from state change (EXPIRED)");
@@ -601,9 +622,10 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
             if (this.state !== FromBTCLNAutoSwapState.CLAIM_CLAIMED &&
                 this.state !== FromBTCLNAutoSwapState.FAILED) {
                 await this._saveAndEmit(FromBTCLNAutoSwapState.FAILED);
-                throw new Error("Swap expired during claiming");
             }
+            throw new Error("Swap expired during claiming");
         }
+        return true;
     }
     //////////////////////////////
     //// LNURL

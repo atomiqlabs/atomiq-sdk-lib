@@ -1,11 +1,6 @@
 /// <reference types="node" />
 /// <reference types="node" />
-import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { Buffer } from "buffer";
-import { Transaction } from "@scure/btc-signer";
-import { CoinselectAddressTypes } from "../btc/coinselect2";
-import { IBitcoinWallet } from "../btc/wallet/IBitcoinWallet";
-import { BitcoinRpcWithAddressIndex } from "../btc/BitcoinRpcWithAddressIndex";
 type Constructor<T = any> = new (...args: any[]) => T;
 export type LoggerType = {
     debug: (msg: string, ...args: any[]) => void;
@@ -111,16 +106,5 @@ export declare function timeoutSignal(timeout: number, abortReason?: any, abortS
 export declare function bigIntMin(a: bigint, b: bigint): bigint;
 export declare function bigIntMax(a: bigint, b: bigint): bigint;
 export declare function bigIntCompare(a: bigint, b: bigint): -1 | 0 | 1;
-export declare function toOutputScript(network: BTC_NETWORK, address: string): Buffer;
-export declare function toCoinselectAddressType(outputScript: Uint8Array): CoinselectAddressTypes;
 export declare function randomBytes(bytesLength: number): Buffer;
-/**
- * General parsers for PSBTs, can parse hex or base64 encoded PSBTs
- * @param _psbt
- */
-export declare function parsePsbtTransaction(_psbt: Transaction | string): Transaction;
-export declare function toBitcoinWallet(_bitcoinWallet: IBitcoinWallet | {
-    address: string;
-    publicKey: string;
-}, btcRpc: BitcoinRpcWithAddressIndex<any>, bitcoinNetwork: BTC_NETWORK): IBitcoinWallet;
 export {};

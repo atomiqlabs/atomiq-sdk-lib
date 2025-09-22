@@ -8,6 +8,7 @@ const UserError_1 = require("../../../../errors/UserError");
 const IntermediaryError_1 = require("../../../../errors/IntermediaryError");
 const SwapType_1 = require("../../../enums/SwapType");
 const Utils_1 = require("../../../../utils/Utils");
+const BitcoinUtils_1 = require("../../../../utils/BitcoinUtils");
 const IntermediaryAPI_1 = require("../../../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../../../errors/RequestError");
 const utils_1 = require("@scure/btc-signer/utils");
@@ -58,7 +59,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      */
     btcAddressToOutputScript(addr) {
         try {
-            return (0, Utils_1.toOutputScript)(this.options.bitcoinNetwork, addr);
+            return (0, BitcoinUtils_1.toOutputScript)(this.options.bitcoinNetwork, addr);
         }
         catch (e) {
             throw new UserError_1.UserError("Invalid address specified");

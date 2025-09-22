@@ -119,15 +119,16 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     /**
      * Executes the swap with the provided bitcoin lightning network wallet
      *
-     * @param wallet Bitcoin lightning wallet to use to sign the bitcoin transaction
+     * @param walletOrLnurlWithdraw Bitcoin lightning wallet to use to pay the lightning network invoice, or an LNURL-withdraw
+     *  link, if the quote was created using LNURL-withdraw you don't need to pass any wallet or lnurl
      * @param callbacks Callbacks to track the progress of the swap
      * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
      *
      * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
      *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
      */
-    execute(wallet: MinimalLightningNetworkWalletInterface, callbacks?: {
-        onSourceTransactionSent?: (sourceTxId: string) => void;
+    execute(walletOrLnurlWithdraw?: MinimalLightningNetworkWalletInterface | LNURLWithdraw | string, callbacks?: {
+        onSourceTransactionReceived?: (sourceTxId: string) => void;
         onSwapSettled?: (destinationTxId: string) => void;
     }, options?: {
         feeRate?: number;
@@ -156,8 +157,9 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
      *
      * @param abortSignal Abort signal to stop waiting for payment
      * @param checkIntervalSeconds How often to poll the intermediary for answer
+     * @param onPaymentReceived Callback as for when the LP reports having received the ln payment
      */
-    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<boolean>;
+    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number, onPaymentReceived?: (txId: string) => void): Promise<boolean>;
     /**
      * Periodically checks the chain to see whether the swap is committed
      *
@@ -194,10 +196,12 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
      * Waits till the swap is successfully claimed
      *
      * @param abortSignal AbortSignal
+     * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
+     * @returns {boolean} whether the swap was claimed in time or not
      */
-    waitTillClaimed(abortSignal?: AbortSignal): Promise<void>;
+    waitTillClaimed(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean>;
     /**
      * Is this an LNURL-withdraw swap?
      */

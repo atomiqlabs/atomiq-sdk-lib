@@ -5,6 +5,7 @@ import { SwapType } from "../../enums/SwapType";
 import { SCToken, TokenAmount } from "../../../Tokens";
 import { ChainIds, MultiChain, Swapper } from "../Swapper";
 import { IBitcoinWallet } from "../../../btc/wallet/IBitcoinWallet";
+import { MinimalBitcoinWalletInterface } from "../../../btc/wallet/MinimalBitcoinWalletInterface";
 export declare class SwapperUtils<T extends MultiChain> {
     readonly bitcoinNetwork: BTC_NETWORK;
     private readonly root;
@@ -95,11 +96,11 @@ export declare class SwapperUtils<T extends MultiChain> {
     /**
      * Returns the spendable balance of a bitcoin wallet
      *
-     * @param addressOrWallet
+     * @param wallet
      * @param targetChain
      * @param options Additional options
      */
-    getBitcoinSpendableBalance(addressOrWallet: string | IBitcoinWallet, targetChain?: ChainIds<T>, options?: {
+    getBitcoinSpendableBalance(wallet: string | IBitcoinWallet | MinimalBitcoinWalletInterface, targetChain?: ChainIds<T>, options?: {
         gasDrop?: boolean;
         feeRate?: number;
         minFeeRate?: number;
@@ -110,7 +111,7 @@ export declare class SwapperUtils<T extends MultiChain> {
     /**
      * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
      */
-    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(wallet: string | T[ChainIdentifier]["Signer"], token: SCToken<ChainIdentifier>, options?: {
+    getSpendableBalance<ChainIdentifier extends ChainIds<T>>(wallet: string | T[ChainIdentifier]["Signer"] | T[ChainIdentifier]["NativeSigner"], token: SCToken<ChainIdentifier>, options?: {
         feeMultiplier?: number;
         feeRate?: any;
     }): Promise<TokenAmount>;
