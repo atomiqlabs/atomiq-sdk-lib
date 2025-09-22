@@ -35,7 +35,7 @@ import {IntermediaryError} from "../../errors/IntermediaryError";
 import {CoinselectAddressTypes} from "../../btc/coinselect2";
 import {OutScript, Transaction} from "@scure/btc-signer";
 import {ISwap} from "../ISwap";
-import {MempoolApi} from "../../btc/mempool/MempoolApi";
+import {IClaimableSwapWrapper} from "../IClaimableSwapWrapper";
 
 export type SpvFromBTCOptions = {
     gasAmount?: bigint,
@@ -56,8 +56,9 @@ export type SpvFromBTCWrapperOptions = ISwapWrapperOptions & {
 
 export class SpvFromBTCWrapper<
     T extends ChainType
-> extends ISwapWrapper<T, SpvFromBTCSwap<T>, SpvFromBTCWrapperOptions> {
+> extends ISwapWrapper<T, SpvFromBTCSwap<T>, SpvFromBTCWrapperOptions> implements IClaimableSwapWrapper<SpvFromBTCSwap<T>> {
 
+    public readonly claimableSwapStates = [SpvFromBTCSwapState.BTC_TX_CONFIRMED];
     public readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
     public readonly swapDeserializer = SpvFromBTCSwap;
 

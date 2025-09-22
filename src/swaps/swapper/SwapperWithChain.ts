@@ -27,6 +27,7 @@ import {FromBTCLNAutoOptions} from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAut
 import {FromBTCLNAutoSwap} from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
 import {SwapAmountType} from "../enums/SwapAmountType";
 import {UserError} from "../../errors/UserError";
+import {IClaimableSwap} from "../IClaimableSwap";
 
 export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends ChainIds<T>> {
 
@@ -236,6 +237,14 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
     }
 
     /**
+     * Returns swaps that are due to be claimed/settled manually for the specific chain,
+     *  optionally also for a specific signer's address
+     */
+    getClaimableSwaps(signer?: string): Promise<IClaimableSwap<T[ChainIdentifier]>[]> {
+        return this.swapper.getClaimableSwaps(this.chainIdentifier, signer);
+    }
+
+    /**
      * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
     getSwapById(id: string, signer?: string): Promise<ISwap<T[ChainIdentifier]>> {
@@ -251,7 +260,7 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
         if(tickerOrAddress.includes("-")) {
             const [chainId, ticker] = tickerOrAddress.split("-");
             if(chainId!==this.chainIdentifier) throw new UserError(`Invalid chainId specified in ticker: ${chainId}, swapper chainId: ${this.chainIdentifier}`);
-            const token = this.swapper.tokens[this.chainIdentifier]?.[ticker];
+            const token = this.swapper.tokensByTicker[this.chainIdentifier]?.[ticker];
             if(token==null) throw new UserError(`Not found ticker: ${ticker} for chainId: ${chainId}`);
             return token as Token<ChainIdentifier>;
         }

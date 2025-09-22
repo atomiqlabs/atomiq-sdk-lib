@@ -137,7 +137,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         return this.state === FromBTCLNSwapState.CLAIM_CLAIMED || this.state === FromBTCLNSwapState.QUOTE_EXPIRED || this.state === FromBTCLNSwapState.FAILED;
     }
     isClaimable() {
-        return this.state === FromBTCLNSwapState.PR_PAID || this.state === FromBTCLNSwapState.CLAIM_COMMITED;
+        return this.state === FromBTCLNSwapState.CLAIM_COMMITED;
     }
     isSuccessful() {
         return this.state === FromBTCLNSwapState.CLAIM_CLAIMED;

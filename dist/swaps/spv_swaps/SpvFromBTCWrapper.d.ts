@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { AmountData, ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens } from "../ISwapWrapper";
 import { BtcRelay, ChainEvent, ChainType, RelaySynchronizer, SpvVaultClaimEvent, SpvVaultCloseEvent, SpvVaultFrontEvent } from "@atomiqlabs/base";
-import { SpvFromBTCSwap } from "./SpvFromBTCSwap";
+import { SpvFromBTCSwap, SpvFromBTCSwapState } from "./SpvFromBTCSwap";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { SwapType } from "../enums/SwapType";
 import { BitcoinRpcWithAddressIndex } from "../../btc/BitcoinRpcWithAddressIndex";
@@ -12,6 +12,7 @@ import { EventEmitter } from "events";
 import { Intermediary } from "../../intermediaries/Intermediary";
 import { Transaction } from "@scure/btc-signer";
 import { ISwap } from "../ISwap";
+import { IClaimableSwapWrapper } from "../IClaimableSwapWrapper";
 export type SpvFromBTCOptions = {
     gasAmount?: bigint;
     unsafeZeroWatchtowerFee?: boolean;
@@ -27,7 +28,8 @@ export type SpvFromBTCWrapperOptions = ISwapWrapperOptions & {
     maxBtcFeeMultiplier?: number;
     maxBtcFeeOffset?: number;
 };
-export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper<T, SpvFromBTCSwap<T>, SpvFromBTCWrapperOptions> {
+export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper<T, SpvFromBTCSwap<T>, SpvFromBTCWrapperOptions> implements IClaimableSwapWrapper<SpvFromBTCSwap<T>> {
+    readonly claimableSwapStates: SpvFromBTCSwapState[];
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
     readonly swapDeserializer: typeof SpvFromBTCSwap;
     readonly synchronizer: RelaySynchronizer<any, T["TX"], any>;

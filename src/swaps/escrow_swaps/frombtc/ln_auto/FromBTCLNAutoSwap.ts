@@ -28,6 +28,7 @@ import {IAddressSwap} from "../../../IAddressSwap";
 import {FromBTCLNAutoWrapper} from "./FromBTCLNAutoWrapper";
 import {ISwapWithGasDrop} from "../../../ISwapWithGasDrop";
 import {MinimalLightningNetworkWalletInterface} from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
+import {IClaimableSwap} from "../../../IClaimableSwap";
 
 export enum FromBTCLNAutoSwapState {
     FAILED = -4,
@@ -71,7 +72,7 @@ export function isFromBTCLNAutoSwapInit<T extends SwapData>(obj: any): obj is Fr
 
 export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     extends ISwap<T, FromBTCLNAutoSwapState>
-    implements IAddressSwap, ISwapWithGasDrop<T> {
+    implements IAddressSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, FromBTCLNAutoSwapState> {
 
     protected readonly inputToken: BtcToken<true> = BitcoinTokens.BTCLN;
     protected readonly TYPE = SwapType.FROM_BTCLN_AUTO;
@@ -252,7 +253,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     }
 
     isClaimable(): boolean {
-        return this.state===FromBTCLNAutoSwapState.PR_PAID || this.state===FromBTCLNAutoSwapState.CLAIM_COMMITED;
+        return this.state===FromBTCLNAutoSwapState.CLAIM_COMMITED;
     }
 
     isSuccessful(): boolean {

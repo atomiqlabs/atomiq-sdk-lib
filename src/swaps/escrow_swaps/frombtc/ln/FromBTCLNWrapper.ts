@@ -24,6 +24,7 @@ import {UnifiedSwapEventListener} from "../../../../events/UnifiedSwapEventListe
 import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
 import {ISwap} from "../../../ISwap";
 import {IFromBTCLNWrapper} from "../IFromBTCLNWrapper";
+import {IClaimableSwapWrapper} from "../../../IClaimableSwapWrapper";
 
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer,
@@ -36,7 +37,9 @@ export type FromBTCLNWrapperOptions = ISwapWrapperOptions & {
 
 export class FromBTCLNWrapper<
     T extends ChainType
-> extends IFromBTCLNWrapper<T, FromBTCLNSwap<T>, FromBTCLNWrapperOptions> {
+> extends IFromBTCLNWrapper<T, FromBTCLNSwap<T>, FromBTCLNWrapperOptions> implements IClaimableSwapWrapper<FromBTCLNSwap<T>> {
+
+    public readonly claimableSwapStates = [FromBTCLNSwapState.CLAIM_COMMITED];
     public readonly TYPE = SwapType.FROM_BTCLN;
     public readonly swapDeserializer = FromBTCLNSwap;
 

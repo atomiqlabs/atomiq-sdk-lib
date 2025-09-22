@@ -36,6 +36,7 @@ import { SwapperUtils } from "./utils/SwapperUtils";
 import { FromBTCLNAutoOptions, FromBTCLNAutoWrapper } from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoWrapper";
 import { FromBTCLNAutoSwap } from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
 import { SwapAmountType } from "../enums/SwapAmountType";
+import { IClaimableSwap } from "../IClaimableSwap";
 export type SwapperOptions = {
     intermediaryUrl?: string | string[];
     registryUrl?: string;
@@ -315,6 +316,14 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * Returns swaps which are refundable for the specific chain, and optionally also for a specific signer's address
      */
     getRefundableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IToBTCSwap<T[C]>[]>;
+    /**
+     * Returns all swaps that are manually claimable
+     */
+    getClaimableSwaps(): Promise<IClaimableSwap[]>;
+    /**
+     * Returns all swaps that are manually claimable for the specific chain, and optionally also for a specific signer's address
+     */
+    getClaimableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IClaimableSwap<T[C]>[]>;
     /**
      * Returns swap with a specific id (identifier)
      */
