@@ -1,7 +1,9 @@
 import {SwapType} from "../../enums/SwapType";
 import {ChainType} from "@atomiqlabs/base";
 import {PaymentAuthError} from "../../../errors/PaymentAuthError";
-import {getLogger, parsePsbtTransaction, timeoutPromise, toBitcoinWallet, toOutputScript} from "../../../utils/Utils";
+import {getLogger, timeoutPromise} from "../../../utils/Utils";
+import {toOutputScript} from "../../../utils/BitcoinUtils";
+import {parsePsbtTransaction, toBitcoinWallet} from "../../../utils/BitcoinHelpers";
 import {isISwapInit, ISwap, ISwapInit, ppmToPercentage} from "../../ISwap";
 import {
     AddressStatusResponseCodes,
@@ -12,7 +14,6 @@ import {OnchainForGasWrapper} from "./OnchainForGasWrapper";
 import {Fee, FeeType} from "../../fee/Fee";
 import {IBitcoinWallet, isIBitcoinWallet} from "../../../btc/wallet/IBitcoinWallet";
 import {IAddressSwap} from "../../IAddressSwap";
-import {FromBTCSwapState} from "../../escrow_swaps/frombtc/onchain/FromBTCSwap";
 import {IBTCWalletSwap} from "../../IBTCWalletSwap";
 import {Transaction} from "@scure/btc-signer";
 import {SingleAddressBitcoinWallet} from "../../../btc/wallet/SingleAddressBitcoinWallet";

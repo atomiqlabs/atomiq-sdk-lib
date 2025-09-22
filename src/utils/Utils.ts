@@ -1,13 +1,6 @@
 import {RequestError} from "../errors/RequestError";
-import {BTC_NETWORK, isBytes, PubT, validatePubkey} from "@scure/btc-signer/utils";
 import {Buffer} from "buffer";
-import {Address, OutScript, Transaction} from "@scure/btc-signer";
 import {randomBytes as randomBytesNoble} from "@noble/hashes/utils";
-import {CoinselectAddressTypes} from "../btc/coinselect2";
-import {IntermediaryError} from "../errors/IntermediaryError";
-import {IBitcoinWallet, isIBitcoinWallet} from "../btc/wallet/IBitcoinWallet";
-import {SingleAddressBitcoinWallet} from "../btc/wallet/SingleAddressBitcoinWallet";
-import {BitcoinRpcWithAddressIndex} from "../btc/BitcoinRpcWithAddressIndex";
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
@@ -319,97 +312,6 @@ export function bigIntCompare(a: bigint, b: bigint): -1 | 0 | 1 {
     return a > b ? 1 : a===b ? 0 : -1;
 }
 
-export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
-    const outputScript = Address(network).decode(address);
-    switch(outputScript.type) {
-        case "pkh":
-        case "sh":
-        case "wpkh":
-        case "wsh":
-            return Buffer.from(OutScript.encode({
-                type: outputScript.type,
-                hash: outputScript.hash
-            }));
-        case "tr":
-            try {
-                return Buffer.from(OutScript.encode({
-                    type: "tr",
-                    pubkey: outputScript.pubkey
-                }));
-            } catch (e) {
-                let msg = "";
-                if(e.name!=null) msg += ": "+e.name;
-                if(e.message!=null) msg += ": "+e.message;
-                if(typeof(e)==="string") msg += ": "+e;
-                msg += ", isBytes: "+isBytes(outputScript.pubkey);
-                try {
-                    validatePubkey(outputScript.pubkey, PubT.schnorr)
-                    msg += ", validatePubkey: success";
-                } catch (e) {
-                    msg += ", validatePubkeyError: ";
-                    if(e.name!=null) msg += ": "+e.name;
-                    if(e.message!=null) msg += ": "+e.message;
-                    if(typeof(e)==="string") msg += ": "+e;
-                }
-                throw new Error(msg);
-            }
-    }
-}
-
-export function toCoinselectAddressType(outputScript: Uint8Array): CoinselectAddressTypes {
-    const data = OutScript.decode(outputScript);
-    switch(data.type) {
-        case "pkh":
-            return "p2pkh";
-        case "sh":
-            return "p2sh-p2wpkh";
-        case "wpkh":
-            return "p2wpkh"
-        case "wsh":
-            return "p2wsh"
-        case "tr":
-            return "p2tr"
-    }
-    throw new Error("Unrecognized address type!");
-}
-
 export function randomBytes(bytesLength: number): Buffer {
     return Buffer.from(randomBytesNoble(bytesLength));
-}
-
-/**
- * General parsers for PSBTs, can parse hex or base64 encoded PSBTs
- * @param _psbt
- */
-export function parsePsbtTransaction(_psbt: Transaction | string): Transaction {
-    if(typeof(_psbt)==="string") {
-        let rawPsbt: Buffer;
-        if(/[0-9a-f]+/i.test(_psbt)) {
-            //Hex
-            rawPsbt = Buffer.from(_psbt, "hex");
-        } else {
-            //Base64
-            rawPsbt = Buffer.from(_psbt, "base64");
-        }
-        return Transaction.fromPSBT(rawPsbt, {
-            allowUnknownOutputs: true,
-            allowUnknownInputs: true,
-            allowLegacyWitnessUtxo: true,
-            allowUnknown: true
-        })
-    } else {
-        return _psbt;
-    }
-}
-
-export function toBitcoinWallet(
-    _bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string },
-    btcRpc: BitcoinRpcWithAddressIndex<any>,
-    bitcoinNetwork: BTC_NETWORK
-): IBitcoinWallet {
-    if(isIBitcoinWallet(_bitcoinWallet)) {
-        return _bitcoinWallet;
-    } else {
-        return new SingleAddressBitcoinWallet(btcRpc, bitcoinNetwork, _bitcoinWallet);
-    }
 }
