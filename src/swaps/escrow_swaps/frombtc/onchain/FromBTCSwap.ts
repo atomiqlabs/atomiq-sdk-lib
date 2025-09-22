@@ -24,6 +24,7 @@ import {
     MinimalBitcoinWalletInterface,
     MinimalBitcoinWalletInterfaceWithSigner
 } from "../../../../btc/wallet/MinimalBitcoinWalletInterface";
+import {IClaimableSwap} from "../../../IClaimableSwap";
 
 export enum FromBTCSwapState {
     FAILED = -4,
@@ -48,7 +49,10 @@ export function isFromBTCSwapInit<T extends SwapData>(obj: any): obj is FromBTCS
         isIEscrowSwapInit<T>(obj);
 }
 
-export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T, FromBTCSwapState> implements IBTCWalletSwap{
+export class FromBTCSwap<T extends ChainType = ChainType>
+    extends IFromBTCSwap<T, FromBTCSwapState>
+    implements IBTCWalletSwap, IClaimableSwap<T, FromBTCSwapState> {
+
     protected readonly inputToken: BtcToken<false> = BitcoinTokens.BTC;
     protected readonly TYPE = SwapType.FROM_BTC;
 

@@ -31,6 +31,7 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
         options.safetyFactor ??= 2;
         options.bitcoinBlocktime ??= 10 * 60;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, lnApi, options, events);
+        this.claimableSwapStates = [FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_COMMITED];
         this.TYPE = SwapType_1.SwapType.FROM_BTCLN_AUTO;
         this.swapDeserializer = FromBTCLNAutoSwap_1.FromBTCLNAutoSwap;
         this.pendingSwapStates = [

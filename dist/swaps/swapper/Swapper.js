@@ -892,6 +892,38 @@ class Swapper extends events_1.EventEmitter {
             return result.filter(swap => swap.isRefundable());
         }
     }
+    async getClaimableSwaps(chainId, signer) {
+        if (chainId == null) {
+            const res = await Promise.all(Object.keys(this.chains).map((chainId) => {
+                const { unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
+                const queryParams = [];
+                for (let wrapper of [wrappers[SwapType_1.SwapType.FROM_BTC], wrappers[SwapType_1.SwapType.FROM_BTCLN], wrappers[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO]]) {
+                    if (wrapper == null)
+                        continue;
+                    const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
+                    if (signer != null)
+                        swapTypeQueryParams.push({ key: "initiator", value: signer });
+                    swapTypeQueryParams.push({ key: "state", value: wrapper.claimableSwapStates });
+                    queryParams.push(swapTypeQueryParams);
+                }
+                return unifiedSwapStorage.query(queryParams, reviver);
+            }));
+            return res.flat().filter(swap => swap.isClaimable());
+        }
+        else {
+            const { unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
+            const queryParams = [];
+            for (let wrapper of [wrappers[SwapType_1.SwapType.TO_BTCLN], wrappers[SwapType_1.SwapType.TO_BTC]]) {
+                const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
+                if (signer != null)
+                    swapTypeQueryParams.push({ key: "initiator", value: signer });
+                swapTypeQueryParams.push({ key: "state", value: wrapper.refundableSwapStates });
+                queryParams.push(swapTypeQueryParams);
+            }
+            const result = await unifiedSwapStorage.query(queryParams, reviver);
+            return result.filter(swap => swap.isClaimable());
+        }
+    }
     async getSwapById(id, chainId, signer) {
         //Check in pending swaps first
         if (chainId != null) {
@@ -999,7 +1031,7 @@ class Swapper extends events_1.EventEmitter {
         //Check if the ticker is in format <chainId>-<ticker>, i.e. SOLANA-USDC, STARKNET-WBTC
         if (tickerOrAddress.includes("-")) {
             const [chainId, ticker] = tickerOrAddress.split("-");
-            const token = this.tokens[chainId]?.[ticker];
+            const token = this.tokensByTicker[chainId]?.[ticker];
             if (token == null)
                 throw new UserError_1.UserError(`Not found ticker: ${ticker} for chainId: ${chainId}`);
             return token;

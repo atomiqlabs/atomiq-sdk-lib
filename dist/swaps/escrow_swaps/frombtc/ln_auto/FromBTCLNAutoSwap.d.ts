@@ -11,6 +11,7 @@ import { IAddressSwap } from "../../../IAddressSwap";
 import { FromBTCLNAutoWrapper } from "./FromBTCLNAutoWrapper";
 import { ISwapWithGasDrop } from "../../../ISwapWithGasDrop";
 import { MinimalLightningNetworkWalletInterface } from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
+import { IClaimableSwap } from "../../../IClaimableSwap";
 export declare enum FromBTCLNAutoSwapState {
     FAILED = -4,
     QUOTE_EXPIRED = -3,
@@ -34,7 +35,7 @@ export type FromBTCLNAutoSwapInit<T extends SwapData> = ISwapInit & {
     lnurlCallback?: string;
 };
 export declare function isFromBTCLNAutoSwapInit<T extends SwapData>(obj: any): obj is FromBTCLNAutoSwapInit<T>;
-export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends ISwap<T, FromBTCLNAutoSwapState> implements IAddressSwap, ISwapWithGasDrop<T> {
+export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends ISwap<T, FromBTCLNAutoSwapState> implements IAddressSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, FromBTCLNAutoSwapState> {
     protected readonly inputToken: BtcToken<true>;
     protected readonly TYPE = SwapType.FROM_BTCLN_AUTO;
     protected readonly lnurlFailSignal: AbortController;

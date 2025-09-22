@@ -39,6 +39,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         options.maxBtcFeeOffset ??= 5;
         options.maxBtcFeeMultiplier ??= 1.5;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
+        this.claimableSwapStates = [SpvFromBTCSwap_1.SpvFromBTCSwapState.BTC_TX_CONFIRMED];
         this.TYPE = SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
         this.swapDeserializer = SpvFromBTCSwap_1.SpvFromBTCSwap;
         this.pendingSwapStates = [

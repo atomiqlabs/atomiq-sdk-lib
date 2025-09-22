@@ -9,6 +9,7 @@ import { IBitcoinWallet } from "../../btc/wallet/IBitcoinWallet";
 import { IBTCWalletSwap } from "../IBTCWalletSwap";
 import { ISwapWithGasDrop } from "../ISwapWithGasDrop";
 import { MinimalBitcoinWalletInterface, MinimalBitcoinWalletInterfaceWithSigner } from "../../btc/wallet/MinimalBitcoinWalletInterface";
+import { IClaimableSwap } from "../IClaimableSwap";
 export declare enum SpvFromBTCSwapState {
     CLOSED = -5,
     FAILED = -4,
@@ -49,7 +50,7 @@ export type SpvFromBTCSwapInit = ISwapInit & {
     executionFeeShare: bigint;
 };
 export declare function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit;
-export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> implements IBTCWalletSwap, ISwapWithGasDrop<T> {
+export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCSwapState> {
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
     readonly wrapper: SpvFromBTCWrapper<T>;
     readonly quoteId: string;

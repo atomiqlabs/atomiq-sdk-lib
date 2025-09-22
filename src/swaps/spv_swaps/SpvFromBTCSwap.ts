@@ -33,6 +33,7 @@ import {
     MinimalBitcoinWalletInterface,
     MinimalBitcoinWalletInterfaceWithSigner
 } from "../../btc/wallet/MinimalBitcoinWalletInterface";
+import {IClaimableSwap} from "../IClaimableSwap";
 
 export enum SpvFromBTCSwapState {
     CLOSED = -5,
@@ -105,7 +106,7 @@ export function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit {
 
 export class SpvFromBTCSwap<T extends ChainType>
     extends ISwap<T, SpvFromBTCSwapState>
-    implements IBTCWalletSwap, ISwapWithGasDrop<T> {
+    implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCSwapState> {
 
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
 

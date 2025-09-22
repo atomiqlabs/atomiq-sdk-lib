@@ -28,6 +28,7 @@ class FromBTCLNWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
      */
     constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, lnApi, options, events) {
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, lnApi, options, events);
+        this.claimableSwapStates = [FromBTCLNSwap_1.FromBTCLNSwapState.CLAIM_COMMITED];
         this.TYPE = SwapType_1.SwapType.FROM_BTCLN;
         this.swapDeserializer = FromBTCLNSwap_1.FromBTCLNSwap;
         this.pendingSwapStates = [

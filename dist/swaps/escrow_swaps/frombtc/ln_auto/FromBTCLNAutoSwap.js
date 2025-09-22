@@ -154,7 +154,7 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         return this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED || this.state === FromBTCLNAutoSwapState.QUOTE_EXPIRED || this.state === FromBTCLNAutoSwapState.FAILED;
     }
     isClaimable() {
-        return this.state === FromBTCLNAutoSwapState.PR_PAID || this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED;
+        return this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED;
     }
     isSuccessful() {
         return this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED;

@@ -26,6 +26,7 @@ import { SwapperWithSigner } from "./SwapperWithSigner";
 import { FromBTCLNAutoOptions } from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoWrapper";
 import { FromBTCLNAutoSwap } from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
 import { SwapAmountType } from "../enums/SwapAmountType";
+import { IClaimableSwap } from "../IClaimableSwap";
 export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier extends ChainIds<T>> {
     readonly chainIdentifier: ChainIdentifier;
     readonly swapper: Swapper<T>;
@@ -117,6 +118,11 @@ export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier exte
      * Returns swaps that are refundable for the specific chain, optionally also for a specific signer's address
      */
     getRefundableSwaps(signer?: string): Promise<IToBTCSwap<T[ChainIdentifier]>[]>;
+    /**
+     * Returns swaps that are due to be claimed/settled manually for the specific chain,
+     *  optionally also for a specific signer's address
+     */
+    getClaimableSwaps(signer?: string): Promise<IClaimableSwap<T[ChainIdentifier]>[]>;
     /**
      * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */

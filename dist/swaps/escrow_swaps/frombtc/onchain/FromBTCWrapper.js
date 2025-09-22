@@ -38,6 +38,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         options.minSendWindow = options.minSendWindow || 30 * 60; //Minimum time window for user to send in the on-chain funds for From BTC swap
         options.bitcoinBlocktime = options.bitcoinBlocktime || 10 * 60;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, options, events);
+        this.claimableSwapStates = [FromBTCSwap_1.FromBTCSwapState.BTC_TX_CONFIRMED];
         this.TYPE = SwapType_1.SwapType.FROM_BTC;
         this.swapDeserializer = FromBTCSwap_1.FromBTCSwap;
         this.pendingSwapStates = [

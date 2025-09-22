@@ -26,6 +26,7 @@ import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {UnifiedSwapEventListener} from "../../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
 import {ISwap} from "../../../ISwap";
+import {IClaimableSwapWrapper} from "../../../IClaimableSwapWrapper";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint,
@@ -44,7 +45,9 @@ export type FromBTCWrapperOptions = ISwapWrapperOptions & {
 
 export class FromBTCWrapper<
     T extends ChainType
-> extends IFromBTCWrapper<T, FromBTCSwap<T>, FromBTCWrapperOptions> {
+> extends IFromBTCWrapper<T, FromBTCSwap<T>, FromBTCWrapperOptions> implements IClaimableSwapWrapper<FromBTCSwap<T>> {
+
+    public readonly claimableSwapStates = [FromBTCSwapState.BTC_TX_CONFIRMED];
     public readonly TYPE = SwapType.FROM_BTC;
     public readonly swapDeserializer = FromBTCSwap;
 

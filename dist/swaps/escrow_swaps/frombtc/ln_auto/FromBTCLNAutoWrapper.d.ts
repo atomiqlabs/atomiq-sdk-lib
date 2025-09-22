@@ -15,6 +15,7 @@ import { UnifiedSwapStorage } from "../../../../storage/UnifiedSwapStorage";
 import { ISwap } from "../../../ISwap";
 import { FromBTCLNAutoSwap, FromBTCLNAutoSwapState } from "./FromBTCLNAutoSwap";
 import { IFromBTCLNWrapper } from "../IFromBTCLNWrapper";
+import { IClaimableSwapWrapper } from "../../../IClaimableSwapWrapper";
 export type FromBTCLNAutoOptions = {
     descriptionHash?: Buffer;
     unsafeSkipLnNodeCheck?: boolean;
@@ -27,7 +28,8 @@ export type FromBTCLNAutoWrapperOptions = ISwapWrapperOptions & {
     bitcoinBlocktime?: number;
     unsafeSkipLnNodeCheck?: boolean;
 };
-export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNAutoSwap<T>, FromBTCLNAutoWrapperOptions> {
+export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNAutoSwap<T>, FromBTCLNAutoWrapperOptions> implements IClaimableSwapWrapper<FromBTCLNAutoSwap<T>> {
+    readonly claimableSwapStates: FromBTCLNAutoSwapState[];
     readonly TYPE = SwapType.FROM_BTCLN_AUTO;
     readonly swapDeserializer: typeof FromBTCLNAutoSwap;
     protected readonly lnApi: LightningNetworkApi;
