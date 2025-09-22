@@ -24,7 +24,8 @@ import {extendAbortController, getLogger, timeoutPromise, tryWithRetries} from "
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../../Tokens";
 import {IEscrowSwapInit, isIEscrowSwapInit} from "../../IEscrowSwap";
 import {MinimalLightningNetworkWalletInterface} from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
-import {FromBTCLNAutoSwapState} from "../ln_auto/FromBTCLNAutoSwap";
+import {IClaimableSwap} from "../../../IClaimableSwap";
+import {IAddressSwap} from "../../../IAddressSwap";
 
 export enum FromBTCLNSwapState {
     FAILED = -4,
@@ -55,7 +56,10 @@ export function isFromBTCLNSwapInit<T extends SwapData>(obj: any): obj is FromBT
         isIEscrowSwapInit(obj);
 }
 
-export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T, FromBTCLNSwapState> {
+export class FromBTCLNSwap<T extends ChainType = ChainType>
+    extends IFromBTCSwap<T, FromBTCLNSwapState>
+    implements IAddressSwap, IClaimableSwap<T, FromBTCLNSwapState> {
+
     protected readonly inputToken: BtcToken<true> = BitcoinTokens.BTCLN;
     protected readonly TYPE = SwapType.FROM_BTCLN;
 
@@ -187,7 +191,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
     }
 
     isClaimable(): boolean {
-        return this.state===FromBTCLNSwapState.PR_PAID || this.state===FromBTCLNSwapState.CLAIM_COMMITED;
+        return this.state===FromBTCLNSwapState.CLAIM_COMMITED;
     }
 
     isSuccessful(): boolean {

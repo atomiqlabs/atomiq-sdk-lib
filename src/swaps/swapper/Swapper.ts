@@ -56,6 +56,8 @@ import {FromBTCLNAutoOptions, FromBTCLNAutoWrapper} from "../escrow_swaps/frombt
 import {FromBTCLNAutoSwap} from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
 import {UserError} from "../../errors/UserError";
 import {SwapAmountType} from "../enums/SwapAmountType";
+import {IClaimableSwap} from "../IClaimableSwap";
+import {IClaimableSwapWrapper} from "../IClaimableSwapWrapper";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -1339,6 +1341,43 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     }
 
     /**
+     * Returns all swaps that are manually claimable
+     */
+    getClaimableSwaps(): Promise<IClaimableSwap[]>;
+    /**
+     * Returns all swaps that are manually claimable for the specific chain, and optionally also for a specific signer's address
+     */
+    getClaimableSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<IClaimableSwap<T[C]>[]>;
+    async getClaimableSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<IClaimableSwap[]> {
+        if(chainId==null) {
+            const res: IClaimableSwap[][] = await Promise.all(Object.keys(this.chains).map((chainId) => {
+                const {unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
+                const queryParams: Array<QueryParams[]> = [];
+                for(let wrapper of [wrappers[SwapType.FROM_BTC], wrappers[SwapType.FROM_BTCLN], wrappers[SwapType.SPV_VAULT_FROM_BTC], wrappers[SwapType.FROM_BTCLN_AUTO]]) {
+                    if(wrapper==null) continue;
+                    const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
+                    if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
+                    swapTypeQueryParams.push({key: "state", value: wrapper.claimableSwapStates});
+                    queryParams.push(swapTypeQueryParams);
+                }
+                return unifiedSwapStorage.query<IClaimableSwap<T[C]>>(queryParams, reviver as any as (val: any) => IClaimableSwap<T[C]>);
+            }));
+            return res.flat().filter(swap => swap.isClaimable());
+        } else {
+            const {unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
+            const queryParams: Array<QueryParams[]> = [];
+            for(let wrapper of [wrappers[SwapType.TO_BTCLN], wrappers[SwapType.TO_BTC]]) {
+                const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
+                if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
+                swapTypeQueryParams.push({key: "state", value: wrapper.refundableSwapStates});
+                queryParams.push(swapTypeQueryParams);
+            }
+            const result = await unifiedSwapStorage.query<IClaimableSwap<T[C]>>(queryParams, reviver as any as (val: any) => IClaimableSwap<T[C]>);
+            return result.filter(swap => swap.isClaimable());
+        }
+    }
+
+    /**
      * Returns swap with a specific id (identifier)
      */
     getSwapById(id: string): Promise<ISwap>;
@@ -1451,7 +1490,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         //Check if the ticker is in format <chainId>-<ticker>, i.e. SOLANA-USDC, STARKNET-WBTC
         if(tickerOrAddress.includes("-")) {
             const [chainId, ticker] = tickerOrAddress.split("-");
-            const token = this.tokens[chainId]?.[ticker];
+            const token = this.tokensByTicker[chainId]?.[ticker];
             if(token==null) throw new UserError(`Not found ticker: ${ticker} for chainId: ${chainId}`);
             return token;
         }

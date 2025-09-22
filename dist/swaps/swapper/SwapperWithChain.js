@@ -116,6 +116,13 @@ class SwapperWithChain {
         return this.swapper.getRefundableSwaps(this.chainIdentifier, signer);
     }
     /**
+     * Returns swaps that are due to be claimed/settled manually for the specific chain,
+     *  optionally also for a specific signer's address
+     */
+    getClaimableSwaps(signer) {
+        return this.swapper.getClaimableSwaps(this.chainIdentifier, signer);
+    }
+    /**
      * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
     getSwapById(id, signer) {
@@ -132,7 +139,7 @@ class SwapperWithChain {
             const [chainId, ticker] = tickerOrAddress.split("-");
             if (chainId !== this.chainIdentifier)
                 throw new UserError_1.UserError(`Invalid chainId specified in ticker: ${chainId}, swapper chainId: ${this.chainIdentifier}`);
-            const token = this.swapper.tokens[this.chainIdentifier]?.[ticker];
+            const token = this.swapper.tokensByTicker[this.chainIdentifier]?.[ticker];
             if (token == null)
                 throw new UserError_1.UserError(`Not found ticker: ${ticker} for chainId: ${chainId}`);
             return token;
