@@ -52,7 +52,7 @@ export abstract class ISwapWrapper<
     readonly unifiedStorage: UnifiedSwapStorage<T>;
     readonly unifiedChainEvents: UnifiedSwapEventListener<T>;
 
-    readonly chainIdentifier: string;
+    readonly chainIdentifier: T["ChainId"];
     readonly chain: T["ChainInterface"];
     readonly prices: ISwapPrice;
     readonly events: EventEmitter<{swapState: [ISwap]}>;
@@ -76,7 +76,7 @@ export abstract class ISwapWrapper<
      * @param events Instance to use for emitting events
      */
     constructor(
-        chainIdentifier: string,
+        chainIdentifier: T["ChainId"],
         unifiedStorage: UnifiedSwapStorage<T>,
         unifiedChainEvents: UnifiedSwapEventListener<T>,
         chain: T["ChainInterface"],

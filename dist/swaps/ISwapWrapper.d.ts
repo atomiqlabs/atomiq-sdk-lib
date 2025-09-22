@@ -35,7 +35,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
     abstract readonly swapDeserializer: new (wrapper: ISwapWrapper<T, S, O>, data: any) => S;
     readonly unifiedStorage: UnifiedSwapStorage<T>;
     readonly unifiedChainEvents: UnifiedSwapEventListener<T>;
-    readonly chainIdentifier: string;
+    readonly chainIdentifier: T["ChainId"];
     readonly chain: T["ChainInterface"];
     readonly prices: ISwapPrice;
     readonly events: EventEmitter<{
@@ -58,7 +58,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, options: O, events?: EventEmitter<{
+    constructor(chainIdentifier: T["ChainId"], unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, options: O, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     /**
