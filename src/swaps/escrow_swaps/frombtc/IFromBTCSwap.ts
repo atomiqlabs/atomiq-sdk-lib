@@ -201,11 +201,11 @@ export abstract class IFromBTCSwap<
     /**
      * Waits till the swap is successfully claimed
      *
-     * @param abortSignal AbortSignal
      * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
+     * @param abortSignal AbortSignal
      * @throws {Error} If swap is in invalid state (must be COMMIT)
      * @returns {boolean} whether the swap was claimed in time or not
      */
-    abstract waitTillClaimed(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean>;
+    abstract waitTillClaimed(maxWaitTimeSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
 
 }

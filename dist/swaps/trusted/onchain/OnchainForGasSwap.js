@@ -351,7 +351,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
      * @throws {PaymentAuthError} If swap expired or failed
      * @throws {Error} When in invalid state (not PR_CREATED)
      */
-    async waitForBitcoinTransaction(abortSignal, checkIntervalSeconds = 5, updateCallback) {
+    async waitForBitcoinTransaction(updateCallback, checkIntervalSeconds = 5, abortSignal) {
         if (this.state !== OnchainForGasSwapState.PR_CREATED)
             throw new Error("Must be in PR_CREATED state!");
         if (!this.initiated) {
@@ -386,7 +386,8 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
             throw new PaymentAuthError_1.PaymentAuthError("Swap failed");
         return this.txId;
     }
-    async waitTillRefunded(abortSignal, checkIntervalSeconds = 5) {
+    async waitTillRefunded(checkIntervalSeconds, abortSignal) {
+        checkIntervalSeconds ??= 5;
         if (this.state === OnchainForGasSwapState.REFUNDED)
             return;
         if (this.state !== OnchainForGasSwapState.REFUNDABLE)
@@ -405,7 +406,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
     async requestRefund(refundAddress, abortSignal) {
         if (refundAddress != null)
             await this.setRefundAddress(refundAddress);
-        await this.waitTillRefunded(abortSignal);
+        await this.waitTillRefunded(undefined, abortSignal);
     }
     //////////////////////////////
     //// Storage

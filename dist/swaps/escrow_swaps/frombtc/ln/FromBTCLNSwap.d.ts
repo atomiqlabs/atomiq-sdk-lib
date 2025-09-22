@@ -98,7 +98,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @param abortSignal Abort signal to stop waiting for payment
      * @param checkIntervalSeconds How often to poll the intermediary for answer
      */
-    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<boolean>;
+    waitForPayment(checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in an HTLC
      *
@@ -128,13 +128,13 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     /**
      * Waits till the swap is successfully claimed
      *
-     * @param abortSignal AbortSignal
      * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
+     * @param abortSignal AbortSignal
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
      * @returns {boolean} whether the swap was claimed in time or not
      */
-    waitTillClaimed(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean>;
+    waitTillClaimed(maxWaitTimeSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     /**
      * Estimated transaction fee for commit & claim txs combined
      */

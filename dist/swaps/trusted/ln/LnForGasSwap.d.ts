@@ -70,12 +70,12 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
      * A blocking promise resolving when payment was received by the intermediary and client can continue
      * rejecting in case of failure
      *
+     * @param checkIntervalSeconds How often to poll the intermediary for answer (default 5 seconds)
      * @param abortSignal Abort signal
-     * @param checkIntervalSeconds How often to poll the intermediary for answer
      * @throws {PaymentAuthError} If swap expired or failed
      * @throws {Error} When in invalid state (not PR_CREATED)
      */
-    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<boolean>;
+    waitForPayment(checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     serialize(): any;
     _getInitiator(): string;
     _sync(save?: boolean): Promise<boolean>;

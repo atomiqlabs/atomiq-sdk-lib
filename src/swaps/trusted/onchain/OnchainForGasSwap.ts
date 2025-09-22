@@ -438,9 +438,9 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
      * @throws {Error} When in invalid state (not PR_CREATED)
      */
     async waitForBitcoinTransaction(
-        abortSignal?: AbortSignal,
+        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
         checkIntervalSeconds: number = 5,
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
+        abortSignal?: AbortSignal
     ): Promise<string> {
         if(this.state!==OnchainForGasSwapState.PR_CREATED) throw new Error("Must be in PR_CREATED state!");
 
@@ -479,9 +479,10 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
     }
 
     async waitTillRefunded(
-        abortSignal?: AbortSignal,
-        checkIntervalSeconds: number = 5,
+        checkIntervalSeconds?: number,
+        abortSignal?: AbortSignal
     ): Promise<void> {
+        checkIntervalSeconds ??= 5;
         if(this.state===OnchainForGasSwapState.REFUNDED) return;
         if(this.state!==OnchainForGasSwapState.REFUNDABLE) throw new Error("Must be in REFUNDABLE state!");
 
@@ -499,7 +500,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
 
     async requestRefund(refundAddress?: string, abortSignal?: AbortSignal): Promise<void> {
         if(refundAddress!=null) await this.setRefundAddress(refundAddress);
-        await this.waitTillRefunded(abortSignal);
+        await this.waitTillRefunded(undefined, abortSignal);
     }
 
 
