@@ -152,7 +152,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      *
      * @throws {Error} If the swap is in invalid state (must be BTC_TX_CONFIRMED)
      */
-    txsClaim(signer?: T["Signer"]): Promise<T["TX"][]>;
+    txsClaim(_signer?: string | T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]>;
     /**
      * Claims and finishes the swap
      *

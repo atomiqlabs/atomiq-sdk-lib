@@ -553,9 +553,18 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
      * @throws {Error} If the swap is in invalid state (must be BTC_TX_CONFIRMED)
      */
     async txsClaim(_signer) {
-        const signer = _signer == null ?
-            null :
-            ((0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer));
+        let address;
+        if (_signer != null) {
+            if (typeof (_signer) === "string") {
+                address = _signer;
+            }
+            else if ((0, base_1.isAbstractSigner)(_signer)) {
+                address = _signer.getAddress();
+            }
+            else {
+                address = (await this.wrapper.chain.wrapSigner(_signer)).getAddress();
+            }
+        }
         if (!this.isClaimable())
             throw new Error("Must be in BTC_TX_CONFIRMED state!");
         const vaultData = await this.wrapper.contract.getVaultData(this.vaultOwner, this.vaultId);
@@ -570,7 +579,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         for (let tx of txs) {
             withdrawalData.push(await this.wrapper.contract.getWithdrawalData(tx));
         }
-        return await this.wrapper.contract.txsClaim(signer == null ? this._getInitiator() : signer.getAddress(), vaultData, withdrawalData.map(tx => { return { tx }; }), this.wrapper.synchronizer, true);
+        return await this.wrapper.contract.txsClaim(address ?? this._getInitiator(), vaultData, withdrawalData.map(tx => { return { tx }; }), this.wrapper.synchronizer, true);
     }
     /**
      * Claims and finishes the swap

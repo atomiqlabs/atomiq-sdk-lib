@@ -395,7 +395,19 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
      *
      * @throws {Error} If the swap is in invalid state (must be BTC_TX_CONFIRMED)
      */
-    async txsClaim(signer) {
+    async txsClaim(_signer) {
+        let signer;
+        if (_signer != null) {
+            if (typeof (_signer) === "string") {
+                signer = _signer;
+            }
+            else if ((0, base_1.isAbstractSigner)(_signer)) {
+                signer = _signer;
+            }
+            else {
+                signer = await this.wrapper.chain.wrapSigner(_signer);
+            }
+        }
         if (this.state !== FromBTCSwapState.BTC_TX_CONFIRMED)
             throw new Error("Must be in BTC_TX_CONFIRMED state!");
         const tx = await this.wrapper.btcRpc.getTransaction(this.txId);
