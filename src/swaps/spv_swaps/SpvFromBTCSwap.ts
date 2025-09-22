@@ -10,12 +10,17 @@ import {
 import {SwapType} from "../enums/SwapType";
 import {SpvFromBTCWrapper} from "./SpvFromBTCWrapper";
 import {
+    extendAbortController,
     getLogger,
-    parsePsbtTransaction,
-    timeoutPromise, timeoutSignal, toBitcoinWallet,
+    timeoutPromise
+} from "../../utils/Utils";
+import {
     toCoinselectAddressType,
     toOutputScript
-} from "../../utils/Utils";
+} from "../../utils/BitcoinUtils";
+import {
+    parsePsbtTransaction,toBitcoinWallet
+} from "../../utils/BitcoinHelpers";
 import {getInputType, Transaction} from "@scure/btc-signer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
 import {Buffer} from "buffer";
@@ -699,24 +704,9 @@ export class SpvFromBTCSwap<T extends ChainType>
         // @ts-ignore
         if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return true;
         if(this.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
-            const _abortSignal = timeoutSignal(
-                options?.maxWaitTillAutomaticSettlementSeconds==null ?
-                    60*1000 :
-                    options.maxWaitTillAutomaticSettlementSeconds * 1000,
-                undefined, options?.abortSignal
-            )
-            try {
-                await this.waitTillClaimedOrFronted(_abortSignal);
-                if(callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
-                return true;
-            } catch (e) {
-                if(_abortSignal.aborted && (options?.abortSignal==null || !options.abortSignal.aborted)) {
-                    //Timed out waiting for claim or front
-                    return false;
-                } else {
-                    throw e;
-                }
-            }
+            const success = await this.waitTillClaimedOrFronted(options?.abortSignal, options?.maxWaitTillAutomaticSettlementSeconds ?? 60);
+            if(success && callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
+            return success;
         }
     }
 
@@ -896,30 +886,47 @@ export class SpvFromBTCSwap<T extends ChainType>
      * Waits till the swap is successfully executed
      *
      * @param abortSignal AbortSignal
+     * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
+     * @returns {boolean} whether the swap was claimed or fronted automatically or not, if the swap was not claimed
+     *  the user can claim manually through `swap.claim()`
      */
-    async waitTillClaimedOrFronted(abortSignal?: AbortSignal): Promise<void> {
-        if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return Promise.resolve();
+    async waitTillClaimedOrFronted(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean> {
+        if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return Promise.resolve(true);
 
-        const abortController = new AbortController();
-        if(abortSignal!=null) abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
-        const res = await Promise.race([
-            this.watchdogWaitTillResult(abortController.signal),
-            this.waitTillState(SpvFromBTCSwapState.CLAIMED, "eq", abortController.signal).then(() => 0),
-            this.waitTillState(SpvFromBTCSwapState.FRONTED, "eq", abortController.signal).then(() => 1),
-            this.waitTillState(SpvFromBTCSwapState.FAILED, "eq", abortController.signal).then(() => 2),
-        ]);
-        abortController.abort();
+        const abortController = extendAbortController(abortSignal);
+
+        let timedOut: boolean = false;
+        if(maxWaitTimeSeconds!=null) {
+            const timeout = setTimeout(() => {
+                timedOut = true;
+                abortController.abort();
+            }, maxWaitTimeSeconds * 1000);
+            abortController.signal.addEventListener("abort", () => clearTimeout(timeout));
+        }
+
+        let res: number | SpvWithdrawalState;
+        try {
+            res = await Promise.race([
+                this.watchdogWaitTillResult(abortController.signal),
+                this.waitTillState(SpvFromBTCSwapState.CLAIMED, "eq", abortController.signal).then(() => 0),
+                this.waitTillState(SpvFromBTCSwapState.FRONTED, "eq", abortController.signal).then(() => 1),
+                this.waitTillState(SpvFromBTCSwapState.FAILED, "eq", abortController.signal).then(() => 2),
+            ]);
+            abortController.abort();
+        } catch (e) {
+            abortController.abort();
+            if(timedOut) return false;
+            throw e;
+        }
 
         if(typeof(res)==="number") {
             if(res===0) {
                 this.logger.debug("waitTillClaimedOrFronted(): Resolved from state change (CLAIMED)");
-                return;
             }
             if(res===1) {
                 this.logger.debug("waitTillClaimedOrFronted(): Resolved from state change (FRONTED)");
-                return;
             }
             if(res===2) {
                 this.logger.debug("waitTillClaimedOrFronted(): Resolved from state change (FAILED)");
@@ -950,7 +957,10 @@ export class SpvFromBTCSwap<T extends ChainType>
             if(
                 (this.state as SpvFromBTCSwapState)!==SpvFromBTCSwapState.CLOSED
             ) await this._saveAndEmit(SpvFromBTCSwapState.CLOSED);
+            throw new Error("Swap failed with catastrophic error!");
         }
+
+        return true;
     }
 
     /**

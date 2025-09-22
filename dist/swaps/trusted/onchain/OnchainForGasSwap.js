@@ -4,6 +4,8 @@ exports.OnchainForGasSwap = exports.isOnchainForGasSwapInit = exports.OnchainFor
 const SwapType_1 = require("../../enums/SwapType");
 const PaymentAuthError_1 = require("../../../errors/PaymentAuthError");
 const Utils_1 = require("../../../utils/Utils");
+const BitcoinUtils_1 = require("../../../utils/BitcoinUtils");
+const BitcoinHelpers_1 = require("../../../utils/BitcoinHelpers");
 const ISwap_1 = require("../../ISwap");
 const TrustedIntermediaryAPI_1 = require("../../../intermediaries/TrustedIntermediaryAPI");
 const Tokens_1 = require("../../../Tokens");
@@ -187,13 +189,13 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
         });
         basePsbt.addOutput({
             amount: this.outputAmount,
-            script: (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.address)
+            script: (0, BitcoinUtils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.address)
         });
         if (additionalOutputs != null)
             additionalOutputs.forEach(output => {
                 basePsbt.addOutput({
                     amount: output.amount,
-                    script: output.outputScript ?? (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, output.address)
+                    script: output.outputScript ?? (0, BitcoinUtils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, output.address)
                 });
             });
         const psbt = await bitcoinWallet.fundPsbt(basePsbt, feeRate);
@@ -216,7 +218,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
      * @param _psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
      */
     async submitPsbt(_psbt) {
-        const psbt = (0, Utils_1.parsePsbtTransaction)(_psbt);
+        const psbt = (0, BitcoinHelpers_1.parsePsbtTransaction)(_psbt);
         if (this.state !== OnchainForGasSwapState.PR_CREATED)
             throw new Error("Swap already paid for!");
         //Ensure not expired
@@ -226,7 +228,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
         const output0 = psbt.getOutput(0);
         if (output0.amount !== this.outputAmount)
             throw new Error("PSBT output amount invalid, expected: " + this.outputAmount + " got: " + output0.amount);
-        const expectedOutputScript = (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.address);
+        const expectedOutputScript = (0, BitcoinUtils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.address);
         if (!expectedOutputScript.equals(output0.script))
             throw new Error("PSBT output script invalid!");
         if (!psbt.isFinal)
@@ -234,7 +236,7 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
         return await this.wrapper.btcRpc.sendRawTransaction(buffer_1.Buffer.from(psbt.toBytes(true, true)).toString("hex"));
     }
     async estimateBitcoinFee(_bitcoinWallet, feeRate) {
-        const bitcoinWallet = (0, Utils_1.toBitcoinWallet)(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
+        const bitcoinWallet = (0, BitcoinHelpers_1.toBitcoinWallet)(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
         const txFee = await bitcoinWallet.getTransactionFee(this.address, this.inputAmount, feeRate);
         return (0, Tokens_1.toTokenAmount)(txFee == null ? null : BigInt(txFee), Tokens_1.BitcoinTokens.BTC, this.wrapper.prices);
     }

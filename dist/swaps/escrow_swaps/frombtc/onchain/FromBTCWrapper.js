@@ -8,6 +8,7 @@ const buffer_1 = require("buffer");
 const IntermediaryError_1 = require("../../../../errors/IntermediaryError");
 const SwapType_1 = require("../../../enums/SwapType");
 const Utils_1 = require("../../../../utils/Utils");
+const BitcoinUtils_1 = require("../../../../utils/BitcoinUtils");
 const IntermediaryAPI_1 = require("../../../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../../../errors/RequestError");
 const utils_1 = require("@scure/btc-signer/utils");
@@ -187,7 +188,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         if ((expiry - currentTimestamp) < BigInt(this.options.minSendWindow)) {
             throw new IntermediaryError_1.IntermediaryError("Send window too low");
         }
-        const lockingScript = (0, Utils_1.toOutputScript)(this.options.bitcoinNetwork, resp.btcAddress);
+        const lockingScript = (0, BitcoinUtils_1.toOutputScript)(this.options.bitcoinNetwork, resp.btcAddress);
         const desiredExtraData = this.contract.getExtraData(lockingScript, resp.amount, requiredConfirmations);
         const desiredClaimHash = this.contract.getHashForOnchain(lockingScript, resp.amount, requiredConfirmations);
         if (!desiredClaimHash.equals(buffer_1.Buffer.from(data.getClaimHash(), "hex"))) {

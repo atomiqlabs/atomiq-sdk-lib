@@ -50,6 +50,7 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
     }
     processEventInitialize(swap, event) {
         if (swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_PAID || swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_CREATED || swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
+            swap.commitTxId = event.meta.txId;
             swap.state = FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_COMMITED;
             return Promise.resolve(true);
         }
@@ -57,6 +58,7 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
     }
     processEventClaim(swap, event) {
         if (swap.state !== FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.FAILED && swap.state !== FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_CLAIMED) {
+            swap.claimTxId = event.meta.txId;
             swap.state = FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_CLAIMED;
             return Promise.resolve(true);
         }

@@ -9,6 +9,7 @@ const Tokens_1 = require("../../../Tokens");
 const SingleAddressBitcoinWallet_1 = require("../../../btc/wallet/SingleAddressBitcoinWallet");
 const base_1 = require("@atomiqlabs/base");
 const Utils_1 = require("../../../utils/Utils");
+const BitcoinHelpers_1 = require("../../../utils/BitcoinHelpers");
 class SwapperUtils {
     constructor(root) {
         this.bitcoinNetwork = root.bitcoinNetwork;
@@ -271,19 +272,17 @@ class SwapperUtils {
     /**
      * Returns the spendable balance of a bitcoin wallet
      *
-     * @param addressOrWallet
+     * @param wallet
      * @param targetChain
      * @param options Additional options
      */
-    async getBitcoinSpendableBalance(addressOrWallet, targetChain, options) {
-        if (typeof (addressOrWallet) !== "string" && addressOrWallet.getTransactionFee == null)
-            throw new Error("Wallet must be a string address or IBitcoinWallet");
+    async getBitcoinSpendableBalance(wallet, targetChain, options) {
         let bitcoinWallet;
-        if (typeof (addressOrWallet) === "string") {
-            bitcoinWallet = new SingleAddressBitcoinWallet_1.SingleAddressBitcoinWallet(this.root.bitcoinRpc, this.bitcoinNetwork, addressOrWallet);
+        if (typeof (wallet) === "string") {
+            bitcoinWallet = new SingleAddressBitcoinWallet_1.SingleAddressBitcoinWallet(this.root.bitcoinRpc, this.bitcoinNetwork, { address: wallet, publicKey: "" });
         }
         else {
-            bitcoinWallet = addressOrWallet;
+            bitcoinWallet = (0, BitcoinHelpers_1.toBitcoinWallet)(wallet, this.root.bitcoinRpc, this.bitcoinNetwork);
         }
         let feeRate = options?.feeRate ?? await bitcoinWallet.getFeeRate();
         if (options?.minFeeRate != null)
@@ -304,12 +303,17 @@ class SwapperUtils {
      * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
      */
     async getSpendableBalance(wallet, token, options) {
-        if (typeof (wallet) !== "string" && wallet.getAddress == null)
-            throw new Error("Signer must be a string or smart chain signer");
         if (this.root.chains[token.chainId] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + token.chainId);
         const { swapContract, chainInterface } = this.root.chains[token.chainId];
-        const signer = typeof (wallet) === "string" ? wallet : wallet.getAddress();
+        let signer;
+        if (typeof (wallet) === "string") {
+            signer = wallet;
+        }
+        else {
+            const abstractSigner = (0, base_1.isAbstractSigner)(wallet) ? wallet : await chainInterface.wrapSigner(wallet);
+            signer = abstractSigner.getAddress();
+        }
         let finalBalance;
         if (chainInterface.getNativeCurrencyAddress() !== token.address) {
             finalBalance = await chainInterface.getBalance(signer, token.address);

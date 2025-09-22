@@ -129,10 +129,12 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * Waits till the swap is successfully claimed
      *
      * @param abortSignal AbortSignal
+     * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
+     * @returns {boolean} whether the swap was claimed in time or not
      */
-    waitTillClaimed(abortSignal?: AbortSignal): Promise<void>;
+    waitTillClaimed(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean>;
     /**
      * Estimated transaction fee for commit & claim txs combined
      */

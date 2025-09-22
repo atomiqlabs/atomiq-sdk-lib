@@ -240,10 +240,13 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * Waits till the swap is successfully executed
      *
      * @param abortSignal AbortSignal
+     * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
+     * @returns {boolean} whether the swap was claimed or fronted automatically or not, if the swap was not claimed
+     *  the user can claim manually through `swap.claim()`
      */
-    waitTillClaimedOrFronted(abortSignal?: AbortSignal): Promise<void>;
+    waitTillClaimedOrFronted(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean>;
     /**
      * Waits till the bitcoin transaction confirms and swap is claimed
      *

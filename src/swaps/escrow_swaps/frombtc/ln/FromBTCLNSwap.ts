@@ -516,25 +516,43 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
      * Waits till the swap is successfully claimed
      *
      * @param abortSignal AbortSignal
+     * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
+     * @returns {boolean} whether the swap was claimed in time or not
      */
-    async waitTillClaimed(abortSignal?: AbortSignal): Promise<void> {
-        if(this.state===FromBTCLNSwapState.CLAIM_CLAIMED) return Promise.resolve();
+    async waitTillClaimed(abortSignal?: AbortSignal, maxWaitTimeSeconds?: number): Promise<boolean> {
+        if(this.state===FromBTCLNSwapState.CLAIM_CLAIMED) return Promise.resolve(true);
         if(this.state!==FromBTCLNSwapState.CLAIM_COMMITED) throw new Error("Invalid state (not CLAIM_COMMITED)");
 
         const abortController = new AbortController();
         if(abortSignal!=null) abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
-        const res = await Promise.race([
-            this.watchdogWaitTillResult(abortController.signal),
-            this.waitTillState(FromBTCLNSwapState.CLAIM_CLAIMED, "eq", abortController.signal).then(() => 0 as const),
-            this.waitTillState(FromBTCLNSwapState.EXPIRED, "eq", abortController.signal).then(() => 1 as const),
-        ]);
-        abortController.abort();
+        let timedOut: boolean = false;
+        if(maxWaitTimeSeconds!=null) {
+            const timeout = setTimeout(() => {
+                timedOut = true;
+                abortController.abort();
+            }, maxWaitTimeSeconds * 1000);
+            abortController.signal.addEventListener("abort", () => clearTimeout(timeout));
+        }
+
+        let res: 0 | 1 | SwapCommitState;
+        try {
+            res = await Promise.race([
+                this.watchdogWaitTillResult(abortController.signal),
+                this.waitTillState(FromBTCLNSwapState.CLAIM_CLAIMED, "eq", abortController.signal).then(() => 0 as const),
+                this.waitTillState(FromBTCLNSwapState.EXPIRED, "eq", abortController.signal).then(() => 1 as const),
+            ]);
+            abortController.abort();
+        } catch (e) {
+            abortController.abort();
+            if(timedOut) return false;
+            throw e;
+        }
 
         if(res===0) {
             this.logger.debug("waitTillClaimed(): Resolved from state change (CLAIM_CLAIMED)");
-            return;
+            return true;
         }
         if(res===1) {
             this.logger.debug("waitTillClaimed(): Resolved from state change (EXPIRED)");
@@ -556,7 +574,9 @@ export class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap
                 this.refundTxId = res.getRefundTxId==null ? null : await res.getRefundTxId();
                 await this._saveAndEmit(FromBTCLNSwapState.FAILED);
             }
+            throw new Error("Swap expired while waiting for claim!");
         }
+        return true;
     }
 
 
