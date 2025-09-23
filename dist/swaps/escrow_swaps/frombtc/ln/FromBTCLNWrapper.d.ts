@@ -22,6 +22,8 @@ export type FromBTCLNOptions = {
 };
 export type FromBTCLNWrapperOptions = ISwapWrapperOptions & {
     unsafeSkipLnNodeCheck?: boolean;
+    safetyFactor?: number;
+    bitcoinBlocktime?: number;
 };
 export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNSwap<T>, FromBTCLNWrapperOptions> implements IClaimableSwapWrapper<FromBTCLNSwap<T>> {
     readonly claimableSwapStates: FromBTCLNSwapState[];
@@ -93,4 +95,8 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWra
         quote: Promise<FromBTCLNSwap<T>>;
         intermediary: Intermediary;
     }[]>;
+    protected _checkPastSwaps(pastSwaps: FromBTCLNSwap<T>[]): Promise<{
+        changedSwaps: FromBTCLNSwap<T>[];
+        removeSwaps: FromBTCLNSwap<T>[];
+    }>;
 }

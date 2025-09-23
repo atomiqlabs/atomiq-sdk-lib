@@ -32,7 +32,9 @@ export type FromBTCLNOptions = {
 };
 
 export type FromBTCLNWrapperOptions = ISwapWrapperOptions & {
-    unsafeSkipLnNodeCheck?: boolean
+    unsafeSkipLnNodeCheck?: boolean,
+    safetyFactor?: number,
+    bitcoinBlocktime?: number
 };
 
 export class FromBTCLNWrapper<
@@ -69,6 +71,8 @@ export class FromBTCLNWrapper<
         options: FromBTCLNWrapperOptions,
         events?: EventEmitter<{swapState: [ISwap]}>
     ) {
+        options.safetyFactor ??= 2;
+        options.bitcoinBlocktime ??= 10*60;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, lnApi, options, events);
     }
 
@@ -330,6 +334,62 @@ export class FromBTCLNWrapper<
             abortController.abort(e);
             throw e;
         }
+    }
+
+    protected async _checkPastSwaps(pastSwaps: FromBTCLNSwap<T>[]): Promise<{
+        changedSwaps: FromBTCLNSwap<T>[];
+        removeSwaps: FromBTCLNSwap<T>[]
+    }> {
+        const changedSwapSet: Set<FromBTCLNSwap<T>> = new Set();
+
+        const swapExpiredStatus: {[escrowHash: string]: boolean} = {};
+        const checkStatusSwaps: FromBTCLNSwap<T>[] = [];
+
+        await Promise.all(pastSwaps.map(async (pastSwap) => {
+            if(pastSwap._shouldCheckIntermediary()) {
+                try {
+                    const result = await pastSwap._checkIntermediaryPaymentReceived(false);
+                    if(result!=null) {
+                        changedSwapSet.add(pastSwap);
+                    }
+                } catch (e) {
+                    this.logger.error(`_checkPastSwaps(): Failed to contact LP regarding swap ${pastSwap.getId()}, error: `, e);
+                }
+            }
+            if(pastSwap._shouldFetchExpiryStatus()) {
+                //Check expiry
+                swapExpiredStatus[pastSwap.getEscrowHash()] = await pastSwap._verifyQuoteDefinitelyExpired();
+            }
+            if(pastSwap._shouldFetchCommitStatus()) {
+                //Add to swaps for which status should be checked
+                checkStatusSwaps.push(pastSwap);
+            }
+        }));
+
+        const swapStatuses = await this.contract.getCommitStatuses(checkStatusSwaps.map(val => ({signer: val._getInitiator(), swapData: val.data})));
+
+        for(let pastSwap of checkStatusSwaps) {
+            const escrowHash = pastSwap.getEscrowHash();
+            const shouldSave = await pastSwap._sync(false, swapExpiredStatus[escrowHash], swapStatuses[escrowHash], true);
+            if(shouldSave) {
+                changedSwapSet.add(pastSwap);
+            }
+        }
+
+        const changedSwaps: FromBTCLNSwap<T>[] = [];
+        const removeSwaps: FromBTCLNSwap<T>[] = [];
+        changedSwapSet.forEach(val => {
+            if(val.isQuoteExpired()) {
+                removeSwaps.push(val);
+            } else {
+                changedSwaps.push(val);
+            }
+        });
+
+        return {
+            changedSwaps,
+            removeSwaps
+        };
     }
 
 }

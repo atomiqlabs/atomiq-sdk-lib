@@ -3,14 +3,14 @@
 import { FromBTCLNWrapper } from "./FromBTCLNWrapper";
 import { IFromBTCSwap } from "../IFromBTCSwap";
 import { SwapType } from "../../../enums/SwapType";
-import { ChainType, SignatureData, SwapData } from "@atomiqlabs/base";
+import { ChainType, SignatureData, SwapCommitState, SwapData } from "@atomiqlabs/base";
 import { Buffer } from "buffer";
 import { LNURLWithdraw } from "../../../../utils/LNURL";
 import { BtcToken, SCToken, TokenAmount } from "../../../../Tokens";
-import { IEscrowSwapInit } from "../../IEscrowSwap";
 import { MinimalLightningNetworkWalletInterface } from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
 import { IClaimableSwap } from "../../../IClaimableSwap";
 import { IAddressSwap } from "../../../IAddressSwap";
+import { IEscrowSelfInitSwapInit } from "../../IEscrowSelfInitSwap";
 export declare enum FromBTCLNSwapState {
     FAILED = -4,
     QUOTE_EXPIRED = -3,
@@ -21,7 +21,7 @@ export declare enum FromBTCLNSwapState {
     CLAIM_COMMITED = 2,
     CLAIM_CLAIMED = 3
 }
-export type FromBTCLNSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
+export type FromBTCLNSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
     pr: string;
     secret: string;
     initialSwapData: T;
@@ -56,6 +56,11 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     getAddress(): string;
     getHyperlink(): string;
     /**
+     * Returns the timeout time (in UNIX milliseconds) when the swap will definitelly be considered as expired
+     *  if the LP doesn't make it expired sooner
+     */
+    getDefinitiveExpiryTime(): number;
+    /**
      * Returns timeout time (in UNIX milliseconds) when the LN invoice will expire
      */
     getTimeoutTime(): number;
@@ -69,6 +74,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     isFailed(): boolean;
     isQuoteExpired(): boolean;
     isQuoteSoftExpired(): boolean;
+    _verifyQuoteDefinitelyExpired(): Promise<boolean>;
     verifyQuoteValid(): Promise<boolean>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>>;
     getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
@@ -103,7 +109,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      *
      * @param save If the new swap state should be saved
      */
-    protected checkIntermediaryPaymentReceived(save?: boolean): Promise<boolean | null>;
+    _checkIntermediaryPaymentReceived(save?: boolean): Promise<boolean | null>;
     /**
      * Checks the data returned by the intermediary in the payment auth request
      *
@@ -213,6 +219,9 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @private
      */
     private syncStateFromChain;
-    _sync(save?: boolean): Promise<boolean>;
+    _shouldFetchExpiryStatus(): boolean;
+    _shouldFetchCommitStatus(): boolean;
+    _shouldCheckIntermediary(): boolean;
+    _sync(save?: boolean, quoteDefinitelyExpired?: boolean, commitStatus?: SwapCommitState, skipLpCheck?: boolean): Promise<boolean>;
     _tick(save?: boolean): Promise<boolean>;
 }
