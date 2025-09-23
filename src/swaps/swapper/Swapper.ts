@@ -1366,10 +1366,11 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         } else {
             const {unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
             const queryParams: Array<QueryParams[]> = [];
-            for(let wrapper of [wrappers[SwapType.TO_BTCLN], wrappers[SwapType.TO_BTC]]) {
+            for(let wrapper of [wrappers[SwapType.FROM_BTC], wrappers[SwapType.FROM_BTCLN], wrappers[SwapType.SPV_VAULT_FROM_BTC], wrappers[SwapType.FROM_BTCLN_AUTO]]) {
+                if(wrapper==null) continue;
                 const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
                 if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
-                swapTypeQueryParams.push({key: "state", value: wrapper.refundableSwapStates});
+                swapTypeQueryParams.push({key: "state", value: wrapper.claimableSwapStates});
                 queryParams.push(swapTypeQueryParams);
             }
             const result = await unifiedSwapStorage.query<IClaimableSwap<T[C]>>(queryParams, reviver as any as (val: any) => IClaimableSwap<T[C]>);

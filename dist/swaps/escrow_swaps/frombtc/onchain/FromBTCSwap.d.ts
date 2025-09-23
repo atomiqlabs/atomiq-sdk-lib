@@ -116,14 +116,15 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      *  quote was created, this is required for legacy swaps because the destination wallet needs to actively open
      *  a bitcoin swap address to which the BTC is then sent, this means that the address also needs to have enough
      *  native tokens to pay for gas on the destination network
-     * @param wallet Bitcoin wallet to use to sign the bitcoin transaction
+     * @param wallet Bitcoin wallet to use to sign the bitcoin transaction, can also be null - then the execution waits
+     *  till a transaction is received from an external wallet
      * @param callbacks Callbacks to track the progress of the swap
      * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
      *
      * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
      *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
      */
-    execute(dstSigner: T["Signer"] | T["NativeSigner"], wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, callbacks?: {
+    execute(dstSigner: T["Signer"] | T["NativeSigner"], wallet?: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner | null | undefined, callbacks?: {
         onDestinationCommitSent?: (destinationCommitTxId: string) => void;
         onSourceTransactionSent?: (sourceTxId: string) => void;
         onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void;

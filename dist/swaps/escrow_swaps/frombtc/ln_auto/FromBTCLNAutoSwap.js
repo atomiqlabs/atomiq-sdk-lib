@@ -262,7 +262,7 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
      * Executes the swap with the provided bitcoin lightning network wallet or LNURL
      *
      * @param walletOrLnurlWithdraw Bitcoin lightning wallet to use to pay the lightning network invoice, or an LNURL-withdraw
-     *  link, if the quote was created using LNURL-withdraw you don't need to pass any wallet or lnurl
+     *  link, wallet is not required and the LN invoice can be paid externally as well (just pass null or undefined here)
      * @param callbacks Callbacks to track the progress of the swap
      * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
      *
@@ -280,7 +280,7 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
             throw new Error("Swap already settled!");
         let abortSignal = options?.abortSignal;
         if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
-            if (this.lnurl == null) {
+            if (walletOrLnurlWithdraw != null && this.lnurl == null) {
                 if (typeof (walletOrLnurlWithdraw) === "string" || (0, LNURL_1.isLNURLWithdraw)(walletOrLnurlWithdraw)) {
                     await this.settleWithLNURLWithdraw(walletOrLnurlWithdraw);
                 }

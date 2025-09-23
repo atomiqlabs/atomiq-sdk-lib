@@ -399,7 +399,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
      * Executes the swap with the provided bitcoin lightning network wallet or LNURL
      *
      * @param walletOrLnurlWithdraw Bitcoin lightning wallet to use to pay the lightning network invoice, or an LNURL-withdraw
-     *  link, if the quote was created using LNURL-withdraw you don't need to pass any wallet or lnurl
+     *  link, wallet is not required and the LN invoice can be paid externally as well (just pass null or undefined here)
      * @param callbacks Callbacks to track the progress of the swap
      * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
      *
@@ -407,7 +407,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
      *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
      */
     async execute(
-        walletOrLnurlWithdraw?: MinimalLightningNetworkWalletInterface | LNURLWithdraw | string,
+        walletOrLnurlWithdraw?: MinimalLightningNetworkWalletInterface | LNURLWithdraw | string | null | undefined,
         callbacks?: {
             onSourceTransactionReceived?: (sourceTxId: string) => void,
             onSwapSettled?: (destinationTxId: string) => void
@@ -426,7 +426,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         let abortSignal = options?.abortSignal;
 
         if(this.state===FromBTCLNAutoSwapState.PR_CREATED) {
-            if(this.lnurl==null) {
+            if(walletOrLnurlWithdraw!=null && this.lnurl==null) {
                 if(typeof(walletOrLnurlWithdraw)==="string" || isLNURLWithdraw(walletOrLnurlWithdraw)) {
                     await this.settleWithLNURLWithdraw(walletOrLnurlWithdraw);
                 } else {

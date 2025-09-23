@@ -191,7 +191,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
      *  quote was created, this is required for legacy swaps because the destination wallet needs to actively claim
      *  the swap funds on the destination (this also means you need native token to cover gas costs)
      * @param walletOrLnurlWithdraw Bitcoin lightning wallet to use to pay the lightning network invoice, or an LNURL-withdraw
-     *  link, if the quote was created using LNURL-withdraw you don't need to pass any wallet or lnurl
+     *  link, wallet is not required and the LN invoice can be paid externally as well (just pass null or undefined here)
      * @param callbacks Callbacks to track the progress of the swap
      * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
      */
@@ -206,7 +206,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             throw new Error("Swap already settled!");
         let abortSignal = options?.abortSignal;
         if (this.state === FromBTCLNSwapState.PR_CREATED) {
-            if (this.lnurl == null) {
+            if (walletOrLnurlWithdraw != null && this.lnurl == null) {
                 if (typeof (walletOrLnurlWithdraw) === "string" || (0, LNURL_1.isLNURLWithdraw)(walletOrLnurlWithdraw)) {
                     await this.settleWithLNURLWithdraw(walletOrLnurlWithdraw);
                 }
@@ -219,9 +219,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                     abortSignal = abortController.signal;
                 }
             }
-            const paymentSuccess = await this.waitForPayment(options?.lightningTxCheckIntervalSeconds, abortSignal);
-            if (callbacks?.onSourceTransactionReceived != null)
-                callbacks.onSourceTransactionReceived(this.getInputTxId());
+            const paymentSuccess = await this.waitForPayment(callbacks?.onSourceTransactionReceived, options?.lightningTxCheckIntervalSeconds, abortSignal);
             if (!paymentSuccess)
                 throw new Error("Failed to receive lightning network payment");
         }
@@ -337,10 +335,11 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     /**
      * Waits till an LN payment is received by the intermediary and client can continue commiting & claiming the HTLC
      *
+     * @param onPaymentReceived Callback as for when the LP reports having received the ln payment
      * @param abortSignal Abort signal to stop waiting for payment
      * @param checkIntervalSeconds How often to poll the intermediary for answer
      */
-    async waitForPayment(checkIntervalSeconds, abortSignal) {
+    async waitForPayment(onPaymentReceived, checkIntervalSeconds, abortSignal) {
         checkIntervalSeconds ??= 5;
         if (this.state !== FromBTCLNSwapState.PR_CREATED &&
             (this.state !== FromBTCLNSwapState.QUOTE_SOFT_EXPIRED || this.signatureData != null))
@@ -378,6 +377,8 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             const swapData = new this.wrapper.swapDataDeserializer(resp.data.data);
             await this.checkIntermediaryReturnedAuthData(this._getInitiator(), swapData, sigData);
             this.expiry = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getInitAuthorizationExpiry(swapData, sigData));
+            if (onPaymentReceived != null)
+                onPaymentReceived(this.getInputTxId());
             if (this.state === FromBTCLNSwapState.PR_CREATED || this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
                 delete this.initialSwapData;
                 this.data = swapData;

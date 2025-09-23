@@ -368,6 +368,10 @@ export class FromBTCLNAutoWrapper<
         quote: Promise<FromBTCLNAutoSwap<T>>,
         intermediary: Intermediary
     }[]> {
+        options ??= {};
+        options.unsafeSkipLnNodeCheck ??= this.options.unsafeSkipLnNodeCheck;
+        options.gasAmount ??= 0n;
+        options.feeSafetyFactor ??= 1.25; //No need to add much of a margin, since the claim should happen rather soon
         if(!this.isInitialized) throw new Error("Not initialized, call init() first!");
 
         const abortController = extendAbortController(abortSignal);
