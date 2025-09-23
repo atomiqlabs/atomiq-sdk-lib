@@ -48,6 +48,7 @@ export type SpvFromBTCSwapInit = ISwapInit & {
     callerFeeShare: bigint;
     frontingFeeShare: bigint;
     executionFeeShare: bigint;
+    genesisSmartChainBlockHeight: number;
 };
 export declare function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit;
 export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCSwapState> {
@@ -76,6 +77,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     readonly callerFeeShare: bigint;
     readonly frontingFeeShare: bigint;
     readonly executionFeeShare: bigint;
+    readonly genesisSmartChainBlockHeight: number;
     claimTxId: string;
     frontTxId: string;
     data: T["SpvVaultWithdrawalData"];

@@ -119,10 +119,25 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         return true;
     }
     /**
+     * Pre-fetches latest finalized block height of the smart chain
+     *
+     * @param abortController
+     * @private
+     */
+    async preFetchFinalizedBlockHeight(abortController) {
+        try {
+            const block = await (0, Utils_1.tryWithRetries)(() => this.chain.getFinalizedBlock(), null, null, abortController.signal);
+            return block.height;
+        }
+        catch (e) {
+            abortController.abort(e);
+            return null;
+        }
+    }
+    /**
      * Pre-fetches caller (watchtower) bounty data for the swap. Doesn't throw, instead returns null and aborts the
      *  provided abortController
      *
-     * @param signer Smartchain signer address initiating the swap
      * @param amountData
      * @param options Options as passed to the swap creation function
      * @param pricePrefetch
@@ -130,7 +145,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
      * @param abortController
      * @private
      */
-    async preFetchCallerFeeShare(signer, amountData, options, pricePrefetch, nativeTokenPricePrefetch, abortController) {
+    async preFetchCallerFeeShare(amountData, options, pricePrefetch, nativeTokenPricePrefetch, abortController) {
         if (options.unsafeZeroWatchtowerFee)
             return 0n;
         if (amountData.amount === 0n)
@@ -347,11 +362,12 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         options.feeSafetyFactor ??= 1.25;
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePrefetchPromise = this.preFetchPrice(amountData, _abortController.signal);
+        const finalizedBlockHeightPrefetchPromise = this.preFetchFinalizedBlockHeight(_abortController);
         const nativeTokenAddress = this.chain.getNativeCurrencyAddress();
         const gasTokenPricePrefetchPromise = options.gasAmount === 0n ?
             null :
             this.preFetchPrice({ token: nativeTokenAddress }, _abortController.signal);
-        const callerFeePrefetchPromise = this.preFetchCallerFeeShare(signer, amountData, options, pricePrefetchPromise, gasTokenPricePrefetchPromise, _abortController);
+        const callerFeePrefetchPromise = this.preFetchCallerFeeShare(amountData, options, pricePrefetchPromise, gasTokenPricePrefetchPromise, _abortController);
         const bitcoinFeeRatePromise = options.maxAllowedNetworkFeeRate != null ?
             Promise.resolve(options.maxAllowedNetworkFeeRate) :
             this.btcRpc.getFeeRate().then(x => this.options.maxBtcFeeOffset + (x * this.options.maxBtcFeeMultiplier)).catch(e => {
@@ -414,7 +430,8 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                             gasSwapFee: resp.gasSwapFee,
                             callerFeeShare: resp.callerFeeShare,
                             frontingFeeShare: resp.frontingFeeShare,
-                            executionFeeShare: resp.executionFeeShare
+                            executionFeeShare: resp.executionFeeShare,
+                            genesisSmartChainBlockHeight: await finalizedBlockHeightPrefetchPromise
                         };
                         const quote = new SpvFromBTCSwap_1.SpvFromBTCSwap(this, swapInit);
                         await quote._save();
@@ -523,7 +540,10 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             if (await pastSwap._shouldCheckWithdrawalState(fronterAddress, latestVaultUtxo))
                 checkWithdrawalStateSwaps.push(pastSwap);
         }
-        const withdrawalStates = await this.contract.getWithdrawalStates(checkWithdrawalStateSwaps.map(val => ({ withdrawal: val.data })));
+        const withdrawalStates = await this.contract.getWithdrawalStates(checkWithdrawalStateSwaps.map(val => ({
+            withdrawal: val.data,
+            scStartBlockheight: val.genesisSmartChainBlockHeight
+        })));
         for (const pastSwap of checkWithdrawalStateSwaps) {
             const status = withdrawalStates[pastSwap.data.getTxId()];
             if (status == null) {

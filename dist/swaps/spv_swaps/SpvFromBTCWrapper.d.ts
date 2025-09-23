@@ -62,10 +62,16 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
     protected processEventClose(event: SpvVaultCloseEvent, swap: SpvFromBTCSwap<T>): boolean;
     protected processEvent(event: ChainEvent<T["Data"]>, swap: SpvFromBTCSwap<T>): Promise<boolean>;
     /**
+     * Pre-fetches latest finalized block height of the smart chain
+     *
+     * @param abortController
+     * @private
+     */
+    private preFetchFinalizedBlockHeight;
+    /**
      * Pre-fetches caller (watchtower) bounty data for the swap. Doesn't throw, instead returns null and aborts the
      *  provided abortController
      *
-     * @param signer Smartchain signer address initiating the swap
      * @param amountData
      * @param options Options as passed to the swap creation function
      * @param pricePrefetch

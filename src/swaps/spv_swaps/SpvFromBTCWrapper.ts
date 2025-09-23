@@ -199,10 +199,25 @@ export class SpvFromBTCWrapper<
     }
 
     /**
+     * Pre-fetches latest finalized block height of the smart chain
+     *
+     * @param abortController
+     * @private
+     */
+    private async preFetchFinalizedBlockHeight(abortController: AbortController): Promise<number> {
+        try {
+            const block = await tryWithRetries(() => this.chain.getFinalizedBlock(), null, null, abortController.signal);
+            return block.height;
+        } catch (e) {
+            abortController.abort(e);
+            return null;
+        }
+    }
+
+    /**
      * Pre-fetches caller (watchtower) bounty data for the swap. Doesn't throw, instead returns null and aborts the
      *  provided abortController
      *
-     * @param signer Smartchain signer address initiating the swap
      * @param amountData
      * @param options Options as passed to the swap creation function
      * @param pricePrefetch
@@ -211,7 +226,6 @@ export class SpvFromBTCWrapper<
      * @private
      */
     private async preFetchCallerFeeShare(
-        signer: string,
         amountData: AmountData,
         options: SpvFromBTCOptions,
         pricePrefetch: Promise<bigint>,
@@ -459,11 +473,12 @@ export class SpvFromBTCWrapper<
 
         const _abortController = extendAbortController(abortSignal);
         const pricePrefetchPromise: Promise<bigint> = this.preFetchPrice(amountData, _abortController.signal);
+        const finalizedBlockHeightPrefetchPromise: Promise<number> = this.preFetchFinalizedBlockHeight(_abortController);
         const nativeTokenAddress = this.chain.getNativeCurrencyAddress();
         const gasTokenPricePrefetchPromise: Promise<bigint> = options.gasAmount===0n ?
             null :
             this.preFetchPrice({token: nativeTokenAddress}, _abortController.signal);
-        const callerFeePrefetchPromise = this.preFetchCallerFeeShare(signer, amountData, options, pricePrefetchPromise, gasTokenPricePrefetchPromise, _abortController);
+        const callerFeePrefetchPromise = this.preFetchCallerFeeShare(amountData, options, pricePrefetchPromise, gasTokenPricePrefetchPromise, _abortController);
         const bitcoinFeeRatePromise: Promise<number> = options.maxAllowedNetworkFeeRate!=null ?
             Promise.resolve(options.maxAllowedNetworkFeeRate) :
             this.btcRpc.getFeeRate().then(x => this.options.maxBtcFeeOffset + (x*this.options.maxBtcFeeMultiplier)).catch(e => {
@@ -555,7 +570,9 @@ export class SpvFromBTCWrapper<
 
                             callerFeeShare: resp.callerFeeShare,
                             frontingFeeShare: resp.frontingFeeShare,
-                            executionFeeShare: resp.executionFeeShare
+                            executionFeeShare: resp.executionFeeShare,
+
+                            genesisSmartChainBlockHeight: await finalizedBlockHeightPrefetchPromise
                         };
                         const quote = new SpvFromBTCSwap<T>(this, swapInit);
                         await quote._save();
@@ -683,7 +700,12 @@ export class SpvFromBTCWrapper<
             if(await pastSwap._shouldCheckWithdrawalState(fronterAddress, latestVaultUtxo)) checkWithdrawalStateSwaps.push(pastSwap);
         }
 
-        const withdrawalStates = await this.contract.getWithdrawalStates(checkWithdrawalStateSwaps.map(val => ({withdrawal: val.data})));
+        const withdrawalStates = await this.contract.getWithdrawalStates(
+            checkWithdrawalStateSwaps.map(val => ({
+                withdrawal: val.data,
+                scStartBlockheight: val.genesisSmartChainBlockHeight
+            }))
+        );
         for(const pastSwap of checkWithdrawalStateSwaps) {
             const status = withdrawalStates[pastSwap.data.getTxId()];
             if(status==null) {

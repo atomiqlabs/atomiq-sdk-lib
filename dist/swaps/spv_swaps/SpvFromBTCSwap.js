@@ -53,6 +53,7 @@ function isSpvFromBTCSwapInit(obj) {
         typeof (obj.callerFeeShare) === "bigint" &&
         typeof (obj.frontingFeeShare) === "bigint" &&
         typeof (obj.executionFeeShare) === "bigint" &&
+        typeof (obj.genesisSmartChainBlockHeight) === "number" &&
         (0, ISwap_1.isISwapInit)(obj);
 }
 exports.isSpvFromBTCSwapInit = isSpvFromBTCSwapInit;
@@ -92,6 +93,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             this.callerFeeShare = BigInt(initOrObject.callerFeeShare);
             this.frontingFeeShare = BigInt(initOrObject.frontingFeeShare);
             this.executionFeeShare = BigInt(initOrObject.executionFeeShare);
+            this.genesisSmartChainBlockHeight = initOrObject.genesisSmartChainBlockHeight;
             this.claimTxId = initOrObject.claimTxId;
             this.frontTxId = initOrObject.frontTxId;
             this.data = initOrObject.data == null ? null : new this.wrapper.spvWithdrawalDataDeserializer(initOrObject.data);
@@ -599,7 +601,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
                 this.logger.info("claim(): Transaction state is CLAIMED, swap was successfully claimed by the watchtower");
                 return this.claimTxId;
             }
-            const withdrawalState = await this.wrapper.contract.getWithdrawalState(this.data);
+            const withdrawalState = await this.wrapper.contract.getWithdrawalState(this.data, this.genesisSmartChainBlockHeight);
             if (withdrawalState.type === base_1.SpvWithdrawalStateType.CLAIMED) {
                 this.logger.info("claim(): Transaction status is CLAIMED, swap was successfully claimed by the watchtower");
                 this.claimTxId = withdrawalState.txId;
@@ -628,7 +630,10 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         while (status.type === base_1.SpvWithdrawalStateType.NOT_FOUND) {
             await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
             try {
-                status = await this.wrapper.contract.getWithdrawalState(this.data);
+                //Be smart about checking withdrawal state
+                if (await this._shouldCheckWithdrawalState()) {
+                    status = await this.wrapper.contract.getWithdrawalState(this.data, this.genesisSmartChainBlockHeight);
+                }
             }
             catch (e) {
                 this.logger.error("watchdogWaitTillResult(): Error when fetching commit status: ", e);
@@ -752,6 +757,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             callerFeeShare: this.callerFeeShare.toString(10),
             frontingFeeShare: this.frontingFeeShare.toString(10),
             executionFeeShare: this.executionFeeShare.toString(10),
+            genesisSmartChainBlockHeight: this.genesisSmartChainBlockHeight,
             claimTxId: this.claimTxId,
             frontTxId: this.frontTxId,
             data: this.data?.serialize()
@@ -828,7 +834,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         }
         if (this.state === SpvFromBTCSwapState.BROADCASTED || this.state === SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
             if (await this._shouldCheckWithdrawalState()) {
-                const status = await this.wrapper.contract.getWithdrawalState(this.data);
+                const status = await this.wrapper.contract.getWithdrawalState(this.data, this.genesisSmartChainBlockHeight);
                 this.logger.debug("syncStateFromChain(): status of " + this.data.btcTx.txid, status);
                 switch (status.type) {
                     case base_1.SpvWithdrawalStateType.FRONTED:
