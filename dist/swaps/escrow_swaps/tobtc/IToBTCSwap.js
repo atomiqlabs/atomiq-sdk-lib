@@ -6,16 +6,16 @@ const IntermediaryAPI_1 = require("../../../intermediaries/IntermediaryAPI");
 const IntermediaryError_1 = require("../../../errors/IntermediaryError");
 const Utils_1 = require("../../../utils/Utils");
 const Tokens_1 = require("../../../Tokens");
-const IEscrowSwap_1 = require("../IEscrowSwap");
 const Fee_1 = require("../../fee/Fee");
 const ISwap_1 = require("../../ISwap");
+const IEscrowSelfInitSwap_1 = require("../IEscrowSelfInitSwap");
 function isIToBTCSwapInit(obj) {
     return typeof (obj.networkFee) === "bigint" &&
         (obj.networkFeeBtc == null || typeof (obj.networkFeeBtc) === "bigint") &&
-        (0, IEscrowSwap_1.isIEscrowSwapInit)(obj);
+        (0, IEscrowSelfInitSwap_1.isIEscrowSelfInitSwapInit)(obj);
 }
 exports.isIToBTCSwapInit = isIToBTCSwapInit;
-class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
+class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
     constructor(wrapper, initOrObject) {
         super(wrapper, initOrObject);
         if (isIToBTCSwapInit(initOrObject)) {
@@ -287,7 +287,7 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
         let result;
         try {
             result = await Promise.race([
-                this.watchdogWaitTillCommited(abortController.signal),
+                this.watchdogWaitTillCommited(undefined, abortController.signal),
                 this.waitTillState(ToBTCSwapState.COMMITED, "gte", abortController.signal).then(() => 0)
             ]);
             abortController.abort();
@@ -501,7 +501,7 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
         if (abortSignal != null)
             abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
         const res = await Promise.race([
-            this.watchdogWaitTillResult(abortController.signal),
+            this.watchdogWaitTillResult(undefined, abortController.signal),
             this.waitTillState(ToBTCSwapState.REFUNDED, "eq", abortController.signal).then(() => 0),
             this.waitTillState(ToBTCSwapState.CLAIMED, "eq", abortController.signal).then(() => 1),
         ]);
@@ -545,35 +545,35 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
      *
      * @private
      */
-    async syncStateFromChain() {
+    async syncStateFromChain(quoteDefinitelyExpired, commitStatus) {
         if (this.state === ToBTCSwapState.CREATED ||
             this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED ||
             this.state === ToBTCSwapState.COMMITED ||
             this.state === ToBTCSwapState.SOFT_CLAIMED ||
             this.state === ToBTCSwapState.REFUNDABLE) {
             let quoteExpired = false;
-            if ((this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED)) {
+            if (this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
                 //Check if quote is still valid
-                quoteExpired = await this.verifyQuoteDefinitelyExpired();
+                quoteExpired = quoteDefinitelyExpired ?? await this._verifyQuoteDefinitelyExpired();
             }
-            const res = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
-            switch (res?.type) {
+            commitStatus ??= await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
+            switch (commitStatus?.type) {
                 case base_1.SwapCommitStateType.PAID:
                     if (this.claimTxId == null)
-                        this.claimTxId = await res.getClaimTxId();
+                        this.claimTxId = await commitStatus.getClaimTxId();
                     this.state = ToBTCSwapState.CLAIMED;
                     return true;
                 case base_1.SwapCommitStateType.REFUNDABLE:
                     this.state = ToBTCSwapState.REFUNDABLE;
                     return true;
                 case base_1.SwapCommitStateType.EXPIRED:
-                    if (this.refundTxId == null && res.getRefundTxId)
-                        this.refundTxId = await res.getRefundTxId();
+                    if (this.refundTxId == null && commitStatus.getRefundTxId)
+                        this.refundTxId = await commitStatus.getRefundTxId();
                     this.state = ToBTCSwapState.QUOTE_EXPIRED;
                     return true;
                 case base_1.SwapCommitStateType.NOT_COMMITED:
-                    if (this.refundTxId == null && res.getRefundTxId)
-                        this.refundTxId = await res.getRefundTxId();
+                    if (this.refundTxId == null && commitStatus.getRefundTxId)
+                        this.refundTxId = await commitStatus.getRefundTxId();
                     if (this.state === ToBTCSwapState.COMMITED || this.state === ToBTCSwapState.REFUNDABLE) {
                         this.state = ToBTCSwapState.REFUNDED;
                         return true;
@@ -594,12 +594,27 @@ class IToBTCSwap extends IEscrowSwap_1.IEscrowSwap {
             }
         }
     }
-    async _sync(save) {
-        let changed = await this.syncStateFromChain();
+    _shouldFetchCommitStatus() {
+        return this.state === ToBTCSwapState.CREATED ||
+            this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED ||
+            this.state === ToBTCSwapState.COMMITED ||
+            this.state === ToBTCSwapState.SOFT_CLAIMED ||
+            this.state === ToBTCSwapState.REFUNDABLE;
+    }
+    _shouldFetchExpiryStatus() {
+        return this.state === ToBTCSwapState.CREATED || this.state === ToBTCSwapState.QUOTE_SOFT_EXPIRED;
+    }
+    async _sync(save, quoteDefinitelyExpired, commitStatus) {
+        let changed = await this.syncStateFromChain(quoteDefinitelyExpired, commitStatus);
         if (this.state === ToBTCSwapState.COMMITED || this.state === ToBTCSwapState.SOFT_CLAIMED) {
             //Check if that maybe already concluded
-            if (await this.checkIntermediarySwapProcessed(false))
-                changed = true;
+            try {
+                if (await this.checkIntermediarySwapProcessed(false))
+                    changed = true;
+            }
+            catch (e) {
+                this.logger.error("_sync(): Failed to synchronize swap, error: ", e);
+            }
         }
         if (save && changed)
             await this._saveAndEmit();

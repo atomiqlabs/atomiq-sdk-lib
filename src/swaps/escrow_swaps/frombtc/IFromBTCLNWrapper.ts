@@ -1,6 +1,5 @@
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {IFromBTCWrapper} from "./IFromBTCWrapper";
-import {ISwap} from "../../ISwap";
 import {ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {LightningNetworkApi, LNNodeLiquidity} from "../../../btc/LightningNetworkApi";
 import {UnifiedSwapStorage} from "../../../storage/UnifiedSwapStorage";
@@ -15,10 +14,11 @@ import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {LNURL, LNURLWithdrawParamsWithUrl} from "../../../utils/LNURL";
 import {UserError} from "../../../errors/UserError";
 import { sha256 } from "@noble/hashes/sha256";
+import {IEscrowSwap} from "../IEscrowSwap";
 
 export abstract class IFromBTCLNWrapper<
     T extends ChainType,
-    S extends ISwap<T> & {commitTxId: string, claimTxId?: string, refundTxId?: string},
+    S extends IEscrowSwap<T>,
     O extends ISwapWrapperOptions = ISwapWrapperOptions
 > extends IFromBTCWrapper<T, S, O> {
 
@@ -48,7 +48,7 @@ export abstract class IFromBTCLNWrapper<
         swapDataDeserializer: new (data: any) => T["Data"],
         lnApi: LightningNetworkApi,
         options: O,
-        events?: EventEmitter<{swapState: [ISwap]}>
+        events?: EventEmitter<{swapState: [IEscrowSwap]}>
     ) {
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, options, events);
         this.lnApi = lnApi;

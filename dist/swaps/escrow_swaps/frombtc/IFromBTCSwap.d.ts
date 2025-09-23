@@ -1,12 +1,12 @@
 import { IFromBTCWrapper } from "./IFromBTCWrapper";
 import { ChainType } from "@atomiqlabs/base";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
-import { IEscrowSwap, IEscrowSwapInit } from "../IEscrowSwap";
 import { Fee, FeeType } from "../../fee/Fee";
 import { IAddressSwap } from "../../IAddressSwap";
-export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S extends number = number> extends IEscrowSwap<T, S> implements IAddressSwap {
+import { IEscrowSelfInitSwap, IEscrowSelfInitSwapInit } from "../IEscrowSelfInitSwap";
+export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, S extends number = number> extends IEscrowSelfInitSwap<T, S> implements IAddressSwap {
     protected abstract readonly inputToken: BtcToken;
-    protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, init: IEscrowSwapInit<T["Data"]>);
+    protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, init: IEscrowSelfInitSwapInit<T["Data"]>);
     protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, obj: any);
     /**
      * In case swapFee in BTC is not supplied it recalculates it based on swap price

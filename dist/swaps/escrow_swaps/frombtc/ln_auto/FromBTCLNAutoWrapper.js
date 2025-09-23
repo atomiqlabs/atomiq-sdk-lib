@@ -296,5 +296,53 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
             throw e;
         }
     }
+    async _checkPastSwaps(pastSwaps) {
+        const changedSwapSet = new Set();
+        const swapExpiredStatus = {};
+        const checkStatusSwaps = [];
+        await Promise.all(pastSwaps.map(async (pastSwap) => {
+            if (pastSwap._shouldCheckIntermediary()) {
+                try {
+                    const result = await pastSwap._checkIntermediaryPaymentReceived(false);
+                    if (result != null) {
+                        changedSwapSet.add(pastSwap);
+                    }
+                }
+                catch (e) {
+                    this.logger.error(`_checkPastSwaps(): Failed to contact LP regarding swap ${pastSwap.getId()}, error: `, e);
+                }
+            }
+            if (pastSwap._shouldFetchExpiryStatus()) {
+                //Check expiry
+                swapExpiredStatus[pastSwap.getEscrowHash()] = await pastSwap._verifyQuoteDefinitelyExpired();
+            }
+            if (pastSwap._shouldFetchCommitStatus()) {
+                //Add to swaps for which status should be checked
+                checkStatusSwaps.push(pastSwap);
+            }
+        }));
+        const swapStatuses = await this.contract.getCommitStatuses(checkStatusSwaps.map(val => ({ signer: val._getInitiator(), swapData: val.data })));
+        for (let pastSwap of checkStatusSwaps) {
+            const escrowHash = pastSwap.getEscrowHash();
+            const shouldSave = await pastSwap._sync(false, swapExpiredStatus[escrowHash], swapStatuses[escrowHash], true);
+            if (shouldSave) {
+                changedSwapSet.add(pastSwap);
+            }
+        }
+        const changedSwaps = [];
+        const removeSwaps = [];
+        changedSwapSet.forEach(val => {
+            if (val.isQuoteExpired()) {
+                removeSwaps.push(val);
+            }
+            else {
+                changedSwaps.push(val);
+            }
+        });
+        return {
+            changedSwaps,
+            removeSwaps
+        };
+    }
 }
 exports.FromBTCLNAutoWrapper = FromBTCLNAutoWrapper;

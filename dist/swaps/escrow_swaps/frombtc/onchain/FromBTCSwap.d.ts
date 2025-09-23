@@ -1,14 +1,14 @@
 import { IFromBTCSwap } from "../IFromBTCSwap";
 import { SwapType } from "../../../enums/SwapType";
 import { FromBTCWrapper } from "./FromBTCWrapper";
-import { ChainType, SwapData } from "@atomiqlabs/base";
+import { ChainType, SwapCommitState, SwapData } from "@atomiqlabs/base";
 import { BtcToken, SCToken, TokenAmount } from "../../../../Tokens";
-import { IEscrowSwapInit } from "../../IEscrowSwap";
 import { IBitcoinWallet } from "../../../../btc/wallet/IBitcoinWallet";
 import { IBTCWalletSwap } from "../../../IBTCWalletSwap";
 import { Transaction } from "@scure/btc-signer";
 import { MinimalBitcoinWalletInterface, MinimalBitcoinWalletInterfaceWithSigner } from "../../../../btc/wallet/MinimalBitcoinWalletInterface";
 import { IClaimableSwap } from "../../../IClaimableSwap";
+import { IEscrowSelfInitSwapInit } from "../../IEscrowSelfInitSwap";
 export declare enum FromBTCSwapState {
     FAILED = -4,
     EXPIRED = -3,
@@ -19,7 +19,7 @@ export declare enum FromBTCSwapState {
     BTC_TX_CONFIRMED = 2,
     CLAIM_CLAIMED = 3
 }
-export type FromBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
+export type FromBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
     address: string;
     amount: bigint;
     requiredConfirmations: number;
@@ -181,6 +181,8 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * @private
      */
     private syncStateFromChain;
-    _sync(save?: boolean): Promise<boolean>;
+    _shouldFetchCommitStatus(): boolean;
+    _shouldFetchExpiryStatus(): boolean;
+    _sync(save?: boolean, quoteDefinitelyExpired?: boolean, commitStatus?: SwapCommitState): Promise<boolean>;
     _tick(save?: boolean): Promise<boolean>;
 }

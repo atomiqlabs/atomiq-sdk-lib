@@ -4,9 +4,9 @@ exports.IFromBTCSwap = void 0;
 const ISwap_1 = require("../../ISwap");
 const base_1 = require("@atomiqlabs/base");
 const Tokens_1 = require("../../../Tokens");
-const IEscrowSwap_1 = require("../IEscrowSwap");
 const Fee_1 = require("../../fee/Fee");
-class IFromBTCSwap extends IEscrowSwap_1.IEscrowSwap {
+const IEscrowSelfInitSwap_1 = require("../IEscrowSelfInitSwap");
+class IFromBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
     constructor(wrapper, initOrObj) {
         super(wrapper, initOrObj);
     }

@@ -9,10 +9,10 @@ const Tokens_1 = require("../../../../Tokens");
 const Utils_1 = require("../../../../utils/Utils");
 const BitcoinUtils_1 = require("../../../../utils/BitcoinUtils");
 const BitcoinHelpers_1 = require("../../../../utils/BitcoinHelpers");
-const IEscrowSwap_1 = require("../../IEscrowSwap");
 const IBitcoinWallet_1 = require("../../../../btc/wallet/IBitcoinWallet");
 const btc_signer_1 = require("@scure/btc-signer");
 const SingleAddressBitcoinWallet_1 = require("../../../../btc/wallet/SingleAddressBitcoinWallet");
+const IEscrowSelfInitSwap_1 = require("../../IEscrowSelfInitSwap");
 var FromBTCSwapState;
 (function (FromBTCSwapState) {
     FromBTCSwapState[FromBTCSwapState["FAILED"] = -4] = "FAILED";
@@ -27,7 +27,7 @@ var FromBTCSwapState;
 function isFromBTCSwapInit(obj) {
     return typeof (obj.address) === "string" &&
         typeof (obj.amount) === "bigint" &&
-        (0, IEscrowSwap_1.isIEscrowSwapInit)(obj);
+        (0, IEscrowSelfInitSwap_1.isIEscrowSelfInitSwapInit)(obj);
 }
 exports.isFromBTCSwapInit = isFromBTCSwapInit;
 class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
@@ -371,7 +371,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             throw new Error("Invalid state");
         const abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const result = await Promise.race([
-            this.watchdogWaitTillCommited(abortController.signal),
+            this.watchdogWaitTillCommited(undefined, abortController.signal),
             this.waitTillState(FromBTCSwapState.CLAIM_COMMITED, "gte", abortController.signal).then(() => 0)
         ]);
         abortController.abort();
@@ -491,7 +491,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
         let res;
         try {
             res = await Promise.race([
-                this.watchdogWaitTillResult(abortController.signal),
+                this.watchdogWaitTillResult(undefined, abortController.signal),
                 this.waitTillState(FromBTCSwapState.CLAIM_CLAIMED, "eq", abortController.signal).then(() => 0),
                 this.waitTillState(FromBTCSwapState.FAILED, "eq", abortController.signal).then(() => 1),
             ]);
@@ -548,10 +548,10 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
      *
      * @private
      */
-    async syncStateFromChain() {
+    async syncStateFromChain(quoteDefinitelyExpired, commitStatus) {
         if (this.state === FromBTCSwapState.PR_CREATED || this.state === FromBTCSwapState.QUOTE_SOFT_EXPIRED) {
-            const quoteExpired = await this.verifyQuoteDefinitelyExpired(); //Make sure we check for expiry here, to prevent race conditions
-            const status = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
+            const quoteExpired = quoteDefinitelyExpired ?? await this._verifyQuoteDefinitelyExpired(); //Make sure we check for expiry here, to prevent race conditions
+            const status = commitStatus ?? await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
             switch (status?.type) {
                 case base_1.SwapCommitStateType.COMMITED:
                     this.state = FromBTCSwapState.CLAIM_COMMITED;
@@ -574,7 +574,7 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             return false;
         }
         if (this.state === FromBTCSwapState.CLAIM_COMMITED || this.state === FromBTCSwapState.BTC_TX_CONFIRMED || this.state === FromBTCSwapState.EXPIRED) {
-            const status = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
+            const status = commitStatus ?? await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
             switch (status?.type) {
                 case base_1.SwapCommitStateType.PAID:
                     if (this.claimTxId == null)
@@ -599,8 +599,16 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
             }
         }
     }
-    async _sync(save) {
-        const changed = await this.syncStateFromChain();
+    _shouldFetchCommitStatus() {
+        return this.state === FromBTCSwapState.PR_CREATED || this.state === FromBTCSwapState.QUOTE_SOFT_EXPIRED ||
+            this.state === FromBTCSwapState.CLAIM_COMMITED || this.state === FromBTCSwapState.BTC_TX_CONFIRMED ||
+            this.state === FromBTCSwapState.EXPIRED;
+    }
+    _shouldFetchExpiryStatus() {
+        return this.state === FromBTCSwapState.PR_CREATED || this.state === FromBTCSwapState.QUOTE_SOFT_EXPIRED;
+    }
+    async _sync(save, quoteDefinitelyExpired, commitStatus) {
+        const changed = await this.syncStateFromChain(quoteDefinitelyExpired, commitStatus);
         if (changed && save)
             await this._saveAndEmit();
         return changed;

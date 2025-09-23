@@ -13,6 +13,7 @@ const Utils_1 = require("../../../../utils/Utils");
 const Tokens_1 = require("../../../../Tokens");
 const ISwap_1 = require("../../../ISwap");
 const Fee_1 = require("../../../fee/Fee");
+const IEscrowSwap_1 = require("../../IEscrowSwap");
 var FromBTCLNAutoSwapState;
 (function (FromBTCLNAutoSwapState) {
     FromBTCLNAutoSwapState[FromBTCLNAutoSwapState["FAILED"] = -4] = "FAILED";
@@ -34,10 +35,10 @@ function isFromBTCLNAutoSwapInit(obj) {
         (obj.lnurl == null || typeof (obj.lnurl) === "string") &&
         (obj.lnurlK1 == null || typeof (obj.lnurlK1) === "string") &&
         (obj.lnurlCallback == null || typeof (obj.lnurlCallback) === "string") &&
-        (0, ISwap_1.isISwapInit)(obj);
+        (0, IEscrowSwap_1.isIEscrowSwapInit)(obj);
 }
 exports.isFromBTCLNAutoSwapInit = isFromBTCLNAutoSwapInit;
-class FromBTCLNAutoSwap extends ISwap_1.ISwap {
+class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
     getSwapData() {
         return this.data ?? this.initialSwapData;
     }
@@ -167,6 +168,9 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
     }
     isQuoteSoftExpired() {
         return this.state === FromBTCLNAutoSwapState.QUOTE_EXPIRED;
+    }
+    _verifyQuoteDefinitelyExpired() {
+        return Promise.resolve(this.getDefinitiveExpiryTime() < Date.now());
     }
     verifyQuoteValid() {
         return Promise.resolve(this.getQuoteExpiry() > Date.now());
@@ -316,7 +320,7 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
      *
      * @param save If the new swap state should be saved
      */
-    async checkIntermediaryPaymentReceived(save = true) {
+    async _checkIntermediaryPaymentReceived(save = true) {
         if (this.state === FromBTCLNAutoSwapState.PR_PAID ||
             this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED ||
             this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED ||
@@ -456,29 +460,6 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Commit
-    /**
-     * Periodically checks the chain to see whether the swap is committed
-     *
-     * @param intervalSeconds How often to check (in seconds), default to 5s
-     * @param abortSignal
-     * @protected
-     */
-    async watchdogWaitTillCommited(intervalSeconds, abortSignal) {
-        intervalSeconds ??= 5;
-        let status = { type: base_1.SwapCommitStateType.NOT_COMMITED };
-        while (status?.type === base_1.SwapCommitStateType.NOT_COMMITED) {
-            await (0, Utils_1.timeoutPromise)(intervalSeconds * 1000, abortSignal);
-            try {
-                status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
-            }
-            catch (e) {
-                this.logger.error("watchdogWaitTillCommited(): Error when fetching commit status or signature expiry: ", e);
-            }
-        }
-        if (abortSignal != null)
-            abortSignal.throwIfAborted();
-        return status?.type !== base_1.SwapCommitStateType.EXPIRED;
-    }
     async waitTillCommited(checkIntervalSeconds, abortSignal) {
         if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED || this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED)
             return Promise.resolve();
@@ -514,29 +495,6 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Claim
-    /**
-     * Periodically checks the chain to see whether the swap was finished (claimed or refunded)
-     *
-     * @param intervalSeconds How often to check (in seconds), default to 5s
-     * @param abortSignal
-     * @protected
-     */
-    async watchdogWaitTillResult(intervalSeconds, abortSignal) {
-        intervalSeconds ??= 5;
-        let status = { type: base_1.SwapCommitStateType.COMMITED };
-        while (status?.type === base_1.SwapCommitStateType.COMMITED || status?.type === base_1.SwapCommitStateType.REFUNDABLE) {
-            await (0, Utils_1.timeoutPromise)(intervalSeconds * 1000, abortSignal);
-            try {
-                status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
-            }
-            catch (e) {
-                this.logger.error("watchdogWaitTillResult(): Error when fetching commit status: ", e);
-            }
-        }
-        if (abortSignal != null)
-            abortSignal.throwIfAborted();
-        return status;
-    }
     /**
      * Returns transactions required for claiming the HTLC and finishing the swap by revealing the HTLC secret
      *  (hash preimage)
@@ -696,10 +654,15 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
      *
      * @private
      */
-    async syncStateFromChain() {
+    async syncStateFromChain(quoteDefinitelyExpired, commitStatus) {
+        //Check for expiry before the getCommitStatus to prevent race conditions
+        let quoteExpired = false;
+        if (this.state === FromBTCLNAutoSwapState.PR_PAID) {
+            quoteExpired = quoteDefinitelyExpired ?? await this._verifyQuoteDefinitelyExpired();
+        }
         if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED || this.state === FromBTCLNAutoSwapState.EXPIRED) {
             //Check if it's already successfully paid
-            const commitStatus = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
+            commitStatus ??= await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
             if (commitStatus?.type === base_1.SwapCommitStateType.PAID) {
                 if (this.claimTxId == null)
                     this.claimTxId = await commitStatus.getClaimTxId();
@@ -713,8 +676,8 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
         }
         if (this.state === FromBTCLNAutoSwapState.PR_PAID) {
             //Check if it's already committed
-            const status = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
-            switch (status?.type) {
+            commitStatus ??= await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
+            switch (commitStatus?.type) {
                 case base_1.SwapCommitStateType.COMMITED:
                     this.state = FromBTCLNAutoSwapState.CLAIM_COMMITED;
                     return true;
@@ -723,31 +686,50 @@ class FromBTCLNAutoSwap extends ISwap_1.ISwap {
                     return true;
                 case base_1.SwapCommitStateType.PAID:
                     if (this.claimTxId == null)
-                        this.claimTxId = await status.getClaimTxId();
+                        this.claimTxId = await commitStatus.getClaimTxId();
                     this.state = FromBTCLNAutoSwapState.CLAIM_CLAIMED;
                     return true;
             }
+            if (quoteExpired) {
+                this.state = FromBTCLNAutoSwapState.QUOTE_EXPIRED;
+                return true;
+            }
         }
     }
-    async _sync(save) {
+    _shouldFetchCommitStatus() {
+        return this.state === FromBTCLNAutoSwapState.PR_PAID || this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED || this.state === FromBTCLNAutoSwapState.EXPIRED;
+    }
+    _shouldFetchExpiryStatus() {
+        return this.state === FromBTCLNAutoSwapState.PR_PAID;
+    }
+    _shouldCheckIntermediary() {
+        return this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED;
+    }
+    async _sync(save, quoteDefinitelyExpired, commitStatus, skipLpCheck) {
         let changed = false;
         if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
             if (this.state !== FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED && this.getQuoteExpiry() < Date.now()) {
                 this.state = FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED;
                 changed ||= true;
             }
-            const result = await this.checkIntermediaryPaymentReceived(false);
-            if (result !== null)
-                changed ||= true;
-        }
-        if (await this.syncStateFromChain())
-            changed = true;
-        if (this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
-            if (this.getDefinitiveExpiryTime() < Date.now()) {
-                this.state = FromBTCLNAutoSwapState.QUOTE_EXPIRED;
-                changed ||= true;
+            if (!skipLpCheck)
+                try {
+                    const result = await this._checkIntermediaryPaymentReceived(false);
+                    if (result !== null)
+                        changed ||= true;
+                }
+                catch (e) {
+                    this.logger.error("_sync(): Failed to synchronize swap, error: ", e);
+                }
+            if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
+                if (await this._verifyQuoteDefinitelyExpired()) {
+                    this.state = FromBTCLNAutoSwapState.QUOTE_EXPIRED;
+                    changed ||= true;
+                }
             }
         }
+        if (await this.syncStateFromChain(quoteDefinitelyExpired, commitStatus))
+            changed = true;
         if (save && changed)
             await this._saveAndEmit();
         return changed;

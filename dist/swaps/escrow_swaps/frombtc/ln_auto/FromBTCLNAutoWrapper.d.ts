@@ -115,4 +115,8 @@ export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCL
         quote: Promise<FromBTCLNAutoSwap<T>>;
         intermediary: Intermediary;
     }[]>;
+    protected _checkPastSwaps(pastSwaps: FromBTCLNAutoSwap<T>[]): Promise<{
+        changedSwaps: FromBTCLNAutoSwap<T>[];
+        removeSwaps: FromBTCLNAutoSwap<T>[];
+    }>;
 }
