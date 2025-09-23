@@ -15,7 +15,6 @@ import {
 import {
     parsePsbtTransaction, toBitcoinWallet,
 } from "../../../../utils/BitcoinHelpers";
-import {IEscrowSwapInit, isIEscrowSwapInit} from "../../IEscrowSwap";
 import {IBitcoinWallet, isIBitcoinWallet} from "../../../../btc/wallet/IBitcoinWallet";
 import {IBTCWalletSwap} from "../../../IBTCWalletSwap";
 import {Transaction} from "@scure/btc-signer";
@@ -25,6 +24,7 @@ import {
     MinimalBitcoinWalletInterfaceWithSigner
 } from "../../../../btc/wallet/MinimalBitcoinWalletInterface";
 import {IClaimableSwap} from "../../../IClaimableSwap";
+import {IEscrowSelfInitSwapInit, isIEscrowSelfInitSwapInit} from "../../IEscrowSelfInitSwap";
 
 export enum FromBTCSwapState {
     FAILED = -4,
@@ -37,7 +37,7 @@ export enum FromBTCSwapState {
     CLAIM_CLAIMED = 3
 }
 
-export type FromBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
+export type FromBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
     address: string;
     amount: bigint;
     requiredConfirmations: number;
@@ -46,7 +46,7 @@ export type FromBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
 export function isFromBTCSwapInit<T extends SwapData>(obj: any): obj is FromBTCSwapInit<T> {
     return typeof(obj.address) === "string" &&
         typeof(obj.amount) === "bigint" &&
-        isIEscrowSwapInit<T>(obj);
+        isIEscrowSelfInitSwapInit<T>(obj);
 }
 
 export class FromBTCSwap<T extends ChainType = ChainType>
@@ -479,7 +479,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
 
         const abortController = extendAbortController(abortSignal);
         const result = await Promise.race([
-            this.watchdogWaitTillCommited(abortController.signal),
+            this.watchdogWaitTillCommited(undefined, abortController.signal),
             this.waitTillState(FromBTCSwapState.CLAIM_COMMITED, "gte", abortController.signal).then(() => 0)
         ]);
         abortController.abort();
@@ -607,7 +607,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         let res: 0 | 1 | SwapCommitState;
         try {
             res = await Promise.race([
-                this.watchdogWaitTillResult(abortController.signal),
+                this.watchdogWaitTillResult(undefined, abortController.signal),
                 this.waitTillState(FromBTCSwapState.CLAIM_CLAIMED, "eq", abortController.signal).then(() => 0 as const),
                 this.waitTillState(FromBTCSwapState.FAILED, "eq", abortController.signal).then(() => 1 as const),
             ]);
@@ -673,10 +673,10 @@ export class FromBTCSwap<T extends ChainType = ChainType>
      *
      * @private
      */
-    private async syncStateFromChain(): Promise<boolean> {
+    private async syncStateFromChain(quoteDefinitelyExpired?: boolean, commitStatus?: SwapCommitState): Promise<boolean> {
         if(this.state===FromBTCSwapState.PR_CREATED || this.state===FromBTCSwapState.QUOTE_SOFT_EXPIRED) {
-            const quoteExpired = await this.verifyQuoteDefinitelyExpired(); //Make sure we check for expiry here, to prevent race conditions
-            const status = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
+            const quoteExpired = quoteDefinitelyExpired ?? await this._verifyQuoteDefinitelyExpired(); //Make sure we check for expiry here, to prevent race conditions
+            const status = commitStatus ?? await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
             switch(status?.type) {
                 case SwapCommitStateType.COMMITED:
                     this.state = FromBTCSwapState.CLAIM_COMMITED;
@@ -700,7 +700,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         }
 
         if(this.state===FromBTCSwapState.CLAIM_COMMITED || this.state===FromBTCSwapState.BTC_TX_CONFIRMED || this.state===FromBTCSwapState.EXPIRED) {
-            const status = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
+            const status = commitStatus ?? await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
             switch(status?.type) {
                 case SwapCommitStateType.PAID:
                     if(this.claimTxId==null) this.claimTxId = await status.getClaimTxId();
@@ -724,8 +724,18 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         }
     }
 
-    async _sync(save?: boolean): Promise<boolean> {
-        const changed = await this.syncStateFromChain();
+    _shouldFetchCommitStatus(): boolean {
+        return this.state===FromBTCSwapState.PR_CREATED || this.state===FromBTCSwapState.QUOTE_SOFT_EXPIRED ||
+            this.state===FromBTCSwapState.CLAIM_COMMITED || this.state===FromBTCSwapState.BTC_TX_CONFIRMED ||
+            this.state===FromBTCSwapState.EXPIRED;
+    }
+
+    _shouldFetchExpiryStatus(): boolean {
+        return this.state===FromBTCSwapState.PR_CREATED || this.state===FromBTCSwapState.QUOTE_SOFT_EXPIRED;
+    }
+
+    async _sync(save?: boolean, quoteDefinitelyExpired?: boolean, commitStatus?: SwapCommitState): Promise<boolean> {
+        const changed = await this.syncStateFromChain(quoteDefinitelyExpired, commitStatus);
         if(changed && save) await this._saveAndEmit();
         return changed;
     }

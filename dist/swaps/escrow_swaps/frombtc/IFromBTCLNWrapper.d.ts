@@ -3,7 +3,6 @@
 /// <reference types="node" />
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { IFromBTCWrapper } from "./IFromBTCWrapper";
-import { ISwap } from "../../ISwap";
 import { ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { LightningNetworkApi, LNNodeLiquidity } from "../../../btc/LightningNetworkApi";
 import { UnifiedSwapStorage } from "../../../storage/UnifiedSwapStorage";
@@ -14,11 +13,8 @@ import { Buffer } from "buffer";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { PaymentRequestObject, TagsObject } from "@atomiqlabs/bolt11";
 import { LNURLWithdrawParamsWithUrl } from "../../../utils/LNURL";
-export declare abstract class IFromBTCLNWrapper<T extends ChainType, S extends ISwap<T> & {
-    commitTxId: string;
-    claimTxId?: string;
-    refundTxId?: string;
-}, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends IFromBTCWrapper<T, S, O> {
+import { IEscrowSwap } from "../IEscrowSwap";
+export declare abstract class IFromBTCLNWrapper<T extends ChainType, S extends IEscrowSwap<T>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends IFromBTCWrapper<T, S, O> {
     protected readonly lnApi: LightningNetworkApi;
     /**
      * @param chainIdentifier
@@ -34,7 +30,7 @@ export declare abstract class IFromBTCLNWrapper<T extends ChainType, S extends I
      * @param events Instance to use for emitting events
      */
     constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: O, events?: EventEmitter<{
-        swapState: [ISwap];
+        swapState: [IEscrowSwap];
     }>);
     /**
      * Returns the swap expiry, leaving enough time for the user to claim the HTLC

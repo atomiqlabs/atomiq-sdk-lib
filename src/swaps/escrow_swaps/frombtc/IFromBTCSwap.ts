@@ -5,22 +5,22 @@ import {
     SignatureVerificationError,
 } from "@atomiqlabs/base";
 import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
-import {IEscrowSwap, IEscrowSwapInit} from "../IEscrowSwap";
 import {Fee, FeeType} from "../../fee/Fee";
 import {IAddressSwap} from "../../IAddressSwap";
+import {IEscrowSelfInitSwap, IEscrowSelfInitSwapInit} from "../IEscrowSelfInitSwap";
 
 
 export abstract class IFromBTCSwap<
     T extends ChainType = ChainType,
     S extends number = number
-> extends IEscrowSwap<T, S> implements IAddressSwap {
+> extends IEscrowSelfInitSwap<T, S> implements IAddressSwap {
     protected abstract readonly inputToken: BtcToken;
 
-    protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, init: IEscrowSwapInit<T["Data"]>);
+    protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, init: IEscrowSelfInitSwapInit<T["Data"]>);
     protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, obj: any);
     protected constructor(
         wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>,
-        initOrObj: IEscrowSwapInit<T["Data"]> | any
+        initOrObj: IEscrowSelfInitSwapInit<T["Data"]> | any
     ) {
         super(wrapper, initOrObj);
     }

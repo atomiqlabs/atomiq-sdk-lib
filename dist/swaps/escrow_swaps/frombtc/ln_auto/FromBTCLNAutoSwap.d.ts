@@ -1,17 +1,17 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import { SwapType } from "../../../enums/SwapType";
-import { ChainType, SwapData, SwapExpiredState, SwapNotCommitedState, SwapPaidState } from "@atomiqlabs/base";
+import { ChainType, SwapCommitState, SwapData } from "@atomiqlabs/base";
 import { Buffer } from "buffer";
 import { LNURLWithdraw } from "../../../../utils/LNURL";
 import { BtcToken, SCToken, TokenAmount } from "../../../../Tokens";
-import { ISwap, ISwapInit } from "../../../ISwap";
 import { Fee, FeeType } from "../../../fee/Fee";
 import { IAddressSwap } from "../../../IAddressSwap";
 import { FromBTCLNAutoWrapper } from "./FromBTCLNAutoWrapper";
 import { ISwapWithGasDrop } from "../../../ISwapWithGasDrop";
 import { MinimalLightningNetworkWalletInterface } from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
 import { IClaimableSwap } from "../../../IClaimableSwap";
+import { IEscrowSwap, IEscrowSwapInit } from "../../IEscrowSwap";
 export declare enum FromBTCLNAutoSwapState {
     FAILED = -4,
     QUOTE_EXPIRED = -3,
@@ -22,7 +22,7 @@ export declare enum FromBTCLNAutoSwapState {
     CLAIM_COMMITED = 2,
     CLAIM_CLAIMED = 3
 }
-export type FromBTCLNAutoSwapInit<T extends SwapData> = ISwapInit & {
+export type FromBTCLNAutoSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
     pr: string;
     secret: string;
     initialSwapData: T;
@@ -35,7 +35,7 @@ export type FromBTCLNAutoSwapInit<T extends SwapData> = ISwapInit & {
     lnurlCallback?: string;
 };
 export declare function isFromBTCLNAutoSwapInit<T extends SwapData>(obj: any): obj is FromBTCLNAutoSwapInit<T>;
-export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends ISwap<T, FromBTCLNAutoSwapState> implements IAddressSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, FromBTCLNAutoSwapState> {
+export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends IEscrowSwap<T, FromBTCLNAutoSwapState> implements IAddressSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, FromBTCLNAutoSwapState> {
     protected readonly inputToken: BtcToken<true>;
     protected readonly TYPE = SwapType.FROM_BTCLN_AUTO;
     protected readonly lnurlFailSignal: AbortController;
@@ -46,9 +46,6 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     protected readonly btcAmountGas: bigint;
     protected readonly gasSwapFeeBtc: bigint;
     protected readonly gasSwapFee: bigint;
-    data: T["Data"];
-    commitTxId: string;
-    claimTxId?: string;
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
@@ -93,6 +90,7 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     isFailed(): boolean;
     isQuoteExpired(): boolean;
     isQuoteSoftExpired(): boolean;
+    _verifyQuoteDefinitelyExpired(): Promise<boolean>;
     verifyQuoteValid(): Promise<boolean>;
     protected getLightningInvoiceSats(): bigint;
     protected getWatchtowerFeeAmountBtc(): bigint;
@@ -141,7 +139,7 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
      *
      * @param save If the new swap state should be saved
      */
-    protected checkIntermediaryPaymentReceived(save?: boolean): Promise<boolean | null>;
+    _checkIntermediaryPaymentReceived(save?: boolean): Promise<boolean | null>;
     /**
      * Checks the data returned by the intermediary in the payment auth request
      *
@@ -160,23 +158,7 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
      * @param abortSignal Abort signal to stop waiting for payment
      */
     waitForPayment(onPaymentReceived?: (txId: string) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
-    /**
-     * Periodically checks the chain to see whether the swap is committed
-     *
-     * @param intervalSeconds How often to check (in seconds), default to 5s
-     * @param abortSignal
-     * @protected
-     */
-    protected watchdogWaitTillCommited(intervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     protected waitTillCommited(checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<void>;
-    /**
-     * Periodically checks the chain to see whether the swap was finished (claimed or refunded)
-     *
-     * @param intervalSeconds How often to check (in seconds), default to 5s
-     * @param abortSignal
-     * @protected
-     */
-    protected watchdogWaitTillResult(intervalSeconds?: number, abortSignal?: AbortSignal): Promise<SwapPaidState | SwapExpiredState | SwapNotCommitedState>;
     /**
      * Returns transactions required for claiming the HTLC and finishing the swap by revealing the HTLC secret
      *  (hash preimage)
@@ -222,6 +204,9 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
      * @private
      */
     private syncStateFromChain;
-    _sync(save?: boolean): Promise<boolean>;
+    _shouldFetchCommitStatus(): boolean;
+    _shouldFetchExpiryStatus(): boolean;
+    _shouldCheckIntermediary(): boolean;
+    _sync(save?: boolean, quoteDefinitelyExpired?: boolean, commitStatus?: SwapCommitState, skipLpCheck?: boolean): Promise<boolean>;
     _tick(save?: boolean): Promise<boolean>;
 }

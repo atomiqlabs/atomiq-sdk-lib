@@ -7,11 +7,8 @@ import { UnifiedSwapEventListener } from "../../events/UnifiedSwapEventListener"
 import { ISwapPrice } from "../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { SwapType } from "../enums/SwapType";
-export declare abstract class IEscrowSwapWrapper<T extends ChainType, S extends ISwap<T> & {
-    commitTxId: string;
-    claimTxId?: string;
-    refundTxId?: string;
-}, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends ISwapWrapper<T, S, O> {
+import { IEscrowSwap } from "./IEscrowSwap";
+export declare abstract class IEscrowSwapWrapper<T extends ChainType, S extends IEscrowSwap<T>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends ISwapWrapper<T, S, O> {
     readonly abstract TYPE: SwapType;
     readonly abstract pendingSwapStates: Array<S["state"]>;
     readonly abstract swapDeserializer: {
@@ -76,4 +73,8 @@ export declare abstract class IEscrowSwapWrapper<T extends ChainType, S extends 
      * @param swap
      */
     protected processEvent(event: SwapEvent<T["Data"]>, swap: S): Promise<boolean>;
+    protected _checkPastSwaps(pastSwaps: S[]): Promise<{
+        changedSwaps: S[];
+        removeSwaps: S[];
+    }>;
 }

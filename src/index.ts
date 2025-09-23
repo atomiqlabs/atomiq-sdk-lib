@@ -49,6 +49,7 @@ export * from "./swaps/enums/SwapType";
 export * from "./swaps/enums/SwapDirection";
 export * from "./swaps/escrow_swaps/IEscrowSwapWrapper";
 export * from "./swaps/escrow_swaps/IEscrowSwap";
+export * from "./swaps/escrow_swaps/IEscrowSelfInitSwap";
 export * from "./swaps/escrow_swaps/tobtc/IToBTCSwap";
 export * from "./swaps/escrow_swaps/tobtc/IToBTCWrapper";
 export * from "./swaps/escrow_swaps/tobtc/ln/ToBTCLNSwap";

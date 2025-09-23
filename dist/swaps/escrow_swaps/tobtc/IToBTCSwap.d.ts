@@ -1,15 +1,15 @@
 import { IToBTCWrapper } from "./IToBTCWrapper";
-import { ChainType, SwapData } from "@atomiqlabs/base";
+import { ChainType, SwapCommitState, SwapData } from "@atomiqlabs/base";
 import { RefundAuthorizationResponse } from "../../../intermediaries/IntermediaryAPI";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
-import { IEscrowSwap, IEscrowSwapInit } from "../IEscrowSwap";
 import { Fee, FeeType } from "../../fee/Fee";
-export type IToBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
+import { IEscrowSelfInitSwap, IEscrowSelfInitSwapInit } from "../IEscrowSelfInitSwap";
+export type IToBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
     networkFee: bigint;
     networkFeeBtc?: bigint;
 };
 export declare function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T>;
-export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscrowSwap<T, ToBTCSwapState> {
+export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscrowSelfInitSwap<T, ToBTCSwapState> {
     protected readonly networkFee: bigint;
     protected networkFeeBtc?: bigint;
     protected readonly abstract outputToken: BtcToken;
@@ -193,7 +193,9 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      * @private
      */
     private syncStateFromChain;
-    _sync(save?: boolean): Promise<boolean>;
+    _shouldFetchCommitStatus(): boolean;
+    _shouldFetchExpiryStatus(): boolean;
+    _sync(save?: boolean, quoteDefinitelyExpired?: boolean, commitStatus?: SwapCommitState): Promise<boolean>;
     _tick(save?: boolean): Promise<boolean>;
 }
 export declare enum ToBTCSwapState {

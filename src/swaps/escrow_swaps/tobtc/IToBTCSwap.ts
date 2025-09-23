@@ -1,5 +1,12 @@
 import {IToBTCWrapper} from "./IToBTCWrapper";
-import {ChainType, isAbstractSigner, SignatureVerificationError, SwapCommitStateType, SwapData} from "@atomiqlabs/base";
+import {
+    ChainType,
+    isAbstractSigner,
+    SignatureVerificationError,
+    SwapCommitState,
+    SwapCommitStateType,
+    SwapData
+} from "@atomiqlabs/base";
 import {
     IntermediaryAPI,
     RefundAuthorizationResponse,
@@ -8,11 +15,11 @@ import {
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {extendAbortController, timeoutPromise, tryWithRetries} from "../../../utils/Utils";
 import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
-import {IEscrowSwap, IEscrowSwapInit, isIEscrowSwapInit} from "../IEscrowSwap";
 import {Fee, FeeType} from "../../fee/Fee";
 import {ppmToPercentage} from "../../ISwap";
+import {IEscrowSelfInitSwap, IEscrowSelfInitSwapInit, isIEscrowSelfInitSwapInit} from "../IEscrowSelfInitSwap";
 
-export type IToBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
+export type IToBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
     networkFee: bigint,
     networkFeeBtc?: bigint
 };
@@ -20,10 +27,10 @@ export type IToBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
 export function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T> {
     return typeof(obj.networkFee) === "bigint" &&
         (obj.networkFeeBtc==null || typeof(obj.networkFeeBtc) === "bigint") &&
-        isIEscrowSwapInit<T>(obj);
+        isIEscrowSelfInitSwapInit<T>(obj);
 }
 
-export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscrowSwap<T, ToBTCSwapState> {
+export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscrowSelfInitSwap<T, ToBTCSwapState> {
     protected readonly networkFee: bigint;
     protected networkFeeBtc?: bigint;
     protected readonly abstract outputToken: BtcToken;
@@ -362,7 +369,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         let result: number | boolean;
         try {
             result = await Promise.race([
-                this.watchdogWaitTillCommited(abortController.signal),
+                this.watchdogWaitTillCommited(undefined, abortController.signal),
                 this.waitTillState(ToBTCSwapState.COMMITED, "gte", abortController.signal).then(() => 0)
             ]);
             abortController.abort();
@@ -600,7 +607,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         const abortController = new AbortController();
         if(abortSignal!=null) abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
         const res = await Promise.race([
-            this.watchdogWaitTillResult(abortController.signal),
+            this.watchdogWaitTillResult(undefined, abortController.signal),
             this.waitTillState(ToBTCSwapState.REFUNDED, "eq", abortController.signal).then(() => 0 as const),
             this.waitTillState(ToBTCSwapState.CLAIMED, "eq", abortController.signal).then(() => 1 as const),
         ]);
@@ -650,8 +657,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
      *
      * @private
      */
-    private async syncStateFromChain(): Promise<boolean> {
-
+    private async syncStateFromChain(quoteDefinitelyExpired?: boolean, commitStatus?: SwapCommitState): Promise<boolean> {
         if(
             this.state===ToBTCSwapState.CREATED ||
             this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED ||
@@ -659,27 +665,27 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
             this.state===ToBTCSwapState.SOFT_CLAIMED ||
             this.state===ToBTCSwapState.REFUNDABLE
         ) {
-            let quoteExpired: boolean = false;
-            if((this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED)) {
+            let quoteExpired = false;
+            if(this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
                 //Check if quote is still valid
-                quoteExpired = await this.verifyQuoteDefinitelyExpired();
+                quoteExpired = quoteDefinitelyExpired ?? await this._verifyQuoteDefinitelyExpired();
             }
 
-            const res = await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
-            switch(res?.type) {
+            commitStatus ??= await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
+            switch(commitStatus?.type) {
                 case SwapCommitStateType.PAID:
-                    if(this.claimTxId==null) this.claimTxId = await res.getClaimTxId();
+                    if(this.claimTxId==null) this.claimTxId = await commitStatus.getClaimTxId();
                     this.state = ToBTCSwapState.CLAIMED;
                     return true;
                 case SwapCommitStateType.REFUNDABLE:
                     this.state = ToBTCSwapState.REFUNDABLE;
                     return true;
                 case SwapCommitStateType.EXPIRED:
-                    if(this.refundTxId==null && res.getRefundTxId) this.refundTxId = await res.getRefundTxId();
+                    if(this.refundTxId==null && commitStatus.getRefundTxId) this.refundTxId = await commitStatus.getRefundTxId();
                     this.state = ToBTCSwapState.QUOTE_EXPIRED;
                     return true;
                 case SwapCommitStateType.NOT_COMMITED:
-                    if(this.refundTxId==null && res.getRefundTxId) this.refundTxId = await res.getRefundTxId();
+                    if(this.refundTxId==null && commitStatus.getRefundTxId) this.refundTxId = await commitStatus.getRefundTxId();
                     if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.REFUNDABLE) {
                         this.state = ToBTCSwapState.REFUNDED;
                         return true;
@@ -702,12 +708,28 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         }
     }
 
-    async _sync(save?: boolean): Promise<boolean> {
-        let changed = await this.syncStateFromChain();
+    _shouldFetchCommitStatus(): boolean {
+        return this.state===ToBTCSwapState.CREATED ||
+            this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED ||
+            this.state===ToBTCSwapState.COMMITED ||
+            this.state===ToBTCSwapState.SOFT_CLAIMED ||
+            this.state===ToBTCSwapState.REFUNDABLE;
+    }
+
+    _shouldFetchExpiryStatus(): boolean {
+        return this.state===ToBTCSwapState.CREATED || this.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED;
+    }
+
+    async _sync(save?: boolean, quoteDefinitelyExpired?: boolean, commitStatus?: SwapCommitState): Promise<boolean> {
+        let changed = await this.syncStateFromChain(quoteDefinitelyExpired, commitStatus);
 
         if(this.state===ToBTCSwapState.COMMITED || this.state===ToBTCSwapState.SOFT_CLAIMED) {
             //Check if that maybe already concluded
-            if(await this.checkIntermediarySwapProcessed(false)) changed = true;
+            try {
+                if(await this.checkIntermediarySwapProcessed(false)) changed = true;
+            } catch (e) {
+                this.logger.error("_sync(): Failed to synchronize swap, error: ", e);
+            }
         }
 
         if(save && changed) await this._saveAndEmit();

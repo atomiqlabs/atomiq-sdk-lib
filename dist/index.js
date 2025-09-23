@@ -61,6 +61,7 @@ __exportStar(require("./swaps/enums/SwapType"), exports);
 __exportStar(require("./swaps/enums/SwapDirection"), exports);
 __exportStar(require("./swaps/escrow_swaps/IEscrowSwapWrapper"), exports);
 __exportStar(require("./swaps/escrow_swaps/IEscrowSwap"), exports);
+__exportStar(require("./swaps/escrow_swaps/IEscrowSelfInitSwap"), exports);
 __exportStar(require("./swaps/escrow_swaps/tobtc/IToBTCSwap"), exports);
 __exportStar(require("./swaps/escrow_swaps/tobtc/IToBTCWrapper"), exports);
 __exportStar(require("./swaps/escrow_swaps/tobtc/ln/ToBTCLNSwap"), exports);
