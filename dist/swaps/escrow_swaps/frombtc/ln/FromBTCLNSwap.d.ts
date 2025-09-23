@@ -84,11 +84,11 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      *  quote was created, this is required for legacy swaps because the destination wallet needs to actively claim
      *  the swap funds on the destination (this also means you need native token to cover gas costs)
      * @param walletOrLnurlWithdraw Bitcoin lightning wallet to use to pay the lightning network invoice, or an LNURL-withdraw
-     *  link, if the quote was created using LNURL-withdraw you don't need to pass any wallet or lnurl
+     *  link, wallet is not required and the LN invoice can be paid externally as well (just pass null or undefined here)
      * @param callbacks Callbacks to track the progress of the swap
      * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
      */
-    execute(dstSigner: T["Signer"] | T["NativeSigner"], walletOrLnurlWithdraw?: MinimalLightningNetworkWalletInterface | LNURLWithdraw | string, callbacks?: {
+    execute(dstSigner: T["Signer"] | T["NativeSigner"], walletOrLnurlWithdraw?: MinimalLightningNetworkWalletInterface | LNURLWithdraw | string | null | undefined, callbacks?: {
         onSourceTransactionReceived?: (sourceTxId: string) => void;
         onDestinationCommitSent?: (destinationCommitTxId: string) => void;
         onDestinationClaimSent?: (destinationClaimTxId: string) => void;
@@ -119,10 +119,11 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     /**
      * Waits till an LN payment is received by the intermediary and client can continue commiting & claiming the HTLC
      *
+     * @param onPaymentReceived Callback as for when the LP reports having received the ln payment
      * @param abortSignal Abort signal to stop waiting for payment
      * @param checkIntervalSeconds How often to poll the intermediary for answer
      */
-    waitForPayment(checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
+    waitForPayment(onPaymentReceived?: (txId: string) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in an HTLC
      *

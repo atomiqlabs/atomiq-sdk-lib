@@ -913,11 +913,13 @@ class Swapper extends events_1.EventEmitter {
         else {
             const { unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
             const queryParams = [];
-            for (let wrapper of [wrappers[SwapType_1.SwapType.TO_BTCLN], wrappers[SwapType_1.SwapType.TO_BTC]]) {
+            for (let wrapper of [wrappers[SwapType_1.SwapType.FROM_BTC], wrappers[SwapType_1.SwapType.FROM_BTCLN], wrappers[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO]]) {
+                if (wrapper == null)
+                    continue;
                 const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
                 if (signer != null)
                     swapTypeQueryParams.push({ key: "initiator", value: signer });
-                swapTypeQueryParams.push({ key: "state", value: wrapper.refundableSwapStates });
+                swapTypeQueryParams.push({ key: "state", value: wrapper.claimableSwapStates });
                 queryParams.push(swapTypeQueryParams);
             }
             const result = await unifiedSwapStorage.query(queryParams, reviver);

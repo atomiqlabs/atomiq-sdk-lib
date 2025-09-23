@@ -435,6 +435,7 @@ export class LNURL {
 
     static decodeSuccessAction(successAction: LNURLPaySuccessAction, secret: string): LNURLDecodedSuccessAction | null {
         if(secret==null) return null;
+        if(successAction==null) return null;
         if(successAction.tag==="message") {
             return {
                 description: successAction.message
