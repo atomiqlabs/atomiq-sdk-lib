@@ -310,6 +310,8 @@ class LNURL {
     static decodeSuccessAction(successAction, secret) {
         if (secret == null)
             return null;
+        if (successAction == null)
+            return null;
         if (successAction.tag === "message") {
             return {
                 description: successAction.message

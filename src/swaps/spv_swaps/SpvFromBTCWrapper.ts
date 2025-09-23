@@ -683,7 +683,7 @@ export class SpvFromBTCWrapper<
             if(await pastSwap._shouldCheckWithdrawalState(fronterAddress, latestVaultUtxo)) checkWithdrawalStateSwaps.push(pastSwap);
         }
 
-        const withdrawalStates = await this.contract.getWithdrawalStates(checkWithdrawalStateSwaps.map(val => val.data.getTxId()));
+        const withdrawalStates = await this.contract.getWithdrawalStates(checkWithdrawalStateSwaps.map(val => ({withdrawal: val.data})));
         for(const pastSwap of checkWithdrawalStateSwaps) {
             const status = withdrawalStates[pastSwap.data.getTxId()];
             if(status==null) {

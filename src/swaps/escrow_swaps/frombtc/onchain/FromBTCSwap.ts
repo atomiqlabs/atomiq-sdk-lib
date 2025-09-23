@@ -381,7 +381,8 @@ export class FromBTCSwap<T extends ChainType = ChainType>
      *  quote was created, this is required for legacy swaps because the destination wallet needs to actively open
      *  a bitcoin swap address to which the BTC is then sent, this means that the address also needs to have enough
      *  native tokens to pay for gas on the destination network
-     * @param wallet Bitcoin wallet to use to sign the bitcoin transaction
+     * @param wallet Bitcoin wallet to use to sign the bitcoin transaction, can also be null - then the execution waits
+     *  till a transaction is received from an external wallet
      * @param callbacks Callbacks to track the progress of the swap
      * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
      *
@@ -390,7 +391,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
      */
     async execute(
         dstSigner: T["Signer"] | T["NativeSigner"],
-        wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner,
+        wallet?: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner | null | undefined,
         callbacks?: {
             onDestinationCommitSent?: (destinationCommitTxId: string) => void,
             onSourceTransactionSent?: (sourceTxId: string) => void,
@@ -414,12 +415,14 @@ export class FromBTCSwap<T extends ChainType = ChainType>
             await this.commit(dstSigner, options?.abortSignal, undefined, callbacks?.onDestinationCommitSent);
         }
         if(this.state===FromBTCSwapState.CLAIM_COMMITED) {
-            const bitcoinPaymentSent = await this.getBitcoinPayment();
+            if(wallet!=null) {
+                const bitcoinPaymentSent = await this.getBitcoinPayment();
 
-            if(bitcoinPaymentSent==null) {
-                //Send btc tx
-                const txId = await this.sendBitcoinTransaction(wallet, options?.feeRate);
-                if(callbacks?.onSourceTransactionSent!=null) callbacks.onSourceTransactionSent(txId);
+                if(bitcoinPaymentSent==null) {
+                    //Send btc tx
+                    const txId = await this.sendBitcoinTransaction(wallet, options?.feeRate);
+                    if(callbacks?.onSourceTransactionSent!=null) callbacks.onSourceTransactionSent(txId);
+                }
             }
 
             const txId = await this.waitForBitcoinTransaction(callbacks?.onSourceTransactionConfirmationStatus, options?.btcTxCheckIntervalSeconds, options?.abortSignal);

@@ -599,7 +599,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
                 this.logger.info("claim(): Transaction state is CLAIMED, swap was successfully claimed by the watchtower");
                 return this.claimTxId;
             }
-            const withdrawalState = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
+            const withdrawalState = await this.wrapper.contract.getWithdrawalState(this.data);
             if (withdrawalState.type === base_1.SpvWithdrawalStateType.CLAIMED) {
                 this.logger.info("claim(): Transaction status is CLAIMED, swap was successfully claimed by the watchtower");
                 this.claimTxId = withdrawalState.txId;
@@ -628,7 +628,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         while (status.type === base_1.SpvWithdrawalStateType.NOT_FOUND) {
             await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
             try {
-                status = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
+                status = await this.wrapper.contract.getWithdrawalState(this.data);
             }
             catch (e) {
                 this.logger.error("watchdogWaitTillResult(): Error when fetching commit status: ", e);
@@ -679,9 +679,11 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         if (typeof (res) === "number") {
             if (res === 0) {
                 this.logger.debug("waitTillClaimedOrFronted(): Resolved from state change (CLAIMED)");
+                return true;
             }
             if (res === 1) {
                 this.logger.debug("waitTillClaimedOrFronted(): Resolved from state change (FRONTED)");
+                return true;
             }
             if (res === 2) {
                 this.logger.debug("waitTillClaimedOrFronted(): Resolved from state change (FAILED)");
@@ -826,7 +828,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         }
         if (this.state === SpvFromBTCSwapState.BROADCASTED || this.state === SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
             if (await this._shouldCheckWithdrawalState()) {
-                const status = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
+                const status = await this.wrapper.contract.getWithdrawalState(this.data);
                 this.logger.debug("syncStateFromChain(): status of " + this.data.btcTx.txid, status);
                 switch (status.type) {
                     case base_1.SpvWithdrawalStateType.FRONTED:
