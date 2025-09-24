@@ -298,6 +298,7 @@ export class SpvFromBTCWrapper<
      * @param options Options as passed to the swap creation function
      * @param callerFeeShare
      * @param bitcoinFeeRatePromise Maximum accepted fee rate from the LPs
+     * @param abortSignal
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
@@ -307,12 +308,15 @@ export class SpvFromBTCWrapper<
         lp: Intermediary,
         options: SpvFromBTCOptions,
         callerFeeShare: bigint,
-        bitcoinFeeRatePromise: Promise<number>
+        bitcoinFeeRatePromise: Promise<number>,
+        abortSignal: AbortSignal
     ): Promise<{
         vault: T["SpvVaultData"],
         vaultUtxoValue: number
     }> {
-        if(resp.btcFeeRate > await bitcoinFeeRatePromise) throw new IntermediaryError("Bitcoin fee rate returned too high!");
+        const btcFeeRate = await bitcoinFeeRatePromise;
+        abortSignal.throwIfAborted();
+        if(btcFeeRate!=null && resp.btcFeeRate > btcFeeRate) throw new IntermediaryError("Bitcoin fee rate returned too high!");
 
         //Vault related
         let vaultScript: Uint8Array;
@@ -359,6 +363,8 @@ export class SpvFromBTCWrapper<
             this.logger.error("Error getting spv vault (owner: "+resp.address+" vaultId: "+resp.vaultId.toString(10)+"): ", e);
             throw new IntermediaryError("Spv swap vault not found", e);
         }
+        abortSignal.throwIfAborted();
+
         //Make sure vault is opened
         if(!vault.isOpened()) throw new IntermediaryError("Returned spv swap vault is not opened!");
         //Make sure the vault doesn't require insane amount of confirmations
@@ -391,6 +397,7 @@ export class SpvFromBTCWrapper<
         let utxo = resp.btcUtxo.toLowerCase();
         const [txId, voutStr] = utxo.split(":");
         let btcTx = await this.btcRpc.getTransaction(txId);
+        abortSignal.throwIfAborted();
         if(btcTx.confirmations==null || btcTx.confirmations<1) throw new IntermediaryError("SPV vault UTXO not confirmed");
         const vout = parseInt(voutStr);
         if(btcTx.outs[vout]==null) throw new IntermediaryError("Invalid UTXO, doesn't exist");
@@ -398,6 +405,7 @@ export class SpvFromBTCWrapper<
 
         //Require vault UTXO is unspent
         if(await this.btcRpc.isSpent(utxo)) throw new IntermediaryError("Returned spv vault UTXO is already spent", null, true);
+        abortSignal.throwIfAborted();
 
         this.logger.debug("verifyReturnedData(): Vault UTXO: "+vault.getUtxo()+" current utxo: "+utxo);
 
@@ -408,6 +416,7 @@ export class SpvFromBTCWrapper<
             //Such that 1st tx isn't fetched twice
             if(btcTx.txid!==txId) btcTx = await this.btcRpc.getTransaction(txId);
             const withdrawalData = await this.contract.getWithdrawalData(btcTx);
+            abortSignal.throwIfAborted();
             pendingWithdrawals.unshift(withdrawalData);
             utxo = pendingWithdrawals[0].getSpentVaultUtxo();
             this.logger.debug("verifyReturnedData(): Vault UTXO: "+vault.getUtxo()+" current utxo: "+utxo);
@@ -439,6 +448,7 @@ export class SpvFromBTCWrapper<
             this.logger.error("Error calculating spv vault balance (owner: "+resp.address+" vaultId: "+resp.vaultId.toString(10)+"): ", e);
             throw new IntermediaryError("Spv swap vault balance prediction failed", e);
         }
+        abortSignal.throwIfAborted();
 
         return {
             vault,
@@ -532,7 +542,7 @@ export class SpvFromBTCWrapper<
                                 resp.totalGas * (100_000n + callerFeeShare) / 100_000n,
                                 nativeTokenAddress, {}, gasTokenPricePrefetchPromise, abortController.signal
                             ),
-                            this.verifyReturnedData(resp, amountData, lp, options, callerFeeShare, bitcoinFeeRatePromise)
+                            this.verifyReturnedData(resp, amountData, lp, options, callerFeeShare, bitcoinFeeRatePromise, abortController.signal)
                         ]);
 
                         const swapInit: SpvFromBTCSwapInit = {
