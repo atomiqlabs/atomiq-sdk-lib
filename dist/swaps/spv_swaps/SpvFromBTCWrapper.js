@@ -203,11 +203,14 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
      * @param options Options as passed to the swap creation function
      * @param callerFeeShare
      * @param bitcoinFeeRatePromise Maximum accepted fee rate from the LPs
+     * @param abortSignal
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
-    async verifyReturnedData(resp, amountData, lp, options, callerFeeShare, bitcoinFeeRatePromise) {
-        if (resp.btcFeeRate > await bitcoinFeeRatePromise)
+    async verifyReturnedData(resp, amountData, lp, options, callerFeeShare, bitcoinFeeRatePromise, abortSignal) {
+        const btcFeeRate = await bitcoinFeeRatePromise;
+        abortSignal.throwIfAborted();
+        if (btcFeeRate != null && resp.btcFeeRate > btcFeeRate)
             throw new IntermediaryError_1.IntermediaryError("Bitcoin fee rate returned too high!");
         //Vault related
         let vaultScript;
@@ -254,6 +257,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             this.logger.error("Error getting spv vault (owner: " + resp.address + " vaultId: " + resp.vaultId.toString(10) + "): ", e);
             throw new IntermediaryError_1.IntermediaryError("Spv swap vault not found", e);
         }
+        abortSignal.throwIfAborted();
         //Make sure vault is opened
         if (!vault.isOpened())
             throw new IntermediaryError_1.IntermediaryError("Returned spv swap vault is not opened!");
@@ -292,6 +296,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         let utxo = resp.btcUtxo.toLowerCase();
         const [txId, voutStr] = utxo.split(":");
         let btcTx = await this.btcRpc.getTransaction(txId);
+        abortSignal.throwIfAborted();
         if (btcTx.confirmations == null || btcTx.confirmations < 1)
             throw new IntermediaryError_1.IntermediaryError("SPV vault UTXO not confirmed");
         const vout = parseInt(voutStr);
@@ -301,6 +306,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         //Require vault UTXO is unspent
         if (await this.btcRpc.isSpent(utxo))
             throw new IntermediaryError_1.IntermediaryError("Returned spv vault UTXO is already spent", null, true);
+        abortSignal.throwIfAborted();
         this.logger.debug("verifyReturnedData(): Vault UTXO: " + vault.getUtxo() + " current utxo: " + utxo);
         //Trace returned utxo back to what's saved on-chain
         let pendingWithdrawals = [];
@@ -310,6 +316,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             if (btcTx.txid !== txId)
                 btcTx = await this.btcRpc.getTransaction(txId);
             const withdrawalData = await this.contract.getWithdrawalData(btcTx);
+            abortSignal.throwIfAborted();
             pendingWithdrawals.unshift(withdrawalData);
             utxo = pendingWithdrawals[0].getSpentVaultUtxo();
             this.logger.debug("verifyReturnedData(): Vault UTXO: " + vault.getUtxo() + " current utxo: " + utxo);
@@ -341,6 +348,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             this.logger.error("Error calculating spv vault balance (owner: " + resp.address + " vaultId: " + resp.vaultId.toString(10) + "): ", e);
             throw new IntermediaryError_1.IntermediaryError("Spv swap vault balance prediction failed", e);
         }
+        abortSignal.throwIfAborted();
         return {
             vault,
             vaultUtxoValue
@@ -399,7 +407,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], false, resp.btcAmountSwap, resp.total * (100000n + callerFeeShare) / 100000n, amountData.token, {}, pricePrefetchPromise, abortController.signal),
                             options.gasAmount === 0n ? Promise.resolve() : this.verifyReturnedPrice({ ...lp.services[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], swapBaseFee: 0 }, //Base fee should be charged only on the amount, not on gas
                             false, resp.btcAmountGas, resp.totalGas * (100000n + callerFeeShare) / 100000n, nativeTokenAddress, {}, gasTokenPricePrefetchPromise, abortController.signal),
-                            this.verifyReturnedData(resp, amountData, lp, options, callerFeeShare, bitcoinFeeRatePromise)
+                            this.verifyReturnedData(resp, amountData, lp, options, callerFeeShare, bitcoinFeeRatePromise, abortController.signal)
                         ]);
                         const swapInit = {
                             pricingInfo,
