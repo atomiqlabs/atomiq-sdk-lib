@@ -916,6 +916,9 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         if (vaultDataUtxo == null)
             return true; //Vault UTXO is null (the vault closed)
         const [txId, _] = vaultDataUtxo.split(":");
+        //Don't check both txns if their txId is equal
+        if (this.data.btcTx.txid === txId)
+            return true;
         const [btcTx, latestVaultTx] = await Promise.all([
             this.wrapper.btcRpc.getTransaction(this.data.btcTx.txid),
             this.wrapper.btcRpc.getTransaction(txId)
