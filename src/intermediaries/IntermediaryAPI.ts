@@ -8,9 +8,7 @@ import {streamingFetchPromise} from "../utils/paramcoders/client/StreamingFetchP
 import {httpGet, httpPost, randomBytes, tryWithRetries} from "../utils/Utils";
 
 export type InfoHandlerResponse = {
-    address: string,
     envelope: string,
-    signature: string,
     chains: {
         [chainIdentifier: string]: {
             address: string,

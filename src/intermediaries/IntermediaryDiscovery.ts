@@ -165,11 +165,6 @@ export class IntermediaryDiscovery extends EventEmitter {
             abortSignal
         );
 
-        //Handle legacy responses
-        if(response.chains==null) response.chains = {
-            [DEFAULT_CHAIN]: {address: response.address, signature: response.signature}
-        };
-
         const addresses: {[key: string]: string} = {};
         for(let chain in response.chains) {
             if(this.swapContracts[chain]!=null) {

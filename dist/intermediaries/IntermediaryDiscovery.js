@@ -98,11 +98,6 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
      */
     async getNodeInfo(url, abortSignal) {
         const response = await (0, Utils_1.tryWithRetries)(() => IntermediaryAPI_1.IntermediaryAPI.getIntermediaryInfo(url, this.httpRequestTimeout, abortSignal), { maxRetries: 3, delay: 100, exponential: true }, undefined, abortSignal);
-        //Handle legacy responses
-        if (response.chains == null)
-            response.chains = {
-                [DEFAULT_CHAIN]: { address: response.address, signature: response.signature }
-            };
         const addresses = {};
         for (let chain in response.chains) {
             if (this.swapContracts[chain] != null) {
