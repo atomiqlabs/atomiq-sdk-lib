@@ -2,9 +2,7 @@
 /// <reference types="node" />
 import { FieldTypeEnum, RequestSchemaResult } from "../utils/paramcoders/SchemaVerifier";
 export type InfoHandlerResponse = {
-    address: string;
     envelope: string;
-    signature: string;
     chains: {
         [chainIdentifier: string]: {
             address: string;
