@@ -23,7 +23,15 @@ import {MempoolBitcoinBlock} from "../../btc/mempool/MempoolBitcoinBlock";
 import {Intermediary} from "../../intermediaries/Intermediary";
 import {isLNURLPay, isLNURLWithdraw, LNURLPay, LNURLWithdraw} from "../../utils/LNURL";
 import {AmountData, ISwapWrapper, WrapperCtorTokens} from "../ISwapWrapper";
-import {bigIntCompare, bigIntMax, bigIntMin, getLogger, objectMap, randomBytes} from "../../utils/Utils";
+import {
+    bigIntCompare,
+    bigIntMax,
+    bigIntMin,
+    getLogger,
+    objectMap,
+    randomBytes,
+    tryWithRetries
+} from "../../utils/Utils";
 import {OutOfBoundsError} from "../../errors/RequestError";
 import {SwapperWithChain} from "./SwapperWithChain";
 import {
@@ -57,7 +65,7 @@ import {FromBTCLNAutoSwap} from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSw
 import {UserError} from "../../errors/UserError";
 import {SwapAmountType} from "../enums/SwapAmountType";
 import {IClaimableSwap} from "../IClaimableSwap";
-import {IClaimableSwapWrapper} from "../IClaimableSwapWrapper";
+import {correctClock} from "../../utils/AutomaticClockDriftCorrection";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -78,7 +86,8 @@ export type SwapperOptions = {
     noSwapCache?: boolean,
     dontCheckPastSwaps?: boolean,
     dontFetchLPs?: boolean,
-    saveUninitializedSwaps?: boolean //automatically persist all created swaps - by default only initiated swaps are persisted
+    saveUninitializedSwaps?: boolean, //automatically persist all created swaps - by default only initiated swaps are persisted
+    automaticClockDriftCorrection?: boolean
 };
 
 export type MultiChain = {
@@ -406,6 +415,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     }
 
     private async _init(): Promise<void> {
+        if(this.options.automaticClockDriftCorrection) {
+            await tryWithRetries(correctClock);
+        }
         const promises = [];
         for(let chainIdentifier in this.chains) {
             promises.push((async() => {
