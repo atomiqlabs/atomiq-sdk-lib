@@ -9,7 +9,7 @@ import {ISwap} from "../swaps/ISwap";
 import {SwapType} from "../swaps/enums/SwapType";
 import {UnifiedSwapStorageIndexes} from "../storage/UnifiedSwapStorage";
 
-export type QuerySetCondition = {
+type QuerySetCondition = {
     key: string,
     values: Set<any>
 }
@@ -19,7 +19,7 @@ function toCompositeIndex(values: Array<any[]>): Array<any[]> {
     if(values.length===1) {
         return values[0];
     } else {
-        const compositeArray = [];
+        const compositeArray: Array<any[]> = [];
         const firstValues = values.shift();
         const restValues = toCompositeIndex(values);
         for(let value of firstValues) {
@@ -241,8 +241,14 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage<UnifiedSwapStora
     async query(params: Array<Array<QueryParams>>): Promise<Array<UnifiedStoredObject>> {
         if(params.length===0) return await this.querySingle([]);
         const results = await Promise.all(params.map(singleParam => this.querySingle(singleParam)));
-        const resultSet = new Set(results.flat()); //Deduplicate
-        return Array.from(resultSet);
+
+        //Deduplicate
+        const knownIds = new Set<string>();
+        return results.flat().filter(value => {
+            if(knownIds.has(value.id)) return false;
+            knownIds.add(value.id);
+            return true;
+        });
     }
 
     async querySingle(params: Array<QueryParams>): Promise<Array<UnifiedStoredObject>> {

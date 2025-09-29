@@ -76,4 +76,5 @@ export * from "./utils/LNURL";
 
 export * from "./storage/IUnifiedStorage";
 export * from "./browser-storage/IndexedDBUnifiedStorage";
+export * from "./abstract-storage/MemoryIndexedKeyValueUnifiedStorage";
 export * from "./swaps/fee/Fee";

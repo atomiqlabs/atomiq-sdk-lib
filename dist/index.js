@@ -86,4 +86,5 @@ __exportStar(require("./swaps/spv_swaps/SpvFromBTCWrapper"), exports);
 __exportStar(require("./utils/LNURL"), exports);
 __exportStar(require("./storage/IUnifiedStorage"), exports);
 __exportStar(require("./browser-storage/IndexedDBUnifiedStorage"), exports);
+__exportStar(require("./abstract-storage/MemoryIndexedKeyValueUnifiedStorage"), exports);
 __exportStar(require("./swaps/fee/Fee"), exports);

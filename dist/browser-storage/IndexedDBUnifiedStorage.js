@@ -204,8 +204,14 @@ class IndexedDBUnifiedStorage {
         if (params.length === 0)
             return await this.querySingle([]);
         const results = await Promise.all(params.map(singleParam => this.querySingle(singleParam)));
-        const resultSet = new Set(results.flat()); //Deduplicate
-        return Array.from(resultSet);
+        //Deduplicate
+        const knownIds = new Set();
+        return results.flat().filter(value => {
+            if (knownIds.has(value.id))
+                return false;
+            knownIds.add(value.id);
+            return true;
+        });
     }
     async querySingle(params) {
         if (params.length === 0) {
