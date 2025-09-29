@@ -27,6 +27,7 @@ const SpvFromBTCWrapper_1 = require("../spv_swaps/SpvFromBTCWrapper");
 const SwapperUtils_1 = require("./utils/SwapperUtils");
 const FromBTCLNAutoWrapper_1 = require("../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoWrapper");
 const UserError_1 = require("../../errors/UserError");
+const AutomaticClockDriftCorrection_1 = require("../../utils/AutomaticClockDriftCorrection");
 class Swapper extends events_1.EventEmitter {
     constructor(bitcoinRpc, chainsData, pricing, tokens, messenger, options) {
         super();
@@ -196,6 +197,9 @@ class Swapper extends events_1.EventEmitter {
         });
     }
     async _init() {
+        if (this.options.automaticClockDriftCorrection) {
+            await (0, Utils_1.tryWithRetries)(AutomaticClockDriftCorrection_1.correctClock);
+        }
         const promises = [];
         for (let chainIdentifier in this.chains) {
             promises.push((async () => {
