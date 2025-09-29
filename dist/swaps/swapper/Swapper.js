@@ -119,7 +119,8 @@ class Swapper extends events_1.EventEmitter {
             });
             wrappers[SwapType_1.SwapType.FROM_BTCLN] = new FromBTCLNWrapper_1.FromBTCLNWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, swapContract, pricing, tokens, chainData.swapDataConstructor, bitcoinRpc, {
                 getRequestTimeout: options.getRequestTimeout,
-                postRequestTimeout: options.postRequestTimeout
+                postRequestTimeout: options.postRequestTimeout,
+                unsafeSkipLnNodeCheck: this._bitcoinNetwork === base_1.BitcoinNetwork.TESTNET4 || this._bitcoinNetwork === base_1.BitcoinNetwork.REGTEST
             });
             wrappers[SwapType_1.SwapType.FROM_BTC] = new FromBTCWrapper_1.FromBTCWrapper(key, unifiedSwapStorage, unifiedChainEvents, chainInterface, swapContract, pricing, tokens, chainData.swapDataConstructor, btcRelay, synchronizer, this.bitcoinRpc, {
                 getRequestTimeout: options.getRequestTimeout,

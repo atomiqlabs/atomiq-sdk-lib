@@ -19,7 +19,10 @@ export type FromBTCLNOptions = {
     descriptionHash?: Buffer;
     unsafeSkipLnNodeCheck?: boolean;
 };
-export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapper<T, FromBTCLNSwap<T>> {
+export type FromBTCLNWrapperOptions = ISwapWrapperOptions & {
+    unsafeSkipLnNodeCheck?: boolean;
+};
+export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapper<T, FromBTCLNSwap<T>, FromBTCLNWrapperOptions> {
     readonly TYPE = SwapType.FROM_BTCLN;
     readonly swapDeserializer: typeof FromBTCLNSwap;
     protected readonly lnApi: LightningNetworkApi;
@@ -36,7 +39,7 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: ISwapWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: FromBTCLNWrapperOptions, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     readonly pendingSwapStates: FromBTCLNSwapState[];

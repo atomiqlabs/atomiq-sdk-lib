@@ -32,9 +32,13 @@ export type FromBTCLNOptions = {
     unsafeSkipLnNodeCheck?: boolean
 };
 
+export type FromBTCLNWrapperOptions = ISwapWrapperOptions & {
+    unsafeSkipLnNodeCheck?: boolean
+};
+
 export class FromBTCLNWrapper<
     T extends ChainType
-> extends IFromBTCWrapper<T, FromBTCLNSwap<T>> {
+> extends IFromBTCWrapper<T, FromBTCLNSwap<T>, FromBTCLNWrapperOptions> {
     public readonly TYPE = SwapType.FROM_BTCLN;
     public readonly swapDeserializer = FromBTCLNSwap;
 
@@ -63,7 +67,7 @@ export class FromBTCLNWrapper<
         tokens: WrapperCtorTokens,
         swapDataDeserializer: new (data: any) => T["Data"],
         lnApi: LightningNetworkApi,
-        options: ISwapWrapperOptions,
+        options: FromBTCLNWrapperOptions,
         events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, options, events);
@@ -240,6 +244,7 @@ export class FromBTCLNWrapper<
         intermediary: Intermediary
     }[] {
         if(options==null) options = {};
+        options.unsafeSkipLnNodeCheck ??= this.options.unsafeSkipLnNodeCheck;
         if(preFetches==null) preFetches = {};
 
         if(options.descriptionHash!=null && options.descriptionHash.length!==32)

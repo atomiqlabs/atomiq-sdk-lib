@@ -261,7 +261,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 bitcoinRpc,
                 {
                     getRequestTimeout: options.getRequestTimeout,
-                    postRequestTimeout: options.postRequestTimeout
+                    postRequestTimeout: options.postRequestTimeout,
+                    unsafeSkipLnNodeCheck: this._bitcoinNetwork===BitcoinNetwork.TESTNET4 || this._bitcoinNetwork===BitcoinNetwork.REGTEST
                 }
             );
             wrappers[SwapType.FROM_BTC] = new FromBTCWrapper<T[InputKey]>(
