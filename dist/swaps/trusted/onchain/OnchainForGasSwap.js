@@ -155,6 +155,9 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
                 fee: this.getSwapFee()
             }];
     }
+    getRequiredConfirmationsCount() {
+        return 1;
+    }
     async getFundedPsbt(_bitcoinWallet, feeRate) {
         if (this.state !== OnchainForGasSwapState.PR_CREATED)
             throw new Error("Swap already paid for!");

@@ -23,4 +23,6 @@ export interface IBTCWalletSwap {
         updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
     ): Promise<string>;
 
+    getRequiredConfirmationsCount(): number;
+
 }

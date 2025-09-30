@@ -21,4 +21,5 @@ export interface IBTCWalletSwap {
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     waitForBitcoinTransaction(abortSignal?: AbortSignal, checkIntervalSeconds?: number, updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void): Promise<string>;
+    getRequiredConfirmationsCount(): number;
 }

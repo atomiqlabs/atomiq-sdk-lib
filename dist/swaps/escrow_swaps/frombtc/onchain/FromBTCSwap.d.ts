@@ -59,6 +59,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * Returns claimer bounty, acting as a reward for watchtowers to claim the swap automatically
      */
     getClaimerBounty(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+    getRequiredConfirmationsCount(): number;
     /**
      * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
      */

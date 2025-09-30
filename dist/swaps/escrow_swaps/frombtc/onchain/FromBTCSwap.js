@@ -139,6 +139,9 @@ class FromBTCSwap extends IFromBTCSwap_1.IFromBTCSwap {
     }
     //////////////////////////////
     //// Bitcoin tx
+    getRequiredConfirmationsCount() {
+        return this.requiredConfirmations;
+    }
     /**
      * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
      */

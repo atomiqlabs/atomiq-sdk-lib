@@ -382,6 +382,10 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     //////////////////////////////
     //// Bitcoin tx
 
+    getRequiredConfirmationsCount(): number {
+        return this.vaultRequiredConfirmations;
+    }
+
     async getTransactionDetails(): Promise<{
         in0txid: string,
         in0vout: number,

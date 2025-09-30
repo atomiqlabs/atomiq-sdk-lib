@@ -225,6 +225,10 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         }];
     }
 
+    getRequiredConfirmationsCount(): number {
+        return 1;
+    }
+
     async getFundedPsbt(_bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string }, feeRate?: number): Promise<{psbt: Transaction, signInputs: number[]}> {
         if(this.state!==OnchainForGasSwapState.PR_CREATED)
             throw new Error("Swap already paid for!");

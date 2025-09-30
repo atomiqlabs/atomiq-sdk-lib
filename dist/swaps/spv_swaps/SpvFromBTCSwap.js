@@ -247,6 +247,9 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Bitcoin tx
+    getRequiredConfirmationsCount() {
+        return this.vaultRequiredConfirmations;
+    }
     async getTransactionDetails() {
         const [txId, voutStr] = this.vaultUtxo.split(":");
         const vaultScript = (0, Utils_1.toOutputScript)(this.wrapper.options.bitcoinNetwork, this.vaultBtcAddress);

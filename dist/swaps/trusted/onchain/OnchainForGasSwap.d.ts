@@ -74,6 +74,7 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
         type: FeeType.SWAP;
         fee: Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
     }];
+    getRequiredConfirmationsCount(): number;
     getFundedPsbt(_bitcoinWallet: IBitcoinWallet | {
         address: string;
         publicKey: string;

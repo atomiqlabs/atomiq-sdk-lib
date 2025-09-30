@@ -175,6 +175,10 @@ export class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T
     //////////////////////////////
     //// Bitcoin tx
 
+    getRequiredConfirmationsCount(): number {
+        return this.requiredConfirmations;
+    }
+
     /**
      * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
      */
