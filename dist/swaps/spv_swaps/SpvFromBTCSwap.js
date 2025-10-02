@@ -764,10 +764,10 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         if (this.state === SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED && !this.initiated) {
             if (this.expiry < Date.now()) {
                 this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
+                if (save)
+                    await this._saveAndEmit();
+                return true;
             }
-            if (save)
-                await this._saveAndEmit();
-            return true;
         }
         if (Math.floor(Date.now() / 1000) % 120 === 0) {
             if (this.state === SpvFromBTCSwapState.POSTED ||
