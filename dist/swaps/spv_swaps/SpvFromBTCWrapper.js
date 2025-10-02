@@ -246,8 +246,9 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             resp.executionFeeShare !== 0n)
             throw new IntermediaryError_1.IntermediaryError("Invalid caller/fronting/execution fee returned");
         //Check expiry
-        if (resp.expiry < Math.floor(Date.now() / 1000))
-            throw new IntermediaryError_1.IntermediaryError("Quote already expired");
+        const timeNowSeconds = Math.floor(Date.now() / 1000);
+        if (resp.expiry < timeNowSeconds)
+            throw new IntermediaryError_1.IntermediaryError(`Quote already expired, expiry: ${resp.expiry}, systemTime: ${timeNowSeconds}, clockAdjusted: ${Date._now != null}`);
         //Fetch vault data
         let vault;
         try {

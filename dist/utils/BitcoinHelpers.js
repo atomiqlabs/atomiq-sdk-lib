@@ -24,7 +24,6 @@ function parsePsbtTransaction(_psbt) {
             allowUnknownOutputs: true,
             allowUnknownInputs: true,
             allowLegacyWitnessUtxo: true,
-            allowUnknown: true
         });
     }
     else {

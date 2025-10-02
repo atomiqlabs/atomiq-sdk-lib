@@ -353,7 +353,8 @@ export class SpvFromBTCWrapper<
         ) throw new IntermediaryError("Invalid caller/fronting/execution fee returned");
 
         //Check expiry
-        if(resp.expiry < Math.floor(Date.now()/1000)) throw new IntermediaryError("Quote already expired");
+        const timeNowSeconds = Math.floor(Date.now()/1000);
+        if(resp.expiry < timeNowSeconds) throw new IntermediaryError(`Quote already expired, expiry: ${resp.expiry}, systemTime: ${timeNowSeconds}, clockAdjusted: ${(Date as any)._now!=null}`);
 
         //Fetch vault data
         let vault: T["SpvVaultData"];

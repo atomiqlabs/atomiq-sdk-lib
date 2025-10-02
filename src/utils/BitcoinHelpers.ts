@@ -23,8 +23,7 @@ export function parsePsbtTransaction(_psbt: Transaction | string): Transaction {
             allowUnknownOutputs: true,
             allowUnknownInputs: true,
             allowLegacyWitnessUtxo: true,
-            allowUnknown: true
-        })
+        });
     } else {
         return _psbt;
     }
