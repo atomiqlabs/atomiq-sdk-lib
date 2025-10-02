@@ -229,7 +229,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     }
 
     verifyQuoteValid(): Promise<boolean> {
-        return Promise.resolve(this.expiry>Date.now() && this.state===SpvFromBTCSwapState.CREATED);
+        return Promise.resolve(this.expiry>Date.now() && (this.state===SpvFromBTCSwapState.CREATED || this.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED));
     }
 
     getOutputAddress(): string | null {
@@ -631,7 +631,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         if(
             this.state!==SpvFromBTCSwapState.POSTED &&
             this.state!==SpvFromBTCSwapState.BROADCASTED &&
-            this.state!==SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED
+            !(this.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED && this.initiated)
         ) throw new Error("Must be in POSTED or BROADCASTED state!");
 
         const result = await this.wrapper.btcRpc.waitForTransaction(
@@ -997,14 +997,18 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             this.state===SpvFromBTCSwapState.SIGNED
         ) {
             if(this.getQuoteExpiry()<Date.now()) {
-                if(this.state===SpvFromBTCSwapState.CREATED) {
-                    this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
-                } else {
-                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
-                }
+                this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
                 if(save) await this._saveAndEmit();
                 return true;
             }
+        }
+
+        if(this.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED && !this.initiated) {
+            if(this.expiry<Date.now()) {
+                this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
+            }
+            if(save) await this._saveAndEmit();
+            return true;
         }
 
         if(Math.floor(Date.now()/1000)%120===0) {

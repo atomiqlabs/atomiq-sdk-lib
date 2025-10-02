@@ -123,6 +123,7 @@ export class SpvFromBTCWrapper<
     ];
     readonly tickSwapState: Array<SpvFromBTCSwap<T>["state"]> = [
         SpvFromBTCSwapState.CREATED,
+        SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED,
         SpvFromBTCSwapState.SIGNED,
         SpvFromBTCSwapState.POSTED,
         SpvFromBTCSwapState.BROADCASTED

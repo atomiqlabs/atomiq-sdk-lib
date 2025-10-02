@@ -51,6 +51,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         ];
         this.tickSwapState = [
             SpvFromBTCSwap_1.SpvFromBTCSwapState.CREATED,
+            SpvFromBTCSwap_1.SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED,
             SpvFromBTCSwap_1.SpvFromBTCSwapState.SIGNED,
             SpvFromBTCSwap_1.SpvFromBTCSwapState.POSTED,
             SpvFromBTCSwap_1.SpvFromBTCSwapState.BROADCASTED

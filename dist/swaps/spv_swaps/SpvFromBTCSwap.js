@@ -133,7 +133,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         return this.expiry - 20 * 1000;
     }
     verifyQuoteValid() {
-        return Promise.resolve(this.expiry > Date.now() && this.state === SpvFromBTCSwapState.CREATED);
+        return Promise.resolve(this.expiry > Date.now() && (this.state === SpvFromBTCSwapState.CREATED || this.state === SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED));
     }
     getOutputAddress() {
         return this.recipient;
@@ -446,7 +446,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     async waitForBitcoinTransaction(abortSignal, checkIntervalSeconds, updateCallback) {
         if (this.state !== SpvFromBTCSwapState.POSTED &&
             this.state !== SpvFromBTCSwapState.BROADCASTED &&
-            this.state !== SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED)
+            !(this.state === SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED && this.initiated))
             throw new Error("Must be in POSTED or BROADCASTED state!");
         const result = await this.wrapper.btcRpc.waitForTransaction(this.data.btcTx.txid, this.vaultRequiredConfirmations, (confirmations, txId, txEtaMs) => {
             if (updateCallback != null)
@@ -755,16 +755,19 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         if (this.state === SpvFromBTCSwapState.CREATED ||
             this.state === SpvFromBTCSwapState.SIGNED) {
             if (this.getQuoteExpiry() < Date.now()) {
-                if (this.state === SpvFromBTCSwapState.CREATED) {
-                    this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
-                }
-                else {
-                    this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
-                }
+                this.state = SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED;
                 if (save)
                     await this._saveAndEmit();
                 return true;
             }
+        }
+        if (this.state === SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED && !this.initiated) {
+            if (this.expiry < Date.now()) {
+                this.state = SpvFromBTCSwapState.QUOTE_EXPIRED;
+            }
+            if (save)
+                await this._saveAndEmit();
+            return true;
         }
         if (Math.floor(Date.now() / 1000) % 120 === 0) {
             if (this.state === SpvFromBTCSwapState.POSTED ||
