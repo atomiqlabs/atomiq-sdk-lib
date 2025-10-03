@@ -544,6 +544,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         swapType: SwapType,
         maxWaitTimeMS: number = 2000
     ): Promise<S> {
+        if(!this.initialized) throw new Error("Swapper not initialized, init first with swapper.init()!");
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
         let candidates: Intermediary[];
 

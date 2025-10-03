@@ -12,12 +12,14 @@ import {SingleAddressBitcoinWallet} from "../btc/wallet/SingleAddressBitcoinWall
 export function parsePsbtTransaction(_psbt: Transaction | string): Transaction {
     if(typeof(_psbt)==="string") {
         let rawPsbt: Buffer;
-        if(/[0-9a-f]+/i.test(_psbt)) {
+        if(/^(?:[0-9a-fA-F]{2})+$/.test(_psbt)) {
             //Hex
             rawPsbt = Buffer.from(_psbt, "hex");
-        } else {
+        } else if(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(_psbt)) {
             //Base64
             rawPsbt = Buffer.from(_psbt, "base64");
+        } else {
+            throw new Error("Provided psbt string not base64 nor hex encoded!");
         }
         return Transaction.fromPSBT(rawPsbt, {
             allowUnknownOutputs: true,
