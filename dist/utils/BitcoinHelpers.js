@@ -12,13 +12,16 @@ const SingleAddressBitcoinWallet_1 = require("../btc/wallet/SingleAddressBitcoin
 function parsePsbtTransaction(_psbt) {
     if (typeof (_psbt) === "string") {
         let rawPsbt;
-        if (/[0-9a-f]+/i.test(_psbt)) {
+        if (/^(?:[0-9a-fA-F]{2})+$/.test(_psbt)) {
             //Hex
             rawPsbt = buffer_1.Buffer.from(_psbt, "hex");
         }
-        else {
+        else if (/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(_psbt)) {
             //Base64
             rawPsbt = buffer_1.Buffer.from(_psbt, "base64");
+        }
+        else {
+            throw new Error("Provided psbt string not base64 nor hex encoded!");
         }
         return btc_signer_1.Transaction.fromPSBT(rawPsbt, {
             allowUnknownOutputs: true,

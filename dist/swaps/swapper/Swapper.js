@@ -298,6 +298,8 @@ class Swapper extends events_1.EventEmitter {
      * @throws {Error} if the chain with the provided identifier cannot be found
      */
     async createSwap(chainIdentifier, create, amountData, swapType, maxWaitTimeMS = 2000) {
+        if (!this.initialized)
+            throw new Error("Swapper not initialized, init first with swapper.init()!");
         if (this.chains[chainIdentifier] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
         let candidates;
