@@ -368,7 +368,7 @@ class Swapper extends events_1.EventEmitter {
                 }
                 else {
                     //Compare inputs
-                    return (0, Utils_1.bigIntCompare)(a.quote.getOutput().rawAmount, b.quote.getOutput().rawAmount);
+                    return (0, Utils_1.bigIntCompare)(a.quote.getInput().rawAmount, b.quote.getInput().rawAmount);
                 }
             });
             this.logger.debug("createSwap(): Sorted quotes, best price to worst: ", quotes);

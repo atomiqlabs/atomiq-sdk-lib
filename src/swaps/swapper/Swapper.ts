@@ -598,7 +598,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                     return bigIntCompare(b.quote.getOutput().rawAmount, a.quote.getOutput().rawAmount);
                 } else {
                     //Compare inputs
-                    return bigIntCompare(a.quote.getOutput().rawAmount, b.quote.getOutput().rawAmount);
+                    return bigIntCompare(a.quote.getInput().rawAmount, b.quote.getInput().rawAmount);
                 }
             });
 
