@@ -169,6 +169,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                             reputationPromise
                         ]);
                         abortController.signal.throwIfAborted();
+                        lp.reputation[amountData.token.toString()] = reputation;
                         const quote = new ToBTCSwap_1.ToBTCSwap(this, {
                             pricingInfo,
                             url: lp.url,

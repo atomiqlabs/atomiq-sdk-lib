@@ -244,6 +244,8 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
                         ]);
                         abortController.signal.throwIfAborted();
 
+                        lp.reputation[amountData.token.toString()] = reputation;
+
                         const quote = new ToBTCSwap<T>(this, {
                             pricingInfo,
                             url: lp.url,
