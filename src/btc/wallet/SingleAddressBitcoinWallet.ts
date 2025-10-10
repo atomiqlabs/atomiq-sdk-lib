@@ -15,7 +15,11 @@ export class SingleAddressBitcoinWallet extends BitcoinWallet {
     constructor(mempoolApi: BitcoinRpcWithAddressIndex<any>, network: BTC_NETWORK, addressDataOrWIF: string | {address: string, publicKey: string}, feeMultiplier: number = 1.25, feeOverride?: number) {
         super(mempoolApi, network, feeMultiplier, feeOverride);
         if(typeof(addressDataOrWIF)==="string") {
-            this.privKey = WIF().decode(addressDataOrWIF);
+            try {
+                this.privKey = WIF(network).decode(addressDataOrWIF);
+            } catch(e) {
+                this.privKey = WIF().decode(addressDataOrWIF);
+            }
             this.pubkey = pubECDSA(this.privKey);
             this.address = getAddress("wpkh", this.privKey, network);
         } else {
@@ -86,8 +90,8 @@ export class SingleAddressBitcoinWallet extends BitcoinWallet {
         return this._getSpendableBalance([{address: this.address, addressType: this.addressType}], psbt, feeRate);
     }
 
-    static generateRandomPrivateKey(): string {
-         return WIF().encode(randomPrivateKeyBytes());
+    static generateRandomPrivateKey(network?: BTC_NETWORK): string {
+         return WIF(network).encode(randomPrivateKeyBytes());
     }
 
 }

@@ -32,5 +32,5 @@ export declare class SingleAddressBitcoinWallet extends BitcoinWallet {
         feeRate: number;
         totalFee: number;
     }>;
-    static generateRandomPrivateKey(): string;
+    static generateRandomPrivateKey(network?: BTC_NETWORK): string;
 }

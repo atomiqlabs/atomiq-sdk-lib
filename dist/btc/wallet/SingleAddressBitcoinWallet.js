@@ -9,7 +9,12 @@ class SingleAddressBitcoinWallet extends BitcoinWallet_1.BitcoinWallet {
     constructor(mempoolApi, network, addressDataOrWIF, feeMultiplier = 1.25, feeOverride) {
         super(mempoolApi, network, feeMultiplier, feeOverride);
         if (typeof (addressDataOrWIF) === "string") {
-            this.privKey = (0, btc_signer_1.WIF)().decode(addressDataOrWIF);
+            try {
+                this.privKey = (0, btc_signer_1.WIF)(network).decode(addressDataOrWIF);
+            }
+            catch (e) {
+                this.privKey = (0, btc_signer_1.WIF)().decode(addressDataOrWIF);
+            }
             this.pubkey = (0, utils_1.pubECDSA)(this.privKey);
             this.address = (0, btc_signer_1.getAddress)("wpkh", this.privKey, network);
         }
@@ -69,8 +74,8 @@ class SingleAddressBitcoinWallet extends BitcoinWallet_1.BitcoinWallet {
     getSpendableBalance(psbt, feeRate) {
         return this._getSpendableBalance([{ address: this.address, addressType: this.addressType }], psbt, feeRate);
     }
-    static generateRandomPrivateKey() {
-        return (0, btc_signer_1.WIF)().encode((0, utils_1.randomPrivateKeyBytes)());
+    static generateRandomPrivateKey(network) {
+        return (0, btc_signer_1.WIF)(network).encode((0, utils_1.randomPrivateKeyBytes)());
     }
 }
 exports.SingleAddressBitcoinWallet = SingleAddressBitcoinWallet;
