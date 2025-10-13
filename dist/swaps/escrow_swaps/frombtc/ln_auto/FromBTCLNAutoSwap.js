@@ -50,6 +50,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         this.TYPE = SwapType_1.SwapType.FROM_BTCLN_AUTO;
         this.lnurlFailSignal = new AbortController();
         this.prPosted = false;
+        this.broadcastTickCounter = 0;
         if (isFromBTCLNAutoSwapInit(initOrObject)) {
             this.state = FromBTCLNAutoSwapState.PR_CREATED;
         }
@@ -763,9 +764,11 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
                 }
                 if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED) {
                     //Broadcast the secret over the provided messenger channel
-                    await this.wrapper.messenger.broadcast(new base_1.SwapClaimWitnessMessage(this.data, this.secret)).catch(e => {
-                        this.logger.warn("_tick(): Error when broadcasting swap secret: ", e);
-                    });
+                    if (this.broadcastTickCounter === 0)
+                        await this.wrapper.messenger.broadcast(new base_1.SwapClaimWitnessMessage(this.data, this.secret)).catch(e => {
+                            this.logger.warn("_tick(): Error when broadcasting swap secret: ", e);
+                        });
+                    this.broadcastTickCounter = (this.broadcastTickCounter + 1) % 3; //Broadcast every 3rd tick
                 }
                 break;
         }

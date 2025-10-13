@@ -900,6 +900,8 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         return changed;
     }
 
+    private broadcastTickCounter: number = 0;
+
     async _tick(save?: boolean): Promise<boolean> {
         switch(this.state) {
             case FromBTCLNAutoSwapState.PR_CREATED:
@@ -926,9 +928,10 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
                 }
                 if(this.state===FromBTCLNAutoSwapState.CLAIM_COMMITED) {
                     //Broadcast the secret over the provided messenger channel
-                    await this.wrapper.messenger.broadcast(new SwapClaimWitnessMessage(this.data, this.secret)).catch(e => {
+                    if(this.broadcastTickCounter===0) await this.wrapper.messenger.broadcast(new SwapClaimWitnessMessage(this.data, this.secret)).catch(e => {
                         this.logger.warn("_tick(): Error when broadcasting swap secret: ", e);
                     });
+                    this.broadcastTickCounter = (this.broadcastTickCounter + 1) % 3; //Broadcast every 3rd tick
                 }
                 break;
         }
