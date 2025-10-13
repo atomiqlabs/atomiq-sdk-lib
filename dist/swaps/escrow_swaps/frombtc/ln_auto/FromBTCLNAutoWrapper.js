@@ -86,7 +86,7 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
         if (options.unsafeZeroWatchtowerFee)
             return 0n;
         const dummyAmount = BigInt(Math.floor(Math.random() * 0x1000000));
-        const dummySwapData = await this.contract.createSwapData(base_1.ChainSwapType.CHAIN, this.chain.randomAddress(), signer, amountData.token, dummyAmount, this.contract.getHashForOnchain((0, Utils_1.randomBytes)(20), dummyAmount, 3).toString("hex"), this.getRandomSequence(), BigInt(Math.floor(Date.now() / 1000)), false, true, BigInt(Math.floor(Math.random() * 0x10000)), BigInt(Math.floor(Math.random() * 0x10000)));
+        const dummySwapData = await this.contract.createSwapData(base_1.ChainSwapType.HTLC, this.chain.randomAddress(), signer, amountData.token, dummyAmount, this.contract.getHashForHtlc((0, Utils_1.randomBytes)(32)).toString("hex"), this.getRandomSequence(), BigInt(Math.floor(Date.now() / 1000)), false, true, BigInt(Math.floor(Math.random() * 0x10000)), BigInt(Math.floor(Math.random() * 0x10000)));
         try {
             const result = await (0, Utils_1.tryWithRetries)(() => this.contract.getClaimFee(this.chain.randomAddress(), dummySwapData), null, null, abortController.signal);
             return result * BigInt(Math.floor(options.feeSafetyFactor * 1000000)) / 1000000n;

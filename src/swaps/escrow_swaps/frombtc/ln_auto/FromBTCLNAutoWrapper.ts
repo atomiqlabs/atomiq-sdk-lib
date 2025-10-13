@@ -148,8 +148,8 @@ export class FromBTCLNAutoWrapper<
 
         const dummyAmount = BigInt(Math.floor(Math.random()* 0x1000000));
         const dummySwapData = await this.contract.createSwapData(
-            ChainSwapType.CHAIN, this.chain.randomAddress(), signer, amountData.token,
-            dummyAmount, this.contract.getHashForOnchain(randomBytes(20), dummyAmount, 3).toString("hex"),
+            ChainSwapType.HTLC, this.chain.randomAddress(), signer, amountData.token,
+            dummyAmount, this.contract.getHashForHtlc(randomBytes(32)).toString("hex"),
             this.getRandomSequence(), BigInt(Math.floor(Date.now()/1000)), false, true,
             BigInt(Math.floor(Math.random() * 0x10000)), BigInt(Math.floor(Math.random() * 0x10000))
         );
