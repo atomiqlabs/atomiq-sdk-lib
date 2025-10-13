@@ -33,9 +33,9 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
         options.bitcoinNetwork ??= utils_1.TEST_NETWORK;
         options.maxConfirmations ??= 6;
         options.bitcoinBlocktime ??= 10 * 60;
-        options.maxTransactionsDelta ??= 5;
+        options.maxTransactionsDelta ??= 3;
         options.maxRawAmountAdjustmentDifferencePPM ??= 100;
-        options.maxBtcFeeOffset ??= 3;
+        options.maxBtcFeeOffset ??= 5;
         options.maxBtcFeeMultiplier ??= 1.5;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
         this.TYPE = SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
@@ -342,7 +342,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
     create(signer, amountData, lps, options, additionalParams, abortSignal) {
         options ??= {};
         options.gasAmount ??= 0n;
-        options.feeSafetyFactor ??= 2;
+        options.feeSafetyFactor ??= 1.25;
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePrefetchPromise = this.preFetchPrice(amountData, _abortController.signal);
         const nativeTokenAddress = this.chain.getNativeCurrencyAddress();

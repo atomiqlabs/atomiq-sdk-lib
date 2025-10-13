@@ -100,9 +100,9 @@ export class SpvFromBTCWrapper<
         options.bitcoinNetwork ??= TEST_NETWORK;
         options.maxConfirmations ??= 6;
         options.bitcoinBlocktime ??= 10*60;
-        options.maxTransactionsDelta ??= 5;
+        options.maxTransactionsDelta ??= 3;
         options.maxRawAmountAdjustmentDifferencePPM ??= 100;
-        options.maxBtcFeeOffset ??= 3;
+        options.maxBtcFeeOffset ??= 5;
         options.maxBtcFeeMultiplier ??= 1.5;
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
         this.spvWithdrawalDataDeserializer = spvWithdrawalDataDeserializer;
@@ -452,7 +452,7 @@ export class SpvFromBTCWrapper<
     }[] {
         options ??= {};
         options.gasAmount ??= 0n;
-        options.feeSafetyFactor ??= 2;
+        options.feeSafetyFactor ??= 1.25;
 
         const _abortController = extendAbortController(abortSignal);
         const pricePrefetchPromise: Promise<bigint> = this.preFetchPrice(amountData, _abortController.signal);
