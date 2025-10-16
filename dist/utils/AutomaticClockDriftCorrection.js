@@ -12,6 +12,24 @@ async function getHeaderTimestamp(url) {
         throw new Error("Date header not returned!");
     return { delta: timeDelta, timestamp: new Date(dateHeaderValue).getTime() };
 }
+async function getBinanceTimestamp() {
+    const timeStart = performance.now();
+    const resp = await fetch("https://api.binance.com/api/v3/time", { signal: (0, Utils_1.timeoutSignal)(3000) });
+    const timeDelta = performance.now() - timeStart;
+    const obj = await resp.json();
+    if (obj == null || obj.serverTime == null)
+        throw new Error("Timestamp not returned!");
+    return { delta: timeDelta, timestamp: Math.floor(obj.serverTime) };
+}
+async function getOKXTimestamp() {
+    const timeStart = performance.now();
+    const resp = await fetch("https://www.okx.com/api/v5/public/time", { signal: (0, Utils_1.timeoutSignal)(3000) });
+    const timeDelta = performance.now() - timeStart;
+    const obj = await resp.json();
+    if (obj == null || obj.data == null || obj.data[0] == null || obj.data[0].ts == null)
+        throw new Error("Timestamp not returned!");
+    return { delta: timeDelta, timestamp: Math.floor(obj.data[0].ts) };
+}
 async function getAisenseApiTimestamp() {
     const timeStart = performance.now();
     const resp = await fetch("https://aisenseapi.com/services/v1/timestamp", { signal: (0, Utils_1.timeoutSignal)(3000) });
@@ -27,7 +45,9 @@ async function correctClock() {
     try {
         let result = await Promise.any([
             ...headerUrls.map(url => getHeaderTimestamp(url)),
-            getAisenseApiTimestamp()
+            getAisenseApiTimestamp(),
+            getBinanceTimestamp(),
+            getOKXTimestamp()
         ]);
         const desiredTime = result.timestamp - (result.delta / 2);
         if (Math.abs(Date.now() - desiredTime) < 2000) {
