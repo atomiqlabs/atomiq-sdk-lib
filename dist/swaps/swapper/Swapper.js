@@ -197,12 +197,39 @@ class Swapper extends events_1.EventEmitter {
         });
     }
     async _init() {
-        if (this.options.automaticClockDriftCorrection) {
-            await (0, Utils_1.tryWithRetries)(AutomaticClockDriftCorrection_1.correctClock);
-        }
+        const abortController = new AbortController();
         const promises = [];
+        let automaticClockDriftCorrectionPromise;
+        if (this.options.automaticClockDriftCorrection) {
+            promises.push(automaticClockDriftCorrectionPromise = (0, Utils_1.tryWithRetries)(AutomaticClockDriftCorrection_1.correctClock, undefined, undefined, abortController.signal).catch((err) => {
+                abortController.abort(err);
+            }));
+        }
+        this.logger.debug("init(): Initializing intermediary discovery");
+        if (!this.options.dontFetchLPs)
+            promises.push(this.intermediaryDiscovery.init(abortController.signal).catch(err => {
+                if (abortController.signal.aborted)
+                    return;
+                this.logger.error("init(): Failed to fetch intermediaries/LPs: ", err);
+            }));
+        if (this.options.defaultTrustedIntermediaryUrl != null) {
+            promises.push(this.intermediaryDiscovery.getIntermediary(this.options.defaultTrustedIntermediaryUrl, abortController.signal)
+                .then(val => {
+                this.defaultTrustedIntermediary = val;
+            })
+                .catch(err => {
+                if (abortController.signal.aborted)
+                    return;
+                this.logger.error("init(): Failed to contact trusted LP url: ", err);
+            }));
+        }
+        if (automaticClockDriftCorrectionPromise != null) {
+            //We should await the promises here before checking the swaps
+            await automaticClockDriftCorrectionPromise;
+        }
+        const chainPromises = [];
         for (let chainIdentifier in this.chains) {
-            promises.push((async () => {
+            chainPromises.push((async () => {
                 const { swapContract, unifiedChainEvents, unifiedSwapStorage, wrappers, reviver } = this.chains[chainIdentifier];
                 await swapContract.start();
                 this.logger.debug("init(): Intialized swap contract: " + chainIdentifier);
@@ -238,13 +265,8 @@ class Swapper extends events_1.EventEmitter {
                 }
             })());
         }
+        await Promise.all(chainPromises);
         await Promise.all(promises);
-        this.logger.debug("init(): Initializing intermediary discovery");
-        if (!this.options.dontFetchLPs)
-            await this.intermediaryDiscovery.init();
-        if (this.options.defaultTrustedIntermediaryUrl != null) {
-            this.defaultTrustedIntermediary = await this.intermediaryDiscovery.getIntermediary(this.options.defaultTrustedIntermediaryUrl);
-        }
         this.logger.debug("init(): Initializing messenger");
         await this.messenger.init();
     }

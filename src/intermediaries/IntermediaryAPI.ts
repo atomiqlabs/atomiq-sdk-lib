@@ -5,7 +5,7 @@ import {
     verifySchema
 } from "../utils/paramcoders/SchemaVerifier";
 import {streamingFetchPromise} from "../utils/paramcoders/client/StreamingFetchPromise";
-import {httpGet, httpPost, randomBytes, tryWithRetries} from "../utils/Utils";
+import {extendAbortController, httpGet, httpPost, randomBytes, tryWithRetries} from "../utils/Utils";
 
 export type InfoHandlerResponse = {
     envelope: string,
@@ -338,9 +338,17 @@ export class IntermediaryAPI {
     ): Promise<InfoHandlerResponse> {
         const nonce = randomBytes(32).toString("hex");
 
-        const response = await httpPost<InfoHandlerResponse>(baseUrl+"/info", {
-            nonce,
-        }, timeout, abortSignal);
+        const abortController = extendAbortController(abortSignal);
+
+        //We don't know whether the node supports only POST or also has GET info support enabled
+        // here we try both, and abort when the first one returns (which should be GET)
+        const response = await Promise.any([
+            httpGet<InfoHandlerResponse>(baseUrl+"/info?nonce="+nonce, timeout, abortController.signal),
+            httpPost<InfoHandlerResponse>(baseUrl+"/info", {
+                nonce,
+            }, timeout, abortController.signal)
+        ]);
+        abortController.abort();
 
         const info = JSON.parse(response.envelope);
         if(nonce!==info.nonce) throw new Error("Invalid response - nonce");

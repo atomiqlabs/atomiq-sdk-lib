@@ -168,12 +168,13 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
      * Returns the intermediary at the provided URL, either from the already fetched list of LPs or fetches the data on-demand
      *
      * @param url
+     * @param abortSignal
      */
-    getIntermediary(url) {
+    getIntermediary(url, abortSignal) {
         const foundLp = this.intermediaries.find(lp => lp.url === url);
         if (foundLp != null)
             return Promise.resolve(foundLp);
-        return this.loadIntermediary(url);
+        return this.loadIntermediary(url, abortSignal);
     }
     /**
      * Reloads the saves a list of intermediaries

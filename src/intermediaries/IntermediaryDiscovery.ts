@@ -243,11 +243,12 @@ export class IntermediaryDiscovery extends EventEmitter {
      * Returns the intermediary at the provided URL, either from the already fetched list of LPs or fetches the data on-demand
      *
      * @param url
+     * @param abortSignal
      */
-    getIntermediary(url: string): Promise<Intermediary> {
+    getIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary> {
         const foundLp = this.intermediaries.find(lp => lp.url===url);
         if(foundLp!=null) return Promise.resolve(foundLp);
-        return this.loadIntermediary(url);
+        return this.loadIntermediary(url, abortSignal);
     }
 
     /**

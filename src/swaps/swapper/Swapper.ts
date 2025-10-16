@@ -415,12 +415,43 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     }
 
     private async _init(): Promise<void> {
+        const abortController = new AbortController();
+
+        const promises: Promise<void>[] = [];
+        let automaticClockDriftCorrectionPromise: Promise<void>;
         if(this.options.automaticClockDriftCorrection) {
-            await tryWithRetries(correctClock);
+            promises.push(automaticClockDriftCorrectionPromise = tryWithRetries(correctClock, undefined, undefined, abortController.signal).catch((err) => {
+                abortController.abort(err);
+            }));
         }
-        const promises = [];
+
+        this.logger.debug("init(): Initializing intermediary discovery");
+        if(!this.options.dontFetchLPs) promises.push(this.intermediaryDiscovery.init(abortController.signal).catch(err => {
+            if(abortController.signal.aborted) return;
+            this.logger.error("init(): Failed to fetch intermediaries/LPs: ", err);
+        }));
+
+        if(this.options.defaultTrustedIntermediaryUrl!=null) {
+            promises.push(
+                this.intermediaryDiscovery.getIntermediary(this.options.defaultTrustedIntermediaryUrl, abortController.signal)
+                    .then(val => {
+                        this.defaultTrustedIntermediary = val;
+                    })
+                    .catch(err => {
+                        if(abortController.signal.aborted) return;
+                        this.logger.error("init(): Failed to contact trusted LP url: ", err);
+                    })
+            );
+        }
+
+        if(automaticClockDriftCorrectionPromise!=null) {
+            //We should await the promises here before checking the swaps
+            await automaticClockDriftCorrectionPromise;
+        }
+
+        const chainPromises = [];
         for(let chainIdentifier in this.chains) {
-            promises.push((async() => {
+            chainPromises.push((async() => {
                 const {
                     swapContract,
                     unifiedChainEvents,
@@ -467,14 +498,9 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 }
             })());
         }
+        await Promise.all(chainPromises);
+
         await Promise.all(promises);
-
-        this.logger.debug("init(): Initializing intermediary discovery");
-        if(!this.options.dontFetchLPs) await this.intermediaryDiscovery.init();
-
-        if(this.options.defaultTrustedIntermediaryUrl!=null) {
-            this.defaultTrustedIntermediary = await this.intermediaryDiscovery.getIntermediary(this.options.defaultTrustedIntermediaryUrl);
-        }
 
         this.logger.debug("init(): Initializing messenger");
         await this.messenger.init();

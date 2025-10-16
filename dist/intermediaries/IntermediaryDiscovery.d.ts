@@ -76,8 +76,9 @@ export declare class IntermediaryDiscovery extends EventEmitter {
      * Returns the intermediary at the provided URL, either from the already fetched list of LPs or fetches the data on-demand
      *
      * @param url
+     * @param abortSignal
      */
-    getIntermediary(url: string): Promise<Intermediary>;
+    getIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary>;
     /**
      * Reloads the saves a list of intermediaries
      * @param abortSignal

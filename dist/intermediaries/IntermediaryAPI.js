@@ -139,9 +139,16 @@ class IntermediaryAPI {
      */
     static async getIntermediaryInfo(baseUrl, timeout, abortSignal) {
         const nonce = (0, Utils_1.randomBytes)(32).toString("hex");
-        const response = await (0, Utils_1.httpPost)(baseUrl + "/info", {
-            nonce,
-        }, timeout, abortSignal);
+        const abortController = (0, Utils_1.extendAbortController)(abortSignal);
+        //We don't know whether the node supports only POST or also has GET info support enabled
+        // here we try both, and abort when the first one returns (which should be GET)
+        const response = await Promise.any([
+            (0, Utils_1.httpGet)(baseUrl + "/info?nonce=" + nonce, timeout, abortController.signal),
+            (0, Utils_1.httpPost)(baseUrl + "/info", {
+                nonce,
+            }, timeout, abortController.signal)
+        ]);
+        abortController.abort();
         const info = JSON.parse(response.envelope);
         if (nonce !== info.nonce)
             throw new Error("Invalid response - nonce");

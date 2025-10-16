@@ -26,30 +26,26 @@ export async function correctClock() {
     const dateNow: () => number = (Date as any)._now ?? Date.now;
     const dateStart = performance.now();
 
-    let result: TimeReturnType[] = await Promise.all([
-        ...headerUrls.map(url => getHeaderTimestamp(url).catch(e => {
-            console.error(`AutomaticClockDriftCorrection: correctClock(header): Failed to get time from ${url}`, e);
-            return null;
-        })),
-        getAisenseApiTimestamp().catch(e => {
-            console.error(`AutomaticClockDriftCorrection: correctClock(aisenseApi): Failed to get time from aisenseapi.com`, e);
-            return null;
-        })
-    ]);
-    result = result.filter(val => val!=null);
-    if(result.length==0) throw new Error("Cannot sync time! All servers responded negatively!");
+    try {
+        let result: TimeReturnType = await Promise.any([
+            ...headerUrls.map(url => getHeaderTimestamp(url)),
+            getAisenseApiTimestamp()
+        ]);
 
-    result.sort((a, b) => a.delta - b.delta);
-    const desiredTime = result[0].timestamp - (result[0].delta / 2);
-    if(Math.abs(Date.now() - desiredTime) < 2000) {
-        console.log("AutomaticClockDriftCorrection: correctClock(): Time drift too small, not adjusting!");
-        return;
+        const desiredTime = result.timestamp - (result.delta / 2);
+        if(Math.abs(Date.now() - desiredTime) < 2000) {
+            console.log("AutomaticClockDriftCorrection: correctClock(): Time drift too small, not adjusting!");
+            return;
+        }
+
+        const timeDrift = dateStart - desiredTime;
+        console.log(`AutomaticClockDriftCorrection: correctClock(): Time correction perf.now: ${dateStart}, server: ${desiredTime}, time diff: ${timeDrift}`);
+        (Date as any)._now = dateNow;
+        (Date as any).now = () => {
+            return Math.floor(performance.now() - timeDrift);
+        };
+    } catch (e: any) {
+        if(e instanceof AggregateError) e.message = "Cannot sync time! All servers responded negatively!";
+        throw e;
     }
-
-    const timeDrift = dateStart - desiredTime;
-    console.log(`AutomaticClockDriftCorrection: correctClock(): Time correction perf.now: ${dateStart}, server: ${desiredTime}, time diff: ${timeDrift}`);
-    (Date as any)._now = dateNow;
-    (Date as any).now = () => {
-        return Math.floor(performance.now() - timeDrift);
-    };
 }
