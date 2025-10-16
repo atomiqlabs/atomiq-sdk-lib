@@ -219,6 +219,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         const claimerBountyPrefetchPromise = this.preFetchClaimerBounty(signer, amountData, options, _abortController);
         const nativeTokenAddress = this.chain.getNativeCurrencyAddress();
         const feeRatePromise = this.preFetchFeeRate(signer, amountData, null, _abortController);
+        const _signDataPromise = this.contract.preFetchBlockDataForSignatures == null ? this.preFetchSignData(Promise.resolve(true)) : null;
         return lps.map(lp => {
             return {
                 intermediary: lp,
@@ -238,7 +239,7 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
                                 additionalParams
                             }, this.options.postRequestTimeout, abortController.signal, retryCount > 0 ? false : null);
                             return {
-                                signDataPromise: this.preFetchSignData(signDataPrefetch),
+                                signDataPromise: _signDataPromise ?? this.preFetchSignData(signDataPrefetch),
                                 resp: await response
                             };
                         }, null, e => e instanceof RequestError_1.RequestError, abortController.signal);

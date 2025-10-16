@@ -340,6 +340,7 @@ export class FromBTCWrapper<
         const claimerBountyPrefetchPromise = this.preFetchClaimerBounty(signer, amountData, options, _abortController);
         const nativeTokenAddress = this.chain.getNativeCurrencyAddress();
         const feeRatePromise: Promise<any> = this.preFetchFeeRate(signer, amountData, null, _abortController);
+        const _signDataPromise: Promise<any> = this.contract.preFetchBlockDataForSignatures==null ? this.preFetchSignData(Promise.resolve(true)) : null;
 
         return lps.map(lp => {
             return {
@@ -368,7 +369,7 @@ export class FromBTCWrapper<
                             );
 
                             return {
-                                signDataPromise: this.preFetchSignData(signDataPrefetch),
+                                signDataPromise: _signDataPromise ?? this.preFetchSignData(signDataPrefetch),
                                 resp: await response
                             };
                         }, null, e => e instanceof RequestError, abortController.signal);

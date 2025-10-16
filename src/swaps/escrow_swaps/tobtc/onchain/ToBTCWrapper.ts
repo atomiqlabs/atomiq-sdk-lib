@@ -203,6 +203,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
         const _abortController = extendAbortController(abortSignal);
         const pricePreFetchPromise: Promise<bigint | null> = this.preFetchPrice(amountData, _abortController.signal);
         const feeRatePromise: Promise<any> = this.preFetchFeeRate(signer, amountData, _hash, _abortController);
+        const _signDataPromise: Promise<any> = this.contract.preFetchBlockDataForSignatures==null ? this.preFetchSignData(Promise.resolve(true)) : null;
 
         return lps.map(lp => {
             return {
@@ -227,7 +228,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
                             }, this.options.postRequestTimeout, abortController.signal, retryCount>0 ? false : null);
 
                             return {
-                                signDataPromise: this.preFetchSignData(signDataPrefetch),
+                                signDataPromise: _signDataPromise ?? this.preFetchSignData(signDataPrefetch),
                                 resp: await response
                             };
                         }, null, RequestError, abortController.signal);

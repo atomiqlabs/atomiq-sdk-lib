@@ -136,6 +136,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePreFetchPromise = this.preFetchPrice(amountData, _abortController.signal);
         const feeRatePromise = this.preFetchFeeRate(signer, amountData, _hash, _abortController);
+        const _signDataPromise = this.contract.preFetchBlockDataForSignatures == null ? this.preFetchSignData(Promise.resolve(true)) : null;
         return lps.map(lp => {
             return {
                 intermediary: lp,
@@ -157,7 +158,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                                 additionalParams
                             }, this.options.postRequestTimeout, abortController.signal, retryCount > 0 ? false : null);
                             return {
-                                signDataPromise: this.preFetchSignData(signDataPrefetch),
+                                signDataPromise: _signDataPromise ?? this.preFetchSignData(signDataPrefetch),
                                 resp: await response
                             };
                         }, null, RequestError_1.RequestError, abortController.signal);

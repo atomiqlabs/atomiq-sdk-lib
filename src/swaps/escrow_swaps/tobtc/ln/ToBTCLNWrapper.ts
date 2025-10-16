@@ -152,13 +152,13 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         preFetches: {
             feeRatePromise: Promise<any>,
             pricePreFetchPromise: Promise<bigint>,
-            reputationPromise?: Promise<SingleChainReputationType>
+            signDataPrefetchPromise?: Promise<any>
         },
         abort: AbortSignal | AbortController,
         additionalParams: Record<string, any>,
     ) {
         const abortController = abort instanceof AbortController ? abort : extendAbortController(abort);
-        preFetches.reputationPromise ??= this.preFetchIntermediaryReputation(amountData, lp, abortController);
+        const reputationPromise = this.preFetchIntermediaryReputation(amountData, lp, abortController);
 
         try {
             const {signDataPromise, resp} = await tryWithRetries(async(retryCount: number) => {
@@ -173,7 +173,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 }, this.options.postRequestTimeout, abortController.signal, retryCount>0 ? false : null);
 
                 return {
-                    signDataPromise: this.preFetchSignData(signDataPrefetch),
+                    signDataPromise: preFetches.signDataPrefetchPromise ?? this.preFetchSignData(signDataPrefetch),
                     resp: await response
                 };
             }, null, e => e instanceof RequestError, abortController.signal);
@@ -194,7 +194,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 this.verifyReturnedSignature(
                     signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal
                 ),
-                preFetches.reputationPromise
+                reputationPromise
             ]);
             abortController.signal.throwIfAborted();
 
@@ -244,7 +244,8 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         abortSignal?: AbortSignal,
         preFetches?: {
             feeRatePromise: Promise<any>,
-            pricePreFetchPromise: Promise<bigint>
+            pricePreFetchPromise: Promise<bigint>,
+            signDataPrefetchPromise?: Promise<any>
         }
     ): Promise<{
         quote: Promise<ToBTCLNSwap<T>>,
@@ -266,7 +267,8 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         const _abortController = extendAbortController(abortSignal);
         if(preFetches==null) preFetches = {
             pricePreFetchPromise: this.preFetchPrice(amountData, _abortController.signal),
-            feeRatePromise: this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController)
+            feeRatePromise: this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController),
+            signDataPrefetchPromise: this.contract.preFetchBlockDataForSignatures==null ? this.preFetchSignData(Promise.resolve(true)) : null
         };
 
         return lps.map(lp => {
@@ -444,6 +446,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         const _abortController = extendAbortController(abortSignal);
         const pricePreFetchPromise: Promise<bigint> = this.preFetchPrice(amountData, _abortController.signal);
         const feeRatePromise: Promise<any> = this.preFetchFeeRate(signer, amountData, null, _abortController);
+        const signDataPrefetchPromise: Promise<any> = this.contract.preFetchBlockDataForSignatures==null ? this.preFetchSignData(Promise.resolve(true)) : null;
 
         options.maxRoutingPPM ??= BigInt(this.options.lightningFeePPM);
         options.maxRoutingBaseFee ??= BigInt(this.options.lightningBaseFee);
@@ -497,7 +500,8 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
 
                 return (await this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
                     feeRatePromise,
-                    pricePreFetchPromise
+                    pricePreFetchPromise,
+                    signDataPrefetchPromise
                 })).map(data => {
                     return {
                         quote: data.quote.then(quote => {
