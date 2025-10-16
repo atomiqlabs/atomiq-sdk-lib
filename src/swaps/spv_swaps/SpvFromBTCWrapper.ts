@@ -356,57 +356,71 @@ export class SpvFromBTCWrapper<
         const timeNowSeconds = Math.floor(Date.now()/1000);
         if(resp.expiry < timeNowSeconds) throw new IntermediaryError(`Quote already expired, expiry: ${resp.expiry}, systemTime: ${timeNowSeconds}, clockAdjusted: ${(Date as any)._now!=null}`);
 
-        //Fetch vault data
-        let vault: T["SpvVaultData"];
-        try {
-            vault = await this.contract.getVaultData(resp.address, resp.vaultId);
-        } catch (e) {
-            this.logger.error("Error getting spv vault (owner: "+resp.address+" vaultId: "+resp.vaultId.toString(10)+"): ", e);
-            throw new IntermediaryError("Spv swap vault not found", e);
-        }
-        abortSignal.throwIfAborted();
-
-        //Make sure vault is opened
-        if(!vault.isOpened()) throw new IntermediaryError("Returned spv swap vault is not opened!");
-        //Make sure the vault doesn't require insane amount of confirmations
-        if(vault.getConfirmations()>this.options.maxConfirmations) throw new IntermediaryError("SPV swap vault needs too many confirmations: "+vault.getConfirmations());
-        const tokenData = vault.getTokenData();
-
-        //Amounts - make sure the amounts match
-        if(amountData.exactIn) {
-            if(resp.btcAmount !== amountData.amount) throw new IntermediaryError("Invalid amount returned");
-        } else {
-            //Check the difference between amount adjusted due to scaling to raw amount
-            const adjustedAmount = amountData.amount / tokenData[0].multiplier * tokenData[0].multiplier;
-            const adjustmentPPM = (amountData.amount - adjustedAmount)*1_000_000n / amountData.amount;
-            if(adjustmentPPM > this.options.maxRawAmountAdjustmentDifferencePPM)
-                throw new IntermediaryError("Invalid amount0 multiplier used, rawAmount diff too high");
-            if(resp.total !== adjustedAmount) throw new IntermediaryError("Invalid total returned");
-        }
-        if(options.gasAmount==null || options.gasAmount===0n) {
-            if(resp.totalGas !== 0n) throw new IntermediaryError("Invalid gas total returned");
-        } else {
-            //Check the difference between amount adjusted due to scaling to raw amount
-            const adjustedGasAmount = options.gasAmount / tokenData[0].multiplier * tokenData[0].multiplier;
-            const adjustmentPPM = (options.gasAmount - adjustedGasAmount)*1_000_000n / options.gasAmount;
-            if(adjustmentPPM > this.options.maxRawAmountAdjustmentDifferencePPM)
-                throw new IntermediaryError("Invalid amount1 multiplier used, rawAmount diff too high");
-            if(resp.totalGas !== adjustedGasAmount) throw new IntermediaryError("Invalid gas total returned");
-        }
-
-        //Require the vault UTXO to have at least 1 confirmation
         let utxo = resp.btcUtxo.toLowerCase();
         const [txId, voutStr] = utxo.split(":");
-        let btcTx = await this.btcRpc.getTransaction(txId);
-        abortSignal.throwIfAborted();
-        if(btcTx.confirmations==null || btcTx.confirmations<1) throw new IntermediaryError("SPV vault UTXO not confirmed");
-        const vout = parseInt(voutStr);
-        if(btcTx.outs[vout]==null) throw new IntermediaryError("Invalid UTXO, doesn't exist");
-        const vaultUtxoValue = btcTx.outs[vout].value;
 
-        //Require vault UTXO is unspent
-        if(await this.btcRpc.isSpent(utxo)) throw new IntermediaryError("Returned spv vault UTXO is already spent", null, true);
-        abortSignal.throwIfAborted();
+        const abortController = extendAbortController(abortSignal);
+        let [vault, {vaultUtxoValue, btcTx}] = await Promise.all([
+            (async() => {
+                //Fetch vault data
+                let vault: T["SpvVaultData"];
+                try {
+                    vault = await this.contract.getVaultData(resp.address, resp.vaultId);
+                } catch (e) {
+                    this.logger.error("Error getting spv vault (owner: "+resp.address+" vaultId: "+resp.vaultId.toString(10)+"): ", e);
+                    throw new IntermediaryError("Spv swap vault not found", e);
+                }
+                abortController.signal.throwIfAborted();
+
+                //Make sure vault is opened
+                if(!vault.isOpened()) throw new IntermediaryError("Returned spv swap vault is not opened!");
+                //Make sure the vault doesn't require insane amount of confirmations
+                if(vault.getConfirmations()>this.options.maxConfirmations) throw new IntermediaryError("SPV swap vault needs too many confirmations: "+vault.getConfirmations());
+                const tokenData = vault.getTokenData();
+
+                //Amounts - make sure the amounts match
+                if(amountData.exactIn) {
+                    if(resp.btcAmount !== amountData.amount) throw new IntermediaryError("Invalid amount returned");
+                } else {
+                    //Check the difference between amount adjusted due to scaling to raw amount
+                    const adjustedAmount = amountData.amount / tokenData[0].multiplier * tokenData[0].multiplier;
+                    const adjustmentPPM = (amountData.amount - adjustedAmount)*1_000_000n / amountData.amount;
+                    if(adjustmentPPM > this.options.maxRawAmountAdjustmentDifferencePPM)
+                        throw new IntermediaryError("Invalid amount0 multiplier used, rawAmount diff too high");
+                    if(resp.total !== adjustedAmount) throw new IntermediaryError("Invalid total returned");
+                }
+                if(options.gasAmount==null || options.gasAmount===0n) {
+                    if(resp.totalGas !== 0n) throw new IntermediaryError("Invalid gas total returned");
+                } else {
+                    //Check the difference between amount adjusted due to scaling to raw amount
+                    const adjustedGasAmount = options.gasAmount / tokenData[0].multiplier * tokenData[0].multiplier;
+                    const adjustmentPPM = (options.gasAmount - adjustedGasAmount)*1_000_000n / options.gasAmount;
+                    if(adjustmentPPM > this.options.maxRawAmountAdjustmentDifferencePPM)
+                        throw new IntermediaryError("Invalid amount1 multiplier used, rawAmount diff too high");
+                    if(resp.totalGas !== adjustedGasAmount) throw new IntermediaryError("Invalid gas total returned");
+                }
+
+                return vault;
+            })(),
+            (async() => {
+                //Require the vault UTXO to have at least 1 confirmation
+                let btcTx = await this.btcRpc.getTransaction(txId);
+                abortController.signal.throwIfAborted();
+                if(btcTx.confirmations==null || btcTx.confirmations<1) throw new IntermediaryError("SPV vault UTXO not confirmed");
+                const vout = parseInt(voutStr);
+                if(btcTx.outs[vout]==null) throw new IntermediaryError("Invalid UTXO, doesn't exist");
+                const vaultUtxoValue = btcTx.outs[vout].value;
+                return {btcTx, vaultUtxoValue};
+            })(),
+            (async() => {
+                //Require vault UTXO is unspent
+                if(await this.btcRpc.isSpent(utxo)) throw new IntermediaryError("Returned spv vault UTXO is already spent", null, true);
+                abortController.signal.throwIfAborted();
+            })()
+        ]).catch(e => {
+            abortController.abort(e);
+            throw e;
+        });
 
         this.logger.debug("verifyReturnedData(): Vault UTXO: "+vault.getUtxo()+" current utxo: "+utxo);
 
