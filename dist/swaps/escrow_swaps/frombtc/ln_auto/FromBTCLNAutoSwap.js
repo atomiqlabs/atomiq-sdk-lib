@@ -430,6 +430,10 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         let lnurlFailListener = () => abortController.abort(this.lnurlFailSignal.signal.reason);
         this.lnurlFailSignal.signal.addEventListener("abort", lnurlFailListener);
         this.lnurlFailSignal.signal.throwIfAborted();
+        if (this.wrapper.messenger.warmup != null)
+            await this.wrapper.messenger.warmup().catch(e => {
+                this.logger.warn("waitForPayment(): Failed to warmup messenger: ", e);
+            });
         let resp = { code: IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING, msg: "" };
         while (!abortController.signal.aborted && resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING) {
             resp = await IntermediaryAPI_1.IntermediaryAPI.getInvoiceStatus(this.url, this.getPaymentHash().toString("hex"));
@@ -479,10 +483,6 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             abortController.abort();
             throw e;
         }
-        if (result === 0)
-            this.logger.debug("waitTillCommited(): Resolved from state changed");
-        if (result === true)
-            this.logger.debug("waitTillCommited(): Resolved from watchdog - commited");
         if (result === false) {
             this.logger.debug("waitTillCommited(): Resolved from watchdog - HTLC expired");
             if (this.state === FromBTCLNAutoSwapState.PR_PAID) {
@@ -492,6 +492,14 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         }
         if (this.state === FromBTCLNAutoSwapState.PR_PAID) {
             await this._saveAndEmit(FromBTCLNAutoSwapState.CLAIM_COMMITED);
+        }
+        if (result === 0)
+            this.logger.debug("waitTillCommited(): Resolved from state changed");
+        if (result === true) {
+            this.logger.debug("waitTillCommited(): Resolved from watchdog - commited");
+            await this._broadcastSecret().catch(e => {
+                this.logger.error("waitTillCommited(): Error broadcasting swap secret: ", e);
+            });
         }
     }
     //////////////////////////////
@@ -733,7 +741,20 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             changed = true;
         if (save && changed)
             await this._saveAndEmit();
+        if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED)
+            await this._broadcastSecret().catch(e => {
+                this.logger.error("_sync(): Error when broadcasting swap secret: ", e);
+            });
         return changed;
+    }
+    async _broadcastSecret(noCheckExpiry) {
+        if (this.state !== FromBTCLNAutoSwapState.CLAIM_COMMITED)
+            throw new Error("Must be in CLAIM_COMMITED state to broadcast swap secret!");
+        if (!noCheckExpiry) {
+            if (await this.wrapper.contract.isExpired(this._getInitiator(), this.data))
+                throw new Error("On-chain HTLC already expired!");
+        }
+        await this.wrapper.messenger.broadcast(new base_1.SwapClaimWitnessMessage(this.data, this.secret));
     }
     async _tick(save) {
         switch (this.state) {
@@ -765,7 +786,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
                 if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED) {
                     //Broadcast the secret over the provided messenger channel
                     if (this.broadcastTickCounter === 0)
-                        await this.wrapper.messenger.broadcast(new base_1.SwapClaimWitnessMessage(this.data, this.secret)).catch(e => {
+                        await this._broadcastSecret(true).catch(e => {
                             this.logger.warn("_tick(): Error when broadcasting swap secret: ", e);
                         });
                     this.broadcastTickCounter = (this.broadcastTickCounter + 1) % 3; //Broadcast every 3rd tick

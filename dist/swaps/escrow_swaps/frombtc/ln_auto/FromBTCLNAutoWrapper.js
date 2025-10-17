@@ -53,6 +53,9 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
         if (swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_PAID || swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_CREATED || swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
             swap.commitTxId = event.meta.txId;
             swap.state = FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_COMMITED;
+            swap._broadcastSecret().catch(e => {
+                this.logger.error("processEventInitialize(" + swap.getId() + "): Error when broadcasting swap secret: ", e);
+            });
             return Promise.resolve(true);
         }
         return Promise.resolve(false);

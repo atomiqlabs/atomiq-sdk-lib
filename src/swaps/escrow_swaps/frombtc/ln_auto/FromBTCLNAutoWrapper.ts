@@ -106,6 +106,9 @@ export class FromBTCLNAutoWrapper<
         if(swap.state===FromBTCLNAutoSwapState.PR_PAID || swap.state===FromBTCLNAutoSwapState.PR_CREATED || swap.state===FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
             swap.commitTxId = event.meta.txId;
             swap.state = FromBTCLNAutoSwapState.CLAIM_COMMITED;
+            swap._broadcastSecret().catch(e => {
+                this.logger.error("processEventInitialize("+swap.getId()+"): Error when broadcasting swap secret: ", e);
+            });
             return Promise.resolve(true);
         }
         return Promise.resolve(false);
