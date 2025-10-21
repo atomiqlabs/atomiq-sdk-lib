@@ -1,15 +1,15 @@
 import { IToBTCWrapper } from "./IToBTCWrapper";
-import { ChainType, SwapData } from "@atomiqlabs/base";
+import { ChainType, SwapCommitState, SwapData } from "@atomiqlabs/base";
 import { RefundAuthorizationResponse } from "../../../intermediaries/IntermediaryAPI";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
-import { IEscrowSwap, IEscrowSwapInit } from "../IEscrowSwap";
 import { Fee, FeeType } from "../../fee/Fee";
-export type IToBTCSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
+import { IEscrowSelfInitSwap, IEscrowSelfInitSwapInit } from "../IEscrowSelfInitSwap";
+export type IToBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
     networkFee: bigint;
     networkFeeBtc?: bigint;
 };
 export declare function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T>;
-export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscrowSwap<T, ToBTCSwapState> {
+export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscrowSelfInitSwap<T, ToBTCSwapState> {
     protected readonly networkFee: bigint;
     protected networkFeeBtc?: bigint;
     protected readonly abstract outputToken: BtcToken;
@@ -86,6 +86,25 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
         required: TokenAmount;
     }>;
     /**
+     * Executes the swap with the provided smart chain wallet/signer
+     *
+     * @param signer Smart chain wallet/signer to use to sign the transaction on the source chain
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether the swap was successfully processed by the LP, in case `false` is returned
+     *  the user can refund their funds back on the source chain by calling `swap.refund()`
+     */
+    execute(signer: T["Signer"] | T["NativeSigner"], callbacks?: {
+        onSourceTransactionSent?: (sourceTxId: string) => void;
+        onSourceTransactionConfirmed?: (sourceTxId: string) => void;
+        onSwapSettled?: (destinationTxId: string) => void;
+    }, options?: {
+        abortSignal?: AbortSignal;
+        paymentCheckIntervalSeconds?: number;
+        maxWaitTillSwapProcessedSeconds?: number;
+    }): Promise<boolean>;
+    /**
      * Returns transactions for committing the swap on-chain, initiating the swap
      *
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
@@ -97,13 +116,14 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
     /**
      * Commits the swap on-chain, initiating the swap
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal Abort signal
      * @param skipChecks Skip checks like making sure init signature is still valid and swap wasn't commited yet
      *  (this is handled on swap creation, if you commit right after quoting, you can skipChecks)`
+     * @param onBeforeTxSent
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    commit(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
+    commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean, onBeforeTxSent?: (txId: string) => void): Promise<string>;
     /**
      * Waits till a swap is committed, should be called after sending the commit transactions manually
      *
@@ -111,7 +131,7 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      * @throws {Error} If swap is not in the correct state (must be CREATED)
      */
     waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
-    protected waitTillIntermediarySwapProcessed(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<RefundAuthorizationResponse>;
+    protected waitTillIntermediarySwapProcessed(checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<RefundAuthorizationResponse>;
     /**
      * Checks whether the swap was already processed by the LP and is either successful (requires proof which is
      *  either a HTLC pre-image for LN swaps or valid txId for on-chain swap) or failed and we can cooperatively
@@ -126,16 +146,17 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      * A blocking promise resolving when swap was concluded by the intermediary,
      *  rejecting in case of failure
      *
-     * @param abortSignal           Abort signal
+     * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled, an error is thrown if the
+     *  swap is taking too long to claim
      * @param checkIntervalSeconds  How often to poll the intermediary for answer
-     *
+     * @param abortSignal           Abort signal
      * @returns {Promise<boolean>}  Was the payment successful? If not we can refund.
      * @throws {IntermediaryError} If a swap is determined expired by the intermediary, but it is actually still valid
      * @throws {SignatureVerificationError} If the swap should be cooperatively refundable but the intermediary returned
      *  invalid refund signature
      * @throws {Error} When swap expires or if the swap has invalid state (must be COMMITED)
      */
-    waitForPayment(abortSignal?: AbortSignal, checkIntervalSeconds?: number): Promise<boolean>;
+    waitForPayment(maxWaitTimeSeconds?: number, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     /**
      * Get the estimated smart chain transaction fee of the refund transaction
      */
@@ -151,11 +172,11 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
     /**
      * Refunds the swap if the swap is in refundable state, you can check so with isRefundable()
      *
-     * @param signer Signer to sign the transactions with, must be the same as used in the initialization
+     * @param _signer Signer to sign the transactions with, must be the same as used in the initialization
      * @param abortSignal               Abort signal
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    refund(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
+    refund(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string>;
     /**
      * Waits till a swap is refunded, should be called after sending the refund transactions manually
      *
@@ -172,7 +193,9 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
      * @private
      */
     private syncStateFromChain;
-    _sync(save?: boolean): Promise<boolean>;
+    _shouldFetchCommitStatus(): boolean;
+    _shouldFetchExpiryStatus(): boolean;
+    _sync(save?: boolean, quoteDefinitelyExpired?: boolean, commitStatus?: SwapCommitState): Promise<boolean>;
     _tick(save?: boolean): Promise<boolean>;
 }
 export declare enum ToBTCSwapState {

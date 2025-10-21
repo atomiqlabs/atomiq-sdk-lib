@@ -13,7 +13,8 @@ export enum SwapHandlerType {
     FROM_BTCLN = "FROM_BTCLN",
     FROM_BTC_TRUSTED = "FROM_BTC_TRUSTED",
     FROM_BTCLN_TRUSTED = "FROM_BTCLN_TRUSTED",
-    FROM_BTC_SPV = "FROM_BTC_SPV"
+    FROM_BTC_SPV = "FROM_BTC_SPV",
+    FROM_BTCLN_AUTO = "FROM_BTCLN_AUTO"
 }
 
 export type SwapHandlerInfoType = {
@@ -74,6 +75,8 @@ function swapHandlerTypeToSwapType(swapHandlerType: SwapHandlerType): SwapType {
             return SwapType.TRUSTED_FROM_BTCLN;
         case SwapHandlerType.FROM_BTC_SPV:
             return SwapType.SPV_VAULT_FROM_BTC;
+        case SwapHandlerType.FROM_BTCLN_AUTO:
+            return SwapType.FROM_BTCLN_AUTO;
     }
 }
 
@@ -240,11 +243,12 @@ export class IntermediaryDiscovery extends EventEmitter {
      * Returns the intermediary at the provided URL, either from the already fetched list of LPs or fetches the data on-demand
      *
      * @param url
+     * @param abortSignal
      */
-    getIntermediary(url: string): Promise<Intermediary> {
+    getIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary> {
         const foundLp = this.intermediaries.find(lp => lp.url===url);
         if(foundLp!=null) return Promise.resolve(foundLp);
-        return this.loadIntermediary(url);
+        return this.loadIntermediary(url, abortSignal);
     }
 
     /**

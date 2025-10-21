@@ -5,7 +5,7 @@ import {
     verifySchema
 } from "../utils/paramcoders/SchemaVerifier";
 import {streamingFetchPromise} from "../utils/paramcoders/client/StreamingFetchPromise";
-import {httpGet, httpPost, randomBytes, tryWithRetries} from "../utils/Utils";
+import {extendAbortController, httpGet, httpPost, randomBytes, tryWithRetries} from "../utils/Utils";
 
 export type InfoHandlerResponse = {
     envelope: string,
@@ -31,6 +31,13 @@ export enum PaymentAuthorizationResponseCodes {
     PAID=10002,
     PENDING=10003,
     ALREADY_COMMITTED=10004
+}
+
+export enum InvoiceStatusResponseCodes {
+    PAID=10000,
+    EXPIRED=10001,
+    SETTLED=10002,
+    PENDING=10003
 }
 
 export type RefundAuthorizationResponse = {
@@ -69,6 +76,17 @@ export type PaymentAuthorizationResponse = {
     code: Exclude<PaymentAuthorizationResponseCodes, PaymentAuthorizationResponseCodes.AUTH_DATA>,
     msg: string
 };
+
+export type InvoiceStatusResponse = {
+    code: Exclude<InvoiceStatusResponseCodes, InvoiceStatusResponseCodes.PAID>,
+    msg: string
+} | {
+    code: InvoiceStatusResponseCodes.PAID,
+    msg: string,
+    data: {
+        data: any
+    }
+}
 
 const SwapResponseSchema = {
     data: FieldTypeEnum.Any,
@@ -210,6 +228,40 @@ export type FromBTCLNInit = BaseFromBTCSwapInit & {
 }
 
 /////////////////////////
+///// From BTCLN Auto
+
+const FromBTCLNAutoResponseSchema = {
+    intermediaryKey: FieldTypeEnum.String,
+    pr: FieldTypeEnum.String,
+
+    btcAmountSwap: FieldTypeEnum.BigInt,
+    btcAmountGas: FieldTypeEnum.BigInt,
+
+    total: FieldTypeEnum.BigInt,
+    totalGas: FieldTypeEnum.BigInt,
+
+    totalFeeBtc: FieldTypeEnum.BigInt,
+
+    swapFeeBtc: FieldTypeEnum.BigInt,
+    swapFee: FieldTypeEnum.BigInt,
+
+    gasSwapFeeBtc: FieldTypeEnum.BigInt,
+    gasSwapFee: FieldTypeEnum.BigInt,
+
+    claimerBounty: FieldTypeEnum.BigInt
+} as const;
+
+export type FromBTCLNAutoResponseType = RequestSchemaResult<typeof FromBTCLNAutoResponseSchema>;
+
+export type FromBTCLNAutoInit = Omit<BaseFromBTCSwapInit, "feeRate"> & {
+    paymentHash: Buffer,
+    gasToken: string,
+    descriptionHash?: Buffer,
+    gasAmount?: bigint,
+    claimerBounty?: Promise<bigint>
+}
+
+/////////////////////////
 ///// Spv vault from BTC
 
 const SpvFromBTCPrepareResponseSchema = {
@@ -286,9 +338,17 @@ export class IntermediaryAPI {
     ): Promise<InfoHandlerResponse> {
         const nonce = randomBytes(32).toString("hex");
 
-        const response = await httpPost<InfoHandlerResponse>(baseUrl+"/info", {
-            nonce,
-        }, timeout, abortSignal);
+        const abortController = extendAbortController(abortSignal);
+
+        //We don't know whether the node supports only POST or also has GET info support enabled
+        // here we try both, and abort when the first one returns (which should be GET)
+        const response = await Promise.any([
+            httpGet<InfoHandlerResponse>(baseUrl+"/info?nonce="+nonce, timeout, abortController.signal),
+            httpPost<InfoHandlerResponse>(baseUrl+"/info", {
+                nonce,
+            }, timeout, abortController.signal)
+        ]);
+        abortController.abort();
 
         const info = JSON.parse(response.envelope);
         if(nonce!==info.nonce) throw new Error("Invalid response - nonce");
@@ -342,6 +402,30 @@ export class IntermediaryAPI {
         return tryWithRetries(() => httpGet<PaymentAuthorizationResponse>(
             url+"/getInvoicePaymentAuth"+
                 "?paymentHash="+encodeURIComponent(paymentHash),
+            timeout,
+            abortSignal
+        ), null, RequestError, abortSignal);
+    }
+
+    /**
+     * Returns the status of the payment of the From BTCLN swaps
+     *
+     * @param url URL of the intermediary
+     * @param paymentHash Payment hash of the swap
+     * @param timeout Timeout in milliseconds for the HTTP request
+     * @param abortSignal
+     *
+     * @throws {RequestError} If non-200 http response code is returned
+     */
+    static async getInvoiceStatus(
+        url: string,
+        paymentHash: string,
+        timeout?: number,
+        abortSignal?: AbortSignal
+    ): Promise<InvoiceStatusResponse> {
+        return tryWithRetries(() => httpGet<InvoiceStatusResponse>(
+            url+"/getInvoiceStatus"+
+            "?paymentHash="+encodeURIComponent(paymentHash),
             timeout,
             abortSignal
         ), null, RequestError, abortSignal);
@@ -531,6 +615,67 @@ export class IntermediaryAPI {
                     throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
                 }
                 return verifySchema(data, FromBTCLNResponseSchema);
+            })
+        };
+    }
+
+    /**
+     * Initiate From BTCLN swap with auto-initilization by an intermediary
+     *
+     * @param chainIdentifier
+     * @param baseUrl Base URL of the intermediary
+     * @param init Swap initialization parameters
+     * @param timeout Timeout in milliseconds for the HTTP request
+     * @param abortSignal
+     * @param streamRequest Whether to force streaming (or not streaming) the request, default is autodetect
+     *
+     * @throws {RequestError} If non-200 http response code is returned
+     */
+    static initFromBTCLNAuto(
+        chainIdentifier: string,
+        baseUrl: string,
+        init: FromBTCLNAutoInit,
+        timeout?: number,
+        abortSignal?: AbortSignal,
+        streamRequest?: boolean
+    ): {
+        lnPublicKey: Promise<string>,
+        response: Promise<FromBTCLNAutoResponseType>
+    } {
+        const responseBodyPromise = streamingFetchPromise(
+            baseUrl+"/frombtcln_auto/createInvoice?chain="+encodeURIComponent(chainIdentifier),
+            {
+                ...init.additionalParams,
+                paymentHash: init.paymentHash.toString("hex"),
+                amount: init.amount.toString(),
+                address: init.claimer,
+                token: init.token,
+                descriptionHash: init.descriptionHash==null ? null : init.descriptionHash.toString("hex"),
+                exactOut: init.exactOut,
+                gasToken: init.gasToken,
+                gasAmount: (init.gasAmount ?? 0n).toString(10),
+                claimerBounty: init.claimerBounty.then(val => val.toString(10)) ?? "0"
+            },
+            {
+                code: FieldTypeEnum.Number,
+                msg: FieldTypeEnum.String,
+                data: FieldTypeEnum.AnyOptional,
+                lnPublicKey: FieldTypeEnum.StringOptional
+            },
+            timeout, abortSignal, streamRequest
+        );
+
+        return {
+            lnPublicKey: responseBodyPromise.then(responseBody => responseBody.lnPublicKey),
+            response: responseBodyPromise.then((responseBody) => Promise.all([
+                responseBody.code,
+                responseBody.msg,
+                responseBody.data,
+            ])).then(([code, msg, data]) => {
+                if(code!==20000) {
+                    throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
+                }
+                return verifySchema(data, FromBTCLNAutoResponseSchema);
             })
         };
     }

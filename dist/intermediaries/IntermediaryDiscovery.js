@@ -17,6 +17,7 @@ var SwapHandlerType;
     SwapHandlerType["FROM_BTC_TRUSTED"] = "FROM_BTC_TRUSTED";
     SwapHandlerType["FROM_BTCLN_TRUSTED"] = "FROM_BTCLN_TRUSTED";
     SwapHandlerType["FROM_BTC_SPV"] = "FROM_BTC_SPV";
+    SwapHandlerType["FROM_BTCLN_AUTO"] = "FROM_BTCLN_AUTO";
 })(SwapHandlerType = exports.SwapHandlerType || (exports.SwapHandlerType = {}));
 /**
  * Converts SwapHandlerType (represented as string & used in REST API communication with intermediaries) to regular
@@ -40,6 +41,8 @@ function swapHandlerTypeToSwapType(swapHandlerType) {
             return SwapType_1.SwapType.TRUSTED_FROM_BTCLN;
         case SwapHandlerType.FROM_BTC_SPV:
             return SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
+        case SwapHandlerType.FROM_BTCLN_AUTO:
+            return SwapType_1.SwapType.FROM_BTCLN_AUTO;
     }
 }
 /**
@@ -165,12 +168,13 @@ class IntermediaryDiscovery extends events_1.EventEmitter {
      * Returns the intermediary at the provided URL, either from the already fetched list of LPs or fetches the data on-demand
      *
      * @param url
+     * @param abortSignal
      */
-    getIntermediary(url) {
+    getIntermediary(url, abortSignal) {
         const foundLp = this.intermediaries.find(lp => lp.url === url);
         if (foundLp != null)
             return Promise.resolve(foundLp);
-        return this.loadIntermediary(url);
+        return this.loadIntermediary(url, abortSignal);
     }
     /**
      * Reloads the saves a list of intermediaries

@@ -47,6 +47,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     /**
      * Verifies returned LP data
      *
+     * @param signer
      * @param resp Response as returned by the LP
      * @param parsedPr Parsed bolt11 lightning invoice
      * @param token Smart chain token to be used in the swap
@@ -57,7 +58,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @private
      * @throws {IntermediaryError} In case the response is not valid
      */
-    async verifyReturnedData(resp, parsedPr, token, lp, options, data, requiredTotal) {
+    async verifyReturnedData(signer, resp, parsedPr, token, lp, options, data, requiredTotal) {
         if (resp.routingFeeSats > await options.maxFee)
             throw new IntermediaryError_1.IntermediaryError("Invalid max fee sats returned");
         if (requiredTotal != null && resp.total !== requiredTotal)
@@ -69,7 +70,9 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             data.getType() !== base_1.ChainSwapType.HTLC ||
             !data.isPayIn() ||
             !data.isToken(token) ||
-            data.getClaimer() !== lp.getAddress(this.chainIdentifier)) {
+            !data.isClaimer(lp.getAddress(this.chainIdentifier)) ||
+            !data.isOfferer(signer) ||
+            data.getTotalDeposit() !== 0n) {
             throw new IntermediaryError_1.IntermediaryError("Invalid data returned");
         }
     }
@@ -90,7 +93,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      */
     async getIntermediaryQuote(signer, amountData, lp, pr, parsedPr, options, preFetches, abort, additionalParams) {
         const abortController = abort instanceof AbortController ? abort : (0, Utils_1.extendAbortController)(abort);
-        preFetches.reputationPromise ??= this.preFetchIntermediaryReputation(amountData, lp, abortController);
+        const reputationPromise = this.preFetchIntermediaryReputation(amountData, lp, abortController);
         try {
             const { signDataPromise, resp } = await (0, Utils_1.tryWithRetries)(async (retryCount) => {
                 const { signDataPrefetch, response } = IntermediaryAPI_1.IntermediaryAPI.initToBTCLN(this.chainIdentifier, lp.url, {
@@ -103,7 +106,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                     additionalParams
                 }, this.options.postRequestTimeout, abortController.signal, retryCount > 0 ? false : null);
                 return {
-                    signDataPromise: this.preFetchSignData(signDataPrefetch),
+                    signDataPromise: preFetches.signDataPrefetchPromise ?? this.preFetchSignData(signDataPrefetch),
                     resp: await response
                 };
             }, null, e => e instanceof RequestError_1.RequestError, abortController.signal);
@@ -111,11 +114,11 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             const totalFee = resp.swapFee + resp.maxFee;
             const data = new this.swapDataDeserializer(resp.data);
             data.setOfferer(signer);
-            await this.verifyReturnedData(resp, parsedPr, amountData.token, lp, options, data);
+            await this.verifyReturnedData(signer, resp, parsedPr, amountData.token, lp, options, data);
             const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                 this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTCLN], true, amountOut, data.getAmount(), amountData.token, { networkFee: resp.maxFee }, preFetches.pricePreFetchPromise, abortController.signal),
                 this.verifyReturnedSignature(signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal),
-                preFetches.reputationPromise
+                reputationPromise
             ]);
             abortController.signal.throwIfAborted();
             lp.reputation[amountData.token.toString()] = reputation;
@@ -168,7 +171,8 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         if (preFetches == null)
             preFetches = {
                 pricePreFetchPromise: this.preFetchPrice(amountData, _abortController.signal),
-                feeRatePromise: this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController)
+                feeRatePromise: this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController),
+                signDataPrefetchPromise: this.contract.preFetchBlockDataForSignatures == null ? this.preFetchSignData(Promise.resolve(true)) : null
             };
         return lps.map(lp => {
             return {
@@ -246,7 +250,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             const totalFee = resp.swapFee + resp.maxFee;
             const data = new this.swapDataDeserializer(resp.data);
             data.setOfferer(signer);
-            await this.verifyReturnedData(resp, parsedInvoice, amountData.token, lp, options, data, amountData.amount);
+            await this.verifyReturnedData(signer, resp, parsedInvoice, amountData.token, lp, options, data, amountData.amount);
             const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                 this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTCLN], true, prepareResp.amount, data.getAmount(), amountData.token, { networkFee: resp.maxFee }, preFetches.pricePreFetchPromise, abortSignal),
                 this.verifyReturnedSignature(signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal),
@@ -298,6 +302,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePreFetchPromise = this.preFetchPrice(amountData, _abortController.signal);
         const feeRatePromise = this.preFetchFeeRate(signer, amountData, null, _abortController);
+        const signDataPrefetchPromise = this.contract.preFetchBlockDataForSignatures == null ? this.preFetchSignData(Promise.resolve(true)) : null;
         options.maxRoutingPPM ??= BigInt(this.options.lightningFeePPM);
         options.maxRoutingBaseFee ??= BigInt(this.options.lightningBaseFee);
         if (amountData.exactIn) {
@@ -335,7 +340,8 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                 const { invoice, parsedInvoice, successAction } = await LNURL_1.LNURL.useLNURLPay(payRequest, amountData.amount, options.comment, this.options.getRequestTimeout, _abortController.signal);
                 return (await this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
                     feeRatePromise,
-                    pricePreFetchPromise
+                    pricePreFetchPromise,
+                    signDataPrefetchPromise
                 })).map(data => {
                     return {
                         quote: data.quote.then(quote => {

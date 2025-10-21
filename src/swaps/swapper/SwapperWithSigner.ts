@@ -23,6 +23,8 @@ import {SpvFromBTCSwap} from "../spv_swaps/SpvFromBTCSwap";
 import {SwapperWithChain} from "./SwapperWithChain";
 import {SwapWithSigner, wrapSwapWithSigner} from "./SwapWithSigner";
 import {OnchainForGasSwap} from "../trusted/onchain/OnchainForGasSwap";
+import {FromBTCLNAutoSwap} from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
+import {FromBTCLNAutoOptions} from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoWrapper";
 
 export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends ChainIds<T>> {
 
@@ -124,6 +126,29 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
             .then(swap => wrapSwapWithSigner(swap, this.signer));
     }
 
+    createFromBTCLNSwapNew(
+        tokenAddress: string,
+        amount: bigint,
+        exactOut?: boolean,
+        additionalParams?: Record<string, any>,
+        options?: FromBTCLNAutoOptions
+    ): Promise<SwapWithSigner<FromBTCLNAutoSwap<T[ChainIdentifier]>>> {
+        return this.swapper.createFromBTCLNSwapNew(this.signer.getAddress(), tokenAddress, amount, exactOut, additionalParams, options)
+            .then(swap => wrapSwapWithSigner(swap, this.signer));
+    }
+
+    createFromBTCLNSwapNewViaLNURL(
+        tokenAddress: string,
+        lnurl: string | LNURLWithdraw,
+        amount: bigint,
+        exactOut?: boolean,
+        additionalParams?: Record<string, any>,
+        options?: FromBTCLNAutoOptions
+    ): Promise<SwapWithSigner<FromBTCLNAutoSwap<T[ChainIdentifier]>>> {
+        return this.swapper.createFromBTCLNSwapNewViaLNURL(this.signer.getAddress(), tokenAddress, lnurl, amount, exactOut, additionalParams, options)
+            .then(swap => wrapSwapWithSigner(swap, this.signer));
+    }
+
     createTrustedLNForGasSwap(amount: bigint, trustedIntermediaryUrl?: string): Promise<LnForGasSwap<T[ChainIdentifier]>> {
         return this.swapper.createTrustedLNForGasSwap(this.signer.getAddress(), amount, trustedIntermediaryUrl);
     }
@@ -132,7 +157,7 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
         return this.swapper.createTrustedOnchainForGasSwap(this.signer.getAddress(), amount, refundAddress, trustedIntermediaryUrl);
     }
 
-    create(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean, lnurlWithdraw?: string | LNURLWithdraw): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
+    create(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean, lnurlWithdraw?: string | LNURLWithdraw): Promise<(SupportsSwapType<T[ChainIdentifier], SwapType.FROM_BTCLN_AUTO> extends true ? FromBTCLNAutoSwap<T[ChainIdentifier]> : FromBTCLNSwap<T[ChainIdentifier]>)>;
     create(srcToken: BtcToken<false>, dstToken: SCToken<ChainIdentifier>, amount: bigint, exactIn: boolean): Promise<(SupportsSwapType<T[ChainIdentifier], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T[ChainIdentifier]> : FromBTCSwap<T[ChainIdentifier]>)>;
     create(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<false>, amount: bigint, exactIn: boolean, address: string): Promise<ToBTCSwap<T[ChainIdentifier]>>;
     create(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>, amount: bigint, exactIn: boolean, lnurlPay: string | LNURLPay): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
@@ -201,12 +226,12 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
      * @param srcToken
      * @param dstToken
      */
-    getSwapType(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>): SwapType.FROM_BTCLN;
+    getSwapType(srcToken: BtcToken<true>, dstToken: SCToken<ChainIdentifier>): (SupportsSwapType<T[ChainIdentifier], SwapType.FROM_BTCLN_AUTO> extends true ? SwapType.FROM_BTCLN_AUTO : SwapType.FROM_BTCLN);
     getSwapType(srcToken: BtcToken<false>, dstToken: SCToken<ChainIdentifier>): (SupportsSwapType<T[ChainIdentifier], SwapType.SPV_VAULT_FROM_BTC> extends true ? SwapType.SPV_VAULT_FROM_BTC : SwapType.FROM_BTC);
     getSwapType(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<false>): SwapType.TO_BTC;
     getSwapType(srcToken: SCToken<ChainIdentifier>, dstToken: BtcToken<true>): SwapType.TO_BTCLN;
-    getSwapType(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>): SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN;
-    getSwapType(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>): SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN {
+    getSwapType(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>): SwapType.FROM_BTCLN_AUTO | SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN;
+    getSwapType(srcToken: Token<ChainIdentifier>, dstToken: Token<ChainIdentifier>): SwapType.FROM_BTCLN_AUTO | SwapType.FROM_BTCLN | SwapType.SPV_VAULT_FROM_BTC | SwapType.FROM_BTC | SwapType.TO_BTC | SwapType.TO_BTCLN {
         return this.swapper.getSwapType(srcToken, dstToken);
     }
 

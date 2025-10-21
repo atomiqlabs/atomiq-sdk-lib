@@ -35,7 +35,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
     abstract readonly swapDeserializer: new (wrapper: ISwapWrapper<T, S, O>, data: any) => S;
     readonly unifiedStorage: UnifiedSwapStorage<T>;
     readonly unifiedChainEvents: UnifiedSwapEventListener<T>;
-    readonly chainIdentifier: string;
+    readonly chainIdentifier: T["ChainId"];
     readonly chain: T["ChainInterface"];
     readonly prices: ISwapPrice;
     readonly events: EventEmitter<{
@@ -53,14 +53,12 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      * @param unifiedStorage
      * @param unifiedChainEvents
      * @param chain
-     * @param contract Underlying contract handling the swaps
      * @param prices Swap pricing handler
      * @param tokens Chain specific token data
-     * @param swapDataDeserializer Deserializer for SwapData
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, options: O, events?: EventEmitter<{
+    constructor(chainIdentifier: T["ChainId"], unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, options: O, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     /**
@@ -109,7 +107,14 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      */
     init(noTimers?: boolean, noCheckPastSwaps?: boolean): Promise<void>;
     protected startTickInterval(): void;
-    checkPastSwaps(pastSwaps?: S[]): Promise<void>;
+    protected _checkPastSwaps(pastSwaps: S[]): Promise<{
+        changedSwaps: S[];
+        removeSwaps: S[];
+    }>;
+    checkPastSwaps(pastSwaps?: S[], noSave?: boolean): Promise<{
+        removeSwaps: S[];
+        changedSwaps: S[];
+    }>;
     tick(swaps?: S[]): Promise<void>;
     saveSwapData(swap: S): Promise<void>;
     removeSwapData(swap: S): Promise<void>;

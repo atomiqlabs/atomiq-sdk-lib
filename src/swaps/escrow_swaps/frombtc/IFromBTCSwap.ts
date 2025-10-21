@@ -1,27 +1,26 @@
 import {IFromBTCWrapper} from "./IFromBTCWrapper";
-import {ISwapInit, ppmToPercentage} from "../../ISwap";
+import {ppmToPercentage} from "../../ISwap";
 import {
     ChainType,
     SignatureVerificationError,
 } from "@atomiqlabs/base";
-import {PriceInfoType} from "../../../prices/abstract/ISwapPrice";
 import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
-import {IEscrowSwap, IEscrowSwapInit} from "../IEscrowSwap";
 import {Fee, FeeType} from "../../fee/Fee";
 import {IAddressSwap} from "../../IAddressSwap";
+import {IEscrowSelfInitSwap, IEscrowSelfInitSwapInit} from "../IEscrowSelfInitSwap";
 
 
 export abstract class IFromBTCSwap<
     T extends ChainType = ChainType,
     S extends number = number
-> extends IEscrowSwap<T, S> implements IAddressSwap {
+> extends IEscrowSelfInitSwap<T, S> implements IAddressSwap {
     protected abstract readonly inputToken: BtcToken;
 
-    protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, init: IEscrowSwapInit<T["Data"]>);
+    protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, init: IEscrowSelfInitSwapInit<T["Data"]>);
     protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, obj: any);
     protected constructor(
         wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>,
-        initOrObj: IEscrowSwapInit<T["Data"]> | any
+        initOrObj: IEscrowSelfInitSwapInit<T["Data"]> | any
     ) {
         super(wrapper, initOrObj);
     }
@@ -177,7 +176,7 @@ export abstract class IFromBTCSwap<
      *  (this is handled when swap is created (quoted), if you commit right after quoting, you can use skipChecks=true)
      * @throws {Error} If invalid signer is provided that doesn't match the swap data
      */
-    abstract commit(signer: T["Signer"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
+    abstract commit(signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean): Promise<string>;
 
     abstract waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
 
@@ -197,14 +196,16 @@ export abstract class IFromBTCSwap<
      * @param signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    abstract claim(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string>;
+    abstract claim(signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string>;
 
     /**
      * Waits till the swap is successfully claimed
      *
+     * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
      * @param abortSignal AbortSignal
      * @throws {Error} If swap is in invalid state (must be COMMIT)
+     * @returns {boolean} whether the swap was claimed in time or not
      */
-    abstract waitTillClaimed(abortSignal?: AbortSignal): Promise<void>;
+    abstract waitTillClaimed(maxWaitTimeSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
 
 }

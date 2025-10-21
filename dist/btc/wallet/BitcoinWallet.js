@@ -5,6 +5,7 @@ const coinselect2_1 = require("../coinselect2");
 const btc_signer_1 = require("@scure/btc-signer");
 const buffer_1 = require("buffer");
 const Utils_1 = require("../../utils/Utils");
+const BitcoinUtils_1 = require("../../utils/BitcoinUtils");
 function identifyAddressType(address, network) {
     switch ((0, btc_signer_1.Address)(network).decode(address).type) {
         case "pkh":
@@ -45,7 +46,7 @@ class BitcoinWallet {
     async _getUtxoPool(sendingAddress, sendingAddressType) {
         const utxos = await this.rpc.getAddressUTXOs(sendingAddress);
         let totalSpendable = 0;
-        const outputScript = (0, Utils_1.toOutputScript)(this.network, sendingAddress);
+        const outputScript = (0, BitcoinUtils_1.toOutputScript)(this.network, sendingAddress);
         const utxoPool = [];
         for (let utxo of utxos) {
             const value = Number(utxo.value);
@@ -75,7 +76,7 @@ class BitcoinWallet {
         const psbt = new btc_signer_1.Transaction({ PSBTVersion: 0 });
         psbt.addOutput({
             amount: BigInt(amount),
-            script: (0, Utils_1.toOutputScript)(this.network, recipient)
+            script: (0, BitcoinUtils_1.toOutputScript)(this.network, recipient)
         });
         return this._fundPsbt(sendingAccounts, psbt, feeRate);
     }
@@ -95,7 +96,7 @@ class BitcoinWallet {
                 txId: buffer_1.Buffer.from(input.txid).toString('hex'),
                 vout: input.index,
                 value: Number(amount),
-                type: (0, Utils_1.toCoinselectAddressType)(script)
+                type: (0, BitcoinUtils_1.toCoinselectAddressType)(script)
             });
         }
         const targets = [];
@@ -174,13 +175,13 @@ class BitcoinWallet {
             if (output.script == null && output.address == null) {
                 //Change output
                 psbt.addOutput({
-                    script: (0, Utils_1.toOutputScript)(this.network, sendingAccounts[0].address),
+                    script: (0, BitcoinUtils_1.toOutputScript)(this.network, sendingAccounts[0].address),
                     amount: BigInt(Math.floor(output.value))
                 });
             }
             else {
                 psbt.addOutput({
-                    script: output.script ?? (0, Utils_1.toOutputScript)(this.network, output.address),
+                    script: output.script ?? (0, BitcoinUtils_1.toOutputScript)(this.network, output.address),
                     amount: BigInt(output.value)
                 });
             }
@@ -204,7 +205,7 @@ class BitcoinWallet {
                     txId: buffer_1.Buffer.from(input.txid).toString('hex'),
                     vout: input.index,
                     value: Number(amount),
-                    type: (0, Utils_1.toCoinselectAddressType)(script)
+                    type: (0, BitcoinUtils_1.toCoinselectAddressType)(script)
                 });
             }
         const additionalOutputs = [];

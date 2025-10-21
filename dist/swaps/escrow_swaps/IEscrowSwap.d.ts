@@ -1,21 +1,16 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import { ISwap, ISwapInit } from "../ISwap";
-import { ChainType, SignatureData, SwapData, SwapExpiredState, SwapNotCommitedState, SwapPaidState } from "@atomiqlabs/base";
+import { ChainType, SwapCommitState, SwapData, SwapExpiredState, SwapNotCommitedState, SwapPaidState } from "@atomiqlabs/base";
 import { IEscrowSwapWrapper } from "./IEscrowSwapWrapper";
 import { Buffer } from "buffer";
-import { SCToken, TokenAmount } from "../../Tokens";
 export type IEscrowSwapInit<T extends SwapData> = ISwapInit & {
-    feeRate: any;
-    signatureData?: SignatureData;
     data?: T;
 };
 export declare function isIEscrowSwapInit<T extends SwapData>(obj: any): obj is IEscrowSwapInit<T>;
 export declare abstract class IEscrowSwap<T extends ChainType = ChainType, S extends number = number> extends ISwap<T, S> {
     protected readonly wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>;
-    data: T["Data"];
-    signatureData?: SignatureData;
-    feeRate?: any;
+    data?: T["Data"];
     /**
      * Transaction IDs for the swap on the smart chain side
      */
@@ -45,52 +40,31 @@ export declare abstract class IEscrowSwap<T extends ChainType = ChainType, S ext
     getClaimHash(): string;
     getId(): string;
     /**
-     * Periodically checks for init signature's expiry
-     *
-     * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
-     * @protected
-     */
-    protected watchdogWaitTillSignatureExpiry(abortSignal?: AbortSignal, interval?: number): Promise<void>;
-    /**
      * Periodically checks the chain to see whether the swap is committed
      *
+     * @param intervalSeconds How often to check (in seconds), default to 5s
      * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
      * @protected
      */
-    protected watchdogWaitTillCommited(abortSignal?: AbortSignal, interval?: number): Promise<boolean>;
+    protected watchdogWaitTillCommited(intervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean>;
     /**
      * Periodically checks the chain to see whether the swap was finished (claimed or refunded)
      *
+     * @param intervalSeconds How often to check (in seconds), default to 5s
      * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
      * @protected
      */
-    protected watchdogWaitTillResult(abortSignal?: AbortSignal, interval?: number): Promise<SwapPaidState | SwapExpiredState | SwapNotCommitedState>;
+    protected watchdogWaitTillResult(intervalSeconds?: number, abortSignal?: AbortSignal): Promise<SwapPaidState | SwapExpiredState | SwapNotCommitedState>;
     /**
      * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
      */
-    protected verifyQuoteDefinitelyExpired(): Promise<boolean>;
+    abstract _verifyQuoteDefinitelyExpired(): Promise<boolean>;
     /**
      * Checks if the swap's quote is still valid
      */
-    verifyQuoteValid(): Promise<boolean>;
-    /**
-     * Get the estimated smart chain fee of the commit transaction
-     */
-    protected getCommitFee(): Promise<bigint>;
-    /**
-     * Returns the transaction fee paid on the smart chain
-     */
-    getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
-    /**
-     * Checks if the initiator/sender has enough balance to cover the transaction fee for processing the swap
-     */
-    abstract hasEnoughForTxFees(): Promise<{
-        enoughBalance: boolean;
-        balance: TokenAmount;
-        required: TokenAmount;
-    }>;
+    abstract verifyQuoteValid(): Promise<boolean>;
+    abstract _shouldFetchCommitStatus(): boolean;
+    abstract _shouldFetchExpiryStatus(): boolean;
+    abstract _sync(save?: boolean, quoteDefinitelyExpired?: boolean, commitStatus?: SwapCommitState): Promise<boolean>;
     serialize(): any;
 }

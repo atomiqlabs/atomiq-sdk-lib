@@ -10,4 +10,5 @@ var SwapType;
     SwapType[SwapType["TRUSTED_FROM_BTC"] = 4] = "TRUSTED_FROM_BTC";
     SwapType[SwapType["TRUSTED_FROM_BTCLN"] = 5] = "TRUSTED_FROM_BTCLN";
     SwapType[SwapType["SPV_VAULT_FROM_BTC"] = 6] = "SPV_VAULT_FROM_BTC";
+    SwapType[SwapType["FROM_BTCLN_AUTO"] = 7] = "FROM_BTCLN_AUTO";
 })(SwapType = exports.SwapType || (exports.SwapType = {}));

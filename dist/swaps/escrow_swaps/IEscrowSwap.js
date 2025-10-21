@@ -5,14 +5,8 @@ const ISwap_1 = require("../ISwap");
 const base_1 = require("@atomiqlabs/base");
 const Utils_1 = require("../../utils/Utils");
 const buffer_1 = require("buffer");
-const Tokens_1 = require("../../Tokens");
 function isIEscrowSwapInit(obj) {
     return typeof obj === 'object' &&
-        obj.feeRate != null &&
-        (obj.signatureData == null || (typeof (obj.signatureData) === 'object' &&
-            typeof (obj.signatureData.prefix) === "string" &&
-            typeof (obj.signatureData.timeout) === "string" &&
-            typeof (obj.signatureData.signature) === "string")) &&
         (obj.data == null || typeof obj.data === 'object') &&
         (0, ISwap_1.isISwapInit)(obj);
 }
@@ -22,12 +16,6 @@ class IEscrowSwap extends ISwap_1.ISwap {
         super(wrapper, swapInitOrObj);
         if (!isIEscrowSwapInit(swapInitOrObj)) {
             this.data = swapInitOrObj.data != null ? new wrapper.swapDataDeserializer(swapInitOrObj.data) : null;
-            this.signatureData = swapInitOrObj.signature == null ? null : {
-                prefix: swapInitOrObj.prefix,
-                timeout: swapInitOrObj.timeout,
-                signature: swapInitOrObj.signature
-            };
-            this.feeRate = swapInitOrObj.feeRate;
             this.commitTxId = swapInitOrObj.commitTxId;
             this.claimTxId = swapInitOrObj.claimTxId;
             this.refundTxId = swapInitOrObj.refundTxId;
@@ -76,41 +64,21 @@ class IEscrowSwap extends ISwap_1.ISwap {
     //////////////////////////////
     //// Watchdogs
     /**
-     * Periodically checks for init signature's expiry
-     *
-     * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
-     * @protected
-     */
-    async watchdogWaitTillSignatureExpiry(abortSignal, interval = 5) {
-        let expired = false;
-        while (!expired) {
-            await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
-            try {
-                expired = await this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData);
-            }
-            catch (e) {
-                this.logger.error("watchdogWaitTillSignatureExpiry(): Error when checking signature expiry: ", e);
-            }
-        }
-        if (abortSignal != null)
-            abortSignal.throwIfAborted();
-    }
-    /**
      * Periodically checks the chain to see whether the swap is committed
      *
+     * @param intervalSeconds How often to check (in seconds), default to 5s
      * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
      * @protected
      */
-    async watchdogWaitTillCommited(abortSignal, interval = 5) {
+    async watchdogWaitTillCommited(intervalSeconds, abortSignal) {
+        intervalSeconds ??= 5;
         let status = { type: base_1.SwapCommitStateType.NOT_COMMITED };
         while (status?.type === base_1.SwapCommitStateType.NOT_COMMITED) {
-            await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
+            await (0, Utils_1.timeoutPromise)(intervalSeconds * 1000, abortSignal);
             try {
                 status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
                 if (status?.type === base_1.SwapCommitStateType.NOT_COMMITED &&
-                    await this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData))
+                    await this._verifyQuoteDefinitelyExpired())
                     return false;
             }
             catch (e) {
@@ -119,19 +87,20 @@ class IEscrowSwap extends ISwap_1.ISwap {
         }
         if (abortSignal != null)
             abortSignal.throwIfAborted();
-        return true;
+        return status?.type !== base_1.SwapCommitStateType.EXPIRED;
     }
     /**
      * Periodically checks the chain to see whether the swap was finished (claimed or refunded)
      *
+     * @param intervalSeconds How often to check (in seconds), default to 5s
      * @param abortSignal
-     * @param interval How often to check (in seconds), default to 5s
      * @protected
      */
-    async watchdogWaitTillResult(abortSignal, interval = 5) {
+    async watchdogWaitTillResult(intervalSeconds, abortSignal) {
+        intervalSeconds ??= 5;
         let status = { type: base_1.SwapCommitStateType.COMMITED };
         while (status?.type === base_1.SwapCommitStateType.COMMITED || status?.type === base_1.SwapCommitStateType.REFUNDABLE) {
-            await (0, Utils_1.timeoutPromise)(interval * 1000, abortSignal);
+            await (0, Utils_1.timeoutPromise)(intervalSeconds * 1000, abortSignal);
             try {
                 status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
             }
@@ -143,53 +112,10 @@ class IEscrowSwap extends ISwap_1.ISwap {
             abortSignal.throwIfAborted();
         return status;
     }
-    //////////////////////////////
-    //// Quote verification
-    /**
-     * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
-     */
-    async verifyQuoteDefinitelyExpired() {
-        return (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData));
-    }
-    /**
-     * Checks if the swap's quote is still valid
-     */
-    async verifyQuoteValid() {
-        try {
-            await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this._getInitiator(), this.data, this.signatureData, this.feeRate), null, base_1.SignatureVerificationError);
-            return true;
-        }
-        catch (e) {
-            if (e instanceof base_1.SignatureVerificationError) {
-                return false;
-            }
-        }
-    }
-    //////////////////////////////
-    //// Amounts & fees
-    /**
-     * Get the estimated smart chain fee of the commit transaction
-     */
-    getCommitFee() {
-        return this.wrapper.contract.getCommitFee(this.data, this.feeRate);
-    }
-    /**
-     * Returns the transaction fee paid on the smart chain
-     */
-    async getSmartChainNetworkFee() {
-        const swapContract = this.wrapper.contract;
-        return (0, Tokens_1.toTokenAmount)(await (swapContract.getRawCommitFee != null ?
-            swapContract.getRawCommitFee(this.data, this.feeRate) :
-            swapContract.getCommitFee(this.data, this.feeRate)), this.wrapper.getNativeToken(), this.wrapper.prices);
-    }
     serialize() {
         return {
             ...super.serialize(),
             data: this.data != null ? this.data.serialize() : null,
-            prefix: this.signatureData?.prefix,
-            timeout: this.signatureData?.timeout,
-            signature: this.signatureData?.signature,
-            feeRate: this.feeRate == null ? null : this.feeRate.toString(),
             commitTxId: this.commitTxId,
             claimTxId: this.claimTxId,
             refundTxId: this.refundTxId

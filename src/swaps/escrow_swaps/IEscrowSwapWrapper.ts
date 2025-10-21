@@ -167,4 +167,43 @@ export abstract class IEscrowSwapWrapper<
         return true;
     }
 
+    protected async _checkPastSwaps(pastSwaps: S[]): Promise<{ changedSwaps: S[]; removeSwaps: S[] }> {
+        const changedSwaps: S[] = [];
+        const removeSwaps: S[] = [];
+
+        const swapExpiredStatus: {[escrowHash: string]: boolean} = {};
+
+        const checkStatusSwaps: S[] = [];
+
+        for(let pastSwap of pastSwaps) {
+            if(pastSwap._shouldFetchExpiryStatus()) {
+                //Check expiry
+                swapExpiredStatus[pastSwap.getEscrowHash()] = await pastSwap._verifyQuoteDefinitelyExpired();
+            }
+            if(pastSwap._shouldFetchCommitStatus()) {
+                //Add to swaps for which status should be checked
+                checkStatusSwaps.push(pastSwap);
+            }
+        }
+
+        const swapStatuses = await this.contract.getCommitStatuses(checkStatusSwaps.map(val => ({signer: val._getInitiator(), swapData: val.data})));
+
+        for(let pastSwap of checkStatusSwaps) {
+            const escrowHash = pastSwap.getEscrowHash();
+            const shouldSave = await pastSwap._sync(false, swapExpiredStatus[escrowHash], swapStatuses[escrowHash]);
+            if(shouldSave) {
+                if(pastSwap.isQuoteExpired()) {
+                    removeSwaps.push(pastSwap);
+                } else {
+                    changedSwaps.push(pastSwap);
+                }
+            }
+        }
+
+        return {
+            changedSwaps,
+            removeSwaps
+        };
+    }
+
 }

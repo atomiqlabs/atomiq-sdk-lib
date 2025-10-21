@@ -73,4 +73,8 @@ export declare abstract class IEscrowSwapWrapper<T extends ChainType, S extends 
      * @param swap
      */
     protected processEvent(event: SwapEvent<T["Data"]>, swap: S): Promise<boolean>;
+    protected _checkPastSwaps(pastSwaps: S[]): Promise<{
+        changedSwaps: S[];
+        removeSwaps: S[];
+    }>;
 }

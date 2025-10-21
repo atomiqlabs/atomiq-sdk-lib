@@ -2,8 +2,7 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import { FromBTCLNSwap, FromBTCLNSwapState } from "./FromBTCLNSwap";
-import { IFromBTCWrapper } from "../IFromBTCWrapper";
-import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, SwapData } from "@atomiqlabs/base";
+import { ChainType, ClaimEvent, InitializeEvent, RefundEvent } from "@atomiqlabs/base";
 import { Intermediary } from "../../../../intermediaries/Intermediary";
 import { Buffer } from "buffer";
 import { SwapType } from "../../../enums/SwapType";
@@ -15,17 +14,21 @@ import { LNURLWithdrawParamsWithUrl } from "../../../../utils/LNURL";
 import { UnifiedSwapEventListener } from "../../../../events/UnifiedSwapEventListener";
 import { UnifiedSwapStorage } from "../../../../storage/UnifiedSwapStorage";
 import { ISwap } from "../../../ISwap";
+import { IFromBTCLNWrapper } from "../IFromBTCLNWrapper";
+import { IClaimableSwapWrapper } from "../../../IClaimableSwapWrapper";
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer;
     unsafeSkipLnNodeCheck?: boolean;
 };
 export type FromBTCLNWrapperOptions = ISwapWrapperOptions & {
     unsafeSkipLnNodeCheck?: boolean;
+    safetyFactor?: number;
+    bitcoinBlocktime?: number;
 };
-export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapper<T, FromBTCLNSwap<T>, FromBTCLNWrapperOptions> {
+export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNSwap<T>, FromBTCLNWrapperOptions> implements IClaimableSwapWrapper<FromBTCLNSwap<T>> {
+    readonly claimableSwapStates: FromBTCLNSwapState[];
     readonly TYPE = SwapType.FROM_BTCLN;
     readonly swapDeserializer: typeof FromBTCLNSwap;
-    protected readonly lnApi: LightningNetworkApi;
     /**
      * @param chainIdentifier
      * @param unifiedStorage Storage interface for the current environment
@@ -48,28 +51,6 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
     protected processEventClaim(swap: FromBTCLNSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean>;
     protected processEventRefund(swap: FromBTCLNSwap<T>, event: RefundEvent<T["Data"]>): Promise<boolean>;
     /**
-     * Returns the swap expiry, leaving enough time for the user to claim the HTLC
-     *
-     * @param data Parsed swap data
-     */
-    getHtlcTimeout(data: SwapData): bigint;
-    /**
-     * Generates a new 32-byte secret to be used as pre-image for lightning network invoice & HTLC swap\
-     *
-     * @private
-     * @returns Hash pre-image & payment hash
-     */
-    private getSecretAndHash;
-    /**
-     * Pre-fetches intermediary's LN node capacity, doesn't throw, instead returns null
-     *
-     * @param pubkeyPromise Promise that resolves when we receive "lnPublicKey" param from the intermediary thorugh
-     *  streaming
-     * @private
-     * @returns LN Node liquidity
-     */
-    private preFetchLnCapacity;
-    /**
      * Verifies response returned from intermediary
      *
      * @param resp Response as returned by the intermediary
@@ -77,25 +58,11 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
      * @param lp Intermediary
      * @param options Options as passed to the swap creation function
      * @param decodedPr Decoded bolt11 lightning network invoice
-     * @param amountIn Amount in sats that will be paid for the swap
+     * @param paymentHash Expected payment hash of the bolt11 lightning network invoice
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
     private verifyReturnedData;
-    /**
-     * Verifies whether the intermediary's lightning node has enough inbound capacity to receive the LN payment
-     *
-     * @param lp Intermediary
-     * @param decodedPr Decoded bolt11 lightning network invoice
-     * @param amountIn Amount to be paid for the swap in sats
-     * @param lnCapacityPrefetchPromise Pre-fetch for LN node capacity, preFetchLnCapacity()
-     * @param abortSignal
-     * @private
-     * @throws {IntermediaryError} if the lightning network node doesn't have enough inbound liquidity
-     * @throws {Error} if the lightning network node's inbound liquidity might be enough, but the swap would
-     *  deplete more than half of the liquidity
-     */
-    private verifyLnNodeCapacity;
     /**
      * Returns a newly created swap, receiving 'amount' on lightning network
      *
@@ -115,15 +82,6 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
         intermediary: Intermediary;
     }[];
     /**
-     * Parses and fetches lnurl withdraw params from the specified lnurl
-     *
-     * @param lnurl LNURL to be parsed and fetched
-     * @param abortSignal
-     * @private
-     * @throws {UserError} if the LNURL is invalid or if it's not a LNURL-withdraw
-     */
-    private getLNURLWithdraw;
-    /**
      * Returns a newly created swap, receiving 'amount' from the lnurl-withdraw
      *
      * @param signer                Smart chains signer's address intiating the swap
@@ -137,4 +95,8 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCWrapp
         quote: Promise<FromBTCLNSwap<T>>;
         intermediary: Intermediary;
     }[]>;
+    protected _checkPastSwaps(pastSwaps: FromBTCLNSwap<T>[]): Promise<{
+        changedSwaps: FromBTCLNSwap<T>[];
+        removeSwaps: FromBTCLNSwap<T>[];
+    }>;
 }

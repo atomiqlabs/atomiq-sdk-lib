@@ -1,9 +1,6 @@
 import {RequestError} from "../errors/RequestError";
-import {BTC_NETWORK} from "@scure/btc-signer/utils";
 import {Buffer} from "buffer";
-import {Address, OutScript} from "@scure/btc-signer";
 import {randomBytes as randomBytesNoble} from "@noble/hashes/utils";
-import {CoinselectAddressTypes} from "../btc/coinselect2";
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
@@ -313,42 +310,6 @@ export function bigIntMax(a: bigint, b: bigint): bigint {
 
 export function bigIntCompare(a: bigint, b: bigint): -1 | 0 | 1 {
     return a > b ? 1 : a===b ? 0 : -1;
-}
-
-export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
-    const outputScript = Address(network).decode(address);
-    switch(outputScript.type) {
-        case "pkh":
-        case "sh":
-        case "wpkh":
-        case "wsh":
-            return Buffer.from(OutScript.encode({
-                type: outputScript.type,
-                hash: outputScript.hash
-            }));
-        case "tr":
-            return Buffer.from(OutScript.encode({
-                type: "tr",
-                pubkey: outputScript.pubkey
-            }));
-    }
-}
-
-export function toCoinselectAddressType(outputScript: Uint8Array): CoinselectAddressTypes {
-    const data = OutScript.decode(outputScript);
-    switch(data.type) {
-        case "pkh":
-            return "p2pkh";
-        case "sh":
-            return "p2sh-p2wpkh";
-        case "wpkh":
-            return "p2wpkh"
-        case "wsh":
-            return "p2wsh"
-        case "tr":
-            return "p2tr"
-    }
-    throw new Error("Unrecognized address type!");
 }
 
 export function randomBytes(bytesLength: number): Buffer {

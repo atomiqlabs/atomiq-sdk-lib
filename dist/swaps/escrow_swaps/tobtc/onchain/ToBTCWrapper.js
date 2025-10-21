@@ -8,6 +8,7 @@ const UserError_1 = require("../../../../errors/UserError");
 const IntermediaryError_1 = require("../../../../errors/IntermediaryError");
 const SwapType_1 = require("../../../enums/SwapType");
 const Utils_1 = require("../../../../utils/Utils");
+const BitcoinUtils_1 = require("../../../../utils/BitcoinUtils");
 const IntermediaryAPI_1 = require("../../../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../../../errors/RequestError");
 const utils_1 = require("@scure/btc-signer/utils");
@@ -58,7 +59,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      */
     btcAddressToOutputScript(addr) {
         try {
-            return (0, Utils_1.toOutputScript)(this.options.bitcoinNetwork, addr);
+            return (0, BitcoinUtils_1.toOutputScript)(this.options.bitcoinNetwork, addr);
         }
         catch (e) {
             throw new UserError_1.UserError("Invalid address specified");
@@ -67,6 +68,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     /**
      * Verifies returned LP data
      *
+     * @param signer
      * @param resp LP's response
      * @param amountData
      * @param lp
@@ -76,7 +78,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @private
      * @throws {IntermediaryError} if returned data are not correct
      */
-    verifyReturnedData(resp, amountData, lp, options, data, hash) {
+    verifyReturnedData(signer, resp, amountData, lp, options, data, hash) {
         if (resp.totalFee !== (resp.swapFee + resp.networkFee))
             throw new IntermediaryError_1.IntermediaryError("Invalid totalFee returned");
         if (amountData.exactIn) {
@@ -103,7 +105,9 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             data.getType() !== base_1.ChainSwapType.CHAIN_NONCED ||
             !data.isPayIn() ||
             !data.isToken(amountData.token) ||
-            data.getClaimer() !== lp.getAddress(this.chainIdentifier)) {
+            !data.isClaimer(lp.getAddress(this.chainIdentifier)) ||
+            !data.isOfferer(signer) ||
+            data.getTotalDeposit() !== 0n) {
             throw new IntermediaryError_1.IntermediaryError("Invalid data returned");
         }
     }
@@ -132,6 +136,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePreFetchPromise = this.preFetchPrice(amountData, _abortController.signal);
         const feeRatePromise = this.preFetchFeeRate(signer, amountData, _hash, _abortController);
+        const _signDataPromise = this.contract.preFetchBlockDataForSignatures == null ? this.preFetchSignData(Promise.resolve(true)) : null;
         return lps.map(lp => {
             return {
                 intermediary: lp,
@@ -153,7 +158,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                                 additionalParams
                             }, this.options.postRequestTimeout, abortController.signal, retryCount > 0 ? false : null);
                             return {
-                                signDataPromise: this.preFetchSignData(signDataPrefetch),
+                                signDataPromise: _signDataPromise ?? this.preFetchSignData(signDataPrefetch),
                                 resp: await response
                             };
                         }, null, RequestError_1.RequestError, abortController.signal);
@@ -162,7 +167,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                             _hash;
                         const data = new this.swapDataDeserializer(resp.data);
                         data.setOfferer(signer);
-                        this.verifyReturnedData(resp, amountData, lp, options, data, hash);
+                        this.verifyReturnedData(signer, resp, amountData, lp, options, data, hash);
                         const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTC], true, resp.amount, data.getAmount(), amountData.token, resp, pricePreFetchPromise, abortController.signal),
                             this.verifyReturnedSignature(signer, data, resp, feeRatePromise, signDataPromise, abortController.signal),

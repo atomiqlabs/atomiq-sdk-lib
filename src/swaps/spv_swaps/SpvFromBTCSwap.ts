@@ -1,6 +1,6 @@
 import {isISwapInit, ISwap, ISwapInit, ppmToPercentage} from "../ISwap";
 import {
-    ChainType,
+    ChainType, isAbstractSigner,
     SpvWithdrawalClaimedState,
     SpvWithdrawalClosedState,
     SpvWithdrawalFrontedState,
@@ -9,7 +9,18 @@ import {
 } from "@atomiqlabs/base";
 import {SwapType} from "../enums/SwapType";
 import {SpvFromBTCWrapper} from "./SpvFromBTCWrapper";
-import {getLogger, timeoutPromise, toCoinselectAddressType, toOutputScript} from "../../utils/Utils";
+import {
+    extendAbortController,
+    getLogger,
+    timeoutPromise
+} from "../../utils/Utils";
+import {
+    toCoinselectAddressType,
+    toOutputScript
+} from "../../utils/BitcoinUtils";
+import {
+    parsePsbtTransaction,toBitcoinWallet
+} from "../../utils/BitcoinHelpers";
 import {getInputType, Transaction} from "@scure/btc-signer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
 import {Buffer} from "buffer";
@@ -17,7 +28,12 @@ import {Fee, FeeType} from "../fee/Fee";
 import {IBitcoinWallet, isIBitcoinWallet} from "../../btc/wallet/IBitcoinWallet";
 import {IntermediaryAPI} from "../../intermediaries/IntermediaryAPI";
 import {IBTCWalletSwap} from "../IBTCWalletSwap";
-import {SingleAddressBitcoinWallet} from "../../btc/wallet/SingleAddressBitcoinWallet";
+import {ISwapWithGasDrop} from "../ISwapWithGasDrop";
+import {
+    MinimalBitcoinWalletInterface,
+    MinimalBitcoinWalletInterfaceWithSigner
+} from "../../btc/wallet/MinimalBitcoinWalletInterface";
+import {IClaimableSwap} from "../IClaimableSwap";
 
 export enum SpvFromBTCSwapState {
     CLOSED = -5,
@@ -58,6 +74,7 @@ export type SpvFromBTCSwapInit = ISwapInit & {
     callerFeeShare: bigint;
     frontingFeeShare: bigint;
     executionFeeShare: bigint;
+    genesisSmartChainBlockHeight: number;
 };
 
 export function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit {
@@ -85,10 +102,14 @@ export function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit {
         typeof(obj.callerFeeShare)==="bigint" &&
         typeof(obj.frontingFeeShare)==="bigint" &&
         typeof(obj.executionFeeShare)==="bigint" &&
+        typeof(obj.genesisSmartChainBlockHeight)==="number" &&
         isISwapInit(obj);
 }
 
-export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> implements IBTCWalletSwap {
+export class SpvFromBTCSwap<T extends ChainType>
+    extends ISwap<T, SpvFromBTCSwapState>
+    implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCSwapState> {
+
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
 
     readonly wrapper: SpvFromBTCWrapper<T>;
@@ -122,6 +143,8 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     readonly callerFeeShare: bigint;
     readonly frontingFeeShare: bigint;
     readonly executionFeeShare: bigint;
+
+    readonly genesisSmartChainBlockHeight: number;
 
     claimTxId: string;
     frontTxId: string;
@@ -161,6 +184,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             this.callerFeeShare = BigInt(initOrObject.callerFeeShare);
             this.frontingFeeShare = BigInt(initOrObject.frontingFeeShare);
             this.executionFeeShare = BigInt(initOrObject.executionFeeShare);
+            this.genesisSmartChainBlockHeight = initOrObject.genesisSmartChainBlockHeight;
             this.claimTxId = initOrObject.claimTxId;
             this.frontTxId = initOrObject.frontTxId;
             this.data = initOrObject.data==null ? null : new this.wrapper.spvWithdrawalDataDeserializer(initOrObject.data);
@@ -437,7 +461,17 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         };
     }
 
-    async getPsbt(): Promise<{psbt: Transaction, in1sequence: number}> {
+    /**
+     * Returns the raw PSBT (not funded), the wallet should fund the PSBT (add its inputs), set the nSequence field of the
+     *  2nd input (input 1 - indexing from 0) to the value returned in `in1sequence`, sign the PSBT and then pass
+     *  it back to the SDK with `swap.submitPsbt()`
+     */
+    async getPsbt(): Promise<{
+        psbt: Transaction,
+        psbtHex: string,
+        psbtBase64: string,
+        in1sequence: number
+    }> {
         const res = await this.getTransactionDetails();
         const psbt = new Transaction({
             allowUnknownOutputs: true,
@@ -465,25 +499,47 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             amount: res.out2amount,
             script: res.out2script
         });
+        const serializedPsbt = Buffer.from(psbt.toPSBT());
         return {
             psbt,
+            psbtHex: serializedPsbt.toString("hex"),
+            psbtBase64: serializedPsbt.toString("base64"),
             in1sequence: res.in1sequence
         };
     }
 
-    async getFundedPsbt(_bitcoinWallet: IBitcoinWallet | { address: string, publicKey: string }, feeRate?: number): Promise<{psbt: Transaction, signInputs: number[]}> {
-        let bitcoinWallet: IBitcoinWallet;
-        if(isIBitcoinWallet(_bitcoinWallet)) {
-            bitcoinWallet = _bitcoinWallet;
-        } else {
-            bitcoinWallet = new SingleAddressBitcoinWallet(this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork, _bitcoinWallet);
-        }
+    /**
+     * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use),
+     *  also returns inputs indices that need to be signed by the wallet before submitting the PSBT back to the SDK with
+     *  `swap.submitPsbt()`
+     *
+     * @param _bitcoinWallet Sender's bitcoin wallet
+     * @param feeRate Optional fee rate for the transaction, needs to be at least as big as {minimumBtcFeeRate} field
+     * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
+     */
+    async getFundedPsbt(
+        _bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface,
+        feeRate?: number,
+        additionalOutputs?: ({amount: bigint, outputScript: Uint8Array} | {amount: bigint, address: string})[]
+    ): Promise<{
+        psbt: Transaction,
+        psbtHex: string,
+        psbtBase64: string,
+        signInputs: number[]
+    }> {
+        const bitcoinWallet: IBitcoinWallet = toBitcoinWallet(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
         if(feeRate!=null) {
             if(feeRate<this.minimumBtcFeeRate) throw new Error("Bitcoin tx fee needs to be at least "+this.minimumBtcFeeRate+" sats/vB");
         } else {
             feeRate = Math.max(this.minimumBtcFeeRate, await bitcoinWallet.getFeeRate());
         }
         let {psbt, in1sequence} = await this.getPsbt();
+        if(additionalOutputs!=null) additionalOutputs.forEach(output => {
+            psbt.addOutput({
+                amount: output.amount,
+                script: (output as {outputScript: Uint8Array}).outputScript ?? toOutputScript(this.wrapper.options.bitcoinNetwork, (output as {address: string}).address)
+            });
+        });
         psbt = await bitcoinWallet.fundPsbt(psbt, feeRate);
         psbt.updateInput(1, {sequence: in1sequence});
         //Sign every input except the first one
@@ -491,10 +547,23 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         for(let i=1;i<psbt.inputsLength;i++) {
             signInputs.push(i);
         }
-        return {psbt, signInputs};
+        const serializedPsbt = Buffer.from(psbt.toPSBT());
+        return {
+            psbt,
+            psbtHex: serializedPsbt.toString("hex"),
+            psbtBase64: serializedPsbt.toString("base64"),
+            signInputs
+        };
     }
 
-    async submitPsbt(psbt: Transaction): Promise<string> {
+    /**
+     * Submits a PSBT signed by the wallet back to the SDK
+     *
+     * @param _psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
+     */
+    async submitPsbt(_psbt: Transaction | string): Promise<string> {
+        const psbt = parsePsbtTransaction(_psbt);
+
         //Ensure not expired
         if(this.expiry<Date.now()) {
             throw new Error("Quote expired!");
@@ -580,15 +649,71 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         return this.data.getTxId();
     }
 
-    async estimateBitcoinFee(wallet: IBitcoinWallet, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
-        const txFee = await wallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
+    async estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
+        const bitcoinWallet: IBitcoinWallet = toBitcoinWallet(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
+        const txFee = await bitcoinWallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
         return toTokenAmount(txFee==null ? null : BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
     }
 
-    async sendBitcoinTransaction(wallet: IBitcoinWallet, feeRate?: number): Promise<string> {
-        let {psbt, signInputs} = await this.getFundedPsbt(wallet, feeRate);
-        psbt = await wallet.signPsbt(psbt, signInputs);
-        return await this.submitPsbt(psbt);
+    async sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string> {
+        const {psbt, psbtBase64, psbtHex, signInputs} = await this.getFundedPsbt(wallet, feeRate);
+        let signedPsbt: Transaction | string;
+        if(isIBitcoinWallet(wallet)) {
+            signedPsbt = await wallet.signPsbt(psbt, signInputs);
+        } else {
+            signedPsbt = await wallet.signPsbt({
+                psbt, psbtHex, psbtBase64
+            }, signInputs);
+        }
+        return await this.submitPsbt(signedPsbt);
+    }
+
+    /**
+     * Executes the swap with the provided bitcoin wallet,
+     *
+     * @param wallet Bitcoin wallet to use to sign the bitcoin transaction
+     * @param callbacks Callbacks to track the progress of the swap
+     * @param options Optional options for the swap like feeRate, AbortSignal, and timeouts/intervals
+     *
+     * @returns {boolean} Whether a swap was settled automatically by swap watchtowers or requires manual claim by the
+     *  user, in case `false` is returned the user should call `swap.claim()` to settle the swap on the destination manually
+     */
+    async execute(
+        wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner,
+        callbacks?: {
+            onSourceTransactionSent?: (sourceTxId: string) => void,
+            onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void,
+            onSourceTransactionConfirmed?: (sourceTxId: string) => void,
+            onSwapSettled?: (destinationTxId: string) => void
+        },
+        options?: {
+            feeRate?: number,
+            abortSignal?: AbortSignal,
+            btcTxCheckIntervalSeconds?: number,
+            maxWaitTillAutomaticSettlementSeconds?: number
+        }
+    ): Promise<boolean> {
+        if(this.state===SpvFromBTCSwapState.CLOSED) throw new Error("Swap encountered a catastrophic failure!");
+        if(this.state===SpvFromBTCSwapState.FAILED) throw new Error("Swap failed!");
+        if(this.state===SpvFromBTCSwapState.DECLINED) throw new Error("Swap execution already declined by the LP!");
+        if(this.state===SpvFromBTCSwapState.QUOTE_EXPIRED || this.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED) throw new Error("Swap quote expired!");
+        if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) throw new Error("Swap already settled or fronted!");
+
+        if(this.state===SpvFromBTCSwapState.CREATED) {
+            const txId = await this.sendBitcoinTransaction(wallet, options?.feeRate);
+            if(callbacks?.onSourceTransactionSent!=null) callbacks.onSourceTransactionSent(txId);
+        }
+        if(this.state===SpvFromBTCSwapState.POSTED || this.state===SpvFromBTCSwapState.BROADCASTED) {
+            const txId = await this.waitForBitcoinTransaction(callbacks?.onSourceTransactionConfirmationStatus, options?.btcTxCheckIntervalSeconds, options?.abortSignal);
+            if (callbacks?.onSourceTransactionConfirmed != null) callbacks.onSourceTransactionConfirmed(txId);
+        }
+        // @ts-ignore
+        if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return true;
+        if(this.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
+            const success = await this.waitTillClaimedOrFronted(options?.maxWaitTillAutomaticSettlementSeconds ?? 60, options?.abortSignal);
+            if(success && callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
+            return success;
+        }
     }
 
 
@@ -618,15 +743,15 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
      *
-     * @param abortSignal Abort signal
-     * @param checkIntervalSeconds How often to check the bitcoin transaction
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
+     * @param checkIntervalSeconds How often to check the bitcoin transaction
+     * @param abortSignal Abort signal
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     async waitForBitcoinTransaction(
-        abortSignal?: AbortSignal,
+        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
         checkIntervalSeconds?: number,
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
+        abortSignal?: AbortSignal
     ): Promise<string> {
         if(
             this.state!==SpvFromBTCSwapState.POSTED &&
@@ -670,7 +795,18 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
      *
      * @throws {Error} If the swap is in invalid state (must be BTC_TX_CONFIRMED)
      */
-    async txsClaim(signer?: T["Signer"]): Promise<T["TX"][]> {
+    async txsClaim(_signer?: string | T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]> {
+        let address: string;
+        if(_signer!=null) {
+            if (typeof (_signer) === "string") {
+                address = _signer;
+            } else if (isAbstractSigner(_signer)) {
+                address = _signer.getAddress();
+            } else {
+                address = (await this.wrapper.chain.wrapSigner(_signer)).getAddress();
+            }
+        }
+
         if(!this.isClaimable()) throw new Error("Must be in BTC_TX_CONFIRMED state!");
 
         const vaultData = await this.wrapper.contract.getVaultData(this.vaultOwner, this.vaultId);
@@ -690,7 +826,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         }
 
         return await this.wrapper.contract.txsClaim(
-            signer==null ? this._getInitiator() : signer.getAddress(), vaultData,
+            address ?? this._getInitiator(), vaultData,
             withdrawalData.map(tx => {return {tx}}),
             this.wrapper.synchronizer, true
         );
@@ -699,10 +835,11 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     /**
      * Claims and finishes the swap
      *
-     * @param signer Signer to sign the transactions with, can also be different to the initializer
+     * @param _signer Signer to sign the transactions with, can also be different to the initializer
      * @param abortSignal Abort signal to stop waiting for transaction confirmation
      */
-    async claim(signer: T["Signer"], abortSignal?: AbortSignal): Promise<string> {
+    async claim(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal): Promise<string> {
+        const signer = isAbstractSigner(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer);
         let txIds: string[];
         try {
             txIds = await this.wrapper.chain.sendAndConfirm(
@@ -714,7 +851,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
                 this.logger.info("claim(): Transaction state is CLAIMED, swap was successfully claimed by the watchtower");
                 return this.claimTxId;
             }
-            const withdrawalState = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
+            const withdrawalState = await this.wrapper.contract.getWithdrawalState(this.data, this.genesisSmartChainBlockHeight);
             if(withdrawalState.type===SpvWithdrawalStateType.CLAIMED) {
                 this.logger.info("claim(): Transaction status is CLAIMED, swap was successfully claimed by the watchtower");
                 this.claimTxId = withdrawalState.txId;
@@ -749,7 +886,10 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         while(status.type===SpvWithdrawalStateType.NOT_FOUND) {
             await timeoutPromise(interval*1000, abortSignal);
             try {
-                status = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
+                //Be smart about checking withdrawal state
+                if(await this._shouldCheckWithdrawalState()) {
+                    status = await this.wrapper.contract.getWithdrawalState(this.data, this.genesisSmartChainBlockHeight);
+                }
             } catch (e) {
                 this.logger.error("watchdogWaitTillResult(): Error when fetching commit status: ", e);
             }
@@ -761,31 +901,50 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     /**
      * Waits till the swap is successfully executed
      *
-     * @param abortSignal AbortSignal
+     * @param maxWaitTimeSeconds Maximum time in seconds to wait for the swap to be settled
+     * @param abortSignal
      * @throws {Error} If swap is in invalid state (must be BTC_TX_CONFIRMED)
      * @throws {Error} If the LP refunded sooner than we were able to claim
+     * @returns {boolean} whether the swap was claimed or fronted automatically or not, if the swap was not claimed
+     *  the user can claim manually through `swap.claim()`
      */
-    async waitTillClaimedOrFronted(abortSignal?: AbortSignal): Promise<void> {
-        if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return Promise.resolve();
+    async waitTillClaimedOrFronted(maxWaitTimeSeconds?: number, abortSignal?: AbortSignal): Promise<boolean> {
+        if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return Promise.resolve(true);
 
-        const abortController = new AbortController();
-        if(abortSignal!=null) abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
-        const res = await Promise.race([
-            this.watchdogWaitTillResult(abortController.signal),
-            this.waitTillState(SpvFromBTCSwapState.CLAIMED, "eq", abortController.signal).then(() => 0),
-            this.waitTillState(SpvFromBTCSwapState.FRONTED, "eq", abortController.signal).then(() => 1),
-            this.waitTillState(SpvFromBTCSwapState.FAILED, "eq", abortController.signal).then(() => 2),
-        ]);
-        abortController.abort();
+        const abortController = extendAbortController(abortSignal);
+
+        let timedOut: boolean = false;
+        if(maxWaitTimeSeconds!=null) {
+            const timeout = setTimeout(() => {
+                timedOut = true;
+                abortController.abort();
+            }, maxWaitTimeSeconds * 1000);
+            abortController.signal.addEventListener("abort", () => clearTimeout(timeout));
+        }
+
+        let res: number | SpvWithdrawalState;
+        try {
+            res = await Promise.race([
+                this.watchdogWaitTillResult(abortController.signal),
+                this.waitTillState(SpvFromBTCSwapState.CLAIMED, "eq", abortController.signal).then(() => 0),
+                this.waitTillState(SpvFromBTCSwapState.FRONTED, "eq", abortController.signal).then(() => 1),
+                this.waitTillState(SpvFromBTCSwapState.FAILED, "eq", abortController.signal).then(() => 2),
+            ]);
+            abortController.abort();
+        } catch (e) {
+            abortController.abort();
+            if(timedOut) return false;
+            throw e;
+        }
 
         if(typeof(res)==="number") {
             if(res===0) {
                 this.logger.debug("waitTillClaimedOrFronted(): Resolved from state change (CLAIMED)");
-                return;
+                return true;
             }
             if(res===1) {
                 this.logger.debug("waitTillClaimedOrFronted(): Resolved from state change (FRONTED)");
-                return;
+                return true;
             }
             if(res===2) {
                 this.logger.debug("waitTillClaimedOrFronted(): Resolved from state change (FAILED)");
@@ -816,7 +975,10 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             if(
                 (this.state as SpvFromBTCSwapState)!==SpvFromBTCSwapState.CLOSED
             ) await this._saveAndEmit(SpvFromBTCSwapState.CLOSED);
+            throw new Error("Swap failed with catastrophic error!");
         }
+
+        return true;
     }
 
     /**
@@ -828,12 +990,12 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     async waitTillExecuted(
-        abortSignal?: AbortSignal,
+        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
         checkIntervalSeconds?: number,
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void
+        abortSignal?: AbortSignal
     ): Promise<void> {
-        await this.waitForBitcoinTransaction(abortSignal, checkIntervalSeconds, updateCallback);
-        await this.waitTillClaimedOrFronted(abortSignal);
+        await this.waitForBitcoinTransaction(updateCallback, checkIntervalSeconds, abortSignal);
+        await this.waitTillClaimedOrFronted(undefined, abortSignal);
     }
 
 
@@ -866,6 +1028,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             callerFeeShare: this.callerFeeShare.toString(10),
             frontingFeeShare: this.frontingFeeShare.toString(10),
             executionFeeShare: this.executionFeeShare.toString(10),
+            genesisSmartChainBlockHeight: this.genesisSmartChainBlockHeight,
 
             claimTxId: this.claimTxId,
             frontTxId: this.frontTxId,
@@ -877,7 +1040,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
     //////////////////////////////
     //// Swap ticks & sync
 
-    private async syncStateFromBitcoin(save: boolean) {
+    async _syncStateFromBitcoin(save: boolean) {
         if(this.data?.btcTx==null) return false;
 
         //Check if bitcoin payment was confirmed
@@ -905,6 +1068,7 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
         } else {
             if(res.confirmations>=this.vaultRequiredConfirmations) {
                 if(
+                    this.state!==SpvFromBTCSwapState.BTC_TX_CONFIRMED &&
                     this.state!==SpvFromBTCSwapState.FRONTED &&
                     this.state!==SpvFromBTCSwapState.CLAIMED
                 ) {
@@ -940,30 +1104,33 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             this.state===SpvFromBTCSwapState.POSTED ||
             this.state===SpvFromBTCSwapState.BROADCASTED ||
             this.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED ||
-            this.state===SpvFromBTCSwapState.DECLINED
+            this.state===SpvFromBTCSwapState.DECLINED ||
+            this.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED
         ) {
             //Check BTC transaction
-            if(await this.syncStateFromBitcoin(false)) changed ||= true;
+            if(await this._syncStateFromBitcoin(false)) changed ||= true;
         }
 
         if(this.state===SpvFromBTCSwapState.BROADCASTED || this.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
-            const status = await this.wrapper.contract.getWithdrawalState(this.data.btcTx.txid);
-            this.logger.debug("syncStateFromChain(): status of "+this.data.btcTx.txid, status);
-            switch(status.type) {
-                case SpvWithdrawalStateType.FRONTED:
-                    this.frontTxId = status.txId;
-                    this.state = SpvFromBTCSwapState.FRONTED;
-                    changed ||= true;
-                    break;
-                case SpvWithdrawalStateType.CLAIMED:
-                    this.claimTxId = status.txId;
-                    this.state = SpvFromBTCSwapState.CLAIMED;
-                    changed ||= true;
-                    break;
-                case SpvWithdrawalStateType.CLOSED:
-                    this.state = SpvFromBTCSwapState.CLOSED;
-                    changed ||= true;
-                    break;
+            if(await this._shouldCheckWithdrawalState()) {
+                const status = await this.wrapper.contract.getWithdrawalState(this.data, this.genesisSmartChainBlockHeight);
+                this.logger.debug("syncStateFromChain(): status of "+this.data.btcTx.txid, status);
+                switch(status.type) {
+                    case SpvWithdrawalStateType.FRONTED:
+                        this.frontTxId = status.txId;
+                        this.state = SpvFromBTCSwapState.FRONTED;
+                        changed ||= true;
+                        break;
+                    case SpvWithdrawalStateType.CLAIMED:
+                        this.claimTxId = status.txId;
+                        this.state = SpvFromBTCSwapState.CLAIMED;
+                        changed ||= true;
+                        break;
+                    case SpvWithdrawalStateType.CLOSED:
+                        this.state = SpvFromBTCSwapState.CLOSED;
+                        changed ||= true;
+                        break;
+                }
             }
         }
 
@@ -1018,12 +1185,44 @@ export class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwap
             ) {
                 try {
                     //Check if bitcoin payment was confirmed
-                    return await this.syncStateFromBitcoin(save);
+                    return await this._syncStateFromBitcoin(save);
                 } catch (e) {
                     this.logger.error("tickSwap("+this.getId()+"): ", e);
                 }
             }
         }
+    }
+
+    async _shouldCheckWithdrawalState(frontingAddress?: string, vaultDataUtxo?: string) {
+        if(frontingAddress===undefined) frontingAddress = await this.wrapper.contract.getFronterAddress(this.vaultOwner, this.vaultId, this.data);
+        if(vaultDataUtxo===undefined) vaultDataUtxo = await this.wrapper.contract.getVaultLatestUtxo(this.vaultOwner, this.vaultId);
+
+        if(frontingAddress != null) return true; //In case the swap is fronted there will for sure be a fronted event
+        if(vaultDataUtxo == null) return true; //Vault UTXO is null (the vault closed)
+
+        const [txId, _] = vaultDataUtxo.split(":");
+        //Don't check both txns if their txId is equal
+        if(this.data.btcTx.txid===txId) return true;
+        const [btcTx, latestVaultTx] = await Promise.all([
+            this.wrapper.btcRpc.getTransaction(this.data.btcTx.txid),
+            this.wrapper.btcRpc.getTransaction(txId)
+        ]);
+        if(btcTx!=null) {
+            const btcTxHeight = btcTx.blockheight;
+            const latestVaultTxHeight = latestVaultTx.blockheight;
+            //We also need to cover the case where bitcoin tx isn't confirmed yet (hence btxTxHeight==null)
+            if(btcTxHeight==null || latestVaultTxHeight < btcTxHeight) {
+                //Definitely not claimed!
+                this.logger.debug(`_shouldCheckWithdrawalState(): Skipped checking withdrawal state, latestVaultTxHeight: ${latestVaultTx.blockheight}, btcTxHeight: ${btcTxHeight} and not fronted!`);
+                return false;
+            }
+        } else {
+            //Definitely not claimed because the transaction was probably double-spent (or evicted from mempool)
+            this.logger.debug(`_shouldCheckWithdrawalState(): Skipped checking withdrawal state, btc tx probably replaced or evicted: ${this.data.btcTx.txid} and not fronted`);
+            return false;
+        }
+
+        return true;
     }
 
 }

@@ -12,7 +12,8 @@ import {Buffer} from "buffer";
 import {UserError} from "../../../../errors/UserError";
 import {IntermediaryError} from "../../../../errors/IntermediaryError";
 import {SwapType} from "../../../enums/SwapType";
-import {extendAbortController, randomBytes, toOutputScript, tryWithRetries} from "../../../../utils/Utils";
+import {extendAbortController, randomBytes, tryWithRetries} from "../../../../utils/Utils";
+import {toOutputScript} from "../../../../utils/BitcoinUtils";
 import {IntermediaryAPI, ToBTCResponseType} from "../../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../../errors/RequestError";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
@@ -109,6 +110,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
     /**
      * Verifies returned LP data
      *
+     * @param signer
      * @param resp LP's response
      * @param amountData
      * @param lp
@@ -119,6 +121,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
      * @throws {IntermediaryError} if returned data are not correct
      */
     private verifyReturnedData(
+        signer: string,
         resp: ToBTCResponseType,
         amountData: AmountData,
         lp: Intermediary,
@@ -155,7 +158,9 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
             data.getType()!==ChainSwapType.CHAIN_NONCED ||
             !data.isPayIn() ||
             !data.isToken(amountData.token) ||
-            data.getClaimer()!==lp.getAddress(this.chainIdentifier)
+            !data.isClaimer(lp.getAddress(this.chainIdentifier)) ||
+            !data.isOfferer(signer) ||
+            data.getTotalDeposit() !== 0n
         ) {
             throw new IntermediaryError("Invalid data returned");
         }
@@ -198,6 +203,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
         const _abortController = extendAbortController(abortSignal);
         const pricePreFetchPromise: Promise<bigint | null> = this.preFetchPrice(amountData, _abortController.signal);
         const feeRatePromise: Promise<any> = this.preFetchFeeRate(signer, amountData, _hash, _abortController);
+        const _signDataPromise: Promise<any> = this.contract.preFetchBlockDataForSignatures==null ? this.preFetchSignData(Promise.resolve(true)) : null;
 
         return lps.map(lp => {
             return {
@@ -222,7 +228,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
                             }, this.options.postRequestTimeout, abortController.signal, retryCount>0 ? false : null);
 
                             return {
-                                signDataPromise: this.preFetchSignData(signDataPrefetch),
+                                signDataPromise: _signDataPromise ?? this.preFetchSignData(signDataPrefetch),
                                 resp: await response
                             };
                         }, null, RequestError, abortController.signal);
@@ -233,7 +239,7 @@ export class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCSwa
                         const data: T["Data"] = new this.swapDataDeserializer(resp.data);
                         data.setOfferer(signer);
 
-                        this.verifyReturnedData(resp, amountData, lp, options, data, hash);
+                        this.verifyReturnedData(signer, resp, amountData, lp, options, data, hash);
                         const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                             this.verifyReturnedPrice(
                                 lp.services[SwapType.TO_BTC], true, resp.amount, data.getAmount(),

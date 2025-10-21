@@ -223,12 +223,12 @@ class LnForGasSwap extends ISwap_1.ISwap {
      * A blocking promise resolving when payment was received by the intermediary and client can continue
      * rejecting in case of failure
      *
+     * @param checkIntervalSeconds How often to poll the intermediary for answer (default 5 seconds)
      * @param abortSignal Abort signal
-     * @param checkIntervalSeconds How often to poll the intermediary for answer
      * @throws {PaymentAuthError} If swap expired or failed
      * @throws {Error} When in invalid state (not PR_CREATED)
      */
-    async waitForPayment(abortSignal, checkIntervalSeconds = 5) {
+    async waitForPayment(checkIntervalSeconds, abortSignal) {
         if (this.state !== LnForGasSwapState.PR_CREATED)
             throw new Error("Must be in PR_CREATED state!");
         if (!this.initiated) {

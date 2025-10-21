@@ -10,7 +10,8 @@ export declare enum SwapHandlerType {
     FROM_BTCLN = "FROM_BTCLN",
     FROM_BTC_TRUSTED = "FROM_BTC_TRUSTED",
     FROM_BTCLN_TRUSTED = "FROM_BTCLN_TRUSTED",
-    FROM_BTC_SPV = "FROM_BTC_SPV"
+    FROM_BTC_SPV = "FROM_BTC_SPV",
+    FROM_BTCLN_AUTO = "FROM_BTCLN_AUTO"
 }
 export type SwapHandlerInfoType = {
     swapFeePPM: number;
@@ -75,8 +76,9 @@ export declare class IntermediaryDiscovery extends EventEmitter {
      * Returns the intermediary at the provided URL, either from the already fetched list of LPs or fetches the data on-demand
      *
      * @param url
+     * @param abortSignal
      */
-    getIntermediary(url: string): Promise<Intermediary>;
+    getIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary>;
     /**
      * Reloads the saves a list of intermediaries
      * @param abortSignal

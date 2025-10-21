@@ -43,6 +43,7 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
     /**
      * Verifies returned LP data
      *
+     * @param signer
      * @param resp Response as returned by the LP
      * @param parsedPr Parsed bolt11 lightning invoice
      * @param token Smart chain token to be used in the swap
@@ -85,6 +86,7 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
     create(signer: string, bolt11PayRequest: string, amountData: Omit<AmountData, "amount">, lps: Intermediary[], options?: ToBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
         feeRatePromise: Promise<any>;
         pricePreFetchPromise: Promise<bigint>;
+        signDataPrefetchPromise?: Promise<any>;
     }): Promise<{
         quote: Promise<ToBTCLNSwap<T>>;
         intermediary: Intermediary;

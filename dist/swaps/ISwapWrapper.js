@@ -10,10 +10,8 @@ class ISwapWrapper {
      * @param unifiedStorage
      * @param unifiedChainEvents
      * @param chain
-     * @param contract Underlying contract handling the swaps
      * @param prices Swap pricing handler
      * @param tokens Chain specific token data
-     * @param swapDataDeserializer Deserializer for SwapData
      * @param options
      * @param events Instance to use for emitting events
      */
@@ -125,24 +123,33 @@ class ISwapWrapper {
             this.tick();
         }, 1000);
     }
-    async checkPastSwaps(pastSwaps) {
-        if (pastSwaps == null)
-            pastSwaps = await this.unifiedStorage.query([[{ key: "type", value: this.TYPE }, { key: "state", value: this.pendingSwapStates }]], (val) => new this.swapDeserializer(this, val));
-        //Check past swaps
+    async _checkPastSwaps(pastSwaps) {
         const changedSwaps = [];
         const removeSwaps = [];
         await Promise.all(pastSwaps.map((swap) => swap._sync(false).then(changed => {
             if (swap.isQuoteExpired()) {
                 removeSwaps.push(swap);
-                this.logger.debug("init(): Removing expired swap: " + swap.getId());
+                this.logger.debug("_checkPastSwaps(): Removing expired swap: " + swap.getId());
             }
             else {
                 if (changed)
                     changedSwaps.push(swap);
             }
-        }).catch(e => this.logger.error("init(): Error when checking swap " + swap.getId() + ": ", e))));
-        await this.unifiedStorage.removeAll(removeSwaps);
-        await this.unifiedStorage.saveAll(changedSwaps);
+        }).catch(e => this.logger.error("_checkPastSwaps(): Error when checking swap " + swap.getId() + ": ", e))));
+        return { changedSwaps, removeSwaps };
+    }
+    async checkPastSwaps(pastSwaps, noSave) {
+        if (pastSwaps == null)
+            pastSwaps = await this.unifiedStorage.query([[{ key: "type", value: this.TYPE }, { key: "state", value: this.pendingSwapStates }]], (val) => new this.swapDeserializer(this, val));
+        const { removeSwaps, changedSwaps } = await this._checkPastSwaps(pastSwaps);
+        if (!noSave) {
+            await this.unifiedStorage.removeAll(removeSwaps);
+            await this.unifiedStorage.saveAll(changedSwaps);
+        }
+        return {
+            removeSwaps,
+            changedSwaps
+        };
     }
     async tick(swaps) {
         if (swaps == null)

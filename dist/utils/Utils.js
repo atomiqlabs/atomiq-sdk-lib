@@ -1,9 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.randomBytes = exports.toCoinselectAddressType = exports.toOutputScript = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
+exports.randomBytes = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
 const RequestError_1 = require("../errors/RequestError");
 const buffer_1 = require("buffer");
-const btc_signer_1 = require("@scure/btc-signer");
 const utils_1 = require("@noble/hashes/utils");
 function isConstructor(fn) {
     return (typeof fn === 'function' &&
@@ -291,42 +290,6 @@ function bigIntCompare(a, b) {
     return a > b ? 1 : a === b ? 0 : -1;
 }
 exports.bigIntCompare = bigIntCompare;
-function toOutputScript(network, address) {
-    const outputScript = (0, btc_signer_1.Address)(network).decode(address);
-    switch (outputScript.type) {
-        case "pkh":
-        case "sh":
-        case "wpkh":
-        case "wsh":
-            return buffer_1.Buffer.from(btc_signer_1.OutScript.encode({
-                type: outputScript.type,
-                hash: outputScript.hash
-            }));
-        case "tr":
-            return buffer_1.Buffer.from(btc_signer_1.OutScript.encode({
-                type: "tr",
-                pubkey: outputScript.pubkey
-            }));
-    }
-}
-exports.toOutputScript = toOutputScript;
-function toCoinselectAddressType(outputScript) {
-    const data = btc_signer_1.OutScript.decode(outputScript);
-    switch (data.type) {
-        case "pkh":
-            return "p2pkh";
-        case "sh":
-            return "p2sh-p2wpkh";
-        case "wpkh":
-            return "p2wpkh";
-        case "wsh":
-            return "p2wsh";
-        case "tr":
-            return "p2tr";
-    }
-    throw new Error("Unrecognized address type!");
-}
-exports.toCoinselectAddressType = toCoinselectAddressType;
 function randomBytes(bytesLength) {
     return buffer_1.Buffer.from((0, utils_1.randomBytes)(bytesLength));
 }

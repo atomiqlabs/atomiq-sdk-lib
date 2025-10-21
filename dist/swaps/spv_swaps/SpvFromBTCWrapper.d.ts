@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { AmountData, ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens } from "../ISwapWrapper";
 import { BtcRelay, ChainEvent, ChainType, RelaySynchronizer, SpvVaultClaimEvent, SpvVaultCloseEvent, SpvVaultFrontEvent } from "@atomiqlabs/base";
-import { SpvFromBTCSwap } from "./SpvFromBTCSwap";
+import { SpvFromBTCSwap, SpvFromBTCSwapState } from "./SpvFromBTCSwap";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { SwapType } from "../enums/SwapType";
 import { BitcoinRpcWithAddressIndex } from "../../btc/BitcoinRpcWithAddressIndex";
@@ -12,6 +12,7 @@ import { EventEmitter } from "events";
 import { Intermediary } from "../../intermediaries/Intermediary";
 import { Transaction } from "@scure/btc-signer";
 import { ISwap } from "../ISwap";
+import { IClaimableSwapWrapper } from "../IClaimableSwapWrapper";
 export type SpvFromBTCOptions = {
     gasAmount?: bigint;
     unsafeZeroWatchtowerFee?: boolean;
@@ -27,7 +28,8 @@ export type SpvFromBTCWrapperOptions = ISwapWrapperOptions & {
     maxBtcFeeMultiplier?: number;
     maxBtcFeeOffset?: number;
 };
-export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper<T, SpvFromBTCSwap<T>, SpvFromBTCWrapperOptions> {
+export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper<T, SpvFromBTCSwap<T>, SpvFromBTCWrapperOptions> implements IClaimableSwapWrapper<SpvFromBTCSwap<T>> {
+    readonly claimableSwapStates: SpvFromBTCSwapState[];
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
     readonly swapDeserializer: typeof SpvFromBTCSwap;
     readonly synchronizer: RelaySynchronizer<any, T["TX"], any>;
@@ -60,10 +62,16 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
     protected processEventClose(event: SpvVaultCloseEvent, swap: SpvFromBTCSwap<T>): boolean;
     protected processEvent(event: ChainEvent<T["Data"]>, swap: SpvFromBTCSwap<T>): Promise<boolean>;
     /**
+     * Pre-fetches latest finalized block height of the smart chain
+     *
+     * @param abortController
+     * @private
+     */
+    private preFetchFinalizedBlockHeight;
+    /**
      * Pre-fetches caller (watchtower) bounty data for the swap. Doesn't throw, instead returns null and aborts the
      *  provided abortController
      *
-     * @param signer Smartchain signer address initiating the swap
      * @param amountData
      * @param options Options as passed to the swap creation function
      * @param pricePrefetch
@@ -81,6 +89,7 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
      * @param options Options as passed to the swap creation function
      * @param callerFeeShare
      * @param bitcoinFeeRatePromise Maximum accepted fee rate from the LPs
+     * @param abortSignal
      * @private
      * @throws {IntermediaryError} in case the response is invalid
      */
@@ -106,4 +115,8 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
      * @param includeGasToken   Whether to return the PSBT also with the gas token amount (increases the vSize by 8)
      */
     getDummySwapPsbt(includeGasToken?: boolean): Transaction;
+    protected _checkPastSwaps(pastSwaps: SpvFromBTCSwap<T>[]): Promise<{
+        changedSwaps: SpvFromBTCSwap<T>[];
+        removeSwaps: SpvFromBTCSwap<T>[];
+    }>;
 }

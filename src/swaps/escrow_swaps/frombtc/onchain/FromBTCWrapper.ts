@@ -18,14 +18,15 @@ import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../../ISwap
 import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../../errors/IntermediaryError";
 import {SwapType} from "../../../enums/SwapType";
-import {extendAbortController, randomBytes, toOutputScript, tryWithRetries} from "../../../../utils/Utils";
+import {extendAbortController, randomBytes, tryWithRetries} from "../../../../utils/Utils";
+import { toOutputScript} from "../../../../utils/BitcoinUtils";
 import {FromBTCResponseType, IntermediaryAPI} from "../../../../intermediaries/IntermediaryAPI";
 import {RequestError} from "../../../../errors/RequestError";
 import {BTC_NETWORK, TEST_NETWORK} from "@scure/btc-signer/utils";
 import {UnifiedSwapEventListener} from "../../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
 import {ISwap} from "../../../ISwap";
-import {MempoolApi} from "../../../../btc/mempool/MempoolApi";
+import {IClaimableSwapWrapper} from "../../../IClaimableSwapWrapper";
 
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint,
@@ -44,7 +45,9 @@ export type FromBTCWrapperOptions = ISwapWrapperOptions & {
 
 export class FromBTCWrapper<
     T extends ChainType
-> extends IFromBTCWrapper<T, FromBTCSwap<T>, FromBTCWrapperOptions> {
+> extends IFromBTCWrapper<T, FromBTCSwap<T>, FromBTCWrapperOptions> implements IClaimableSwapWrapper<FromBTCSwap<T>> {
+
+    public readonly claimableSwapStates = [FromBTCSwapState.BTC_TX_CONFIRMED];
     public readonly TYPE = SwapType.FROM_BTC;
     public readonly swapDeserializer = FromBTCSwap;
 
@@ -232,6 +235,7 @@ export class FromBTCWrapper<
     /**
      * Verifies response returned from intermediary
      *
+     * @param signer
      * @param resp Response as returned by the intermediary
      * @param amountData
      * @param lp Intermediary
@@ -244,6 +248,7 @@ export class FromBTCWrapper<
      * @throws {IntermediaryError} in case the response is invalid
      */
     private verifyReturnedData(
+        signer: string,
         resp: FromBTCResponseType,
         amountData: AmountData,
         lp: Intermediary,
@@ -277,8 +282,10 @@ export class FromBTCWrapper<
             data.getAmount() !== resp.total ||
             data.isPayIn() ||
             !data.isToken(amountData.token) ||
-            data.getOfferer()!==lp.getAddress(this.chainIdentifier) ||
-            !data.isDepositToken(depositToken)
+            !data.isOfferer(lp.getAddress(this.chainIdentifier)) ||
+            !data.isClaimer(signer) ||
+            !data.isDepositToken(depositToken) ||
+            data.hasSuccessAction()
         ) {
             throw new IntermediaryError("Invalid data returned");
         }
@@ -333,6 +340,7 @@ export class FromBTCWrapper<
         const claimerBountyPrefetchPromise = this.preFetchClaimerBounty(signer, amountData, options, _abortController);
         const nativeTokenAddress = this.chain.getNativeCurrencyAddress();
         const feeRatePromise: Promise<any> = this.preFetchFeeRate(signer, amountData, null, _abortController);
+        const _signDataPromise: Promise<any> = this.contract.preFetchBlockDataForSignatures==null ? this.preFetchSignData(Promise.resolve(true)) : null;
 
         return lps.map(lp => {
             return {
@@ -361,7 +369,7 @@ export class FromBTCWrapper<
                             );
 
                             return {
-                                signDataPromise: this.preFetchSignData(signDataPrefetch),
+                                signDataPromise: _signDataPromise ?? this.preFetchSignData(signDataPrefetch),
                                 resp: await response
                             };
                         }, null, e => e instanceof RequestError, abortController.signal);
@@ -369,7 +377,7 @@ export class FromBTCWrapper<
                         const data: T["Data"] = new this.swapDataDeserializer(resp.data);
                         data.setClaimer(signer);
 
-                        this.verifyReturnedData(resp, amountData, lp, options, data, sequence, await claimerBountyPrefetchPromise, nativeTokenAddress);
+                        this.verifyReturnedData(signer, resp, amountData, lp, options, data, sequence, await claimerBountyPrefetchPromise, nativeTokenAddress);
                         const [pricingInfo, signatureExpiry] = await Promise.all([
                             //Get intermediary's liquidity
                             this.verifyReturnedPrice(

@@ -7,8 +7,10 @@ import {BitcoinTokens, fromDecimal, SCToken, TokenAmount, toTokenAmount} from ".
 import {ChainIds, MultiChain, Swapper} from "../Swapper";
 import {IBitcoinWallet} from "../../../btc/wallet/IBitcoinWallet";
 import {SingleAddressBitcoinWallet} from "../../../btc/wallet/SingleAddressBitcoinWallet";
-import {AbstractSigner, BigIntBufferUtils, ChainSwapType} from "@atomiqlabs/base";
+import {BigIntBufferUtils, ChainSwapType, isAbstractSigner} from "@atomiqlabs/base";
 import {bigIntMax, randomBytes} from "../../../utils/Utils";
+import {MinimalBitcoinWalletInterface} from "../../../btc/wallet/MinimalBitcoinWalletInterface";
+import {toBitcoinWallet} from "../../../utils/BitcoinHelpers";
 
 export class SwapperUtils<T extends MultiChain> {
 
@@ -325,12 +327,12 @@ export class SwapperUtils<T extends MultiChain> {
     /**
      * Returns the spendable balance of a bitcoin wallet
      *
-     * @param addressOrWallet
+     * @param wallet
      * @param targetChain
      * @param options Additional options
      */
     async getBitcoinSpendableBalance(
-        addressOrWallet: string | IBitcoinWallet,
+        wallet: string | IBitcoinWallet | MinimalBitcoinWalletInterface,
         targetChain?: ChainIds<T>,
         options?: {
             gasDrop?: boolean,
@@ -341,14 +343,11 @@ export class SwapperUtils<T extends MultiChain> {
         balance: TokenAmount,
         feeRate: number
     }> {
-        if(typeof(addressOrWallet)!=="string" && (addressOrWallet as IBitcoinWallet).getTransactionFee==null)
-            throw new Error("Wallet must be a string address or IBitcoinWallet");
-
         let bitcoinWallet: IBitcoinWallet;
-        if(typeof(addressOrWallet)==="string") {
-            bitcoinWallet = new SingleAddressBitcoinWallet(this.root.bitcoinRpc, this.bitcoinNetwork, addressOrWallet);
+        if(typeof(wallet)==="string") {
+            bitcoinWallet = new SingleAddressBitcoinWallet(this.root.bitcoinRpc, this.bitcoinNetwork, {address: wallet, publicKey: ""});
         } else {
-            bitcoinWallet = addressOrWallet as IBitcoinWallet;
+            bitcoinWallet = toBitcoinWallet(wallet, this.root.bitcoinRpc, this.bitcoinNetwork);
         }
 
         let feeRate = options?.feeRate ?? await bitcoinWallet.getFeeRate();
@@ -370,18 +369,20 @@ export class SwapperUtils<T extends MultiChain> {
     /**
      * Returns the maximum spendable balance of the wallet, deducting the fee needed to initiate a swap for native balances
      */
-    async getSpendableBalance<ChainIdentifier extends ChainIds<T>>(wallet: string | T[ChainIdentifier]["Signer"], token: SCToken<ChainIdentifier>, options?: {
+    async getSpendableBalance<ChainIdentifier extends ChainIds<T>>(wallet: string | T[ChainIdentifier]["Signer"] | T[ChainIdentifier]["NativeSigner"], token: SCToken<ChainIdentifier>, options?: {
         feeMultiplier?: number,
         feeRate?: any
     }): Promise<TokenAmount> {
-        if(typeof(wallet)!=="string" && (wallet as AbstractSigner).getAddress==null)
-            throw new Error("Signer must be a string or smart chain signer");
-
         if(this.root.chains[token.chainId]==null) throw new Error("Invalid chain identifier! Unknown chain: "+token.chainId);
-
         const {swapContract, chainInterface} = this.root.chains[token.chainId];
 
-        const signer = typeof(wallet)==="string" ? wallet : (wallet as AbstractSigner).getAddress();
+        let signer: string;
+        if(typeof(wallet)==="string") {
+            signer = wallet;
+        } else {
+            const abstractSigner = isAbstractSigner(wallet) ? wallet : await chainInterface.wrapSigner(wallet);
+            signer = abstractSigner.getAddress();
+        }
 
         let finalBalance: bigint;
         if(chainInterface.getNativeCurrencyAddress()!==token.address) {
@@ -390,6 +391,7 @@ export class SwapperUtils<T extends MultiChain> {
             let [balance, commitFee] = await Promise.all([
                 chainInterface.getBalance(signer, token.address),
                 swapContract.getCommitFee(
+                    signer,
                     //Use large amount, such that the fee for wrapping more tokens is always included!
                     await swapContract.createSwapData(
                         ChainSwapType.HTLC, signer, null, token.address,

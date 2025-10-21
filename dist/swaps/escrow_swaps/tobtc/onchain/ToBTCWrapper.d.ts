@@ -61,6 +61,7 @@ export declare class ToBTCWrapper<T extends ChainType> extends IToBTCWrapper<T, 
     /**
      * Verifies returned LP data
      *
+     * @param signer
      * @param resp LP's response
      * @param amountData
      * @param lp
