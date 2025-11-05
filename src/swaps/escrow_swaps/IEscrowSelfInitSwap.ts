@@ -105,6 +105,13 @@ export abstract class IEscrowSelfInitSwap<
 
 
     //////////////////////////////
+    //// Commit and claim
+
+    abstract txsCommit(skipChecks?: boolean): Promise<T["TX"][]>;
+    abstract commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean, onBeforeTxSent?: (txId: string) => void): Promise<string>;
+
+
+    //////////////////////////////
     //// Quote verification
 
     /**

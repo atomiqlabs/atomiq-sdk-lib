@@ -36,6 +36,8 @@ export declare abstract class IEscrowSelfInitSwap<T extends ChainType = ChainTyp
         balance: TokenAmount;
         required: TokenAmount;
     }>;
+    abstract txsCommit(skipChecks?: boolean): Promise<T["TX"][]>;
+    abstract commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean, onBeforeTxSent?: (txId: string) => void): Promise<string>;
     /**
      * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
      */
