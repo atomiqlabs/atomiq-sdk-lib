@@ -7,12 +7,18 @@ import {BitcoinRpcWithAddressIndex} from "../BitcoinRpcWithAddressIndex";
 
 export class SingleAddressBitcoinWallet extends BitcoinWallet {
 
-    readonly privKey: Uint8Array;
+    readonly privKey?: Uint8Array;
     readonly pubkey: Uint8Array;
     readonly address: string;
     readonly addressType: CoinselectAddressTypes;
 
-    constructor(mempoolApi: BitcoinRpcWithAddressIndex<any>, network: BTC_NETWORK, addressDataOrWIF: string | {address: string, publicKey: string}, feeMultiplier: number = 1.25, feeOverride?: number) {
+    constructor(
+        mempoolApi: BitcoinRpcWithAddressIndex<any>,
+        network: BTC_NETWORK,
+        addressDataOrWIF: string | {address: string, publicKey: string},
+        feeMultiplier: number = 1.25,
+        feeOverride?: number
+    ) {
         super(mempoolApi, network, feeMultiplier, feeOverride);
         if(typeof(addressDataOrWIF)==="string") {
             try {
@@ -21,7 +27,9 @@ export class SingleAddressBitcoinWallet extends BitcoinWallet {
                 this.privKey = WIF().decode(addressDataOrWIF);
             }
             this.pubkey = pubECDSA(this.privKey);
-            this.address = getAddress("wpkh", this.privKey, network);
+            const address = getAddress("wpkh", this.privKey, network);
+            if(address==null) throw new Error("Failed to generate p2wpkh address from the provided private key!");
+            this.address = address;
         } else {
             this.address = addressDataOrWIF.address;
             this.pubkey = Buffer.from(addressDataOrWIF.publicKey, "hex");
@@ -37,7 +45,8 @@ export class SingleAddressBitcoinWallet extends BitcoinWallet {
 
     async sendTransaction(address: string, amount: bigint, feeRate?: number): Promise<string> {
         if(!this.privKey) throw new Error("Not supported.");
-        const {psbt} = await super._getPsbt(this.toBitcoinWalletAccounts(), address, Number(amount), feeRate);
+        const {psbt, fee} = await super._getPsbt(this.toBitcoinWalletAccounts(), address, Number(amount), feeRate);
+        if(psbt==null) throw new Error(`Not enough funds, required for fee: ${fee} sats!`);
         psbt.sign(this.privKey);
         psbt.finalize();
         const txHex = Buffer.from(psbt.extract()).toString("hex");
@@ -61,14 +70,12 @@ export class SingleAddressBitcoinWallet extends BitcoinWallet {
     }
 
     async getTransactionFee(address: string, amount: bigint, feeRate?: number): Promise<number> {
-        const {psbt, fee} = await super._getPsbt(this.toBitcoinWalletAccounts(), address, Number(amount), feeRate);
-        if(psbt==null) return null;
+        const {fee} = await super._getPsbt(this.toBitcoinWalletAccounts(), address, Number(amount), feeRate);
         return fee;
     }
 
     async getFundedPsbtFee(basePsbt: Transaction, feeRate?: number): Promise<number> {
-        const {psbt, fee} = await super._fundPsbt(this.toBitcoinWalletAccounts(), basePsbt, feeRate);
-        if(psbt==null) return null;
+        const {fee} = await super._fundPsbt(this.toBitcoinWalletAccounts(), basePsbt, feeRate);
         return fee;
     }
 
