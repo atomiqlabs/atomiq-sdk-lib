@@ -347,6 +347,61 @@ export class FromBTCLNSwap<T extends ChainType = ChainType>
         }
     }
 
+    async txsExecute(options?: {
+        skipChecks?: boolean
+    }) {
+        if(this.state===FromBTCLNSwapState.PR_CREATED) {
+            if(!await this.verifyQuoteValid()) throw new Error("Quote already expired or close to expiry!");
+            return [
+                {
+                    name: "Payment" as const,
+                    description: "Initiates the swap by paying up the lightning network invoice",
+                    chain: "LIGHTNING",
+                    txs: [
+                        {
+                            address: this.pr,
+                            hyperlink: this.getHyperlink()
+                        }
+                    ]
+                }
+            ];
+        }
+
+        if(this.state===FromBTCLNSwapState.PR_PAID) {
+            if(!await this.verifyQuoteValid()) throw new Error("Quote already expired or close to expiry!");
+            const txsCommit = await this.txsCommit(options?.skipChecks);
+            const txsClaim = await this.txsClaim(undefined, true);
+            return [
+                {
+                    name: "Commit" as const,
+                    description: `Creates the HTLC escrow on the ${this.chainIdentifier} side`,
+                    chain: this.chainIdentifier,
+                    txs: txsCommit
+                },
+                {
+                    name: "Claim" as const,
+                    description: `Settles & claims the funds from the HTLC escrow on the ${this.chainIdentifier} side`,
+                    chain: this.chainIdentifier,
+                    txs: txsClaim
+                },
+            ];
+        }
+
+        if(this.state===FromBTCLNSwapState.CLAIM_COMMITED) {
+            const txsClaim = await this.txsClaim();
+            return [
+                {
+                    name: "Claim" as const,
+                    description: `Settles & claims the funds from the HTLC escrow on the ${this.chainIdentifier} side`,
+                    chain: this.chainIdentifier,
+                    txs: txsClaim
+                },
+            ];
+        }
+
+        throw new Error("Invalid swap state to obtain execution txns, required PR_CREATED, PR_PAID or CLAIM_COMMITED");
+    }
+
 
     //////////////////////////////
     //// Payment
@@ -592,8 +647,8 @@ export class FromBTCLNSwap<T extends ChainType = ChainType>
      * @param _signer Optional signer address to use for claiming the swap, can also be different from the initializer
      * @throws {Error} If in invalid state (must be CLAIM_COMMITED)
      */
-    async txsClaim(_signer?: T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]> {
-        if(this.state!==FromBTCLNSwapState.CLAIM_COMMITED) throw new Error("Must be in CLAIM_COMMITED state!");
+    async txsClaim(_signer?: T["Signer"] | T["NativeSigner"], skipStateChecks?: boolean): Promise<T["TX"][]> {
+        if(!skipStateChecks && this.state!==FromBTCLNSwapState.CLAIM_COMMITED) throw new Error("Must be in CLAIM_COMMITED state!");
         return await this.wrapper.contract.txsClaimWithSecret(
             _signer==null ?
                 this._getInitiator() :

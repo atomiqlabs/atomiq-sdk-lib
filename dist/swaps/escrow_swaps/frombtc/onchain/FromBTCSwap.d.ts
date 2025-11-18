@@ -41,6 +41,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * Returns bitcoin address where the on-chain BTC should be sent to
      */
     getAddress(): string;
+    private _getHyperlink;
     getHyperlink(): string;
     getInputTxId(): string | null;
     /**
@@ -101,6 +102,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
         psbtBase64: string;
         signInputs: number[];
     }>;
+    private _getFundedPsbt;
     /**
      * Submits a PSBT signed by the wallet back to the SDK
      *
@@ -136,6 +138,29 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
         btcTxCheckIntervalSeconds?: number;
         maxWaitTillAutomaticSettlementSeconds?: number;
     }): Promise<boolean>;
+    txsExecute(options?: {
+        bitcoinWallet?: MinimalBitcoinWalletInterface;
+        skipChecks?: boolean;
+    }): Promise<({
+        name: "Commit";
+        description: string;
+        chain: T["ChainId"];
+        txs: T["TX"][];
+    } | {
+        name: "Payment";
+        description: string;
+        chain: string;
+        txs: ({
+            psbt: Transaction;
+            psbtHex: string;
+            psbtBase64: string;
+            signInputs: number[];
+        } | {
+            address: string;
+            amount: number;
+            hyperlink: string;
+        })[];
+    })[]>;
     /**
      * Commits the swap on-chain, locking the tokens from the intermediary in a PTLC
      *

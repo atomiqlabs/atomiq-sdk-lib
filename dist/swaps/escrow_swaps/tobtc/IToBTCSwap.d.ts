@@ -104,6 +104,14 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extend
         paymentCheckIntervalSeconds?: number;
         maxWaitTillSwapProcessedSeconds?: number;
     }): Promise<boolean>;
+    txsExecute(options?: {
+        skipChecks?: boolean;
+    }): Promise<{
+        name: "Commit";
+        description: string;
+        chain: T["ChainId"];
+        txs: T["TX"][];
+    }[]>;
     /**
      * Returns transactions for committing the swap on-chain, initiating the swap
      *
