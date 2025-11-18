@@ -67,6 +67,15 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
         type: FeeType.SWAP;
         fee: Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>>;
     }];
+    txsExecute(): Promise<{
+        name: "Payment";
+        description: string;
+        chain: string;
+        txs: {
+            address: string;
+            hyperlink: string;
+        }[];
+    }[]>;
     protected checkInvoicePaid(save?: boolean): Promise<boolean | null>;
     /**
      * A blocking promise resolving when payment was received by the intermediary and client can continue

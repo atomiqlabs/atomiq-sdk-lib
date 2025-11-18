@@ -180,6 +180,26 @@ class LnForGasSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Payment
+    async txsExecute() {
+        if (this.state === LnForGasSwapState.PR_CREATED) {
+            if (!await this.verifyQuoteValid())
+                throw new Error("Quote already expired or close to expiry!");
+            return [
+                {
+                    name: "Payment",
+                    description: "Initiates the swap by paying up the lightning network invoice",
+                    chain: "LIGHTNING",
+                    txs: [
+                        {
+                            address: this.pr,
+                            hyperlink: this.getHyperlink()
+                        }
+                    ]
+                }
+            ];
+        }
+        throw new Error("Invalid swap state to obtain execution txns, required PR_CREATED");
+    }
     async checkInvoicePaid(save = true) {
         if (this.state === LnForGasSwapState.FAILED || this.state === LnForGasSwapState.EXPIRED)
             return false;

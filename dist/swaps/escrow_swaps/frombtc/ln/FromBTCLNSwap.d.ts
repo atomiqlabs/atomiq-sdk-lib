@@ -105,6 +105,27 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
         lightningTxCheckIntervalSeconds?: number;
         delayBetweenCommitAndClaimSeconds?: number;
     }): Promise<void>;
+    txsExecute(options?: {
+        skipChecks?: boolean;
+    }): Promise<{
+        name: "Payment";
+        description: string;
+        chain: string;
+        txs: {
+            address: string;
+            hyperlink: string;
+        }[];
+    }[] | ({
+        name: "Commit";
+        description: string;
+        chain: T["ChainId"];
+        txs: T["TX"][];
+    } | {
+        name: "Claim";
+        description: string;
+        chain: T["ChainId"];
+        txs: T["TX"][];
+    })[]>;
     /**
      * Checks whether the LP received the LN payment and we can continue by committing & claiming the HTLC on-chain
      *
@@ -150,7 +171,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
      * @param _signer Optional signer address to use for claiming the swap, can also be different from the initializer
      * @throws {Error} If in invalid state (must be CLAIM_COMMITED)
      */
-    txsClaim(_signer?: T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]>;
+    txsClaim(_signer?: T["Signer"] | T["NativeSigner"], skipStateChecks?: boolean): Promise<T["TX"][]>;
     /**
      * Claims and finishes the swap
      *

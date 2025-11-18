@@ -480,6 +480,27 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         throw new Error("Invalid state reached!");
     }
 
+    async txsExecute() {
+        if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
+            if (!await this.verifyQuoteValid()) throw new Error("Quote already expired or close to expiry!");
+            return [
+                {
+                    name: "Payment" as const,
+                    description: "Initiates the swap by paying up the lightning network invoice",
+                    chain: "LIGHTNING",
+                    txs: [
+                        {
+                            address: this.pr,
+                            hyperlink: this.getHyperlink()
+                        }
+                    ]
+                }
+            ];
+        }
+
+        throw new Error("Invalid swap state to obtain execution txns, required PR_CREATED");
+    }
+
 
     //////////////////////////////
     //// Payment

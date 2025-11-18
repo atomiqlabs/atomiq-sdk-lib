@@ -107,6 +107,23 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
     submitPsbt(_psbt: Transaction | string): Promise<string>;
     estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>> | null>;
     sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string>;
+    txsExecute(options?: {
+        bitcoinWallet?: MinimalBitcoinWalletInterface;
+    }): Promise<{
+        name: "Payment";
+        description: string;
+        chain: string;
+        txs: ({
+            psbt: Transaction;
+            psbtHex: string;
+            psbtBase64: string;
+            signInputs: number[];
+        } | {
+            address: string;
+            amount: number;
+            hyperlink: string;
+        })[];
+    }[]>;
     protected checkAddress(save?: boolean): Promise<boolean | null>;
     protected setRefundAddress(refundAddress: string): Promise<void>;
     /**

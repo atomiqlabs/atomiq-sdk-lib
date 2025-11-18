@@ -201,6 +201,26 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         btcTxCheckIntervalSeconds?: number;
         maxWaitTillAutomaticSettlementSeconds?: number;
     }): Promise<boolean>;
+    txsExecute(options?: {
+        bitcoinWallet?: MinimalBitcoinWalletInterface;
+    }): Promise<{
+        name: "Payment";
+        description: string;
+        chain: string;
+        txs: ({
+            type: string;
+            psbt: Transaction;
+            psbtHex: string;
+            psbtBase64: string;
+            in1sequence: number;
+        } | {
+            type: string;
+            psbt: Transaction;
+            psbtHex: string;
+            psbtBase64: string;
+            signInputs: number[];
+        })[];
+    }[]>;
     /**
      * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
      */

@@ -328,6 +328,21 @@ export abstract class IToBTCSwap<
         throw new Error("Unexpected state reached!");
     }
 
+    async txsExecute(options?: {
+        skipChecks?: boolean
+    }) {
+        if(this.state!==ToBTCSwapState.CREATED) throw new Error("Invalid swap state, needs to be CREATED!");
+        const txsCommit = await this.txsCommit(options?.skipChecks);
+        return [
+            {
+                name: "Commit" as const,
+                description: `Initiates the swap by commiting the funds to the escrow on the ${this.chainIdentifier} side`,
+                chain: this.chainIdentifier,
+                txs: txsCommit
+            }
+        ];
+    }
+
 
     //////////////////////////////
     //// Commit

@@ -45,6 +45,13 @@ export function ppmToPercentage(ppm: bigint): PercentagePPM {
     }
 }
 
+export type SwapExecutionAction<T extends ChainType> = {
+    name: "Payment" | "Commit" | "Claim",
+    description: string,
+    chain: "LIGHTNING" | "BITCOIN" | T["ChainId"],
+    txs: any[]
+};
+
 export abstract class ISwap<
     T extends ChainType = ChainType,
     D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D, S>> = SwapTypeDefinition<T, ISwapWrapper<T, any>, ISwap<T, any, any>>,
@@ -164,6 +171,7 @@ export abstract class ISwap<
         });
     }
 
+    abstract txsExecute(options?: any): Promise<SwapExecutionAction<T>[]>;
 
     //////////////////////////////
     //// Pricing

@@ -357,6 +357,30 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         }
     }
 
+    async txsExecute(options?: {
+        bitcoinWallet?: MinimalBitcoinWalletInterface
+    }) {
+        if(this.state===OnchainForGasSwapState.PR_CREATED) {
+            if(!await this.verifyQuoteValid()) throw new Error("Quote already expired or close to expiry!");
+            return [
+                {
+                    name: "Payment" as const,
+                    description: "Send funds to the bitcoin swap address",
+                    chain: "BITCOIN",
+                    txs: [
+                        options?.bitcoinWallet==null ? {
+                            address: this.address,
+                            amount: Number(this.inputAmount),
+                            hyperlink: this.getHyperlink()
+                        } : await this.getFundedPsbt(options.bitcoinWallet)
+                    ]
+                }
+            ];
+        }
+
+        throw new Error("Invalid swap state to obtain execution txns, required PR_CREATED or CLAIM_COMMITED");
+    }
+
 
     //////////////////////////////
     //// Payment
