@@ -63,6 +63,10 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
                     return false;
                 }
             }
+            if (swap._getEscrowHash() !== event.escrowHash) {
+                this.logger.error("processEventInitialize(" + swap.getId() + "): Error when processing event, escrow hashes don't match!");
+                return false;
+            }
             swap.commitTxId = event.meta.txId;
             swap.state = FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_COMMITED;
             swap._broadcastSecret().catch(e => {

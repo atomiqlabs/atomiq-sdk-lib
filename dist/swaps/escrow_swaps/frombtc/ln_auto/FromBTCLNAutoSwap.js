@@ -305,7 +305,6 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             if (!paymentSuccess)
                 throw new Error("Failed to receive lightning network payment");
         }
-        // @ts-ignore
         if (this.state === FromBTCLNAutoSwapState.CLAIM_CLAIMED)
             return true;
         if (this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED) {
@@ -411,8 +410,9 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         checkIntervalSeconds ??= 5;
         if (this.state === FromBTCLNAutoSwapState.PR_PAID) {
             await this.waitTillCommited(checkIntervalSeconds, abortSignal);
-            return true;
         }
+        if (this.state >= FromBTCLNAutoSwapState.CLAIM_COMMITED)
+            return true;
         if (this.state !== FromBTCLNAutoSwapState.PR_CREATED)
             throw new Error("Must be in PR_CREATED state!");
         const abortController = new AbortController();
@@ -439,31 +439,40 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             await this.wrapper.messenger.warmup().catch(e => {
                 this.logger.warn("waitForPayment(): Failed to warmup messenger: ", e);
             });
-        let resp = { code: IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING, msg: "" };
-        while (!abortController.signal.aborted && resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING) {
-            resp = await IntermediaryAPI_1.IntermediaryAPI.getInvoiceStatus(this.url, this.getPaymentHash().toString("hex"));
-            if (resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING)
-                await (0, Utils_1.timeoutPromise)(checkIntervalSeconds * 1000, abortController.signal);
-        }
-        this.lnurlFailSignal.signal.removeEventListener("abort", lnurlFailListener);
-        abortController.signal.throwIfAborted();
-        if (resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.PAID) {
-            const swapData = new this.wrapper.swapDataDeserializer(resp.data.data);
-            const success = await this._saveRealSwapData(swapData, true);
+        if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
+            const paymentResult = await Promise.any([
+                this.waitTillState(FromBTCLNAutoSwapState.PR_PAID, "gte", abortController.signal).then(() => true),
+                (async () => {
+                    let resp = { code: IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING, msg: "" };
+                    while (!abortController.signal.aborted && resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING) {
+                        resp = await IntermediaryAPI_1.IntermediaryAPI.getInvoiceStatus(this.url, this.getPaymentHash().toString("hex"));
+                        if (resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING)
+                            await (0, Utils_1.timeoutPromise)(checkIntervalSeconds * 1000, abortController.signal);
+                    }
+                    this.lnurlFailSignal.signal.removeEventListener("abort", lnurlFailListener);
+                    abortController.signal.throwIfAborted();
+                    if (resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.PAID) {
+                        const swapData = new this.wrapper.swapDataDeserializer(resp.data.data);
+                        return await this._saveRealSwapData(swapData, true);
+                    }
+                    if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
+                        if (resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.EXPIRED) {
+                            await this._saveAndEmit(FromBTCLNAutoSwapState.QUOTE_EXPIRED);
+                        }
+                        return false;
+                    }
+                })()
+            ]);
+            abortController.abort();
+            if (!paymentResult)
+                return false;
             if (onPaymentReceived != null)
                 onPaymentReceived(this.getInputTxId());
-            if (success) {
-                await this.waitTillCommited(checkIntervalSeconds, abortSignal);
-                return this.state >= FromBTCLNAutoSwapState.CLAIM_COMMITED;
-            }
-            return false;
         }
-        if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
-            if (resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.EXPIRED) {
-                await this._saveAndEmit(FromBTCLNAutoSwapState.QUOTE_EXPIRED);
-            }
-            return false;
+        if (this.state === FromBTCLNAutoSwapState.PR_PAID) {
+            await this.waitTillCommited(checkIntervalSeconds, abortSignal);
         }
+        return this.state >= FromBTCLNAutoSwapState.CLAIM_COMMITED;
     }
     //////////////////////////////
     //// Commit
