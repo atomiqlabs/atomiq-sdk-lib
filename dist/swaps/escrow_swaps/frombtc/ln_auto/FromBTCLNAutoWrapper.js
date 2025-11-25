@@ -55,12 +55,13 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
                 //Obtain data from the initialize event
                 const eventData = await event.swapData();
                 try {
-                    return await swap._saveRealSwapData(eventData, false);
+                    await swap._saveRealSwapData(eventData, false);
+                    this.logger.info("processEventInitialize(" + swap.getId() + "): Successfully taken swap data from on-chain event!");
                 }
                 catch (e) {
                     this.logger.error("processEventInitialize(" + swap.getId() + "): Error when saving swap data for swap: ", e);
+                    return false;
                 }
-                return false;
             }
             swap.commitTxId = event.meta.txId;
             swap.state = FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_COMMITED;
