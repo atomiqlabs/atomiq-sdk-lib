@@ -350,6 +350,7 @@ export class FromBTCLNAutoWrapper<
                         };
                         const quote = new FromBTCLNAutoSwap<T>(this, swapInit);
                         await quote._save();
+                        this.logger.debug("create(): Created new FromBTCLNAutoSwap quote, claimHash (pseudo escrowHash): ", quote._getEscrowHash());
                         return quote;
                     } catch (e) {
                         abortController.abort(e);

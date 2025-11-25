@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UnifiedSwapEventListener = void 0;
 const base_1 = require("@atomiqlabs/base");
+const Utils_1 = require("../utils/Utils");
 function chainEventToEscrowHash(event) {
     if (event instanceof base_1.SwapEvent)
         return event.escrowHash;
@@ -10,6 +11,7 @@ function chainEventToEscrowHash(event) {
         event instanceof base_1.SpvVaultCloseEvent)
         return event.btcTxId;
 }
+const logger = (0, Utils_1.getLogger)("UnifiedSwapEventListener: ");
 class UnifiedSwapEventListener {
     constructor(unifiedStorage, events) {
         this.listeners = {};
@@ -21,6 +23,7 @@ class UnifiedSwapEventListener {
         events.forEach(event => {
             swapsByEscrowHash[chainEventToEscrowHash(event)] = null;
         });
+        logger.debug("processEvents(): Processing events with escrow hashes: ", Object.keys(swapsByEscrowHash));
         const swaps = await this.storage.query([
             [{ key: "escrowHash", value: Object.keys(swapsByEscrowHash) }]
         ], (val) => {
@@ -50,6 +53,9 @@ class UnifiedSwapEventListener {
                 }
             }
         }
+        logger.debug("processEvents(): Additionally checking HTLC claim hashes: ", Object.keys(htlcCheckInitializeEvents));
+        if (Object.keys(htlcCheckInitializeEvents).length === 0)
+            return;
         //Try to query based on claimData
         const claimDataSwaps = await this.storage.query([
             [{ key: "escrowHash", value: Object.keys(htlcCheckInitializeEvents) }]
@@ -61,6 +67,7 @@ class UnifiedSwapEventListener {
         });
         const swapsByClaimDataHash = {};
         claimDataSwaps.forEach(swap => swapsByClaimDataHash[swap._getEscrowHash()] = swap);
+        logger.debug("processEvents(): Additional HTLC swaps founds: ", swapsByClaimDataHash);
         for (let claimData in htlcCheckInitializeEvents) {
             const event = htlcCheckInitializeEvents[claimData];
             const swap = swapsByClaimDataHash[claimData];
@@ -75,14 +82,19 @@ class UnifiedSwapEventListener {
     async start() {
         if (this.listener != null)
             return;
+        logger.info("start(): Starting unified swap event listener");
         await this.storage.init();
+        logger.debug("start(): Storage initialized");
         await this.events.init();
+        logger.debug("start(): Events initialized");
         this.events.registerListener(this.listener = async (events) => {
             await this.processEvents(events);
             return true;
         });
+        logger.info("start(): Successfully initiated the unified swap event listener!");
     }
     stop() {
+        logger.info("stop(): Stopping unified swap event listener");
         this.events.unregisterListener(this.listener);
         return this.events.stop();
     }

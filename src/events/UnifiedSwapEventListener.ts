@@ -12,6 +12,7 @@ import {ISwap} from "../swaps/ISwap";
 import {EventListener} from "@atomiqlabs/base/src/events/ChainEvents";
 import {SwapType} from "../swaps/enums/SwapType";
 import {UnifiedSwapStorage} from "../storage/UnifiedSwapStorage";
+import {getLogger} from "../utils/Utils";
 
 function chainEventToEscrowHash(event: ChainEvent<any>) {
     if(event instanceof SwapEvent) return event.escrowHash;
@@ -26,6 +27,8 @@ export type SwapEventListener<
     T extends ChainType,
     S extends ISwap<T>
 > = (event: ChainEvent<T["Data"]>, swap: S) => Promise<void>;
+
+const logger = getLogger("UnifiedSwapEventListener: ");
 
 export class UnifiedSwapEventListener<
     T extends ChainType
@@ -50,6 +53,8 @@ export class UnifiedSwapEventListener<
         events.forEach(event => {
             swapsByEscrowHash[chainEventToEscrowHash(event)] = null;
         });
+
+        logger.debug("processEvents(): Processing events with escrow hashes: ", Object.keys(swapsByEscrowHash));
 
         const swaps = await this.storage.query<ISwap<T>>(
             [
@@ -84,6 +89,10 @@ export class UnifiedSwapEventListener<
             }
         }
 
+        logger.debug("processEvents(): Additionally checking HTLC claim hashes: ", Object.keys(htlcCheckInitializeEvents));
+
+        if(Object.keys(htlcCheckInitializeEvents).length===0) return;
+
         //Try to query based on claimData
         const claimDataSwaps = await this.storage.query<ISwap<T>>(
             [
@@ -97,6 +106,8 @@ export class UnifiedSwapEventListener<
         );
         const swapsByClaimDataHash: {[claimData: string]: ISwap} = {};
         claimDataSwaps.forEach(swap => swapsByClaimDataHash[swap._getEscrowHash()] = swap);
+
+        logger.debug("processEvents(): Additional HTLC swaps founds: ", swapsByClaimDataHash);
 
         for(let claimData in htlcCheckInitializeEvents) {
             const event = htlcCheckInitializeEvents[claimData];
@@ -113,15 +124,20 @@ export class UnifiedSwapEventListener<
     listener: EventListener<T["Data"]>;
     async start() {
         if(this.listener!=null) return;
+        logger.info("start(): Starting unified swap event listener");
         await this.storage.init();
+        logger.debug("start(): Storage initialized");
         await this.events.init();
+        logger.debug("start(): Events initialized");
         this.events.registerListener(this.listener = async (events) => {
             await this.processEvents(events);
             return true;
         });
+        logger.info("start(): Successfully initiated the unified swap event listener!");
     }
 
     stop(): Promise<void> {
+        logger.info("stop(): Stopping unified swap event listener");
         this.events.unregisterListener(this.listener);
         return this.events.stop();
     }

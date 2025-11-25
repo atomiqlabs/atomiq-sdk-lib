@@ -415,6 +415,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     }
 
     private async _init(): Promise<void> {
+        this.logger.debug("init(): Initializing swapper, sdk-lib version 16.1.3");
+
         const abortController = new AbortController();
 
         const promises: Promise<void>[] = [];

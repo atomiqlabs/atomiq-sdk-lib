@@ -197,6 +197,7 @@ class Swapper extends events_1.EventEmitter {
         });
     }
     async _init() {
+        this.logger.debug("init(): Initializing swapper, sdk-lib version 16.1.3");
         const abortController = new AbortController();
         const promises = [];
         let automaticClockDriftCorrectionPromise;

@@ -231,6 +231,7 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
                         };
                         const quote = new FromBTCLNAutoSwap_1.FromBTCLNAutoSwap(this, swapInit);
                         await quote._save();
+                        this.logger.debug("create(): Created new FromBTCLNAutoSwap quote, claimHash (pseudo escrowHash): ", quote._getEscrowHash());
                         return quote;
                     }
                     catch (e) {
