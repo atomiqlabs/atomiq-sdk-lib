@@ -49,16 +49,27 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
         ];
         this.messenger = messenger;
     }
-    processEventInitialize(swap, event) {
+    async processEventInitialize(swap, event) {
         if (swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_PAID || swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.PR_CREATED || swap.state === FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
+            if (swap.data == null) {
+                //Obtain data from the initialize event
+                const eventData = await event.swapData();
+                try {
+                    return await swap._saveRealSwapData(eventData, false);
+                }
+                catch (e) {
+                    this.logger.error("processEventInitialize(" + swap.getId() + "): Error when saving swap data for swap: ", e);
+                }
+                return false;
+            }
             swap.commitTxId = event.meta.txId;
             swap.state = FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_COMMITED;
             swap._broadcastSecret().catch(e => {
                 this.logger.error("processEventInitialize(" + swap.getId() + "): Error when broadcasting swap secret: ", e);
             });
-            return Promise.resolve(true);
+            return true;
         }
-        return Promise.resolve(false);
+        return false;
     }
     processEventClaim(swap, event) {
         if (swap.state !== FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.FAILED && swap.state !== FromBTCLNAutoSwap_1.FromBTCLNAutoSwapState.CLAIM_CLAIMED) {

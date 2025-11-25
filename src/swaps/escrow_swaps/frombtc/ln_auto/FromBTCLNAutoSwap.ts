@@ -172,7 +172,8 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     //// Getters & utils
 
     _getEscrowHash(): string | null {
-        return this.data?.getEscrowHash();
+        //Use claim hash in case the data is not yet known
+        return this.data == null ? this.initialSwapData?.getClaimHash() : this.data?.getEscrowHash();
     }
 
     _getInitiator(): string {
@@ -474,12 +475,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
             case InvoiceStatusResponseCodes.PAID:
                 const data = new this.wrapper.swapDataDeserializer(resp.data.data);
                 if(this.state===FromBTCLNAutoSwapState.PR_CREATED || this.state===FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) try {
-                    await this.checkIntermediaryReturnedData(this._getInitiator(), data);
-                    this.state = FromBTCLNAutoSwapState.PR_PAID;
-                    delete this.initialSwapData;
-                    this.data = data;
-                    this.initiated = true;
-                    if(save) await this._saveAndEmit();
+                    await this._saveRealSwapData(data, save);
                     return true;
                 } catch (e) {}
                 return null;
@@ -493,17 +489,28 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         }
     }
 
+    async _saveRealSwapData(data: T["Data"], save?: boolean): Promise<boolean> {
+        await this.checkIntermediaryReturnedData(data);
+        if(this.state===FromBTCLNAutoSwapState.PR_CREATED || this.state===FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
+            this.state = FromBTCLNAutoSwapState.PR_PAID;
+            delete this.initialSwapData;
+            this.data = data;
+            this.initiated = true;
+            if(save) await this._saveAndEmit();
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Checks the data returned by the intermediary in the payment auth request
      *
-     * @param signer Smart chain signer's address initiating the swap
      * @param data Parsed swap data as returned by the intermediary
      * @protected
      * @throws {IntermediaryError} If the returned are not valid
      * @throws {Error} If the swap is already committed on-chain
      */
-    protected async checkIntermediaryReturnedData(signer: string, data: T["Data"]): Promise<void> {
-        if (data.getClaimer() !== signer) throw new IntermediaryError("Invalid claimer used");
+    protected async checkIntermediaryReturnedData(data: T["Data"]): Promise<void> {
         if (!data.isPayOut()) throw new IntermediaryError("Invalid not pay out");
         if (data.getType() !== ChainSwapType.HTLC) throw new IntermediaryError("Invalid swap type");
         if (!data.isOfferer(this.getSwapData().getOfferer())) throw new IntermediaryError("Invalid offerer used");
@@ -516,7 +523,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         if (!data.isDepositToken(this.getSwapData().getDepositToken())) throw new IntermediaryError("Invalid deposit token used!");
         if (data.hasSuccessAction()) throw new IntermediaryError("Invalid has success action");
 
-        if (await this.wrapper.contract.isExpired(signer, data)) throw new IntermediaryError("Not enough time to claim!");
+        if (await this.wrapper.contract.isExpired(this._getInitiator(), data)) throw new IntermediaryError("Not enough time to claim!");
         if (this.wrapper.getHtlcTimeout(data) <= (Date.now()/1000)) throw new IntermediaryError("HTLC expires too soon!");
     }
 
@@ -576,13 +583,9 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
 
         if(resp.code===InvoiceStatusResponseCodes.PAID) {
             const swapData = new this.wrapper.swapDataDeserializer(resp.data.data);
-            await this.checkIntermediaryReturnedData(this._getInitiator(), swapData);
+            const success = await this._saveRealSwapData(swapData, true);
             if(onPaymentReceived!=null) onPaymentReceived(this.getInputTxId());
-            if(this.state===FromBTCLNAutoSwapState.PR_CREATED || this.state===FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
-                delete this.initialSwapData;
-                this.data = swapData;
-                await this._saveAndEmit(FromBTCLNAutoSwapState.PR_PAID);
-
+            if(success) {
                 await this.waitTillCommited(checkIntervalSeconds, abortSignal);
                 return this.state >= FromBTCLNAutoSwapState.CLAIM_COMMITED;
             }

@@ -140,16 +140,16 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
      * @param save If the new swap state should be saved
      */
     _checkIntermediaryPaymentReceived(save?: boolean): Promise<boolean | null>;
+    _saveRealSwapData(data: T["Data"], save?: boolean): Promise<boolean>;
     /**
      * Checks the data returned by the intermediary in the payment auth request
      *
-     * @param signer Smart chain signer's address initiating the swap
      * @param data Parsed swap data as returned by the intermediary
      * @protected
      * @throws {IntermediaryError} If the returned are not valid
      * @throws {Error} If the swap is already committed on-chain
      */
-    protected checkIntermediaryReturnedData(signer: string, data: T["Data"]): Promise<void>;
+    protected checkIntermediaryReturnedData(data: T["Data"]): Promise<void>;
     /**
      * Waits till an LN payment is received by the intermediary and client can continue commiting & claiming the HTLC
      *
