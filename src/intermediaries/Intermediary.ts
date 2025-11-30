@@ -96,7 +96,8 @@ export class Intermediary {
         SwapType.TO_BTCLN,
         SwapType.FROM_BTC,
         SwapType.FROM_BTCLN,
-        SwapType.SPV_VAULT_FROM_BTC
+        SwapType.SPV_VAULT_FROM_BTC,
+        SwapType.FROM_BTCLN_AUTO
     ]): Set<string> {
         const swapTypes = new Set(swapTypesArr);
         let tokens: Set<string> = new Set<string>();
