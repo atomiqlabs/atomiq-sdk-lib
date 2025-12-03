@@ -26,10 +26,10 @@ class IFromBTCWrapper extends IEscrowSwapWrapper_1.IEscrowSwapWrapper {
      * @returns Fee rate
      */
     preFetchFeeRate(signer, amountData, claimHash, abortController) {
-        return (0, Utils_1.tryWithRetries)(() => this.contract.getInitFeeRate(null, signer, amountData.token, claimHash), null, null, abortController.signal).catch(e => {
+        return (0, Utils_1.tryWithRetries)(() => this.contract.getInitFeeRate(this.chain.randomAddress(), signer, amountData.token, claimHash), undefined, undefined, abortController.signal).catch(e => {
             this.logger.warn("preFetchFeeRate(): Error: ", e);
             abortController.abort(e);
-            return null;
+            return undefined;
         });
     }
     /**
@@ -44,7 +44,7 @@ class IFromBTCWrapper extends IEscrowSwapWrapper_1.IEscrowSwapWrapper {
         return lp.getLiquidity(this.chainIdentifier, this.contract, amountData.token.toString(), abortController.signal).catch(e => {
             this.logger.warn("preFetchIntermediaryLiquidity(): Error: ", e);
             abortController.abort(e);
-            return null;
+            return undefined;
         });
     }
     /**

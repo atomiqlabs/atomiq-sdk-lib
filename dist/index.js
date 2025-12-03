@@ -68,7 +68,7 @@ __exportStar(require("./swaps/escrow_swaps/tobtc/ln/ToBTCLNSwap"), exports);
 __exportStar(require("./swaps/escrow_swaps/tobtc/ln/ToBTCLNWrapper"), exports);
 __exportStar(require("./swaps/escrow_swaps/tobtc/onchain/ToBTCSwap"), exports);
 __exportStar(require("./swaps/escrow_swaps/tobtc/onchain/ToBTCWrapper"), exports);
-__exportStar(require("./swaps/escrow_swaps/frombtc/IFromBTCSwap"), exports);
+__exportStar(require("./swaps/escrow_swaps/frombtc/IFromBTCSelfInitSwap"), exports);
 __exportStar(require("./swaps/escrow_swaps/frombtc/IFromBTCWrapper"), exports);
 __exportStar(require("./swaps/escrow_swaps/frombtc/IFromBTCLNWrapper"), exports);
 __exportStar(require("./swaps/escrow_swaps/frombtc/ln/FromBTCLNSwap"), exports);

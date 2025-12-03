@@ -1,12 +1,12 @@
-import {IFromBTCSwap} from "../IFromBTCSwap";
+import {IFromBTCSelfInitSwap} from "../IFromBTCSelfInitSwap";
 import {SwapType} from "../../../enums/SwapType";
-import {FromBTCWrapper} from "./FromBTCWrapper";
+import {FromBTCDefinition, FromBTCWrapper} from "./FromBTCWrapper";
 import {ChainType, isAbstractSigner, SwapCommitState, SwapCommitStateType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../../Tokens";
 import {
     extendAbortController,
-    getLogger,
+    getLogger, LoggerType,
     tryWithRetries
 } from "../../../../utils/Utils";
 import {
@@ -25,6 +25,7 @@ import {
 } from "../../../../btc/wallet/MinimalBitcoinWalletInterface";
 import {IClaimableSwap} from "../../../IClaimableSwap";
 import {IEscrowSelfInitSwapInit, isIEscrowSelfInitSwapInit} from "../../IEscrowSelfInitSwap";
+import {IAddressSwap} from "../../../IAddressSwap";
 
 export enum FromBTCSwapState {
     FAILED = -4,
@@ -38,6 +39,8 @@ export enum FromBTCSwapState {
 }
 
 export type FromBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
+    data: T;
+    feeRate: string;
     address: string;
     amount: bigint;
     requiredConfirmations: number;
@@ -46,17 +49,21 @@ export type FromBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
 export function isFromBTCSwapInit<T extends SwapData>(obj: any): obj is FromBTCSwapInit<T> {
     return typeof(obj.address) === "string" &&
         typeof(obj.amount) === "bigint" &&
+        typeof(obj.data) === "object" &&
+        typeof(obj.requiredConfirmations) === "number" &&
         isIEscrowSelfInitSwapInit<T>(obj);
 }
 
 export class FromBTCSwap<T extends ChainType = ChainType>
-    extends IFromBTCSwap<T, FromBTCSwapState>
-    implements IBTCWalletSwap, IClaimableSwap<T, FromBTCSwapState> {
+    extends IFromBTCSelfInitSwap<T, FromBTCDefinition<T>, FromBTCSwapState>
+    implements IBTCWalletSwap, IClaimableSwap<T, FromBTCDefinition<T>, FromBTCSwapState>, IAddressSwap {
 
+    protected readonly logger: LoggerType;
     protected readonly inputToken: BtcToken<false> = BitcoinTokens.BTC;
     protected readonly TYPE = SwapType.FROM_BTC;
 
-    readonly wrapper: FromBTCWrapper<T>;
+    readonly data!: T["Data"];
+    readonly feeRate!: string;
 
     readonly address: string;
     readonly amount: bigint;
@@ -72,6 +79,11 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         super(wrapper, initOrObject);
         if(isFromBTCSwapInit(initOrObject)) {
             this.state = FromBTCSwapState.PR_CREATED;
+            this.data = initOrObject.data;
+            this.feeRate = initOrObject.feeRate;
+            this.address = initOrObject.address;
+            this.amount = initOrObject.amount;
+            this.requiredConfirmations = initOrObject.requiredConfirmations;
         } else {
             this.address = initOrObject.address;
             this.amount = BigInt(initOrObject.amount);
@@ -81,6 +93,10 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         }
         this.tryRecomputeSwapPrice();
         this.logger = getLogger("FromBTC("+this.getIdentifierHashString()+"): ");
+    }
+
+    protected getSwapData(): T["Data"] {
+        return this.data;
     }
 
     protected upgradeVersion() {
@@ -117,17 +133,17 @@ export class FromBTCSwap<T extends ChainType = ChainType>
      * Returns bitcoin address where the on-chain BTC should be sent to
      */
     getAddress(): string {
-        if(this.state===FromBTCSwapState.PR_CREATED) return null;
+        if(this.state===FromBTCSwapState.PR_CREATED) throw new Error("Cannot get bitcoin address of non-committed swap");
         return this.address;
     }
 
     getHyperlink(): string {
-        if(this.state===FromBTCSwapState.PR_CREATED) return null;
+        if(this.state===FromBTCSwapState.PR_CREATED) throw new Error("Cannot get bitcoin address of non-committed swap");
         return "bitcoin:"+this.address+"?amount="+encodeURIComponent((Number(this.amount) / 100000000).toString(10));
     }
 
     getInputTxId(): string | null {
-        return this.txId;
+        return this.txId ?? null;
     }
 
     /**
@@ -206,13 +222,16 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         confirmations: number,
         targetConfirmations: number
     } | null> {
-        const result = await this.wrapper.btcRpc.checkAddressTxos(this.address, Buffer.from(this.data.getTxoHashHint(), "hex"));
+        const txoHashHint = this.data.getTxoHashHint();
+        if(txoHashHint==null) throw new Error("Swap data don't include the txo hash hint! Cannot check btc transaction!");
+
+        const result = await this.wrapper.btcRpc.checkAddressTxos(this.address, Buffer.from(txoHashHint, "hex"));
         if(result==null) return null;
 
         return {
             txId: result.tx.txid,
             vout: result.vout,
-            confirmations: result.tx.confirmations,
+            confirmations: result.tx.confirmations ?? 0,
             targetConfirmations: this.requiredConfirmations
         }
     }
@@ -226,17 +245,19 @@ export class FromBTCSwap<T extends ChainType = ChainType>
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     async waitForBitcoinTransaction(
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
+        updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void,
         checkIntervalSeconds?: number,
         abortSignal?: AbortSignal
     ): Promise<string> {
         if(this.state!==FromBTCSwapState.CLAIM_COMMITED && this.state!==FromBTCSwapState.EXPIRED) throw new Error("Must be in COMMITED state!");
+        const txoHashHint = this.data.getTxoHashHint();
+        if(txoHashHint==null) throw new Error("Swap data don't include the txo hash hint! Cannot check btc transaction!");
 
         const result = await this.wrapper.btcRpc.waitForAddressTxo(
             this.address,
-            Buffer.from(this.data.getTxoHashHint(), "hex"),
+            Buffer.from(txoHashHint, "hex"),
             this.requiredConfirmations,
-            (confirmations: number, txId: string, vout: number, txEtaMs: number) => {
+            (confirmations?: number, txId?: string, vout?: number, txEtaMs?: number) => {
                 if(updateCallback!=null) updateCallback(txId, confirmations, this.requiredConfirmations, txEtaMs);
             },
             abortSignal,
@@ -336,7 +357,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         if(output0.amount!==this.amount)
             throw new Error("PSBT output amount invalid, expected: "+this.amount+" got: "+output0.amount);
         const expectedOutputScript = toOutputScript(this.wrapper.options.bitcoinNetwork, this.address);
-        if(!expectedOutputScript.equals(output0.script))
+        if(output0.script==null || !expectedOutputScript.equals(output0.script))
             throw new Error("PSBT output script invalid!");
 
         if(!psbt.isFinal) psbt.finalize();
@@ -344,10 +365,11 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         return await this.wrapper.btcRpc.sendRawTransaction(Buffer.from(psbt.toBytes(true, true)).toString("hex"));
     }
 
-    async estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
+    async estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>> | null> {
         const bitcoinWallet: IBitcoinWallet = toBitcoinWallet(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
         const txFee = await bitcoinWallet.getTransactionFee(this.address, this.amount, feeRate);
-        return toTokenAmount(txFee==null ? null : BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
+        if(txFee==null) return null;
+        return toTokenAmount(BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
     }
 
     async sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string> {
@@ -395,7 +417,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         callbacks?: {
             onDestinationCommitSent?: (destinationCommitTxId: string) => void,
             onSourceTransactionSent?: (sourceTxId: string) => void,
-            onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void,
+            onSourceTransactionConfirmationStatus?: (sourceTxId?: string, confirmations?: number, targetConfirations?: number, etaMs?: number) => void,
             onSourceTransactionConfirmed?: (sourceTxId: string) => void,
             onSwapSettled?: (destinationTxId: string) => void
         },
@@ -434,9 +456,11 @@ export class FromBTCSwap<T extends ChainType = ChainType>
 
         if(this.state===FromBTCSwapState.BTC_TX_CONFIRMED) {
             const success = await this.waitTillClaimed(options?.maxWaitTillAutomaticSettlementSeconds ?? 60, options?.abortSignal);
-            if(success && callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
+            if(success && callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId()!);
             return success;
         }
+
+        throw new Error("Invalid state reached!");
     }
 
 
@@ -510,7 +534,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
      * @throws {Error} If the swap is in invalid state (must be BTC_TX_CONFIRMED)
      */
     async txsClaim(_signer?: string | T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]> {
-        let signer: string | T["Signer"];
+        let signer: string | T["Signer"] | undefined = undefined;
         if(_signer!=null) {
             if (typeof (_signer) === "string") {
                 signer = _signer;
@@ -522,8 +546,12 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         }
 
         if(this.state!==FromBTCSwapState.BTC_TX_CONFIRMED) throw new Error("Must be in BTC_TX_CONFIRMED state!");
+        if(this.txId==null || this.vout==null) throw new Error("Bitcoin transaction ID not known!");
 
         const tx = await this.wrapper.btcRpc.getTransaction(this.txId);
+        if(tx==null) throw new Error("Bitcoin transaction not found on the network!");
+        if(tx.blockhash==null || tx.confirmations==null || tx.blockheight==null)
+            throw new Error("Bitcoin transaction not confirmed yet!");
 
         return await this.wrapper.contract.txsClaimWithTxData(signer ?? this._getInitiator(), this.data, {
             blockhash: tx.blockhash,
@@ -531,7 +559,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
             txid: tx.txid,
             hex: tx.hex,
             height: tx.blockheight
-        }, this.requiredConfirmations, this.vout, null, this.wrapper.synchronizer, true);
+        }, this.requiredConfirmations, this.vout, undefined, this.wrapper.synchronizer, true);
     }
 
     /**
@@ -558,7 +586,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
             this.logger.info("claim(): Failed to claim ourselves, checking swap claim state...");
             if(this.state===FromBTCSwapState.CLAIM_CLAIMED) {
                 this.logger.info("claim(): Transaction state is CLAIM_CLAIMED, swap was successfully claimed by the watchtower");
-                return this.claimTxId;
+                return this.claimTxId!;
             }
             const status = await this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data);
             if(status?.type===SwapCommitStateType.PAID) {
@@ -639,7 +667,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
                 (this.state as FromBTCSwapState)!==FromBTCSwapState.CLAIM_CLAIMED &&
                 (this.state as FromBTCSwapState)!==FromBTCSwapState.FAILED
             ) {
-                this.refundTxId = res.getRefundTxId==null ? null : await res.getRefundTxId();
+                if(res.getRefundTxId!=null) this.refundTxId = await res.getRefundTxId();
                 await this._saveAndEmit(FromBTCSwapState.FAILED);
             }
             throw new Error("Swap expired while waiting for claim!");
@@ -722,6 +750,8 @@ export class FromBTCSwap<T extends ChainType = ChainType>
                     break;
             }
         }
+
+        return false;
     }
 
     _shouldFetchCommitStatus(): boolean {
@@ -773,6 +803,8 @@ export class FromBTCSwap<T extends ChainType = ChainType>
                 }
                 break;
         }
+
+        return false;
     }
 
 }

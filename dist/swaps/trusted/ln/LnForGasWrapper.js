@@ -13,8 +13,8 @@ class LnForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
         this.TYPE = SwapType_1.SwapType.TRUSTED_FROM_BTCLN;
         this.swapDeserializer = LnForGasSwap_1.LnForGasSwap;
         this.pendingSwapStates = [LnForGasSwap_1.LnForGasSwapState.PR_CREATED];
-        this.tickSwapState = null;
-        this.processEvent = null;
+        this.tickSwapState = undefined;
+        this.processEvent = undefined;
     }
     /**
      * Returns a newly created swap, receiving 'amount' on lightning network
@@ -34,10 +34,14 @@ class LnForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
             token
         }, this.options.getRequestTimeout);
         const decodedPr = (0, bolt11_1.decode)(resp.pr);
+        if (decodedPr.millisatoshis == null)
+            throw new Error("Invalid payment request returned, no msat amount value!");
+        if (decodedPr.timeExpireDate == null)
+            throw new Error("Invalid payment request returned, no time expire date!");
         const amountIn = (BigInt(decodedPr.millisatoshis) + 999n) / 1000n;
         if (resp.total !== amount)
             throw new IntermediaryError_1.IntermediaryError("Invalid total returned");
-        const pricingInfo = await this.verifyReturnedPrice(typeof (lpOrUrl) === "string" ?
+        const pricingInfo = await this.verifyReturnedPrice(typeof (lpOrUrl) === "string" || lpOrUrl.services[SwapType_1.SwapType.TRUSTED_FROM_BTCLN] == null ?
             { swapFeePPM: 10000, swapBaseFee: 10 } :
             lpOrUrl.services[SwapType_1.SwapType.TRUSTED_FROM_BTCLN], false, amountIn, amount, token, {});
         const quote = new LnForGasSwap_1.LnForGasSwap(this, {

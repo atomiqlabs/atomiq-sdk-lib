@@ -14,7 +14,7 @@ class Intermediary {
         this.swapBounds = {};
         for (let _swapType in this.services) {
             const swapType = parseInt(_swapType);
-            const serviceInfo = this.services[_swapType];
+            const serviceInfo = this.services[swapType];
             const btcBounds = { min: BigInt(serviceInfo.min), max: BigInt(serviceInfo.max) };
             const isSend = swapType === SwapType_1.SwapType.TO_BTC || swapType === SwapType_1.SwapType.TO_BTCLN;
             this.swapBounds[swapType] = {};
@@ -22,8 +22,8 @@ class Intermediary {
                 this.swapBounds[swapType][chainIdentifier] = {};
                 for (let tokenAddress of serviceInfo.chainTokens[chainIdentifier]) {
                     this.swapBounds[swapType][chainIdentifier][tokenAddress] = {
-                        input: isSend ? { min: null, max: null } : btcBounds,
-                        output: !isSend ? { min: null, max: null } : btcBounds,
+                        input: isSend ? {} : btcBounds,
+                        output: !isSend ? {} : btcBounds,
                     };
                 }
             }
@@ -50,10 +50,9 @@ class Intermediary {
         const swapTypes = new Set(swapTypesArr);
         let tokens = new Set();
         swapTypes.forEach((swapType) => {
-            if (this.services[swapType] != null &&
-                this.services[swapType].chainTokens != null &&
-                this.services[swapType].chainTokens[chainIdentifier] != null)
-                this.services[swapType].chainTokens[chainIdentifier].forEach(token => tokens.add(token));
+            const supportedTokens = this.services[swapType]?.chainTokens?.[chainIdentifier];
+            if (supportedTokens != null)
+                supportedTokens.forEach(token => tokens.add(token));
         });
         return tokens;
     }
@@ -72,8 +71,9 @@ class Intermediary {
         const promises = [];
         const reputation = {};
         for (let token of checkReputationTokens) {
-            promises.push((0, Utils_1.tryWithRetries)(() => swapContract.getIntermediaryReputation(this.getAddress(chainIdentifier), token), null, null, abortSignal).then(result => {
-                reputation[token] = result;
+            promises.push((0, Utils_1.tryWithRetries)(() => swapContract.getIntermediaryReputation(this.getAddress(chainIdentifier), token), undefined, undefined, abortSignal).then(result => {
+                if (result != null)
+                    reputation[token] = result;
             }));
         }
         await Promise.all(promises);
@@ -93,7 +93,7 @@ class Intermediary {
      * @param abortSignal
      */
     async getLiquidity(chainIdentifier, swapContract, token, abortSignal) {
-        const result = await (0, Utils_1.tryWithRetries)(() => swapContract.getBalance(this.getAddress(chainIdentifier), token, true), null, null, abortSignal);
+        const result = await (0, Utils_1.tryWithRetries)(() => swapContract.getBalance(this.getAddress(chainIdentifier), token, true), undefined, undefined, abortSignal);
         this.liquidity ??= {};
         this.liquidity[chainIdentifier] ??= {};
         this.liquidity[chainIdentifier][token] = result;

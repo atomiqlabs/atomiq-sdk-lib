@@ -56,7 +56,7 @@ export * from "./swaps/escrow_swaps/tobtc/ln/ToBTCLNSwap";
 export * from "./swaps/escrow_swaps/tobtc/ln/ToBTCLNWrapper";
 export * from "./swaps/escrow_swaps/tobtc/onchain/ToBTCSwap";
 export * from "./swaps/escrow_swaps/tobtc/onchain/ToBTCWrapper";
-export * from "./swaps/escrow_swaps/frombtc/IFromBTCSwap";
+export * from "./swaps/escrow_swaps/frombtc/IFromBTCSelfInitSwap";
 export * from "./swaps/escrow_swaps/frombtc/IFromBTCWrapper";
 export * from "./swaps/escrow_swaps/frombtc/IFromBTCLNWrapper";
 export * from "./swaps/escrow_swaps/frombtc/ln/FromBTCLNSwap";

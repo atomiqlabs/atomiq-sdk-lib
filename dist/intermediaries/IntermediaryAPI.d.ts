@@ -131,7 +131,7 @@ export type ToBTCLNInit = BaseToBTCSwapInit & {
     pr: string;
     maxFee: bigint;
     expiryTimestamp: bigint;
-    feeRate: Promise<any>;
+    feeRate: Promise<string>;
 };
 declare const ToBTCLNPrepareExactInSchema: {
     readonly amount: FieldTypeEnum.BigInt;
@@ -147,7 +147,7 @@ export type ToBTCLNPrepareExactIn = BaseToBTCSwapInit & {
 export type ToBTCLNInitExactIn = {
     pr: string;
     reqId: string;
-    feeRate: Promise<any>;
+    feeRate: Promise<string>;
     additionalParams?: {
         [name: string]: any;
     };
@@ -162,7 +162,7 @@ declare const FromBTCResponseSchema: {
     readonly address: FieldTypeEnum.String;
     readonly swapFee: FieldTypeEnum.BigInt;
     readonly total: FieldTypeEnum.BigInt;
-    readonly confirmations: FieldTypeEnum.NumberOptional;
+    readonly confirmations: FieldTypeEnum.Number;
 };
 export type FromBTCResponseType = RequestSchemaResult<typeof FromBTCResponseSchema>;
 export type FromBTCInit = BaseFromBTCSwapInit & {
@@ -343,7 +343,7 @@ export declare class IntermediaryAPI {
      * @throws {RequestError} If non-200 http response code is returned
      */
     static initFromBTCLN(chainIdentifier: string, baseUrl: string, depositToken: string, init: FromBTCLNInit, timeout?: number, abortSignal?: AbortSignal, streamRequest?: boolean): {
-        lnPublicKey: Promise<string>;
+        lnPublicKey: Promise<string | null>;
         response: Promise<FromBTCLNResponseType>;
     };
     /**
@@ -359,7 +359,7 @@ export declare class IntermediaryAPI {
      * @throws {RequestError} If non-200 http response code is returned
      */
     static initFromBTCLNAuto(chainIdentifier: string, baseUrl: string, init: FromBTCLNAutoInit, timeout?: number, abortSignal?: AbortSignal, streamRequest?: boolean): {
-        lnPublicKey: Promise<string>;
+        lnPublicKey: Promise<string | null>;
         response: Promise<FromBTCLNAutoResponseType>;
     };
     /**

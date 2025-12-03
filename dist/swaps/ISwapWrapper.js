@@ -19,7 +19,6 @@ class ISwapWrapper {
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
         this.pendingSwaps = new Map();
         this.isInitialized = false;
-        this.tickInterval = null;
         this.unifiedStorage = unifiedStorage;
         this.unifiedChainEvents = unifiedChainEvents;
         this.chainIdentifier = chainIdentifier;
@@ -54,7 +53,7 @@ class ISwapWrapper {
     preFetchPrice(amountData, abortSignal) {
         return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
             this.logger.error("preFetchPrice(): Error: ", e);
-            return null;
+            return undefined;
         });
     }
     /**
@@ -72,10 +71,10 @@ class ISwapWrapper {
      * @returns Price info object
      * @throws {IntermediaryError} if the calculated fee is too high
      */
-    async verifyReturnedPrice(lpServiceData, send, amountSats, amountToken, token, feeData, pricePrefetchPromise = Promise.resolve(null), abortSignal) {
+    async verifyReturnedPrice(lpServiceData, send, amountSats, amountToken, token, feeData, pricePrefetchPromise = Promise.resolve(undefined), abortSignal) {
         const swapBaseFee = BigInt(lpServiceData.swapBaseFee);
         const swapFeePPM = BigInt(lpServiceData.swapFeePPM);
-        if (send)
+        if (send && feeData.networkFee != null)
             amountToken = amountToken - feeData.networkFee;
         const isValidAmount = await (send ?
             this.prices.isValidAmountSend(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, await pricePrefetchPromise) :
@@ -90,7 +89,6 @@ class ISwapWrapper {
     async init(noTimers = false, noCheckPastSwaps = false) {
         if (this.isInitialized)
             return;
-        const hasEventListener = this.processEvent != null;
         //Save events received in the meantime into the event queue and process them only after we've checked and
         // processed all the past swaps
         let eventQueue = [];
@@ -98,11 +96,11 @@ class ISwapWrapper {
             eventQueue.push({ event, swap });
             return Promise.resolve();
         };
-        if (hasEventListener)
+        if (this.processEvent != null)
             this.unifiedChainEvents.registerListener(this.TYPE, initListener, this.swapDeserializer.bind(null, this));
         if (!noCheckPastSwaps)
             await this.checkPastSwaps();
-        if (hasEventListener) {
+        if (this.processEvent != null) {
             //Process accumulated event queue
             for (let event of eventQueue) {
                 await this.processEvent(event.event, event.swap);

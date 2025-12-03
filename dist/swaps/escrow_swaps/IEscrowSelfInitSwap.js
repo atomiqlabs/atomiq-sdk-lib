@@ -19,11 +19,12 @@ class IEscrowSelfInitSwap extends IEscrowSwap_1.IEscrowSwap {
     constructor(wrapper, swapInitOrObj) {
         super(wrapper, swapInitOrObj);
         if (!isIEscrowSelfInitSwapInit(swapInitOrObj)) {
-            this.signatureData = swapInitOrObj.signature == null ? null : {
-                prefix: swapInitOrObj.prefix,
-                timeout: swapInitOrObj.timeout,
-                signature: swapInitOrObj.signature
-            };
+            if (swapInitOrObj.signature != null)
+                this.signatureData = {
+                    prefix: swapInitOrObj.prefix,
+                    timeout: swapInitOrObj.timeout,
+                    signature: swapInitOrObj.signature
+                };
             this.feeRate = swapInitOrObj.feeRate;
         }
     }
@@ -37,6 +38,8 @@ class IEscrowSelfInitSwap extends IEscrowSwap_1.IEscrowSwap {
      * @protected
      */
     async watchdogWaitTillSignatureExpiry(intervalSeconds, abortSignal) {
+        if (this.data == null || this.signatureData == null)
+            throw new Error("Tried to await signature expiry but data or signature is null, invalid state?");
         intervalSeconds ??= 5;
         let expired = false;
         while (!expired) {
@@ -57,7 +60,7 @@ class IEscrowSelfInitSwap extends IEscrowSwap_1.IEscrowSwap {
      * Get the estimated smart chain fee of the commit transaction
      */
     getCommitFee() {
-        return this.wrapper.contract.getCommitFee(this._getInitiator(), this.data, this.feeRate);
+        return this.wrapper.contract.getCommitFee(this._getInitiator(), this.getSwapData(), this.feeRate);
     }
     /**
      * Returns the transaction fee paid on the smart chain
@@ -65,8 +68,8 @@ class IEscrowSelfInitSwap extends IEscrowSwap_1.IEscrowSwap {
     async getSmartChainNetworkFee() {
         const swapContract = this.wrapper.contract;
         return (0, Tokens_1.toTokenAmount)(await (swapContract.getRawCommitFee != null ?
-            swapContract.getRawCommitFee(this._getInitiator(), this.data, this.feeRate) :
-            swapContract.getCommitFee(this._getInitiator(), this.data, this.feeRate)), this.wrapper.getNativeToken(), this.wrapper.prices);
+            swapContract.getRawCommitFee(this._getInitiator(), this.getSwapData(), this.feeRate) :
+            swapContract.getCommitFee(this._getInitiator(), this.getSwapData(), this.feeRate)), this.wrapper.getNativeToken(), this.wrapper.prices);
     }
     //////////////////////////////
     //// Quote verification
@@ -74,14 +77,18 @@ class IEscrowSelfInitSwap extends IEscrowSwap_1.IEscrowSwap {
      * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
      */
     async _verifyQuoteDefinitelyExpired() {
+        if (this.data == null || this.signatureData == null)
+            throw new Error("data or signature data are null!");
         return (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isInitAuthorizationExpired(this.data, this.signatureData));
     }
     /**
      * Checks if the swap's quote is still valid
      */
     async verifyQuoteValid() {
+        if (this.data == null || this.signatureData == null)
+            throw new Error("data or signature data are null!");
         try {
-            await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this._getInitiator(), this.data, this.signatureData, this.feeRate), null, base_1.SignatureVerificationError);
+            await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this._getInitiator(), this.data, this.signatureData, this.feeRate), undefined, base_1.SignatureVerificationError);
             return true;
         }
         catch (e) {

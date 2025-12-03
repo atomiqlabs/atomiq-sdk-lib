@@ -27,9 +27,7 @@ class ICachedSwapPrice extends ISwapPrice_1.ISwapPrice {
             expiry: Date.now() + this.cacheTimeout
         };
         thisFetch.catch(e => {
-            if (this.cache[chainIdentifier] != null &&
-                this.cache[chainIdentifier][token] != null &&
-                this.cache[chainIdentifier][token].price === thisFetch)
+            if (this.cache?.[chainIdentifier]?.[token].price === thisFetch)
                 delete this.cache[token];
             throw e;
         });

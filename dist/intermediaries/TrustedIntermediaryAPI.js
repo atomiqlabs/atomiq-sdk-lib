@@ -52,7 +52,7 @@ class TrustedIntermediaryAPI {
      * @throws {RequestError} if non-200 http response is returned
      */
     static async getInvoiceStatus(url, paymentHash, timeout, abortSignal) {
-        return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getInvoiceStatus?paymentHash=" + encodeURIComponent(paymentHash), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+        return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getInvoiceStatus?paymentHash=" + encodeURIComponent(paymentHash), timeout, abortSignal), undefined, RequestError_1.RequestError, abortSignal);
     }
     /**
      * Initiate a trusted swap from BTCLN to SC native currency, retries!
@@ -69,10 +69,13 @@ class TrustedIntermediaryAPI {
             "?address=" + encodeURIComponent(init.address) +
             "&amount=" + encodeURIComponent(init.amount.toString(10)) +
             "&chain=" + encodeURIComponent(chainIdentifier) +
-            "&token=" + encodeURIComponent(init.token), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+            "&token=" + encodeURIComponent(init.token), timeout, abortSignal), undefined, RequestError_1.RequestError, abortSignal);
         if (resp.code !== 10000)
             throw RequestError_1.RequestError.parse(JSON.stringify(resp), 400);
-        return (0, SchemaVerifier_1.verifySchema)(resp.data, TrustedFromBTCLNResponseSchema);
+        const res = (0, SchemaVerifier_1.verifySchema)(resp.data, TrustedFromBTCLNResponseSchema);
+        if (res == null)
+            throw new Error("Invalid response returned from LP");
+        return res;
     }
     /**
      * Fetches the address status from the intermediary node
@@ -85,7 +88,7 @@ class TrustedIntermediaryAPI {
      * @throws {RequestError} if non-200 http response is returned
      */
     static async getAddressStatus(url, paymentHash, sequence, timeout, abortSignal) {
-        return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getAddressStatus?paymentHash=" + encodeURIComponent(paymentHash) + "&sequence=" + encodeURIComponent(sequence.toString(10)), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+        return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getAddressStatus?paymentHash=" + encodeURIComponent(paymentHash) + "&sequence=" + encodeURIComponent(sequence.toString(10)), timeout, abortSignal), undefined, RequestError_1.RequestError, abortSignal);
     }
     /**
      * Sets the refund address for an on-chain gas swap
@@ -102,7 +105,7 @@ class TrustedIntermediaryAPI {
         return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/setRefundAddress" +
             "?paymentHash=" + encodeURIComponent(paymentHash) +
             "&sequence=" + encodeURIComponent(sequence.toString(10)) +
-            "&refundAddress=" + encodeURIComponent(refundAddress), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+            "&refundAddress=" + encodeURIComponent(refundAddress), timeout, abortSignal), undefined, RequestError_1.RequestError, abortSignal);
     }
     /**
      * Initiate a trusted swap from BTC to SC native currency, retries!
@@ -118,12 +121,15 @@ class TrustedIntermediaryAPI {
         const resp = await (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(baseUrl + "/frombtc_trusted/getAddress?chain=" + encodeURIComponent(chainIdentifier) +
             "&address=" + encodeURIComponent(init.address) +
             "&amount=" + encodeURIComponent(init.amount.toString(10)) +
-            "&refundAddress=" + encodeURIComponent(init.refundAddress) +
+            (init.refundAddress == null ? "" : "&refundAddress=" + encodeURIComponent(init.refundAddress)) +
             "&exactIn=true" +
-            "&token=" + encodeURIComponent(init.token), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+            "&token=" + encodeURIComponent(init.token), timeout, abortSignal), undefined, RequestError_1.RequestError, abortSignal);
         if (resp.code !== 10000)
             throw RequestError_1.RequestError.parse(JSON.stringify(resp), 400);
-        return (0, SchemaVerifier_1.verifySchema)(resp.data, TrustedFromBTCResponseSchema);
+        const res = (0, SchemaVerifier_1.verifySchema)(resp.data, TrustedFromBTCResponseSchema);
+        if (res == null)
+            throw new Error("Invalid response returned from LP");
+        return res;
     }
 }
 exports.TrustedIntermediaryAPI = TrustedIntermediaryAPI;

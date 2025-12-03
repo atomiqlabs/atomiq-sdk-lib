@@ -29,11 +29,11 @@ export type FieldType<T extends FieldTypeEnum | RequestSchema | ((val: any) => (
     T extends FieldTypeEnum.Number ? number :
     T extends FieldTypeEnum.BigInt ? bigint :
     T extends FieldTypeEnum.Any ? any :
-    T extends FieldTypeEnum.StringOptional ? string :
-    T extends FieldTypeEnum.BooleanOptional ? boolean :
-    T extends FieldTypeEnum.NumberOptional ? number :
-    T extends FieldTypeEnum.BigIntOptional ? bigint :
-    T extends FieldTypeEnum.AnyOptional ? any :
+    T extends FieldTypeEnum.StringOptional ? (string | null) :
+    T extends FieldTypeEnum.BooleanOptional ? (boolean | null) :
+    T extends FieldTypeEnum.NumberOptional ? (number | null) :
+    T extends FieldTypeEnum.BigIntOptional ? (bigint | null) :
+    T extends FieldTypeEnum.AnyOptional ? (any | null) :
     T extends RequestSchema ? RequestSchemaResult<T> :
     T extends ((val: any) => string) ? string :
     T extends ((val: any) => boolean) ? boolean :
@@ -67,7 +67,9 @@ export function isOptionalField(type: FieldTypeEnum | RequestSchema | ((val: any
     return type>=100;
 }
 
-export function verifyField<T extends FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any))>(fieldType: T, val: any): FieldType<T> {
+export function verifyField<
+    T extends FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any))
+>(fieldType: T, val: any): FieldType<T> | undefined {
 
     const type: FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any)) = fieldType;
     if(typeof(type)==="function") {
@@ -77,7 +79,7 @@ export function verifyField<T extends FieldTypeEnum | RequestSchema | ((val: any
     }
 
     if(val==null && isOptionalField(type as FieldTypeEnum)) {
-        return null;
+        return null as FieldType<T>;
     }
 
     if(type===FieldTypeEnum.Any || type===FieldTypeEnum.AnyOptional) {
@@ -105,7 +107,7 @@ export function verifyField<T extends FieldTypeEnum | RequestSchema | ((val: any
 
 }
 
-export function verifySchema<T extends RequestSchema>(req: any, schema: T): RequestSchemaResult<T> {
+export function verifySchema<T extends RequestSchema>(req: any, schema: T): RequestSchemaResult<T> | null {
     if(req==null) return null;
     const resultSchema: any = {};
     for(let fieldName in schema) {

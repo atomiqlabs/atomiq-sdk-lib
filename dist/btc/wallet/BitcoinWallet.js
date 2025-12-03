@@ -19,7 +19,7 @@ function identifyAddressType(address, network) {
         case "wsh":
             return "p2wsh";
         default:
-            return null;
+            throw new Error("Unknown address type of " + address);
     }
 }
 exports.identifyAddressType = identifyAddressType;
@@ -60,12 +60,12 @@ class BitcoinWallet {
                 address: sendingAddress,
                 cpfp: !utxo.confirmed ? await this.rpc.getCPFPData(utxo.txid).then((result) => {
                     if (result.effectiveFeePerVsize == null)
-                        return null;
+                        return;
                     return {
                         txVsize: result.adjustedVsize,
                         txEffectiveFeeRate: result.effectiveFeePerVsize
                     };
-                }) : null,
+                }) : undefined,
                 confirmed: utxo.confirmed
             });
         }
@@ -90,8 +90,20 @@ class BitcoinWallet {
         const requiredInputs = [];
         for (let i = 0; i < psbt.inputsLength; i++) {
             const input = psbt.getInput(i);
-            let amount = input.witnessUtxo != null ? input.witnessUtxo.amount : input.nonWitnessUtxo.outputs[input.index].amount;
-            let script = input.witnessUtxo != null ? input.witnessUtxo.script : input.nonWitnessUtxo.outputs[input.index].script;
+            if (input.index == null || input.txid == null)
+                throw new Error("Inputs need txid & index!");
+            let amount;
+            let script;
+            if (input.witnessUtxo != null) {
+                amount = input.witnessUtxo.amount;
+                script = input.witnessUtxo.script;
+            }
+            else if (input.nonWitnessUtxo != null) {
+                amount = input.nonWitnessUtxo.outputs[input.index].amount;
+                script = input.nonWitnessUtxo.outputs[input.index].script;
+            }
+            else
+                throw new Error("Either witnessUtxo or nonWitnessUtxo has to be defined!");
             requiredInputs.push({
                 txId: buffer_1.Buffer.from(input.txid).toString('hex'),
                 vout: input.index,
@@ -102,6 +114,8 @@ class BitcoinWallet {
         const targets = [];
         for (let i = 0; i < psbt.outputsLength; i++) {
             const output = psbt.getOutput(i);
+            if (output.amount == null || output.script == null)
+                throw new Error("Outputs need amount & script defined!");
             targets.push({
                 value: Number(output.amount),
                 script: buffer_1.Buffer.from(output.script)
@@ -112,9 +126,7 @@ class BitcoinWallet {
         logger.debug("_fundPsbt(): Coinselect result: ", coinselectResult);
         if (coinselectResult.inputs == null || coinselectResult.outputs == null) {
             return {
-                psbt: null,
-                fee: coinselectResult.fee,
-                inputAddressIndexes: null
+                fee: coinselectResult.fee
             };
         }
         // Remove in/outs that are already in the PSBT
@@ -162,12 +174,17 @@ class BitcoinWallet {
                         sighashType: 0x01
                     };
                 case "p2pkh":
+                    const tx = await this.rpc.getTransaction(input.txId);
+                    if (tx == null)
+                        throw new Error("Cannot fetch existing tx " + input.txId);
                     return {
                         txid: input.txId,
                         index: input.vout,
-                        nonWitnessUtxo: (await this.rpc.getTransaction(input.txId)).raw,
+                        nonWitnessUtxo: tx.raw,
                         sighashType: 0x01
                     };
+                default:
+                    throw new Error("Invalid input type: " + input.type);
             }
         }));
         formattedInputs.forEach(input => psbt.addInput(input));
@@ -199,8 +216,20 @@ class BitcoinWallet {
         if (psbt != null)
             for (let i = 0; i < psbt.inputsLength; i++) {
                 const input = psbt.getInput(i);
-                let amount = input.witnessUtxo != null ? input.witnessUtxo.amount : input.nonWitnessUtxo.outputs[input.index].amount;
-                let script = input.witnessUtxo != null ? input.witnessUtxo.script : input.nonWitnessUtxo.outputs[input.index].script;
+                if (input.index == null || input.txid == null)
+                    throw new Error("Inputs need txid & index!");
+                let amount;
+                let script;
+                if (input.witnessUtxo != null) {
+                    amount = input.witnessUtxo.amount;
+                    script = input.witnessUtxo.script;
+                }
+                else if (input.nonWitnessUtxo != null) {
+                    amount = input.nonWitnessUtxo.outputs[input.index].amount;
+                    script = input.nonWitnessUtxo.outputs[input.index].script;
+                }
+                else
+                    throw new Error("Either witnessUtxo or nonWitnessUtxo has to be defined!");
                 requiredInputs.push({
                     txId: buffer_1.Buffer.from(input.txid).toString('hex'),
                     vout: input.index,
@@ -212,6 +241,8 @@ class BitcoinWallet {
         if (psbt != null)
             for (let i = 0; i < psbt.outputsLength; i++) {
                 const output = psbt.getOutput(i);
+                if (output.amount == null || output.script == null)
+                    throw new Error("Outputs need amount & script!");
                 additionalOutputs.push({
                     value: Number(output.amount),
                     script: buffer_1.Buffer.from(output.script)

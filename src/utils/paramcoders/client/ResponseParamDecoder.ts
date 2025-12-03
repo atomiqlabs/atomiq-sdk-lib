@@ -16,6 +16,7 @@ export class ResponseParamDecoder extends ParamDecoder {
 
         try {
             //Read from stream
+            if(resp.body==null) throw new Error("Response has no body field!");
             this.reader = resp.body.getReader();
             this.readResponse();
         } catch (e) {
@@ -30,7 +31,7 @@ export class ResponseParamDecoder extends ParamDecoder {
 
         if(abortSignal!=null) abortSignal.addEventListener("abort", () => {
             super.onError(abortSignal.reason);
-            if(!this.reader.closed) this.reader.cancel(abortSignal.reason);
+            if(this.reader!=null && !this.reader.closed) this.reader.cancel(abortSignal.reason);
         });
     }
 
@@ -39,6 +40,7 @@ export class ResponseParamDecoder extends ParamDecoder {
      * @private
      */
     private async readResponse() {
+        if(this.reader==null) return;
         while(true) {
             const readResp = await this.reader.read().catch(e => {
                 logger.error("readResponse(): Error reading response: ",e);

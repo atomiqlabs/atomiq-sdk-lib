@@ -86,22 +86,21 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
     coinsDecimals: CoinDecimals<T> = {};
     priceApis: {
         priceApi: IPriceProvider<T>,
-        operational: boolean
+        operational?: boolean
     }[];
 
     constructor(maxAllowedFeeDiffPPM: bigint, coinsDecimals: CtorCoinDecimals<T>, priceApis: IPriceProvider<T>[], cacheTimeout?: number) {
         super(maxAllowedFeeDiffPPM, cacheTimeout);
         for(let coinData of coinsDecimals) {
             for(let chainId in coinData.chains) {
-                const {address, decimals} = coinData.chains[chainId];
+                const {address, decimals} = coinData.chains[chainId]!;
                 this.coinsDecimals[chainId] ??= {};
                 (this.coinsDecimals[chainId] as any)[address.toString()] = decimals;
             }
         }
         this.priceApis = priceApis.map(api => {
             return {
-                priceApi: api,
-                operational: null
+                priceApi: api
             }
         });
     }
@@ -111,7 +110,7 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
      *
      * @private
      */
-    private getOperationalPriceApi(): {priceApi: IPriceProvider<T>, operational: boolean} {
+    private getOperationalPriceApi(): {priceApi: IPriceProvider<T>, operational?: boolean} | undefined {
         return this.priceApis.find(e => e.operational===true);
     }
 
@@ -121,10 +120,10 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
      *
      * @private
      */
-    private getMaybeOperationalPriceApis(): {priceApi: IPriceProvider<T>, operational: boolean}[] {
-        let operational = this.priceApis.filter(e => e.operational===true || e.operational===null);
+    private getMaybeOperationalPriceApis(): {priceApi: IPriceProvider<T>, operational?: boolean}[] {
+        let operational = this.priceApis.filter(e => e.operational===true || e.operational===undefined);
         if(operational.length===0) {
-            this.priceApis.forEach(e => e.operational=null);
+            this.priceApis.forEach(e => e.operational=undefined);
             operational = this.priceApis;
         }
         return operational;
@@ -154,7 +153,8 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
                     }
                 })()
             ))
-        } catch (e) {
+        } catch (_e: any) {
+            const e = _e as any[];
             if(abortSignal!=null) abortSignal.throwIfAborted();
             throw e.find(err => !(err instanceof RequestError)) || e[0];
         }
@@ -183,12 +183,12 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
                 }
             }
             return await this.fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal);
-        }, null, RequestError, abortSignal);
+        }, undefined, RequestError, abortSignal);
     }
 
     protected getDecimals<C extends ChainIds<T>>(chainIdentifier: C, token: string): number | null {
         if(this.coinsDecimals[chainIdentifier]==null) return null;
-        return this.coinsDecimals[chainIdentifier][token.toString()];
+        return this.coinsDecimals[chainIdentifier]?.[token.toString()] ?? null;
     }
 
 
@@ -214,7 +214,8 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
                     }
                 })()
             ))
-        } catch (e) {
+        } catch (_e: any) {
+            const e = _e as any[];
             if(abortSignal!=null) abortSignal.throwIfAborted();
             throw e.find(err => !(err instanceof RequestError)) || e[0];
         }
@@ -231,7 +232,7 @@ export class RedundantSwapPrice<T extends MultiChain> extends ICachedSwapPrice<T
                 });
             }
             return this.fetchUsdPriceFromMaybeOperationalPriceApis(abortSignal);
-        }, null, RequestError, abortSignal);
+        }, undefined, RequestError, abortSignal);
     }
 
 }

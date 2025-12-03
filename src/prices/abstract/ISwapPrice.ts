@@ -6,7 +6,7 @@ export type PriceInfoType = {
     differencePPM: bigint,
     satsBaseFee: bigint,
     feePPM: bigint,
-    realPriceUSatPerToken: bigint,
+    realPriceUSatPerToken?: bigint,
     swapPriceUSatPerToken: bigint
 };
 
@@ -16,7 +16,7 @@ export function isPriceInfoType(obj: any): obj is PriceInfoType {
         typeof(obj.differencePPM) === "bigint" &&
         typeof(obj.satsBaseFee) === "bigint" &&
         typeof(obj.feePPM) === "bigint" &&
-        typeof(obj.realPriceUSatPerToken) === "bigint" &&
+        (obj.realPriceUSatPerToken==null || typeof(obj.realPriceUSatPerToken) === "bigint") &&
         typeof(obj.swapPriceUSatPerToken) === "bigint";
 }
 
@@ -54,6 +54,12 @@ export abstract class ISwapPrice<T extends MultiChain = MultiChain> {
      */
     protected abstract getUsdPrice(abortSignal?: AbortSignal): Promise<number>;
 
+    protected getDecimalsThrowing<C extends ChainIds<T>>(chainIdentifier: C, token: string): number {
+        const decimals = this.getDecimals(chainIdentifier, token);
+        if(decimals==null) throw new Error(`Cannot get decimal count for token ${chainIdentifier}:${token}!`);
+        return decimals;
+    }
+
     /**
      * Recomputes pricing info without fetching the current price
      *
@@ -75,14 +81,14 @@ export abstract class ISwapPrice<T extends MultiChain = MultiChain> {
         const totalSats = (amountSats * (1000000n + feePPM) / 1000000n)
             + satsBaseFee;
         const totalUSats = totalSats * 1000000n;
-        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / paidToken;
+        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimalsThrowing(chainIdentifier, token))) / paidToken;
 
         return {
             isValid: true,
             differencePPM: 0n,
             satsBaseFee,
             feePPM,
-            realPriceUSatPerToken: this.shouldIgnore(chainIdentifier, token) ? null : swapPriceUSatPerToken,
+            realPriceUSatPerToken: this.shouldIgnore(chainIdentifier, token) ? undefined : swapPriceUSatPerToken,
             swapPriceUSatPerToken
         };
     }
@@ -107,24 +113,24 @@ export abstract class ISwapPrice<T extends MultiChain = MultiChain> {
         paidToken: bigint,
         token: string,
         abortSignal?: AbortSignal,
-        preFetchedPrice?: bigint
+        preFetchedPrice?: bigint | null
     ): Promise<PriceInfoType> {
         const totalSats = (amountSats * (1000000n + feePPM) / 1000000n)
             + satsBaseFee;
         const totalUSats = totalSats * 1000000n;
-        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / paidToken;
+        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimalsThrowing(chainIdentifier, token))) / paidToken;
 
         if(this.shouldIgnore(chainIdentifier, token)) return {
             isValid: true,
             differencePPM: 0n,
             satsBaseFee,
             feePPM,
-            realPriceUSatPerToken: null,
+            realPriceUSatPerToken: undefined,
             swapPriceUSatPerToken
         };
 
         const calculatedAmtInToken = await this.getFromBtcSwapAmount(chainIdentifier, totalSats, token, abortSignal, preFetchedPrice);
-        const realPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / calculatedAmtInToken;
+        const realPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimalsThrowing(chainIdentifier, token))) / calculatedAmtInToken;
 
         const difference = paidToken - calculatedAmtInToken; //Will be >0 if we need to pay more than we should've
         const differencePPM = difference * 1000000n / calculatedAmtInToken;
@@ -160,14 +166,14 @@ export abstract class ISwapPrice<T extends MultiChain = MultiChain> {
         const totalSats = (amountSats * (1000000n - feePPM) / 1000000n)
             - satsBaseFee;
         const totalUSats = totalSats * 1000000n;
-        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / receiveToken;
+        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimalsThrowing(chainIdentifier, token))) / receiveToken;
 
         return {
             isValid: true,
             differencePPM: 0n,
             satsBaseFee,
             feePPM,
-            realPriceUSatPerToken: this.shouldIgnore(chainIdentifier, token) ? null : swapPriceUSatPerToken,
+            realPriceUSatPerToken: this.shouldIgnore(chainIdentifier, token) ? undefined : swapPriceUSatPerToken,
             swapPriceUSatPerToken
         };
     }
@@ -192,24 +198,24 @@ export abstract class ISwapPrice<T extends MultiChain = MultiChain> {
         receiveToken: bigint,
         token: string,
         abortSignal?: AbortSignal,
-        preFetchedPrice?: bigint
+        preFetchedPrice?: bigint | null
     ): Promise<PriceInfoType> {
         const totalSats = (amountSats * (1000000n - feePPM) / 1000000n)
             - satsBaseFee;
         const totalUSats = totalSats * 1000000n;
-        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / receiveToken;
+        const swapPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimalsThrowing(chainIdentifier, token))) / receiveToken;
 
         if(this.shouldIgnore(chainIdentifier, token)) return {
             isValid: true,
             differencePPM: 0n,
             satsBaseFee,
             feePPM,
-            realPriceUSatPerToken: null,
+            realPriceUSatPerToken: undefined,
             swapPriceUSatPerToken
         };
 
         const calculatedAmtInToken = await this.getFromBtcSwapAmount(chainIdentifier, totalSats, token, abortSignal, preFetchedPrice);
-        const realPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimals(chainIdentifier, token))) / calculatedAmtInToken;
+        const realPriceUSatPerToken = totalUSats * (10n ** BigInt(this.getDecimalsThrowing(chainIdentifier, token))) / calculatedAmtInToken;
 
         const difference = calculatedAmtInToken - receiveToken; //Will be >0 if we receive less than we should've
         const differencePPM = difference * 100000n / calculatedAmtInToken;
@@ -247,14 +253,14 @@ export abstract class ISwapPrice<T extends MultiChain = MultiChain> {
         fromAmount: bigint,
         toToken: string,
         abortSignal?: AbortSignal,
-        preFetchedPrice?: bigint
+        preFetchedPrice?: bigint | null
     ): Promise<bigint> {
         if(this.getDecimals(chainIdentifier, toToken.toString())==null) throw new Error("Token not found!");
 
         const price = preFetchedPrice || await this.getPrice(chainIdentifier, toToken, abortSignal);
 
         return fromAmount
-            * (10n ** BigInt(this.getDecimals(chainIdentifier, toToken.toString())))
+            * (10n ** BigInt(this.getDecimalsThrowing(chainIdentifier, toToken.toString())))
             * (1000000n) //To usat
             / (price);
     }
@@ -283,7 +289,7 @@ export abstract class ISwapPrice<T extends MultiChain = MultiChain> {
         return fromAmount
             * price
             / 1000000n
-            / (10n ** BigInt(this.getDecimals(chainIdentifier, fromToken.toString())));
+            / (10n ** BigInt(this.getDecimalsThrowing(chainIdentifier, fromToken.toString())));
     }
 
     /**

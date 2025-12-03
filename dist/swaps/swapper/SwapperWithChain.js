@@ -196,11 +196,10 @@ class SwapperWithChain {
                 swapType = SwapType_1.SwapType.FROM_BTCLN_AUTO;
             if (swapType === SwapType_1.SwapType.FROM_BTC && this.supportsSwapType(SwapType_1.SwapType.SPV_VAULT_FROM_BTC))
                 swapType = SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
-            if (lp.services[swapType] == null)
+            const chainTokens = lp.services[swapType]?.chainTokens?.[this.chainIdentifier];
+            if (chainTokens == null)
                 return;
-            if (lp.services[swapType].chainTokens == null)
-                return;
-            for (let tokenAddress of lp.services[swapType].chainTokens[this.chainIdentifier]) {
+            for (let tokenAddress of chainTokens) {
                 const token = this.swapper.tokens?.[this.chainIdentifier]?.[tokenAddress];
                 if (token != null)
                     tokens.push(token);
@@ -216,11 +215,10 @@ class SwapperWithChain {
     getSupportedTokenAddresses(swapType) {
         const set = new Set();
         this.intermediaryDiscovery.intermediaries.forEach(lp => {
-            if (lp.services[swapType] == null)
+            const chainTokens = lp.services[swapType]?.chainTokens?.[this.chainIdentifier];
+            if (chainTokens == null)
                 return;
-            if (lp.services[swapType].chainTokens == null || lp.services[swapType].chainTokens[this.chainIdentifier] == null)
-                return;
-            lp.services[swapType].chainTokens[this.chainIdentifier].forEach(token => set.add(token));
+            chainTokens.forEach(token => set.add(token));
         });
         return set;
     }

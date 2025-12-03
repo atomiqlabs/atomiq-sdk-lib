@@ -54,7 +54,7 @@ export type UnifiedSwapStorageCompositeIndexes = typeof compositeIndexes;
 export declare class UnifiedSwapStorage<T extends ChainType> {
     readonly storage: IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedSwapStorageCompositeIndexes>;
     readonly weakRefCache: Map<string, WeakRef<ISwap<T>>>;
-    readonly noWeakRefMap: boolean;
+    readonly noWeakRefMap?: boolean;
     constructor(storage: IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedSwapStorageCompositeIndexes>, noWeakRefMap?: boolean);
     init(): Promise<void>;
     /**
@@ -65,7 +65,7 @@ export declare class UnifiedSwapStorage<T extends ChainType> {
      * @param params
      * @param reviver
      */
-    query<S extends ISwap<T>>(params: Array<Array<QueryParams>>, reviver: (obj: any) => S): Promise<Array<S>>;
+    query<S extends ISwap<T>>(params: Array<Array<QueryParams>>, reviver: (obj: any) => S | null | undefined): Promise<Array<S>>;
     save<S extends ISwap<T>>(value: S): Promise<void>;
     saveAll<S extends ISwap<T>>(values: S[]): Promise<void>;
     remove<S extends ISwap<T>>(value: S): Promise<void>;

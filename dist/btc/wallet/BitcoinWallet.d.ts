@@ -24,7 +24,7 @@ export declare abstract class BitcoinWallet implements IBitcoinWallet {
     rpc: BitcoinRpcWithAddressIndex<any>;
     network: BTC_NETWORK;
     feeMultiplier: number;
-    feeOverride: number;
+    feeOverride?: number;
     constructor(mempoolApi: BitcoinRpcWithAddressIndex<any>, network: BTC_NETWORK, feeMultiplier?: number, feeOverride?: number);
     getFeeRate(): Promise<number>;
     protected _sendTransaction(rawHex: string): Promise<string>;
@@ -38,9 +38,9 @@ export declare abstract class BitcoinWallet implements IBitcoinWallet {
         address: string;
         addressType: CoinselectAddressTypes;
     }[], recipient: string, amount: number, feeRate?: number): Promise<{
-        psbt: Transaction;
         fee: number;
-        inputAddressIndexes: {
+        psbt?: Transaction;
+        inputAddressIndexes?: {
             [address: string]: number[];
         };
     }>;
@@ -49,9 +49,9 @@ export declare abstract class BitcoinWallet implements IBitcoinWallet {
         address: string;
         addressType: CoinselectAddressTypes;
     }[], psbt: Transaction, feeRate?: number): Promise<{
-        psbt: Transaction;
         fee: number;
-        inputAddressIndexes: {
+        psbt?: Transaction;
+        inputAddressIndexes?: {
             [address: string]: number[];
         };
     }>;

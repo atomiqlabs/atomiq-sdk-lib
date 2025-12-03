@@ -23,8 +23,8 @@ class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
         this.TYPE = SwapType_1.SwapType.TRUSTED_FROM_BTC;
         this.swapDeserializer = OnchainForGasSwap_1.OnchainForGasSwap;
         this.pendingSwapStates = [OnchainForGasSwap_1.OnchainForGasSwapState.PR_CREATED];
-        this.tickSwapState = null;
-        this.processEvent = null;
+        this.tickSwapState = undefined;
+        this.processEvent = undefined;
         this.btcRpc = btcRpc;
     }
     /**
@@ -48,7 +48,7 @@ class OnchainForGasWrapper extends ISwapWrapper_1.ISwapWrapper {
         }, this.options.getRequestTimeout);
         if (resp.total !== amount)
             throw new IntermediaryError_1.IntermediaryError("Invalid total returned");
-        const pricingInfo = await this.verifyReturnedPrice(typeof (lpOrUrl) === "string" ?
+        const pricingInfo = await this.verifyReturnedPrice(typeof (lpOrUrl) === "string" || lpOrUrl.services[SwapType_1.SwapType.TRUSTED_FROM_BTC] == null ?
             { swapFeePPM: 10000, swapBaseFee: 10 } :
             lpOrUrl.services[SwapType_1.SwapType.TRUSTED_FROM_BTC], false, resp.amountSats, amount, this.chain.getNativeCurrencyAddress(), {});
         const quote = new OnchainForGasSwap_1.OnchainForGasSwap(this, {
