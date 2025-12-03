@@ -78,7 +78,7 @@ export declare class IntermediaryDiscovery extends EventEmitter {
      * @param url
      * @param abortSignal
      */
-    getIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary>;
+    getIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary | null>;
     /**
      * Reloads the saves a list of intermediaries
      * @param abortSignal
@@ -103,7 +103,7 @@ export declare class IntermediaryDiscovery extends EventEmitter {
      * @param swapType
      * @param token
      */
-    getSwapMinimum(chainIdentifier: string, swapType: SwapType, token: any): number;
+    getSwapMinimum(chainIdentifier: string, swapType: SwapType, token: any): number | null;
     /**
      * Returns the aggregate swap maximum (in sats - BTC) for a specific swap type & token
      *  as indicated by the intermediaries
@@ -112,7 +112,7 @@ export declare class IntermediaryDiscovery extends EventEmitter {
      * @param swapType
      * @param token
      */
-    getSwapMaximum(chainIdentifier: string, swapType: SwapType, token: any): number;
+    getSwapMaximum(chainIdentifier: string, swapType: SwapType, token: any): number | null;
     /**
      * Returns swap candidates for a specific swap type & token address
      *

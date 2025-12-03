@@ -1,7 +1,8 @@
 import { ISwap, ISwapInit } from "../ISwap";
 import { ChainType, SpvWithdrawalClaimedState, SpvWithdrawalClosedState, SpvWithdrawalFrontedState } from "@atomiqlabs/base";
 import { SwapType } from "../enums/SwapType";
-import { SpvFromBTCWrapper } from "./SpvFromBTCWrapper";
+import { SpvFromBTCTypeDefinition, SpvFromBTCWrapper } from "./SpvFromBTCWrapper";
+import { LoggerType } from "../../utils/Utils";
 import { Transaction } from "@scure/btc-signer";
 import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
 import { Fee, FeeType } from "../fee/Fee";
@@ -51,9 +52,9 @@ export type SpvFromBTCSwapInit = ISwapInit & {
     genesisSmartChainBlockHeight: number;
 };
 export declare function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit;
-export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCSwapState> {
+export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCTypeDefinition<T>> implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCTypeDefinition<T>, SpvFromBTCSwapState> {
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
-    readonly wrapper: SpvFromBTCWrapper<T>;
+    protected readonly logger: LoggerType;
     readonly quoteId: string;
     readonly recipient: string;
     readonly vaultOwner: string;
@@ -78,9 +79,9 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     readonly frontingFeeShare: bigint;
     readonly executionFeeShare: bigint;
     readonly genesisSmartChainBlockHeight: number;
-    claimTxId: string;
-    frontTxId: string;
-    data: T["SpvVaultWithdrawalData"];
+    claimTxId?: string;
+    frontTxId?: string;
+    data?: T["SpvVaultWithdrawalData"];
     constructor(wrapper: SpvFromBTCWrapper<T>, init: SpvFromBTCSwapInit);
     constructor(wrapper: SpvFromBTCWrapper<T>, obj: any);
     protected upgradeVersion(): void;
@@ -91,7 +92,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     protected tryCalculateSwapFee(): void;
     refreshPriceData(): Promise<void>;
     _getInitiator(): string;
-    _getEscrowHash(): string;
+    _getEscrowHash(): string | null;
     getId(): string;
     getQuoteExpiry(): number;
     verifyQuoteValid(): Promise<boolean>;
@@ -177,7 +178,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * @param _psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
      */
     submitPsbt(_psbt: Transaction | string): Promise<string>;
-    estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
+    estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>> | null>;
     sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string>;
     /**
      * Executes the swap with the provided bitcoin wallet,
@@ -191,7 +192,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      */
     execute(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, callbacks?: {
         onSourceTransactionSent?: (sourceTxId: string) => void;
-        onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void;
+        onSourceTransactionConfirmationStatus?: (sourceTxId?: string, confirmations?: number, targetConfirations?: number, etaMs?: number) => void;
         onSourceTransactionConfirmed?: (sourceTxId: string) => void;
         onSwapSettled?: (destinationTxId: string) => void;
     }, options?: {
@@ -216,7 +217,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * @param abortSignal Abort signal
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitForBitcoinTransaction(updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
+    waitForBitcoinTransaction(updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
     /**
      * Returns transactions required to claim the swap on-chain (and possibly also sync the bitcoin light client)
      *  after a bitcoin transaction was sent and confirmed
@@ -258,9 +259,9 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitTillExecuted(updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<void>;
+    waitTillExecuted(updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<void>;
     serialize(): any;
-    _syncStateFromBitcoin(save: boolean): Promise<boolean>;
+    _syncStateFromBitcoin(save?: boolean): Promise<boolean>;
     /**
      * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
      *  data
@@ -270,5 +271,5 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     private syncStateFromChain;
     _sync(save?: boolean): Promise<boolean>;
     _tick(save?: boolean): Promise<boolean>;
-    _shouldCheckWithdrawalState(frontingAddress?: string, vaultDataUtxo?: string): Promise<boolean>;
+    _shouldCheckWithdrawalState(frontingAddress?: string | null, vaultDataUtxo?: string | null): Promise<boolean>;
 }

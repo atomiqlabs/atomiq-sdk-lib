@@ -47,6 +47,7 @@ function toOutputScript(network, address) {
                 throw new Error(msg);
             }
     }
+    throw new Error(`Unrecognized output script type: ${outputScript.type}`);
 }
 exports.toOutputScript = toOutputScript;
 function toCoinselectAddressType(outputScript) {

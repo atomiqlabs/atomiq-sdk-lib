@@ -1,4 +1,4 @@
-import {IFromBTCWrapper} from "./IFromBTCWrapper";
+import {IFromBTCDefinition, IFromBTCWrapper} from "./IFromBTCWrapper";
 import {ppmToPercentage} from "../../ISwap";
 import {
     ChainType,
@@ -7,19 +7,21 @@ import {
 import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {Fee, FeeType} from "../../fee/Fee";
 import {IAddressSwap} from "../../IAddressSwap";
-import {IEscrowSelfInitSwap, IEscrowSelfInitSwapInit} from "../IEscrowSelfInitSwap";
+import {IEscrowSelfInitSwap, IEscrowSelfInitSwapDefinition, IEscrowSelfInitSwapInit} from "../IEscrowSelfInitSwap";
 
+export type IFromBTCSelfInitDefinition<T extends ChainType, W extends IFromBTCWrapper<T, any>, S extends IFromBTCSelfInitSwap<T>> = IEscrowSelfInitSwapDefinition<T, W, S>;
 
-export abstract class IFromBTCSwap<
+export abstract class IFromBTCSelfInitSwap<
     T extends ChainType = ChainType,
+    D extends IFromBTCSelfInitDefinition<T, IFromBTCWrapper<T, D>, IFromBTCSelfInitSwap<T, D, S>> = IFromBTCSelfInitDefinition<T, IFromBTCWrapper<T, any>, IFromBTCSelfInitSwap<T, any, any>>,
     S extends number = number
-> extends IEscrowSelfInitSwap<T, S> implements IAddressSwap {
+> extends IEscrowSelfInitSwap<T, D, S> implements IAddressSwap {
     protected abstract readonly inputToken: BtcToken;
 
-    protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, init: IEscrowSelfInitSwapInit<T["Data"]>);
-    protected constructor(wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>, obj: any);
+    protected constructor(wrapper: D["Wrapper"], init: IEscrowSelfInitSwapInit<T["Data"]>);
+    protected constructor(wrapper: D["Wrapper"], obj: any);
     protected constructor(
-        wrapper: IFromBTCWrapper<T, IFromBTCSwap<T, S>>,
+        wrapper: D["Wrapper"],
         initOrObj: IEscrowSelfInitSwapInit<T["Data"]> | any
     ) {
         super(wrapper, initOrObj);
@@ -34,10 +36,6 @@ export abstract class IFromBTCSwap<
             this.swapFeeBtc = this.swapFee * this.getInput().rawAmount / this.getOutAmountWithoutFee();
         }
         super.tryRecomputeSwapPrice();
-    }
-
-    protected getSwapData(): T["Data"] {
-        return this.data;
     }
 
 
@@ -67,7 +65,7 @@ export abstract class IFromBTCSwap<
     }
 
     getOutputTxId(): string | null {
-        return this.claimTxId;
+        return this.claimTxId ?? null;
     }
 
     getOutputAddress(): string | null {
@@ -87,6 +85,8 @@ export abstract class IFromBTCSwap<
     }
 
     protected getSwapFee(): Fee<T["ChainId"], BtcToken, SCToken<T["ChainId"]>> {
+        if(this.pricingInfo==null) throw new Error("No pricing info known, cannot estimate fee!");
+
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
 
@@ -156,6 +156,7 @@ export abstract class IFromBTCSwap<
      */
     async txsCommit(skipChecks?: boolean): Promise<T["TX"][]> {
         if(!this.canCommit()) throw new Error("Must be in CREATED state!");
+        if(this.data==null || this.signatureData==null) throw new Error("data or signature data is null, invalid state?");
 
         if(!this.initiated) {
             this.initiated = true;

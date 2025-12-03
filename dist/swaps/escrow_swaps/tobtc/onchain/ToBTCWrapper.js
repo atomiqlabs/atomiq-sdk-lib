@@ -27,15 +27,14 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @param events Instance to use for emitting events
      */
     constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, btcRpc, options, events) {
-        if (options == null)
-            options = {};
-        options.bitcoinNetwork = options.bitcoinNetwork ?? utils_1.TEST_NETWORK;
-        options.safetyFactor = options.safetyFactor || 2;
-        options.maxConfirmations = options.maxConfirmations || 6;
-        options.bitcoinBlocktime = options.bitcoinBlocktime || (60 * 10);
-        options.maxExpectedOnchainSendSafetyFactor = options.maxExpectedOnchainSendSafetyFactor || 4;
-        options.maxExpectedOnchainSendGracePeriodBlocks = options.maxExpectedOnchainSendGracePeriodBlocks || 12;
-        super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, options, events);
+        super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, {
+            bitcoinNetwork: options?.bitcoinNetwork ?? utils_1.TEST_NETWORK,
+            safetyFactor: options?.safetyFactor ?? 2,
+            maxConfirmations: options?.maxConfirmations ?? 6,
+            bitcoinBlocktime: options?.bitcoinBlocktime ?? (60 * 10),
+            maxExpectedOnchainSendSafetyFactor: options?.maxExpectedOnchainSendSafetyFactor ?? 4,
+            maxExpectedOnchainSendGracePeriodBlocks: options?.maxExpectedOnchainSendGracePeriodBlocks ?? 12,
+        }, events);
         this.TYPE = SwapType_1.SwapType.TO_BTC;
         this.swapDeserializer = ToBTCSwap_1.ToBTCSwap;
         this.btcRpc = btcRpc;
@@ -125,22 +124,27 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     create(signer, address, amountData, lps, options, additionalParams, abortSignal) {
         if (!this.isInitialized)
             throw new Error("Not initialized, call init() first!");
-        options ??= {};
-        options.confirmationTarget ??= 3;
-        options.confirmations ??= 2;
+        const _options = {
+            confirmationTarget: options?.confirmationTarget ?? 3,
+            confirmations: options?.confirmations ?? 2
+        };
         const nonce = this.getRandomNonce();
         const outputScript = this.btcAddressToOutputScript(address);
         const _hash = !amountData.exactIn ?
-            this.contract.getHashForOnchain(outputScript, amountData.amount, options.confirmations, nonce).toString("hex") :
-            null;
+            this.contract.getHashForOnchain(outputScript, amountData.amount, _options.confirmations, nonce).toString("hex") :
+            undefined;
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePreFetchPromise = this.preFetchPrice(amountData, _abortController.signal);
         const feeRatePromise = this.preFetchFeeRate(signer, amountData, _hash, _abortController);
-        const _signDataPromise = this.contract.preFetchBlockDataForSignatures == null ? this.preFetchSignData(Promise.resolve(true)) : null;
+        const _signDataPromise = this.contract.preFetchBlockDataForSignatures == null ?
+            this.preFetchSignData(Promise.resolve(true)) :
+            undefined;
         return lps.map(lp => {
             return {
                 intermediary: lp,
                 quote: (async () => {
+                    if (lp.services[SwapType_1.SwapType.TO_BTC] == null)
+                        throw new Error("LP service for processing to btc swaps not found!");
                     const abortController = (0, Utils_1.extendAbortController)(_abortController.signal);
                     const reputationPromise = this.preFetchIntermediaryReputation(amountData, lp, abortController);
                     try {
@@ -148,48 +152,52 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                             const { signDataPrefetch, response } = IntermediaryAPI_1.IntermediaryAPI.initToBTC(this.chainIdentifier, lp.url, {
                                 btcAddress: address,
                                 amount: amountData.amount,
-                                confirmationTarget: options.confirmationTarget,
-                                confirmations: options.confirmations,
+                                confirmationTarget: _options.confirmationTarget,
+                                confirmations: _options.confirmations,
                                 nonce: nonce,
                                 token: amountData.token,
                                 offerer: signer,
                                 exactIn: amountData.exactIn,
-                                feeRate: feeRatePromise,
+                                feeRate: (0, Utils_1.throwIfUndefined)(feeRatePromise),
                                 additionalParams
-                            }, this.options.postRequestTimeout, abortController.signal, retryCount > 0 ? false : null);
+                            }, this.options.postRequestTimeout, abortController.signal, retryCount > 0 ? false : undefined);
                             return {
                                 signDataPromise: _signDataPromise ?? this.preFetchSignData(signDataPrefetch),
                                 resp: await response
                             };
-                        }, null, RequestError_1.RequestError, abortController.signal);
-                        let hash = amountData.exactIn ?
-                            this.contract.getHashForOnchain(outputScript, resp.amount, options.confirmations, nonce).toString("hex") :
-                            _hash;
+                        }, undefined, RequestError_1.RequestError, abortController.signal);
+                        let hash = _hash ?? this.contract.getHashForOnchain(outputScript, resp.amount, _options.confirmations, nonce).toString("hex");
                         const data = new this.swapDataDeserializer(resp.data);
                         data.setOfferer(signer);
-                        this.verifyReturnedData(signer, resp, amountData, lp, options, data, hash);
+                        this.verifyReturnedData(signer, resp, amountData, lp, _options, data, hash);
                         const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTC], true, resp.amount, data.getAmount(), amountData.token, resp, pricePreFetchPromise, abortController.signal),
                             this.verifyReturnedSignature(signer, data, resp, feeRatePromise, signDataPromise, abortController.signal),
                             reputationPromise
                         ]);
                         abortController.signal.throwIfAborted();
-                        lp.reputation[amountData.token.toString()] = reputation;
+                        if (reputation != null)
+                            lp.reputation[amountData.token.toString()] = reputation;
+                        const inputWithoutFees = data.getAmount() - resp.swapFee - resp.networkFee;
+                        const swapFeeBtc = resp.swapFee * resp.amount / inputWithoutFees;
+                        const networkFeeBtc = resp.networkFee * resp.amount / inputWithoutFees;
                         const quote = new ToBTCSwap_1.ToBTCSwap(this, {
                             pricingInfo,
                             url: lp.url,
                             expiry: signatureExpiry,
                             swapFee: resp.swapFee,
-                            feeRate: await feeRatePromise,
+                            swapFeeBtc,
+                            feeRate: (await feeRatePromise),
                             signatureData: resp,
                             data,
                             networkFee: resp.networkFee,
+                            networkFeeBtc,
                             address,
                             amount: resp.amount,
-                            confirmationTarget: options.confirmationTarget,
+                            confirmationTarget: _options.confirmationTarget,
                             satsPerVByte: Number(resp.satsPervByte),
-                            exactIn: amountData.exactIn ?? false,
-                            requiredConfirmations: options.confirmations,
+                            exactIn: amountData.exactIn,
+                            requiredConfirmations: _options.confirmations,
                             nonce
                         });
                         await quote._save();

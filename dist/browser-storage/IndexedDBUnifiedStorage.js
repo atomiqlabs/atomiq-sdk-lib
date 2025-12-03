@@ -140,6 +140,10 @@ class IndexedDBUnifiedStorage {
     }
     executeTransaction(cbk, readonly) {
         return new Promise((resolve, reject) => {
+            if (this.db == null) {
+                reject(new Error("Not initiated, call init() first!"));
+                return;
+            }
             const tx = this.db.transaction("swaps", readonly ? "readonly" : "readwrite", { durability: "strict" });
             const req = cbk(tx.objectStore("swaps"));
             req.onsuccess = (event) => resolve(event.target.result);
@@ -147,6 +151,8 @@ class IndexedDBUnifiedStorage {
         });
     }
     executeTransactionArr(cbk, readonly) {
+        if (this.db == null)
+            throw new Error("Not initiated, call init() first!");
         const tx = this.db.transaction("swaps", readonly ? "readonly" : "readwrite", { durability: "strict" });
         const reqs = cbk(tx.objectStore("swaps"));
         return Promise.all(reqs.map(req => new Promise((resolve, reject) => {
@@ -154,27 +160,29 @@ class IndexedDBUnifiedStorage {
             req.onerror = (event) => reject(event);
         })));
     }
-    executeTransactionWithCursor(cbk, valueCbk) {
-        return new Promise((resolve, reject) => {
-            const tx = this.db.transaction("swaps", "readonly", { durability: "strict" });
-            const cursorRequests = cbk(tx.objectStore("swaps"));
+    async executeTransactionWithCursor(cbk, valueCbk) {
+        if (this.db == null)
+            throw new Error("Not initiated, call init() first!");
+        const tx = this.db.transaction("swaps", "readonly", { durability: "strict" });
+        const cursorRequests = cbk(tx.objectStore("swaps"));
+        const promises = cursorRequests.map(cursorRequest => new Promise((resolve, reject) => {
             const resultObjects = [];
-            for (let cursorRequest of cursorRequests) {
-                cursorRequest.onsuccess = (event) => {
-                    const cursor = event.target.result;
-                    if (cursor != null) {
-                        const value = cursor.value;
-                        if (valueCbk(value))
-                            resultObjects.push(value);
-                        cursor.continue();
-                    }
-                    else {
-                        resolve(resultObjects);
-                    }
-                };
-                cursorRequest.onerror = (event) => reject(event);
-            }
-        });
+            cursorRequest.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor != null) {
+                    const value = cursor.value;
+                    if (valueCbk(value))
+                        resultObjects.push(value);
+                    cursor.continue();
+                }
+                else {
+                    resolve(resultObjects);
+                }
+            };
+            cursorRequest.onerror = (event) => reject(event);
+        }));
+        const result = await Promise.all(promises);
+        return result.flat();
     }
     async init() {
         if (this.db == null) {

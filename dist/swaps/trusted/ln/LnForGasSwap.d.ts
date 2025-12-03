@@ -1,6 +1,7 @@
 import { SwapType } from "../../enums/SwapType";
 import { ChainType } from "@atomiqlabs/base";
-import { LnForGasWrapper } from "./LnForGasWrapper";
+import { LnForGasSwapTypeDefinition, LnForGasWrapper } from "./LnForGasWrapper";
+import { LoggerType } from "../../../utils/Utils";
 import { ISwap, ISwapInit } from "../../ISwap";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
 import { Fee, FeeType } from "../../fee/Fee";
@@ -19,14 +20,15 @@ export type LnForGasSwapInit = ISwapInit & {
     token: string;
 };
 export declare function isLnForGasSwapInit(obj: any): obj is LnForGasSwapInit;
-export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapState> implements IAddressSwap {
+export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnForGasSwapTypeDefinition<T>, LnForGasSwapState> implements IAddressSwap {
     protected readonly currentVersion: number;
     protected readonly TYPE: SwapType;
+    protected readonly logger: LoggerType;
     private readonly pr;
     private readonly outputAmount;
     private readonly recipient;
     private readonly token;
-    scTxId: string;
+    scTxId?: string;
     constructor(wrapper: LnForGasWrapper<T>, init: LnForGasSwapInit);
     constructor(wrapper: LnForGasWrapper<T>, obj: any);
     protected upgradeVersion(): void;
@@ -65,7 +67,7 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
         type: FeeType.SWAP;
         fee: Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>>;
     }];
-    protected checkInvoicePaid(save?: boolean): Promise<boolean>;
+    protected checkInvoicePaid(save?: boolean): Promise<boolean | null>;
     /**
      * A blocking promise resolving when payment was received by the intermediary and client can continue
      * rejecting in case of failure

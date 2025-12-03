@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
+import { ISwapWrapper, ISwapWrapperOptions, SwapTypeDefinition, WrapperCtorTokens } from "../../ISwapWrapper";
 import { ChainType } from "@atomiqlabs/base";
 import { OnchainForGasSwap, OnchainForGasSwapState } from "./OnchainForGasSwap";
 import { BitcoinRpcWithAddressIndex } from "../../../btc/BitcoinRpcWithAddressIndex";
@@ -14,7 +14,8 @@ import { BTC_NETWORK } from "@scure/btc-signer/utils";
 export type OnchainForGasWrapperOptions = ISwapWrapperOptions & {
     bitcoinNetwork: BTC_NETWORK;
 };
-export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>, OnchainForGasWrapperOptions> {
+export type OnchainForGasSwapTypeDefinition<T extends ChainType> = SwapTypeDefinition<T, OnchainForGasWrapper<T>, OnchainForGasSwap<T>>;
+export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwapTypeDefinition<T>, OnchainForGasWrapperOptions> {
     readonly TYPE = SwapType.TRUSTED_FROM_BTC;
     readonly swapDeserializer: typeof OnchainForGasSwap;
     readonly btcRpc: BitcoinRpcWithAddressIndex<any>;
@@ -29,7 +30,7 @@ export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrap
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, btcRpc: BitcoinRpcWithAddressIndex<any>, options?: OnchainForGasWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], prices: ISwapPrice, tokens: WrapperCtorTokens, btcRpc: BitcoinRpcWithAddressIndex<any>, options: OnchainForGasWrapperOptions, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     /**
@@ -42,6 +43,6 @@ export declare class OnchainForGasWrapper<T extends ChainType> extends ISwapWrap
      */
     create(signer: string, amount: bigint, lpOrUrl: Intermediary | string, refundAddress?: string): Promise<OnchainForGasSwap<T>>;
     readonly pendingSwapStates: OnchainForGasSwapState[];
-    readonly tickSwapState: any;
-    protected processEvent: any;
+    readonly tickSwapState: undefined;
+    protected processEvent: undefined;
 }

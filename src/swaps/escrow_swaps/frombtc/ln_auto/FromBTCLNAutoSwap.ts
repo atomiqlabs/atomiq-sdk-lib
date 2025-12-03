@@ -17,12 +17,19 @@ import {
     InvoiceStatusResponseCodes
 } from "../../../../intermediaries/IntermediaryAPI";
 import {IntermediaryError} from "../../../../errors/IntermediaryError";
-import {extendAbortController, getLogger, timeoutPromise, tryWithRetries} from "../../../../utils/Utils";
+import {
+    extendAbortController,
+    getLogger,
+    LoggerType,
+    timeoutPromise,
+    toBigInt,
+    tryWithRetries
+} from "../../../../utils/Utils";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../../Tokens";
 import {ppmToPercentage} from "../../../ISwap";
 import {Fee, FeeType} from "../../../fee/Fee";
 import {IAddressSwap} from "../../../IAddressSwap";
-import {FromBTCLNAutoWrapper} from "./FromBTCLNAutoWrapper";
+import {FromBTCLNAutoDefinition, FromBTCLNAutoWrapper} from "./FromBTCLNAutoWrapper";
 import {ISwapWithGasDrop} from "../../../ISwapWithGasDrop";
 import {MinimalLightningNetworkWalletInterface} from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
 import {IClaimableSwap} from "../../../IClaimableSwap";
@@ -69,9 +76,10 @@ export function isFromBTCLNAutoSwapInit<T extends SwapData>(obj: any): obj is Fr
 }
 
 export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
-    extends IEscrowSwap<T, FromBTCLNAutoSwapState>
-    implements IAddressSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, FromBTCLNAutoSwapState> {
+    extends IEscrowSwap<T, FromBTCLNAutoDefinition<T>>
+    implements IAddressSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, FromBTCLNAutoDefinition<T>, FromBTCLNAutoSwapState> {
 
+    protected readonly logger: LoggerType;
     protected readonly inputToken: BtcToken<true> = BitcoinTokens.BTCLN;
     protected readonly TYPE = SwapType.FROM_BTCLN_AUTO;
 
@@ -92,8 +100,6 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     lnurlCallback?: string;
     prPosted?: boolean = false;
 
-    wrapper: FromBTCLNAutoWrapper<T>;
-
     protected getSwapData(): T["Data"] {
         return this.data ?? this.initialSwapData;
     }
@@ -108,18 +114,31 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         super(wrapper, initOrObject);
         if(isFromBTCLNAutoSwapInit(initOrObject)) {
             this.state = FromBTCLNAutoSwapState.PR_CREATED;
+            this.pr = initOrObject.pr;
+            this.secret = initOrObject.secret;
+            this.initialSwapData = initOrObject.initialSwapData;
+            this.btcAmountSwap = initOrObject.btcAmountSwap;
+            this.btcAmountGas = initOrObject.btcAmountGas;
+            this.gasSwapFeeBtc = initOrObject.gasSwapFeeBtc;
+            this.gasSwapFee = initOrObject.gasSwapFee;
+            this.lnurl = initOrObject.lnurl;
+            this.lnurlK1 = initOrObject.lnurlK1;
+            this.lnurlCallback = initOrObject.lnurlCallback;
         } else {
             this.pr = initOrObject.pr;
             this.secret = initOrObject.secret;
 
-            this.initialSwapData = initOrObject.initialSwapData==null ? null : SwapData.deserialize<T["Data"]>(initOrObject.initialSwapData);
+            if(initOrObject.initialSwapData==null) {
+                this.initialSwapData = this.data!;
+            } else {
+                this.initialSwapData = SwapData.deserialize<T["Data"]>(initOrObject.initialSwapData);
+            }
 
-            this.btcAmountSwap = initOrObject.btcAmountSwap==null ? null : BigInt(initOrObject.btcAmountSwap);
-            this.btcAmountGas = initOrObject.btcAmountGas==null ? null : BigInt(initOrObject.btcAmountGas);
-            this.gasSwapFeeBtc = initOrObject.gasSwapFeeBtc==null ? null : BigInt(initOrObject.gasSwapFeeBtc);
-            this.gasSwapFee = initOrObject.gasSwapFee==null ? null : BigInt(initOrObject.gasSwapFee);
+            this.btcAmountSwap = toBigInt(initOrObject.btcAmountSwap);
+            this.btcAmountGas = toBigInt(initOrObject.btcAmountGas);
+            this.gasSwapFeeBtc = toBigInt(initOrObject.gasSwapFeeBtc);
+            this.gasSwapFee = toBigInt(initOrObject.gasSwapFee);
 
-            this.data = initOrObject.data==null ? null : SwapData.deserialize<T["Data"]>(initOrObject.data);
             this.commitTxId = initOrObject.commitTxId;
             this.claimTxId = initOrObject.claimTxId;
 
@@ -139,6 +158,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
      * @protected
      */
     protected tryRecomputeSwapPrice() {
+        if(this.pricingInfo==null) return;
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
                 this.chainIdentifier,
@@ -156,7 +176,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     //// Pricing
 
     async refreshPriceData(): Promise<void> {
-        if(this.pricingInfo==null) return null;
+        if(this.pricingInfo==null) return;
         this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(
             this.chainIdentifier,
             this.btcAmountSwap,
@@ -189,7 +209,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     }
 
     getOutputTxId(): string | null {
-        return this.claimTxId;
+        return this.claimTxId ?? null;
     }
 
     requiresAction(): boolean {
@@ -203,12 +223,12 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     }
 
     protected getPaymentHash(): Buffer {
-        if(this.pr==null) return null;
         const decodedPR = bolt11Decode(this.pr);
+        if(decodedPR.tagsObject.payment_hash==null) throw new Error("Swap invoice doesn't contain payment hash field!");
         return Buffer.from(decodedPR.tagsObject.payment_hash, "hex");
     }
 
-    getInputTxId(): string | null {
+    getInputTxId(): string {
         return this.getPaymentHash().toString("hex");
     }
 
@@ -228,8 +248,9 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
      *  if the LP doesn't make it expired sooner
      */
     getDefinitiveExpiryTime(): number {
-        if(this.pr==null) return null;
         const decoded = bolt11Decode(this.pr);
+        if(decoded.tagsObject.min_final_cltv_expiry==null) throw new Error("Swap invoice doesn't contain final ctlv delta field!");
+        if(decoded.timeExpireDate==null) throw new Error("Swap invoice doesn't contain expiry date field!");
         const finalCltvExpiryDelta = decoded.tagsObject.min_final_cltv_expiry ?? 144;
         const finalCltvExpiryDelay = finalCltvExpiryDelta * this.wrapper.options.bitcoinBlocktime * this.wrapper.options.safetyFactor;
         return (decoded.timeExpireDate + finalCltvExpiryDelay)*1000;
@@ -280,6 +301,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
 
     protected getLightningInvoiceSats(): bigint {
         const parsed = bolt11Decode(this.pr);
+        if(parsed.millisatoshis==null) throw new Error("Swap invoice doesn't contain msat amount field!");
         return (BigInt(parsed.millisatoshis) + 999n) / 1000n;
     }
 
@@ -323,6 +345,8 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     }
 
     protected getSwapFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>> {
+        if(this.pricingInfo==null) throw new Error("No pricing info known, cannot estimate fee!");
+
         const outputToken = this.wrapper.tokens[this.getSwapData().getToken()];
         const gasSwapFeeInOutputToken = this.gasSwapFeeBtc
             * (10n ** BigInt(outputToken.decimals))
@@ -345,6 +369,8 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     }
 
     protected getWatchtowerFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>> {
+        if(this.pricingInfo==null) throw new Error("No pricing info known, cannot estimate fee!");
+
         const btcWatchtowerFee = this.getWatchtowerFeeAmountBtc();
         const outputToken = this.wrapper.tokens[this.getSwapData().getToken()];
         const watchtowerFeeInOutputToken = btcWatchtowerFee
@@ -432,7 +458,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
 
                     const abortController = new AbortController();
                     paymentPromise.catch(e => abortController.abort(e));
-                    if(options?.abortSignal!=null) options.abortSignal.addEventListener("abort", () => abortController.abort(options.abortSignal.reason));
+                    if(options?.abortSignal!=null) options.abortSignal.addEventListener("abort", () => abortController.abort(options?.abortSignal?.reason));
                     abortSignal = abortController.signal;
                 }
             }
@@ -447,9 +473,11 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
 
         if(this.state===FromBTCLNAutoSwapState.CLAIM_COMMITED) {
             const success = await this.waitTillClaimed(options?.maxWaitTillAutomaticSettlementSeconds ?? 60, options?.abortSignal);
-            if (success && callbacks?.onSwapSettled != null) callbacks.onSwapSettled(this.getOutputTxId());
+            if (success && callbacks?.onSwapSettled != null) callbacks.onSwapSettled(this.getOutputTxId()!);
             return success;
         }
+
+        throw new Error("Invalid state reached!");
     }
 
 
@@ -492,7 +520,6 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         await this.checkIntermediaryReturnedData(data);
         if(this.state===FromBTCLNAutoSwapState.PR_CREATED || this.state===FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
             this.state = FromBTCLNAutoSwapState.PR_PAID;
-            delete this.initialSwapData;
             this.data = data;
             this.initiated = true;
             if(save) await this._saveAndEmit();
@@ -548,7 +575,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
 
         let save = false;
 
-        if(this.lnurl!=null && !this.prPosted) {
+        if(this.lnurl!=null && this.lnurlK1!=null && this.lnurlCallback!=null && !this.prPosted) {
             LNURL.postInvoiceToLNURLWithdraw({k1: this.lnurlK1, callback: this.lnurlCallback}, this.pr).catch(e => {
                 this.lnurlFailSignal.abort(e);
             });
@@ -669,6 +696,8 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
      */
     async txsClaim(_signer?: T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]> {
         if(this.state!==FromBTCLNAutoSwapState.CLAIM_COMMITED) throw new Error("Must be in CLAIM_COMMITED state!");
+        if(this.data==null) throw new Error("Unknown data, wrong state?");
+
         return await this.wrapper.contract.txsClaimWithSecret(
             _signer==null ?
                 this._getInitiator() :
@@ -777,7 +806,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
      * Gets the used LNURL or null if this is not an LNURL-withdraw swap
      */
     getLNURL(): string | null {
-        return this.lnurl;
+        return this.lnurl ?? null;
     }
 
     /**
@@ -822,7 +851,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
             lnurlK1: this.lnurlK1,
             lnurlCallback: this.lnurlCallback,
             prPosted: this.prPosted,
-            initialSwapData: this.initialSwapData==null ? null : this.initialSwapData.serialize()
+            initialSwapData: this.initialSwapData.serialize()
         };
     }
 
@@ -845,7 +874,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
 
         if(this.state===FromBTCLNAutoSwapState.CLAIM_COMMITED || this.state===FromBTCLNAutoSwapState.EXPIRED) {
             //Check if it's already successfully paid
-            commitStatus ??= await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
+            commitStatus ??= await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data!));
             if(commitStatus?.type===SwapCommitStateType.PAID) {
                 if(this.claimTxId==null) this.claimTxId = await commitStatus.getClaimTxId();
                 this.state = FromBTCLNAutoSwapState.CLAIM_CLAIMED;
@@ -860,7 +889,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
 
         if(this.state===FromBTCLNAutoSwapState.PR_PAID) {
             //Check if it's already committed
-            commitStatus ??= await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
+            commitStatus ??= await tryWithRetries(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data!));
             switch(commitStatus?.type) {
                 case SwapCommitStateType.COMMITED:
                     this.state = FromBTCLNAutoSwapState.CLAIM_COMMITED;
@@ -878,6 +907,8 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
                 return true;
             }
         }
+
+        return false;
     }
 
     _shouldFetchCommitStatus(): boolean {
@@ -931,6 +962,8 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
 
     async _broadcastSecret(noCheckExpiry?: boolean): Promise<void> {
         if(this.state!==FromBTCLNAutoSwapState.CLAIM_COMMITED) throw new Error("Must be in CLAIM_COMMITED state to broadcast swap secret!");
+        if(this.data==null) throw new Error("Unknown data, wrong state?");
+
         if(!noCheckExpiry) {
             if(await this.wrapper.contract.isExpired(this._getInitiator(), this.data)) throw new Error("On-chain HTLC already expired!");
         }
@@ -955,7 +988,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
                 break;
             case FromBTCLNAutoSwapState.PR_PAID:
             case FromBTCLNAutoSwapState.CLAIM_COMMITED:
-                const expired = await this.wrapper.contract.isExpired(this._getInitiator(), this.data);
+                const expired = await this.wrapper.contract.isExpired(this._getInitiator(), this.data!);
                 if(expired) {
                     this.state = FromBTCLNAutoSwapState.EXPIRED;
                     if(save) await this._saveAndEmit();
@@ -970,6 +1003,8 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
                 }
                 break;
         }
+
+        return false;
     }
 
 }

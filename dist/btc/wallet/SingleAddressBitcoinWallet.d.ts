@@ -4,7 +4,7 @@ import { Transaction } from "@scure/btc-signer";
 import { BitcoinWallet } from "./BitcoinWallet";
 import { BitcoinRpcWithAddressIndex } from "../BitcoinRpcWithAddressIndex";
 export declare class SingleAddressBitcoinWallet extends BitcoinWallet {
-    readonly privKey: Uint8Array;
+    readonly privKey?: Uint8Array;
     readonly pubkey: Uint8Array;
     readonly address: string;
     readonly addressType: CoinselectAddressTypes;

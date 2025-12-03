@@ -1,4 +1,4 @@
-import {ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
+import {ISwapWrapper, ISwapWrapperOptions, SwapTypeDefinition, WrapperCtorTokens} from "../../ISwapWrapper";
 import {TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediaryAPI";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {ChainType} from "@atomiqlabs/base";
@@ -17,7 +17,9 @@ export type OnchainForGasWrapperOptions = ISwapWrapperOptions & {
     bitcoinNetwork: BTC_NETWORK
 };
 
-export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwap<T>, OnchainForGasWrapperOptions> {
+export type OnchainForGasSwapTypeDefinition<T extends ChainType> = SwapTypeDefinition<T, OnchainForGasWrapper<T>, OnchainForGasSwap<T>>;
+
+export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, OnchainForGasSwapTypeDefinition<T>, OnchainForGasWrapperOptions> {
     public readonly TYPE = SwapType.TRUSTED_FROM_BTC;
     public readonly swapDeserializer = OnchainForGasSwap;
 
@@ -42,7 +44,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         prices: ISwapPrice,
         tokens: WrapperCtorTokens,
         btcRpc: BitcoinRpcWithAddressIndex<any>,
-        options?: OnchainForGasWrapperOptions,
+        options: OnchainForGasWrapperOptions,
         events?: EventEmitter<{swapState: [ISwap]}>
     ) {
         super(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, prices, tokens, options, events);
@@ -74,7 +76,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
         if(resp.total !== amount) throw new IntermediaryError("Invalid total returned");
 
         const pricingInfo = await this.verifyReturnedPrice(
-            typeof(lpOrUrl)==="string" ?
+            typeof(lpOrUrl)==="string" || lpOrUrl.services[SwapType.TRUSTED_FROM_BTC]==null ?
                 {swapFeePPM: 10000, swapBaseFee: 10} :
                 lpOrUrl.services[SwapType.TRUSTED_FROM_BTC],
             false, resp.amountSats,
@@ -102,7 +104,7 @@ export class OnchainForGasWrapper<T extends ChainType> extends ISwapWrapper<T, O
     }
 
     public readonly pendingSwapStates = [OnchainForGasSwapState.PR_CREATED];
-    public readonly tickSwapState = null;
-    protected processEvent = null;
+    public readonly tickSwapState = undefined;
+    protected processEvent = undefined;
 
 }

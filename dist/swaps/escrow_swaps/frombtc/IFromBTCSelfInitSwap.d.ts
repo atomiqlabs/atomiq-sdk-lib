@@ -1,10 +1,11 @@
-import { IFromBTCDefinition, IFromBTCWrapper } from "./IFromBTCWrapper";
+import { IFromBTCWrapper } from "./IFromBTCWrapper";
 import { ChainType } from "@atomiqlabs/base";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
 import { Fee, FeeType } from "../../fee/Fee";
 import { IAddressSwap } from "../../IAddressSwap";
-import { IEscrowSelfInitSwap, IEscrowSelfInitSwapInit } from "../IEscrowSelfInitSwap";
-export declare abstract class IFromBTCSwap<T extends ChainType = ChainType, D extends IFromBTCDefinition<T, IFromBTCWrapper<T, D>, IFromBTCSwap<T, D, S>> = IFromBTCDefinition<T, IFromBTCWrapper<T, any>, IFromBTCSwap<T, any, any>>, S extends number = number> extends IEscrowSelfInitSwap<T, D, S> implements IAddressSwap {
+import { IEscrowSelfInitSwap, IEscrowSelfInitSwapDefinition, IEscrowSelfInitSwapInit } from "../IEscrowSelfInitSwap";
+export type IFromBTCSelfInitDefinition<T extends ChainType, W extends IFromBTCWrapper<T, any>, S extends IFromBTCSelfInitSwap<T>> = IEscrowSelfInitSwapDefinition<T, W, S>;
+export declare abstract class IFromBTCSelfInitSwap<T extends ChainType = ChainType, D extends IFromBTCSelfInitDefinition<T, IFromBTCWrapper<T, D>, IFromBTCSelfInitSwap<T, D, S>> = IFromBTCSelfInitDefinition<T, IFromBTCWrapper<T, any>, IFromBTCSelfInitSwap<T, any, any>>, S extends number = number> extends IEscrowSelfInitSwap<T, D, S> implements IAddressSwap {
     protected abstract readonly inputToken: BtcToken;
     protected constructor(wrapper: D["Wrapper"], init: IEscrowSelfInitSwapInit<T["Data"]>);
     protected constructor(wrapper: D["Wrapper"], obj: any);

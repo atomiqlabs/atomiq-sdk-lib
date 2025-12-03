@@ -6,12 +6,12 @@ export class SwapPriceWithChain<T extends MultiChain, ChainIdentifier extends Ch
 
     swapPrice: ISwapPrice<T>;
     chainIdentifier: ChainIdentifier;
-
     maxAllowedFeeDifferencePPM: bigint;
 
     constructor(swapPrice: ISwapPrice<T>, chainIdentifier: ChainIdentifier) {
         this.swapPrice = swapPrice;
         this.chainIdentifier = chainIdentifier;
+        this.maxAllowedFeeDifferencePPM = swapPrice.maxAllowedFeeDifferencePPM;
     }
 
     /**

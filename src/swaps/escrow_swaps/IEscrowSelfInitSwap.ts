@@ -2,11 +2,12 @@ import {IEscrowSwap, IEscrowSwapInit, isIEscrowSwapInit} from "./IEscrowSwap";
 import {ChainType, SignatureData, SignatureVerificationError, SwapData} from "@atomiqlabs/base";
 import {SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
 import {timeoutPromise, tryWithRetries} from "../../utils/Utils";
-import {IEscrowSwapWrapper} from "./IEscrowSwapWrapper";
+import {IEscrowSwapDefinition, IEscrowSwapWrapper} from "./IEscrowSwapWrapper";
+import {SwapTypeDefinition} from "../ISwapWrapper";
 
 export type IEscrowSelfInitSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
-    feeRate: any,
-    signatureData: SignatureData,
+    feeRate: string,
+    signatureData?: SignatureData,
 };
 
 export function isIEscrowSelfInitSwapInit<T extends SwapData>(obj: any): obj is IEscrowSelfInitSwapInit<T> {
@@ -21,24 +22,27 @@ export function isIEscrowSelfInitSwapInit<T extends SwapData>(obj: any): obj is 
         isIEscrowSwapInit(obj);
 }
 
+export type IEscrowSelfInitSwapDefinition<T extends ChainType, W extends IEscrowSwapWrapper<T, any>, S extends IEscrowSelfInitSwap<T>> = SwapTypeDefinition<T, W, S>;
+
 export abstract class IEscrowSelfInitSwap<
     T extends ChainType = ChainType,
+    D extends IEscrowSelfInitSwapDefinition<T, IEscrowSwapWrapper<T, D>, IEscrowSelfInitSwap<T, D, S>> = IEscrowSwapDefinition<T, IEscrowSwapWrapper<T, any>, IEscrowSelfInitSwap<T, any, any>>,
     S extends number = number
-> extends IEscrowSwap<T, S> {
+> extends IEscrowSwap<T, D, S> {
 
     signatureData?: SignatureData;
-    feeRate?: any;
+    feeRate?: string;
 
-    protected constructor(wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>, obj: any);
-    protected constructor(wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>, swapInit: IEscrowSelfInitSwapInit<T["Data"]>);
+    protected constructor(wrapper: D["Wrapper"], obj: any);
+    protected constructor(wrapper: D["Wrapper"], swapInit: IEscrowSelfInitSwapInit<T["Data"]>);
     protected constructor(
-        wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>,
+        wrapper: D["Wrapper"],
         swapInitOrObj: IEscrowSelfInitSwapInit<T["Data"]> | any,
     ) {
         super(wrapper, swapInitOrObj);
 
         if(!isIEscrowSelfInitSwapInit(swapInitOrObj)) {
-            this.signatureData = swapInitOrObj.signature==null ? null : {
+            if(swapInitOrObj.signature!=null) this.signatureData ={
                 prefix: swapInitOrObj.prefix,
                 timeout: swapInitOrObj.timeout,
                 signature: swapInitOrObj.signature
@@ -58,6 +62,9 @@ export abstract class IEscrowSelfInitSwap<
      * @protected
      */
     protected async watchdogWaitTillSignatureExpiry(intervalSeconds?: number, abortSignal?: AbortSignal): Promise<void> {
+        if(this.data==null || this.signatureData==null)
+            throw new Error("Tried to await signature expiry but data or signature is null, invalid state?");
+
         intervalSeconds ??= 5;
         let expired = false
         while(!expired) {
@@ -79,7 +86,7 @@ export abstract class IEscrowSelfInitSwap<
      * Get the estimated smart chain fee of the commit transaction
      */
     protected getCommitFee(): Promise<bigint> {
-        return this.wrapper.contract.getCommitFee(this._getInitiator(), this.data, this.feeRate);
+        return this.wrapper.contract.getCommitFee(this._getInitiator(), this.getSwapData(), this.feeRate);
     }
 
     /**
@@ -90,8 +97,8 @@ export abstract class IEscrowSelfInitSwap<
         return toTokenAmount(
             await (
                 swapContract.getRawCommitFee!=null ?
-                    swapContract.getRawCommitFee(this._getInitiator(), this.data, this.feeRate) :
-                    swapContract.getCommitFee(this._getInitiator(), this.data, this.feeRate)
+                    swapContract.getRawCommitFee(this._getInitiator(), this.getSwapData(), this.feeRate) :
+                    swapContract.getCommitFee(this._getInitiator(), this.getSwapData(), this.feeRate)
             ),
             this.wrapper.getNativeToken(),
             this.wrapper.prices
@@ -118,9 +125,11 @@ export abstract class IEscrowSelfInitSwap<
      * Checks if the swap's quote is expired for good (i.e. the swap strictly cannot be committed on-chain anymore)
      */
     async _verifyQuoteDefinitelyExpired(): Promise<boolean> {
+        if(this.data==null || this.signatureData==null) throw new Error("data or signature data are null!");
+
         return tryWithRetries(
             () => this.wrapper.contract.isInitAuthorizationExpired(
-                this.data, this.signatureData
+                this.data!, this.signatureData!
             )
         );
     }
@@ -129,12 +138,14 @@ export abstract class IEscrowSelfInitSwap<
      * Checks if the swap's quote is still valid
      */
     async verifyQuoteValid(): Promise<boolean> {
+        if(this.data==null || this.signatureData==null) throw new Error("data or signature data are null!");
+
         try {
             await tryWithRetries(
                 () => this.wrapper.contract.isValidInitAuthorization(
-                    this._getInitiator(), this.data, this.signatureData, this.feeRate
+                    this._getInitiator(), this.data!, this.signatureData!, this.feeRate
                 ),
-                null,
+                undefined,
                 SignatureVerificationError
             );
             return true;

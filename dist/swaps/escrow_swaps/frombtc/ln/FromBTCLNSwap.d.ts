@@ -1,11 +1,12 @@
 /// <reference types="node" />
 /// <reference types="node" />
-import { FromBTCLNWrapper } from "./FromBTCLNWrapper";
-import { IFromBTCSwap } from "../IFromBTCSwap";
+import { FromBTCLNDefinition, FromBTCLNWrapper } from "./FromBTCLNWrapper";
+import { IFromBTCSelfInitSwap } from "../IFromBTCSelfInitSwap";
 import { SwapType } from "../../../enums/SwapType";
 import { ChainType, SignatureData, SwapCommitState, SwapData } from "@atomiqlabs/base";
 import { Buffer } from "buffer";
 import { LNURLWithdraw } from "../../../../utils/LNURL";
+import { LoggerType } from "../../../../utils/Utils";
 import { BtcToken, SCToken, TokenAmount } from "../../../../Tokens";
 import { MinimalLightningNetworkWalletInterface } from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
 import { IClaimableSwap } from "../../../IClaimableSwap";
@@ -30,7 +31,8 @@ export type FromBTCLNSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> &
     lnurlCallback?: string;
 };
 export declare function isFromBTCLNSwapInit<T extends SwapData>(obj: any): obj is FromBTCLNSwapInit<T>;
-export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T, FromBTCLNSwapState> implements IAddressSwap, IClaimableSwap<T, FromBTCLNSwapState> {
+export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFromBTCSelfInitSwap<T, FromBTCLNDefinition<T>, FromBTCLNSwapState> implements IAddressSwap, IClaimableSwap<T, FromBTCLNDefinition<T>, FromBTCLNSwapState> {
+    protected readonly logger: LoggerType;
     protected readonly inputToken: BtcToken<true>;
     protected readonly TYPE = SwapType.FROM_BTCLN;
     protected readonly lnurlFailSignal: AbortController;
@@ -41,7 +43,6 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     lnurlK1?: string;
     lnurlCallback?: string;
     prPosted?: boolean;
-    wrapper: FromBTCLNWrapper<T>;
     protected getSwapData(): T["Data"];
     constructor(wrapper: FromBTCLNWrapper<T>, init: FromBTCLNSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNWrapper<T>, obj: any);
@@ -49,7 +50,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     protected getIdentifierHash(): Buffer;
     protected getPaymentHash(): Buffer;
     protected canCommit(): boolean;
-    getInputTxId(): string | null;
+    getInputTxId(): string;
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap
      */

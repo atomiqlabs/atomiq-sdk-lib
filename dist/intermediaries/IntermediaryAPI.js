@@ -70,7 +70,7 @@ const FromBTCResponseSchema = {
     address: SchemaVerifier_1.FieldTypeEnum.String,
     swapFee: SchemaVerifier_1.FieldTypeEnum.BigInt,
     total: SchemaVerifier_1.FieldTypeEnum.BigInt,
-    confirmations: SchemaVerifier_1.FieldTypeEnum.NumberOptional,
+    confirmations: SchemaVerifier_1.FieldTypeEnum.Number,
     ...SwapResponseSchema
 };
 /////////////////////////
@@ -168,7 +168,7 @@ class IntermediaryAPI {
     static async getRefundAuthorization(url, paymentHash, sequence, timeout, abortSignal) {
         return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getRefundAuthorization" +
             "?paymentHash=" + encodeURIComponent(paymentHash) +
-            "&sequence=" + encodeURIComponent(sequence.toString(10)), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+            "&sequence=" + encodeURIComponent(sequence.toString(10)), timeout, abortSignal), undefined, RequestError_1.RequestError, abortSignal);
     }
     /**
      * Returns the information about the payment of the From BTCLN swaps
@@ -182,7 +182,7 @@ class IntermediaryAPI {
      */
     static async getPaymentAuthorization(url, paymentHash, timeout, abortSignal) {
         return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getInvoicePaymentAuth" +
-            "?paymentHash=" + encodeURIComponent(paymentHash), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+            "?paymentHash=" + encodeURIComponent(paymentHash), timeout, abortSignal), undefined, RequestError_1.RequestError, abortSignal);
     }
     /**
      * Returns the status of the payment of the From BTCLN swaps
@@ -196,7 +196,7 @@ class IntermediaryAPI {
      */
     static async getInvoiceStatus(url, paymentHash, timeout, abortSignal) {
         return (0, Utils_1.tryWithRetries)(() => (0, Utils_1.httpGet)(url + "/getInvoiceStatus" +
-            "?paymentHash=" + encodeURIComponent(paymentHash), timeout, abortSignal), null, RequestError_1.RequestError, abortSignal);
+            "?paymentHash=" + encodeURIComponent(paymentHash), timeout, abortSignal), undefined, RequestError_1.RequestError, abortSignal);
     }
     /**
      * Initiate To BTC swap with an intermediary
@@ -238,7 +238,10 @@ class IntermediaryAPI {
                 if (code !== 20000) {
                     throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
                 }
-                return (0, SchemaVerifier_1.verifySchema)(data, ToBTCResponseSchema);
+                const result = (0, SchemaVerifier_1.verifySchema)(data, ToBTCResponseSchema);
+                if (result == null)
+                    throw new RequestError_1.RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -289,7 +292,10 @@ class IntermediaryAPI {
                 if (code !== 20000) {
                     throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
                 }
-                return (0, SchemaVerifier_1.verifySchema)(data, FromBTCResponseSchema);
+                const result = (0, SchemaVerifier_1.verifySchema)(data, FromBTCResponseSchema);
+                if (result == null)
+                    throw new RequestError_1.RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -332,7 +338,10 @@ class IntermediaryAPI {
                 if (code !== 20000) {
                     throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
                 }
-                return (0, SchemaVerifier_1.verifySchema)(data, FromBTCLNResponseSchema);
+                const result = (0, SchemaVerifier_1.verifySchema)(data, FromBTCLNResponseSchema);
+                if (result == null)
+                    throw new RequestError_1.RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -358,8 +367,8 @@ class IntermediaryAPI {
             descriptionHash: init.descriptionHash == null ? null : init.descriptionHash.toString("hex"),
             exactOut: init.exactOut,
             gasToken: init.gasToken,
-            gasAmount: (init.gasAmount ?? 0n).toString(10),
-            claimerBounty: init.claimerBounty.then(val => val.toString(10)) ?? "0"
+            gasAmount: init.gasAmount?.toString(10) ?? "0",
+            claimerBounty: init.claimerBounty?.then(val => val.toString(10)) ?? "0"
         }, {
             code: SchemaVerifier_1.FieldTypeEnum.Number,
             msg: SchemaVerifier_1.FieldTypeEnum.String,
@@ -376,7 +385,10 @@ class IntermediaryAPI {
                 if (code !== 20000) {
                     throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
                 }
-                return (0, SchemaVerifier_1.verifySchema)(data, FromBTCLNAutoResponseSchema);
+                const result = (0, SchemaVerifier_1.verifySchema)(data, FromBTCLNAutoResponseSchema);
+                if (result == null)
+                    throw new RequestError_1.RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -419,7 +431,10 @@ class IntermediaryAPI {
                 if (code !== 20000) {
                     throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
                 }
-                return (0, SchemaVerifier_1.verifySchema)(data, ToBTCLNResponseSchema);
+                const result = (0, SchemaVerifier_1.verifySchema)(data, ToBTCLNResponseSchema);
+                if (result == null)
+                    throw new RequestError_1.RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -452,7 +467,10 @@ class IntermediaryAPI {
         ]);
         if (code !== 20000)
             throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
-        return (0, SchemaVerifier_1.verifySchema)(data, ToBTCLNResponseSchema);
+        const result = (0, SchemaVerifier_1.verifySchema)(data, ToBTCLNResponseSchema);
+        if (result == null)
+            throw new RequestError_1.RequestError("Cannot parse the response with the expected schema", 200);
+        return result;
     }
     /**
      * Prepare To BTCLN exact in swap with an intermediary
@@ -492,7 +510,10 @@ class IntermediaryAPI {
                 if (code !== 20000) {
                     throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
                 }
-                return (0, SchemaVerifier_1.verifySchema)(data, ToBTCLNPrepareExactInSchema);
+                const result = (0, SchemaVerifier_1.verifySchema)(data, ToBTCLNPrepareExactInSchema);
+                if (result == null)
+                    throw new RequestError_1.RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -532,7 +553,10 @@ class IntermediaryAPI {
             if (code !== 20000) {
                 throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
             }
-            return (0, SchemaVerifier_1.verifySchema)(data, SpvFromBTCPrepareResponseSchema);
+            const result = (0, SchemaVerifier_1.verifySchema)(data, SpvFromBTCPrepareResponseSchema);
+            if (result == null)
+                throw new RequestError_1.RequestError("Cannot parse the response with the expected schema", 200);
+            return result;
         });
     }
     /**
@@ -564,7 +588,10 @@ class IntermediaryAPI {
             if (code !== 20000) {
                 throw RequestError_1.RequestError.parse(JSON.stringify({ code, msg, data }), 400);
             }
-            return (0, SchemaVerifier_1.verifySchema)(data, SpvFromBTCInitResponseSchema);
+            const result = (0, SchemaVerifier_1.verifySchema)(data, SpvFromBTCInitResponseSchema);
+            if (result == null)
+                throw new RequestError_1.RequestError("Cannot parse the response with the expected schema", 200);
+            return result;
         });
     }
 }

@@ -60,7 +60,7 @@ export type LNURLPay = {
     min: bigint,
     max: bigint,
     commentMaxLength: number,
-    shortDescription: string,
+    shortDescription?: string,
     longDescription?: string,
     icon?: string,
     params: LNURLPayParamsWithUrl
@@ -74,7 +74,7 @@ export function isLNURLPay(value: any): value is LNURLPay {
         typeof(value.min) === "bigint" &&
         typeof(value.max) === "bigint" &&
         typeof value.commentMaxLength === "number" &&
-        typeof value.shortDescription === "string" &&
+        (value.shortDescription === undefined || typeof value.shortDescription === "string") &&
         (value.longDescription === undefined || typeof value.longDescription === "string") &&
         (value.icon === undefined || typeof value.icon === "string") &&
         isLNURLPayParams(value.params)
@@ -249,30 +249,30 @@ export class LNURL {
     ) : Promise<LNURLPayParamsWithUrl | LNURLWithdrawParamsWithUrl | null> {
         if(shouldRetry==null) shouldRetry = true;
 
-        const url: string = LNURL.extractCallUrl(str);
-        if(url!=null) {
-            const sendRequest =
-                () => httpGet<LNURLPayParams | LNURLWithdrawParams | LNURLError>(url, timeout, abortSignal, true);
+        const url = LNURL.extractCallUrl(str);
+        if(url==null) return null;
 
-            let response = shouldRetry ?
-                await tryWithRetries(sendRequest, null, RequestError, abortSignal) :
-                await sendRequest();
+        const sendRequest =
+            () => httpGet<LNURLPayParams | LNURLWithdrawParams | LNURLError>(url, timeout, abortSignal, true);
 
-            if(isLNURLError(response)) return null;
+        let response = shouldRetry ?
+            await tryWithRetries(sendRequest, undefined, RequestError, abortSignal) :
+            await sendRequest();
 
-            if(response.tag==="payRequest") try {
-                response.decodedMetadata = JSON.parse(response.metadata)
-            } catch (err) {
-                response.decodedMetadata = []
-            }
+        if(isLNURLError(response)) return null;
 
-            if(!isLNURLPayParams(response) && !isLNURLWithdrawParams(response)) return null;
-
-            return {
-                ...response,
-                url: str
-            };
+        if(response.tag==="payRequest") try {
+            response.decodedMetadata = JSON.parse(response.metadata)
+        } catch (err) {
+            response.decodedMetadata = []
         }
+
+        if(!isLNURLPayParams(response) && !isLNURLWithdrawParams(response)) return null;
+
+        return {
+            ...response,
+            url: str
+        };
     }
 
     /**
@@ -288,9 +288,9 @@ export class LNURL {
 
         if(res.tag==="payRequest") {
             const payRequest: LNURLPayParamsWithUrl = res;
-            let shortDescription: string;
-            let longDescription: string;
-            let icon: string;
+            let shortDescription: string | undefined = undefined;
+            let longDescription: string | undefined = undefined;
+            let icon: string | undefined = undefined;
             payRequest.decodedMetadata.forEach(data => {
                 switch(data[0]) {
                     case "text/plain":
@@ -360,7 +360,7 @@ export class LNURL {
 
         const response = await tryWithRetries(
             () => httpGet<LNURLPayResult | LNURLError>(payRequest.callback+queryParams, timeout, abortSignal, true),
-            null, RequestError, abortSignal
+            undefined, RequestError, abortSignal
         );
 
         if(isLNURLError(response)) throw new RequestError("LNURL callback error: "+response.reason, 200);
@@ -372,14 +372,17 @@ export class LNURL {
         if(parsedPR.tagsObject.purpose_commit_hash!==descHash)
             throw new RequestError("Invalid invoice received (description hash)!", 200);
 
-        const invoiceMSats = BigInt(parsedPR.millisatoshis);
+        const msats = parsedPR.millisatoshis;
+        if(msats==null)
+            throw new RequestError("Invalid invoice received (amount msats not defined)", 200);
+        const invoiceMSats = BigInt(msats);
         if(invoiceMSats !== (amount * 1000n))
             throw new RequestError("Invalid invoice received (amount)!", 200);
 
         return {
             invoice: response.pr,
             parsedInvoice: parsedPR,
-            successAction: response.successAction
+            successAction: response.successAction ?? undefined
         }
     }
 
@@ -403,8 +406,8 @@ export class LNURL {
         const queryParams = (withdrawRequest.callback.includes("?") ? "&" : "?")+params.join("&");
 
         const response = await tryWithRetries(
-            () => httpGet<LNURLOk | LNURLError>(withdrawRequest.callback+queryParams, null, null, true),
-            null, RequestError
+            () => httpGet<LNURLOk | LNURLError>(withdrawRequest.callback+queryParams, undefined, undefined, true),
+            undefined, RequestError
         );
 
         if(isLNURLError(response)) throw new RequestError("LNURL callback error: " + response.reason, 200);
@@ -426,28 +429,30 @@ export class LNURL {
         const max = BigInt(withdrawRequest.maxWithdrawable) / 1000n;
 
         const parsedPR = bolt11Decode(lnpr);
-        const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
+        const msats = parsedPR.millisatoshis;
+        if(msats==null) throw new UserError("Invoice without msats value field!");
+        const amount = (BigInt(msats) + 999n) / 1000n;
         if(amount < min) throw new UserError("Invoice amount less than minimum LNURL-withdraw limit");
         if(amount > max) throw new UserError("Invoice amount more than maximum LNURL-withdraw limit");
 
         return await LNURL.postInvoiceToLNURLWithdraw(withdrawRequest, lnpr);
     }
 
-    static decodeSuccessAction(successAction: LNURLPaySuccessAction, secret: string): LNURLDecodedSuccessAction | null {
+    static decodeSuccessAction(successAction?: LNURLPaySuccessAction | null, secret?: string | null): LNURLDecodedSuccessAction | null {
         if(secret==null) return null;
         if(successAction==null) return null;
-        if(successAction.tag==="message") {
+        if(successAction.tag==="message" && successAction.message!=null) {
             return {
                 description: successAction.message
             };
         }
-        if(successAction.tag==="url") {
+        if(successAction.tag==="url" && successAction.description!=null && successAction.url!=null) {
             return {
                 description: successAction.description,
                 url: successAction.url
             };
         }
-        if(successAction.tag==="aes") {
+        if(successAction.tag==="aes" && successAction.iv!=null && successAction.ciphertext!=null && successAction.description!=null) {
             const CBC = cbc(Buffer.from(secret, "hex"), Buffer.from(successAction.iv, "hex"));
             let plaintext = CBC.decrypt(Buffer.from(successAction.ciphertext, "base64"));
             // remove padding
@@ -458,6 +463,7 @@ export class LNURL {
                 text: Buffer.from(plaintext).toString("utf8", 0, size - pad)
             };
         }
+        return null;
     }
 
 }

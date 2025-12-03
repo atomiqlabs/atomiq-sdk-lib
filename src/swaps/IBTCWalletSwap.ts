@@ -31,7 +31,7 @@ export interface IBTCWalletSwap {
     submitPsbt(psbt: Transaction | string): Promise<string>;
 
 
-    estimateBitcoinFee(wallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
+    estimateBitcoinFee(wallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>> | null>;
 
 
     sendBitcoinTransaction(
@@ -48,7 +48,7 @@ export interface IBTCWalletSwap {
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     waitForBitcoinTransaction(
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
+        updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void,
         checkIntervalSeconds?: number,
         abortSignal?: AbortSignal,
     ): Promise<string>;

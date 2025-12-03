@@ -36,7 +36,7 @@ class IToBTCWrapper extends IEscrowSwapWrapper_1.IEscrowSwapWrapper {
         }).catch(e => {
             this.logger.warn("preFetchIntermediaryReputation(): Error: ", e);
             abortController.abort(e);
-            return null;
+            return undefined;
         });
     }
     /**
@@ -50,22 +50,18 @@ class IToBTCWrapper extends IEscrowSwapWrapper_1.IEscrowSwapWrapper {
      * @returns Fee rate
      */
     preFetchFeeRate(signer, amountData, claimHash, abortController) {
-        return (0, Utils_1.tryWithRetries)(() => this.contract.getInitPayInFeeRate(signer, null, amountData.token, claimHash), null, null, abortController.signal).catch(e => {
+        return (0, Utils_1.tryWithRetries)(() => this.contract.getInitPayInFeeRate(signer, this.chain.randomAddress(), amountData.token, claimHash), undefined, undefined, abortController.signal).catch(e => {
             this.logger.warn("preFetchFeeRate(): Error: ", e);
             abortController.abort(e);
-            return null;
+            return undefined;
         });
     }
     async processEventInitialize(swap, event) {
         if (swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED || swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
-            const swapData = await event.swapData();
-            if (swap.data != null && !swap.data.equals(swapData))
-                return false;
-            if (swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED || swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED)
-                swap.state = IToBTCSwap_1.ToBTCSwapState.COMMITED;
-            swap.data = swapData;
+            swap.state = IToBTCSwap_1.ToBTCSwapState.COMMITED;
             return true;
         }
+        return false;
     }
     processEventClaim(swap, event) {
         if (swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDED && swap.state !== IToBTCSwap_1.ToBTCSwapState.CLAIMED) {

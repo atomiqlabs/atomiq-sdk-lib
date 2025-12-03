@@ -1,20 +1,25 @@
-import { IToBTCWrapper } from "./IToBTCWrapper";
-import { ChainType, SwapCommitState, SwapData } from "@atomiqlabs/base";
+import { IToBTCDefinition, IToBTCWrapper } from "./IToBTCWrapper";
+import { ChainType, SignatureData, SwapCommitState, SwapData } from "@atomiqlabs/base";
 import { RefundAuthorizationResponse } from "../../../intermediaries/IntermediaryAPI";
 import { BtcToken, SCToken, TokenAmount } from "../../../Tokens";
 import { Fee, FeeType } from "../../fee/Fee";
 import { IEscrowSelfInitSwap, IEscrowSelfInitSwapInit } from "../IEscrowSelfInitSwap";
 export type IToBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
+    signatureData: SignatureData;
+    data: T;
     networkFee: bigint;
-    networkFeeBtc?: bigint;
+    networkFeeBtc: bigint;
 };
 export declare function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T>;
-export declare abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscrowSelfInitSwap<T, ToBTCSwapState> {
+export declare abstract class IToBTCSwap<T extends ChainType = ChainType, D extends IToBTCDefinition<T, IToBTCWrapper<T, D>, IToBTCSwap<T, D>> = IToBTCDefinition<T, IToBTCWrapper<T, any>, IToBTCSwap<T, any>>> extends IEscrowSelfInitSwap<T, D, ToBTCSwapState> {
     protected readonly networkFee: bigint;
-    protected networkFeeBtc?: bigint;
+    protected networkFeeBtc: bigint;
     protected readonly abstract outputToken: BtcToken;
-    protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, serializedObject: any);
-    protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, init: IToBTCSwapInit<T["Data"]>);
+    readonly data: T["Data"];
+    readonly signatureData: SignatureData;
+    protected constructor(wrapper: D["Wrapper"], serializedObject: any);
+    protected constructor(wrapper: D["Wrapper"], init: IToBTCSwapInit<T["Data"]>);
+    protected getSwapData(): T["Data"];
     protected upgradeVersion(): void;
     /**
      * In case swapFee in BTC is not supplied it recalculates it based on swap price

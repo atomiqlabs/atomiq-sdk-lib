@@ -35,14 +35,22 @@ export declare class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<Mem
      * @returns estimated confirmation delay, -1 if the transaction won't confirm in the near future, null if the
      *  transaction was replaced or was confirmed in the meantime
      */
-    getConfirmationDelay(tx: BtcTx, requiredConfirmations: number): Promise<number | null>;
+    getConfirmationDelay(tx: {
+        txid: string;
+        confirmations?: number;
+    }, requiredConfirmations: number): Promise<number | null>;
     /**
-     * Converts mempool API's transaction to BtcTx object
+     * Converts mempool API's transaction to BtcTx object while fetching the raw tx separately
      * @param tx Transaction to convert
-     * @param getRaw If the raw transaction field should be filled (requires one more network request)
      * @private
      */
     private toBtcTx;
+    /**
+     * Converts mempool API's transaction to BtcTx object, doesn't populate raw and hex fields
+     * @param tx Transaction to convert
+     * @private
+     */
+    private toBtcTxWithoutRawData;
     getTipHeight(): Promise<number>;
     getBlockHeader(blockhash: string): Promise<MempoolBitcoinBlock>;
     getMerkleProof(txId: string, blockhash: string): Promise<{
@@ -51,14 +59,14 @@ export declare class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<Mem
         merkle: Buffer[];
         blockheight: number;
     }>;
-    getTransaction(txId: string): Promise<BtcTxWithBlockheight>;
+    getTransaction(txId: string): Promise<BtcTxWithBlockheight | null>;
     isInMainChain(blockhash: string): Promise<boolean>;
     getBlockhash(height: number): Promise<string>;
     getBlockWithTransactions(blockhash: string): Promise<BtcBlockWithTxs>;
     getSyncInfo(): Promise<BtcSyncInfo>;
     getPast15Blocks(height: number): Promise<MempoolBitcoinBlock[]>;
     checkAddressTxos(address: string, txoHash: Buffer): Promise<{
-        tx: BtcTxWithBlockheight;
+        tx: Omit<BtcTxWithBlockheight, "hex" | "raw">;
         vout: number;
     } | null>;
     /**
@@ -71,12 +79,12 @@ export declare class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<Mem
      * @param abortSignal
      * @param intervalSeconds
      */
-    waitForAddressTxo(address: string, txoHash: Buffer, requiredConfirmations: number, stateUpdateCbk: (confirmations: number, txId: string, vout: number, txEtaMS: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<{
-        tx: BtcTxWithBlockheight;
+    waitForAddressTxo(address: string, txoHash: Buffer, requiredConfirmations: number, stateUpdateCbk: (confirmations?: number, txId?: string, vout?: number, txEtaMS?: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<{
+        tx: Omit<BtcTxWithBlockheight, "hex" | "raw">;
         vout: number;
     }>;
-    waitForTransaction(txId: string, requiredConfirmations: number, stateUpdateCbk: (confirmations: number, txId: string, txEtaMS: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<BtcTxWithBlockheight>;
-    getLNNodeLiquidity(pubkey: string): Promise<LNNodeLiquidity>;
+    waitForTransaction(txId: string, requiredConfirmations: number, stateUpdateCbk: (confirmations?: number, txId?: string, txEtaMS?: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<BtcTxWithBlockheight>;
+    getLNNodeLiquidity(pubkey: string): Promise<LNNodeLiquidity | null>;
     sendRawTransaction(rawTx: string): Promise<string>;
     sendRawPackage(rawTx: string[]): Promise<string[]>;
     isSpent(utxo: string, confirmed?: boolean): Promise<boolean>;

@@ -1,9 +1,10 @@
 import { IToBTCSwap, ToBTCSwapState } from "./IToBTCSwap";
 import { ChainType, ClaimEvent, InitializeEvent, RefundEvent } from "@atomiqlabs/base";
-import { AmountData, ISwapWrapperOptions } from "../../ISwapWrapper";
+import { AmountData, ISwapWrapperOptions, SwapTypeDefinition } from "../../ISwapWrapper";
 import { Intermediary, SingleChainReputationType } from "../../../intermediaries/Intermediary";
 import { IEscrowSwapWrapper } from "../IEscrowSwapWrapper";
-export declare abstract class IToBTCWrapper<T extends ChainType, S extends IToBTCSwap<T> = IToBTCSwap<T>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends IEscrowSwapWrapper<T, S, O> {
+export type IToBTCDefinition<T extends ChainType, W extends IToBTCWrapper<T, any>, S extends IToBTCSwap<T>> = SwapTypeDefinition<T, W, S>;
+export declare abstract class IToBTCWrapper<T extends ChainType, D extends IToBTCDefinition<T, IToBTCWrapper<T, D>, IToBTCSwap<T, D>>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends IEscrowSwapWrapper<T, D, O> {
     /**
      * Pre-fetches intermediary's reputation, doesn't throw, instead aborts via abortController and returns null
      *
@@ -14,7 +15,7 @@ export declare abstract class IToBTCWrapper<T extends ChainType, S extends IToBT
      * @returns Intermediary's reputation or null if failed
      * @throws {IntermediaryError} If the intermediary vault doesn't exist
      */
-    protected preFetchIntermediaryReputation(amountData: Omit<AmountData, "amount">, lp: Intermediary, abortController: AbortController): Promise<SingleChainReputationType | null>;
+    protected preFetchIntermediaryReputation(amountData: Omit<AmountData, "amount">, lp: Intermediary, abortController: AbortController): Promise<SingleChainReputationType | undefined>;
     /**
      * Pre-fetches feeRate for a given swap
      *
@@ -25,11 +26,11 @@ export declare abstract class IToBTCWrapper<T extends ChainType, S extends IToBT
      * @protected
      * @returns Fee rate
      */
-    protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, claimHash: string | null, abortController: AbortController): Promise<any | null>;
+    protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, claimHash: string | undefined, abortController: AbortController): Promise<string | undefined>;
     readonly pendingSwapStates: ToBTCSwapState[];
     readonly tickSwapState: ToBTCSwapState[];
     readonly refundableSwapStates: ToBTCSwapState[];
-    protected processEventInitialize(swap: S, event: InitializeEvent<T["Data"]>): Promise<boolean>;
-    protected processEventClaim(swap: S, event: ClaimEvent<T["Data"]>): Promise<boolean>;
-    protected processEventRefund(swap: S, event: RefundEvent<T["Data"]>): Promise<boolean>;
+    protected processEventInitialize(swap: D["Swap"], event: InitializeEvent<T["Data"]>): Promise<boolean>;
+    protected processEventClaim(swap: D["Swap"], event: ClaimEvent<T["Data"]>): Promise<boolean>;
+    protected processEventRefund(swap: D["Swap"], event: RefundEvent<T["Data"]>): Promise<boolean>;
 }

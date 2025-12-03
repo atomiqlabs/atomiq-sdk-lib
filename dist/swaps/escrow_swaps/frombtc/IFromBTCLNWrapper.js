@@ -77,20 +77,20 @@ class IFromBTCLNWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
      *  deplete more than half of the liquidity
      */
     async verifyLnNodeCapacity(lp, decodedPr, lnCapacityPrefetchPromise, abortSignal) {
-        let result = lnCapacityPrefetchPromise == null ? null : await lnCapacityPrefetchPromise;
-        if (result == null)
-            result = await this.lnApi.getLNNodeLiquidity(decodedPr.payeeNodeKey);
-        if (abortSignal != null)
-            abortSignal.throwIfAborted();
-        if (result === null)
+        if (decodedPr.payeeNodeKey == null)
+            throw new Error("Unable to extract payee pubkey from the swap invoice!");
+        if (decodedPr.millisatoshis == null)
+            throw new Error("Swap invoice doesn't contains msat amount field!");
+        const _result = await lnCapacityPrefetchPromise ?? await this.lnApi.getLNNodeLiquidity(decodedPr.payeeNodeKey);
+        if (_result === null)
             throw new IntermediaryError_1.IntermediaryError("LP's lightning node not found in the lightning network graph!");
-        lp.lnData = result;
-        if (decodedPr.payeeNodeKey !== result.publicKey)
+        lp.lnData = _result;
+        if (decodedPr.payeeNodeKey !== _result.publicKey)
             throw new IntermediaryError_1.IntermediaryError("Invalid pr returned - payee pubkey");
         const amountIn = (BigInt(decodedPr.millisatoshis) + 999n) / 1000n;
-        if (result.capacity < amountIn)
+        if (_result.capacity < amountIn)
             throw new IntermediaryError_1.IntermediaryError("LP's lightning node doesn't have enough inbound capacity for the swap!");
-        if ((result.capacity / 2n) < amountIn)
+        if ((_result.capacity / 2n) < amountIn)
             throw new Error("LP's lightning node probably doesn't have enough inbound capacity for the swap!");
     }
     /**

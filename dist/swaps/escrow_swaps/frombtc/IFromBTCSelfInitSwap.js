@@ -1,12 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.IFromBTCSwap = void 0;
+exports.IFromBTCSelfInitSwap = void 0;
 const ISwap_1 = require("../../ISwap");
 const base_1 = require("@atomiqlabs/base");
 const Tokens_1 = require("../../../Tokens");
 const Fee_1 = require("../../fee/Fee");
 const IEscrowSelfInitSwap_1 = require("../IEscrowSelfInitSwap");
-class IFromBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
+class IFromBTCSelfInitSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
     constructor(wrapper, initOrObj) {
         super(wrapper, initOrObj);
     }
@@ -98,6 +98,8 @@ class IFromBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
     async txsCommit(skipChecks) {
         if (!this.canCommit())
             throw new Error("Must be in CREATED state!");
+        if (this.data == null || this.signatureData == null)
+            throw new Error("data or signature data is null, invalid state?");
         if (!this.initiated) {
             this.initiated = true;
             await this._saveAndEmit();
@@ -110,4 +112,4 @@ class IFromBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
         return this.wrapper.contract.getClaimFee(this._getInitiator(), this.getSwapData());
     }
 }
-exports.IFromBTCSwap = IFromBTCSwap;
+exports.IFromBTCSelfInitSwap = IFromBTCSelfInitSwap;

@@ -8,10 +8,10 @@ import {
     SpvWithdrawalStateType
 } from "@atomiqlabs/base";
 import {SwapType} from "../enums/SwapType";
-import {SpvFromBTCWrapper} from "./SpvFromBTCWrapper";
+import {SpvFromBTCTypeDefinition, SpvFromBTCWrapper} from "./SpvFromBTCWrapper";
 import {
     extendAbortController,
-    getLogger,
+    getLogger, LoggerType,
     timeoutPromise
 } from "../../utils/Utils";
 import {
@@ -107,12 +107,11 @@ export function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit {
 }
 
 export class SpvFromBTCSwap<T extends ChainType>
-    extends ISwap<T, SpvFromBTCSwapState>
-    implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCSwapState> {
+    extends ISwap<T, SpvFromBTCTypeDefinition<T>>
+    implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCTypeDefinition<T>, SpvFromBTCSwapState> {
 
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
-
-    readonly wrapper: SpvFromBTCWrapper<T>;
+    protected readonly logger: LoggerType;
 
     readonly quoteId: string;
     readonly recipient: string;
@@ -146,9 +145,9 @@ export class SpvFromBTCSwap<T extends ChainType>
 
     readonly genesisSmartChainBlockHeight: number;
 
-    claimTxId: string;
-    frontTxId: string;
-    data: T["SpvVaultWithdrawalData"];
+    claimTxId?: string;
+    frontTxId?: string;
+    data?: T["SpvVaultWithdrawalData"];
 
     constructor(wrapper: SpvFromBTCWrapper<T>, init: SpvFromBTCSwapInit);
     constructor(wrapper: SpvFromBTCWrapper<T>, obj: any);
@@ -157,6 +156,30 @@ export class SpvFromBTCSwap<T extends ChainType>
         super(wrapper, initOrObject);
         if(isSpvFromBTCSwapInit(initOrObject)) {
             this.state = SpvFromBTCSwapState.CREATED;
+            this.quoteId = initOrObject.quoteId;
+            this.recipient = initOrObject.recipient;
+            this.vaultOwner = initOrObject.vaultOwner;
+            this.vaultId = initOrObject.vaultId;
+            this.vaultRequiredConfirmations = initOrObject.vaultRequiredConfirmations;
+            this.vaultTokenMultipliers = initOrObject.vaultTokenMultipliers;
+            this.vaultBtcAddress = initOrObject.vaultBtcAddress;
+            this.vaultUtxo = initOrObject.vaultUtxo;
+            this.vaultUtxoValue = initOrObject.vaultUtxoValue;
+            this.btcDestinationAddress = initOrObject.btcDestinationAddress;
+            this.btcAmount = initOrObject.btcAmount;
+            this.btcAmountSwap = initOrObject.btcAmountSwap;
+            this.btcAmountGas = initOrObject.btcAmountGas;
+            this.minimumBtcFeeRate = initOrObject.minimumBtcFeeRate;
+            this.outputTotalSwap = initOrObject.outputTotalSwap;
+            this.outputSwapToken = initOrObject.outputSwapToken;
+            this.outputTotalGas = initOrObject.outputTotalGas;
+            this.outputGasToken = initOrObject.outputGasToken;
+            this.gasSwapFeeBtc = initOrObject.gasSwapFeeBtc;
+            this.gasSwapFee = initOrObject.gasSwapFee;
+            this.callerFeeShare = initOrObject.callerFeeShare;
+            this.frontingFeeShare = initOrObject.frontingFeeShare;
+            this.executionFeeShare = initOrObject.executionFeeShare;
+            this.genesisSmartChainBlockHeight = initOrObject.genesisSmartChainBlockHeight;
             const vaultAddressType = toCoinselectAddressType(toOutputScript(this.wrapper.options.bitcoinNetwork, this.vaultBtcAddress));
             if(vaultAddressType!=="p2tr" && vaultAddressType!=="p2wpkh" && vaultAddressType!=="p2wsh")
                 throw new Error("Vault address type must be of witness type: p2tr, p2wpkh, p2wsh");
@@ -166,7 +189,7 @@ export class SpvFromBTCSwap<T extends ChainType>
             this.vaultOwner = initOrObject.vaultOwner;
             this.vaultId = BigInt(initOrObject.vaultId);
             this.vaultRequiredConfirmations = initOrObject.vaultRequiredConfirmations;
-            this.vaultTokenMultipliers = initOrObject.vaultTokenMultipliers.map(val => BigInt(val));
+            this.vaultTokenMultipliers = initOrObject.vaultTokenMultipliers.map((val: string) => BigInt(val));
             this.vaultBtcAddress = initOrObject.vaultBtcAddress;
             this.vaultUtxo = initOrObject.vaultUtxo;
             this.vaultUtxoValue = BigInt(initOrObject.vaultUtxoValue);
@@ -187,7 +210,7 @@ export class SpvFromBTCSwap<T extends ChainType>
             this.genesisSmartChainBlockHeight = initOrObject.genesisSmartChainBlockHeight;
             this.claimTxId = initOrObject.claimTxId;
             this.frontTxId = initOrObject.frontTxId;
-            this.data = initOrObject.data==null ? null : new this.wrapper.spvWithdrawalDataDeserializer(initOrObject.data);
+            if(initOrObject.data!=null) this.data = new this.wrapper.spvWithdrawalDataDeserializer(initOrObject.data);
         }
         this.tryCalculateSwapFee();
         this.logger = getLogger("SPVFromBTC("+this.getId()+"): ");
@@ -200,11 +223,11 @@ export class SpvFromBTCSwap<T extends ChainType>
      * @protected
      */
     protected tryCalculateSwapFee() {
-        if(this.swapFeeBtc==null) {
+        if(this.swapFeeBtc==null && this.swapFee!=null) {
             this.swapFeeBtc = this.swapFee * this.btcAmountSwap / this.getOutputWithoutFee().rawAmount;
         }
 
-        if(this.pricingInfo.swapPriceUSatPerToken==null) {
+        if(this.pricingInfo!=null && this.pricingInfo.swapPriceUSatPerToken==null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
                 this.chainIdentifier,
                 this.btcAmountSwap,
@@ -221,7 +244,7 @@ export class SpvFromBTCSwap<T extends ChainType>
     //// Pricing
 
     async refreshPriceData(): Promise<void> {
-        if(this.pricingInfo==null) return null;
+        if(this.pricingInfo==null) return;
         this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(
             this.chainIdentifier,
             this.btcAmountSwap,
@@ -240,8 +263,8 @@ export class SpvFromBTCSwap<T extends ChainType>
         return this.recipient;
     }
 
-    _getEscrowHash(): string {
-        return this.data?.btcTx?.txid;
+    _getEscrowHash(): string | null {
+        return this.data?.btcTx?.txid ?? null;
     }
 
     getId(): string {
@@ -261,11 +284,11 @@ export class SpvFromBTCSwap<T extends ChainType>
     }
 
     getOutputTxId(): string | null {
-        return this.frontTxId ?? this.claimTxId;
+        return this.frontTxId ?? this.claimTxId ?? null;
     }
 
     getInputTxId(): string | null {
-        return this.data?.btcTx?.txid;
+        return this.data?.btcTx?.txid ?? null;
     }
 
     requiresAction(): boolean {
@@ -314,12 +337,14 @@ export class SpvFromBTCSwap<T extends ChainType>
 
     protected getOutputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
         return toTokenAmount(
-            (this.outputTotalSwap * (100_000n + this.callerFeeShare + this.frontingFeeShare + this.executionFeeShare) / 100_000n) + this.swapFee,
+            (this.outputTotalSwap * (100_000n + this.callerFeeShare + this.frontingFeeShare + this.executionFeeShare) / 100_000n) + (this.swapFee ?? 0n),
             this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices
         );
     }
 
     protected getSwapFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>> {
+        if(this.pricingInfo==null) throw new Error("No pricing info known, cannot estimate fee!");
+
         const outputToken = this.wrapper.tokens[this.outputSwapToken];
         const gasSwapFeeInOutputToken = this.gasSwapFeeBtc
             * (10n ** BigInt(outputToken.decimals))
@@ -342,6 +367,8 @@ export class SpvFromBTCSwap<T extends ChainType>
     }
 
     protected getWatchtowerFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>> {
+        if(this.pricingInfo==null) throw new Error("No pricing info known, cannot estimate fee!");
+
         const totalFeeShare = this.callerFeeShare + this.frontingFeeShare;
         const outputToken = this.wrapper.tokens[this.outputSwapToken];
         const watchtowerFeeInOutputToken = this.getInputGasAmountWithoutFee() * totalFeeShare
@@ -604,6 +631,7 @@ export class SpvFromBTCSwap<T extends ChainType>
         //Verify correct LP output
         const lpOutput = psbt.getOutput(2);
         if(
+            lpOutput.script==null ||
             lpOutput.amount!==this.btcAmount ||
             !toOutputScript(this.wrapper.options.bitcoinNetwork, this.btcDestinationAddress).equals(Buffer.from(lpOutput.script))
         ) {
@@ -618,7 +646,7 @@ export class SpvFromBTCSwap<T extends ChainType>
         //Verify tx is parsable by the contract
         try {
             await this.wrapper.contract.checkWithdrawalTx(data);
-        } catch (e) {
+        } catch (e: any) {
             throw new Error("Transaction not parsable by the contract: "+(e.message ?? e.toString()));
         }
 
@@ -649,10 +677,11 @@ export class SpvFromBTCSwap<T extends ChainType>
         return this.data.getTxId();
     }
 
-    async estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>> {
+    async estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>> | null> {
         const bitcoinWallet: IBitcoinWallet = toBitcoinWallet(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
         const txFee = await bitcoinWallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
-        return toTokenAmount(txFee==null ? null : BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
+        if(txFee==null) return null;
+        return toTokenAmount(BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
     }
 
     async sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string> {
@@ -682,7 +711,7 @@ export class SpvFromBTCSwap<T extends ChainType>
         wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner,
         callbacks?: {
             onSourceTransactionSent?: (sourceTxId: string) => void,
-            onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void,
+            onSourceTransactionConfirmationStatus?: (sourceTxId?: string, confirmations?: number, targetConfirations?: number, etaMs?: number) => void,
             onSourceTransactionConfirmed?: (sourceTxId: string) => void,
             onSwapSettled?: (destinationTxId: string) => void
         },
@@ -711,9 +740,11 @@ export class SpvFromBTCSwap<T extends ChainType>
         if(this.state===SpvFromBTCSwapState.CLAIMED || this.state===SpvFromBTCSwapState.FRONTED) return true;
         if(this.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
             const success = await this.waitTillClaimedOrFronted(options?.maxWaitTillAutomaticSettlementSeconds ?? 60, options?.abortSignal);
-            if(success && callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
+            if(success && callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId()!);
             return success;
         }
+
+        throw new Error("Unexpected state reached!");
     }
 
 
@@ -735,7 +766,7 @@ export class SpvFromBTCSwap<T extends ChainType>
 
         return {
             txId: result.txid,
-            confirmations: result.confirmations,
+            confirmations: result.confirmations ?? 0,
             targetConfirmations: this.vaultRequiredConfirmations
         }
     }
@@ -749,7 +780,7 @@ export class SpvFromBTCSwap<T extends ChainType>
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     async waitForBitcoinTransaction(
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
+        updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void,
         checkIntervalSeconds?: number,
         abortSignal?: AbortSignal
     ): Promise<string> {
@@ -758,11 +789,12 @@ export class SpvFromBTCSwap<T extends ChainType>
             this.state!==SpvFromBTCSwapState.BROADCASTED &&
             !(this.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED && this.initiated)
         ) throw new Error("Must be in POSTED or BROADCASTED state!");
+        if(this.data==null) throw new Error("Expected swap to have withdrawal data filled!");
 
         const result = await this.wrapper.btcRpc.waitForTransaction(
             this.data.btcTx.txid,
             this.vaultRequiredConfirmations,
-            (confirmations: number, txId: string, txEtaMs: number) => {
+            (confirmations?: number, txId?: string, txEtaMs?: number) => {
                 if(updateCallback!=null) updateCallback(txId, confirmations, this.vaultRequiredConfirmations, txEtaMs);
                 if(
                     txId!=null &&
@@ -796,7 +828,7 @@ export class SpvFromBTCSwap<T extends ChainType>
      * @throws {Error} If the swap is in invalid state (must be BTC_TX_CONFIRMED)
      */
     async txsClaim(_signer?: string | T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]> {
-        let address: string;
+        let address: string | undefined = undefined;
         if(_signer!=null) {
             if (typeof (_signer) === "string") {
                 address = _signer;
@@ -808,15 +840,21 @@ export class SpvFromBTCSwap<T extends ChainType>
         }
 
         if(!this.isClaimable()) throw new Error("Must be in BTC_TX_CONFIRMED state!");
+        if(this.data==null) throw new Error("Expected swap to have withdrawal data filled!");
 
         const vaultData = await this.wrapper.contract.getVaultData(this.vaultOwner, this.vaultId);
+        if(vaultData==null) throw new Error(`Vault data for ${this.vaultOwner}:${this.vaultId.toString(10)} not found (already closed???)!`);
 
-        const txs = [await this.wrapper.btcRpc.getTransaction(this.data.btcTx.txid)];
+        const btcTx = await this.wrapper.btcRpc.getTransaction(this.data.btcTx.txid);
+        if(btcTx==null) throw new Error(`Bitcoin transaction ${this.data.btcTx.txid} not found!`);
+        const txs = [btcTx];
 
         //Trace back from current tx to the vaultData-specified UTXO
         const vaultUtxo = vaultData.getUtxo();
         while(txs[0].ins[0].txid+":"+txs[0].ins[0].vout!==vaultUtxo) {
-            txs.unshift(await this.wrapper.btcRpc.getTransaction(txs[0].ins[0].txid));
+            const btcTx = await this.wrapper.btcRpc.getTransaction(txs[0].ins[0].txid);
+            if(btcTx==null) throw new Error(`Prior withdrawal bitcoin transaction ${this.data.btcTx.txid} not found!`);
+            txs.unshift(btcTx);
         }
 
         //Parse transactions to withdrawal data
@@ -846,17 +884,19 @@ export class SpvFromBTCSwap<T extends ChainType>
                 signer, await this.txsClaim(signer), true, abortSignal
             );
         } catch (e) {
+            if(this.data==null) throw e;
+
             this.logger.info("claim(): Failed to claim ourselves, checking swap claim state...");
             if(this.state===SpvFromBTCSwapState.CLAIMED) {
                 this.logger.info("claim(): Transaction state is CLAIMED, swap was successfully claimed by the watchtower");
-                return this.claimTxId;
+                return this.claimTxId!;
             }
             const withdrawalState = await this.wrapper.contract.getWithdrawalState(this.data, this.genesisSmartChainBlockHeight);
-            if(withdrawalState.type===SpvWithdrawalStateType.CLAIMED) {
+            if(withdrawalState!=null && withdrawalState.type===SpvWithdrawalStateType.CLAIMED) {
                 this.logger.info("claim(): Transaction status is CLAIMED, swap was successfully claimed by the watchtower");
                 this.claimTxId = withdrawalState.txId;
                 await this._saveAndEmit(SpvFromBTCSwapState.CLAIMED);
-                return null;
+                return withdrawalState.txId;
             }
             throw e;
         }
@@ -882,13 +922,17 @@ export class SpvFromBTCSwap<T extends ChainType>
     protected async watchdogWaitTillResult(abortSignal?: AbortSignal, interval: number = 5): Promise<
         SpvWithdrawalClaimedState | SpvWithdrawalFrontedState | SpvWithdrawalClosedState
     > {
+        if(this.data==null) throw new Error("Cannot await the result before the btc transaction is sent!");
+
         let status: SpvWithdrawalState = {type: SpvWithdrawalStateType.NOT_FOUND};
         while(status.type===SpvWithdrawalStateType.NOT_FOUND) {
             await timeoutPromise(interval*1000, abortSignal);
             try {
                 //Be smart about checking withdrawal state
                 if(await this._shouldCheckWithdrawalState()) {
-                    status = await this.wrapper.contract.getWithdrawalState(this.data, this.genesisSmartChainBlockHeight);
+                    status = await this.wrapper.contract.getWithdrawalState(
+                        this.data, this.genesisSmartChainBlockHeight
+                    ) ?? {type: SpvWithdrawalStateType.NOT_FOUND};
                 }
             } catch (e) {
                 this.logger.error("watchdogWaitTillResult(): Error when fetching commit status: ", e);
@@ -950,7 +994,7 @@ export class SpvFromBTCSwap<T extends ChainType>
                 this.logger.debug("waitTillClaimedOrFronted(): Resolved from state change (FAILED)");
                 throw new Error("Swap failed while waiting for claim or front");
             }
-            return;
+            throw new Error("Invalid numeric response, this should never happen!");
         }
         this.logger.debug("waitTillClaimedOrFronted(): Resolved from watchdog");
 
@@ -990,7 +1034,7 @@ export class SpvFromBTCSwap<T extends ChainType>
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     async waitTillExecuted(
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
+        updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void,
         checkIntervalSeconds?: number,
         abortSignal?: AbortSignal
     ): Promise<void> {
@@ -1040,7 +1084,7 @@ export class SpvFromBTCSwap<T extends ChainType>
     //////////////////////////////
     //// Swap ticks & sync
 
-    async _syncStateFromBitcoin(save: boolean) {
+    async _syncStateFromBitcoin(save?: boolean) {
         if(this.data?.btcTx==null) return false;
 
         //Check if bitcoin payment was confirmed
@@ -1113,9 +1157,9 @@ export class SpvFromBTCSwap<T extends ChainType>
 
         if(this.state===SpvFromBTCSwapState.BROADCASTED || this.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
             if(await this._shouldCheckWithdrawalState()) {
-                const status = await this.wrapper.contract.getWithdrawalState(this.data, this.genesisSmartChainBlockHeight);
-                this.logger.debug("syncStateFromChain(): status of "+this.data.btcTx.txid, status);
-                switch(status.type) {
+                const status = await this.wrapper.contract.getWithdrawalState(this.data!, this.genesisSmartChainBlockHeight);
+                this.logger.debug("syncStateFromChain(): status of "+this.data!.btcTx.txid, status);
+                switch(status?.type) {
                     case SpvWithdrawalStateType.FRONTED:
                         this.frontTxId = status.txId;
                         this.state = SpvFromBTCSwapState.FRONTED;
@@ -1191,10 +1235,12 @@ export class SpvFromBTCSwap<T extends ChainType>
                 }
             }
         }
+
+        return false;
     }
 
-    async _shouldCheckWithdrawalState(frontingAddress?: string, vaultDataUtxo?: string) {
-        if(frontingAddress===undefined) frontingAddress = await this.wrapper.contract.getFronterAddress(this.vaultOwner, this.vaultId, this.data);
+    async _shouldCheckWithdrawalState(frontingAddress?: string | null, vaultDataUtxo?: string | null) {
+        if(frontingAddress===undefined) frontingAddress = await this.wrapper.contract.getFronterAddress(this.vaultOwner, this.vaultId, this.data!);
         if(vaultDataUtxo===undefined) vaultDataUtxo = await this.wrapper.contract.getVaultLatestUtxo(this.vaultOwner, this.vaultId);
 
         if(frontingAddress != null) return true; //In case the swap is fronted there will for sure be a fronted event
@@ -1202,11 +1248,19 @@ export class SpvFromBTCSwap<T extends ChainType>
 
         const [txId, _] = vaultDataUtxo.split(":");
         //Don't check both txns if their txId is equal
-        if(this.data.btcTx.txid===txId) return true;
+        if(this.data!.btcTx.txid===txId) return true;
         const [btcTx, latestVaultTx] = await Promise.all([
-            this.wrapper.btcRpc.getTransaction(this.data.btcTx.txid),
+            this.wrapper.btcRpc.getTransaction(this.data!.btcTx.txid),
             this.wrapper.btcRpc.getTransaction(txId)
         ]);
+
+        if(latestVaultTx==null || latestVaultTx.blockheight==null) {
+            //Something must've gone horribly wrong, the latest vault utxo tx of the vault either
+            // cannot be found on bitcoin network or is not even confirmed yet
+            this.logger.debug(`_shouldCheckWithdrawalState(): Latest vault utxo not found or not confirmed on bitcoin ${txId}`);
+            return false;
+        }
+
         if(btcTx!=null) {
             const btcTxHeight = btcTx.blockheight;
             const latestVaultTxHeight = latestVaultTx.blockheight;
@@ -1218,7 +1272,7 @@ export class SpvFromBTCSwap<T extends ChainType>
             }
         } else {
             //Definitely not claimed because the transaction was probably double-spent (or evicted from mempool)
-            this.logger.debug(`_shouldCheckWithdrawalState(): Skipped checking withdrawal state, btc tx probably replaced or evicted: ${this.data.btcTx.txid} and not fronted`);
+            this.logger.debug(`_shouldCheckWithdrawalState(): Skipped checking withdrawal state, btc tx probably replaced or evicted: ${this.data!.btcTx.txid} and not fronted`);
             return false;
         }
 

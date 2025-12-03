@@ -13,7 +13,7 @@ export function blackjack (
     outputs?: CoinselectTxOutput[],
     fee: number
 } {
-    if (!isFinite(utils.uintOrNaN(feeRate))) return null;
+    if (!isFinite(utils.uintOrNaN(feeRate))) throw new Error("Invalid feeRate passed!");
 
     const inputs = requiredInputs==null ? [] : [...requiredInputs];
     let bytesAccum = utils.transactionBytes(inputs, outputs, type);

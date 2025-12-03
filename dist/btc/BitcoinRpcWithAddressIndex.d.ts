@@ -25,8 +25,8 @@ export interface BitcoinRpcWithAddressIndex<T extends BtcBlock> extends BitcoinR
         effectiveFeePerVsize: number;
         adjustedVsize: number;
     }>;
-    getTransaction(txId: string): Promise<BtcTxWithBlockheight>;
-    waitForTransaction(txId: string, requiredConfirmations: number, stateUpdateCbk: (confirmations: number, txId: string, txEtaMS: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<BtcTxWithBlockheight>;
+    getTransaction(txId: string): Promise<BtcTxWithBlockheight | null>;
+    waitForTransaction(txId: string, requiredConfirmations: number, stateUpdateCbk: (confirmations?: number, txId?: string, txEtaMS?: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<BtcTxWithBlockheight>;
     /**
      * Returns an estimate after which time the tx will confirm with the required amount of confirmations,
      *  confirmationDelay of -1 means the transaction won't confirm in the near future
@@ -47,7 +47,7 @@ export interface BitcoinRpcWithAddressIndex<T extends BtcBlock> extends BitcoinR
      * @param txoHash Required output txoHash
      */
     checkAddressTxos(address: string, txoHash: Buffer): Promise<{
-        tx: BtcTxWithBlockheight;
+        tx: Omit<BtcTxWithBlockheight, "hex" | "raw">;
         vout: number;
     } | null>;
     /**
@@ -60,8 +60,8 @@ export interface BitcoinRpcWithAddressIndex<T extends BtcBlock> extends BitcoinR
      * @param abortSignal Abort signal
      * @param intervalSeconds How often to check new transaction
      */
-    waitForAddressTxo(address: string, txoHash: Buffer, requiredConfirmations: number, stateUpdateCbk: (confirmations: number, txId: string, vout: number, txEtaMS: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<{
-        tx: BtcTxWithBlockheight;
+    waitForAddressTxo(address: string, txoHash: Buffer, requiredConfirmations: number, stateUpdateCbk: (confirmations?: number, txId?: string, vout?: number, txEtaMS?: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<{
+        tx: Omit<BtcTxWithBlockheight, "hex" | "raw">;
         vout: number;
     }>;
 }

@@ -159,7 +159,7 @@ export type ToBTCLNInit = BaseToBTCSwapInit & {
     pr: string,
     maxFee: bigint,
     expiryTimestamp: bigint,
-    feeRate: Promise<any>
+    feeRate: Promise<string>
 };
 
 const ToBTCLNPrepareExactInSchema = {
@@ -179,7 +179,7 @@ export type ToBTCLNPrepareExactIn = BaseToBTCSwapInit & {
 export type ToBTCLNInitExactIn = {
     pr: string,
     reqId: string,
-    feeRate: Promise<any>,
+    feeRate: Promise<string>,
     additionalParams?: { [name: string]: any }
 }
 
@@ -192,7 +192,7 @@ const FromBTCResponseSchema = {
     address: FieldTypeEnum.String,
     swapFee: FieldTypeEnum.BigInt,
     total: FieldTypeEnum.BigInt,
-    confirmations: FieldTypeEnum.NumberOptional,
+    confirmations: FieldTypeEnum.Number,
     ...SwapResponseSchema
 } as const;
 
@@ -380,7 +380,7 @@ export class IntermediaryAPI {
                 "&sequence=" + encodeURIComponent(sequence.toString(10)),
             timeout,
             abortSignal
-        ), null, RequestError, abortSignal);
+        ), undefined, RequestError, abortSignal);
     }
 
     /**
@@ -404,7 +404,7 @@ export class IntermediaryAPI {
                 "?paymentHash="+encodeURIComponent(paymentHash),
             timeout,
             abortSignal
-        ), null, RequestError, abortSignal);
+        ), undefined, RequestError, abortSignal);
     }
 
     /**
@@ -428,7 +428,7 @@ export class IntermediaryAPI {
             "?paymentHash="+encodeURIComponent(paymentHash),
             timeout,
             abortSignal
-        ), null, RequestError, abortSignal);
+        ), undefined, RequestError, abortSignal);
     }
 
     /**
@@ -482,7 +482,9 @@ export class IntermediaryAPI {
                 if(code!==20000) {
                     throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
                 }
-                return verifySchema(data, ToBTCResponseSchema);
+                const result = verifySchema(data, ToBTCResponseSchema);
+                if(result==null) throw new RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -553,7 +555,9 @@ export class IntermediaryAPI {
                 if(code!==20000) {
                     throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
                 }
-                return verifySchema(data, FromBTCResponseSchema);
+                const result = verifySchema(data, FromBTCResponseSchema);
+                if(result==null) throw new RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -580,7 +584,7 @@ export class IntermediaryAPI {
         abortSignal?: AbortSignal,
         streamRequest?: boolean
     ): {
-        lnPublicKey: Promise<string>,
+        lnPublicKey: Promise<string | null>,
         response: Promise<FromBTCLNResponseType>
     } {
         const responseBodyPromise = streamingFetchPromise(
@@ -614,7 +618,9 @@ export class IntermediaryAPI {
                 if(code!==20000) {
                     throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
                 }
-                return verifySchema(data, FromBTCLNResponseSchema);
+                const result = verifySchema(data, FromBTCLNResponseSchema);
+                if(result==null) throw new RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -639,7 +645,7 @@ export class IntermediaryAPI {
         abortSignal?: AbortSignal,
         streamRequest?: boolean
     ): {
-        lnPublicKey: Promise<string>,
+        lnPublicKey: Promise<string | null>,
         response: Promise<FromBTCLNAutoResponseType>
     } {
         const responseBodyPromise = streamingFetchPromise(
@@ -653,8 +659,8 @@ export class IntermediaryAPI {
                 descriptionHash: init.descriptionHash==null ? null : init.descriptionHash.toString("hex"),
                 exactOut: init.exactOut,
                 gasToken: init.gasToken,
-                gasAmount: (init.gasAmount ?? 0n).toString(10),
-                claimerBounty: init.claimerBounty.then(val => val.toString(10)) ?? "0"
+                gasAmount: init.gasAmount?.toString(10) ?? "0",
+                claimerBounty: init.claimerBounty?.then(val => val.toString(10)) ?? "0"
             },
             {
                 code: FieldTypeEnum.Number,
@@ -675,7 +681,9 @@ export class IntermediaryAPI {
                 if(code!==20000) {
                     throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
                 }
-                return verifySchema(data, FromBTCLNAutoResponseSchema);
+                const result = verifySchema(data, FromBTCLNAutoResponseSchema);
+                if(result==null) throw new RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -730,7 +738,9 @@ export class IntermediaryAPI {
                 if(code!==20000) {
                     throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
                 }
-                return verifySchema(data, ToBTCLNResponseSchema);
+                const result = verifySchema(data, ToBTCLNResponseSchema);
+                if(result==null) throw new RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -771,7 +781,9 @@ export class IntermediaryAPI {
         ])
 
         if(code!==20000) throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
-        return verifySchema(data, ToBTCLNResponseSchema);
+        const result = verifySchema(data, ToBTCLNResponseSchema);
+        if(result==null) throw new RequestError("Cannot parse the response with the expected schema", 200);
+        return result;
     }
 
     /**
@@ -823,7 +835,9 @@ export class IntermediaryAPI {
                 if(code!==20000) {
                     throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
                 }
-                return verifySchema(data, ToBTCLNPrepareExactInSchema);
+                const result = verifySchema(data, ToBTCLNPrepareExactInSchema);
+                if(result==null) throw new RequestError("Cannot parse the response with the expected schema", 200);
+                return result;
             })
         };
     }
@@ -872,7 +886,9 @@ export class IntermediaryAPI {
             if(code!==20000) {
                 throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
             }
-            return verifySchema(data, SpvFromBTCPrepareResponseSchema);
+            const result = verifySchema(data, SpvFromBTCPrepareResponseSchema);
+            if(result==null) throw new RequestError("Cannot parse the response with the expected schema", 200);
+            return result;
         });
     }
 
@@ -913,7 +929,9 @@ export class IntermediaryAPI {
             if(code!==20000) {
                 throw RequestError.parse(JSON.stringify({code, msg, data}), 400);
             }
-            return verifySchema(data, SpvFromBTCInitResponseSchema);
+            const result = verifySchema(data, SpvFromBTCInitResponseSchema);
+            if(result==null) throw new RequestError("Cannot parse the response with the expected schema", 200);
+            return result;
         });
     }
 

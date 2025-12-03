@@ -14,12 +14,11 @@ function bitcoinTxToBtcTx(btcTx) {
     return {
         locktime: btcTx.lockTime,
         version: btcTx.version,
-        blockhash: null,
         confirmations: 0,
         txid: buffer_1.Buffer.from((0, sha2_1.sha256)((0, sha2_1.sha256)(btcTx.toBytes(true, false)))).reverse().toString("hex"),
         hex: buffer_1.Buffer.from(btcTx.toBytes(true, false)).toString("hex"),
         raw: buffer_1.Buffer.from(btcTx.toBytes(true, true)).toString("hex"),
-        vsize: btcTx.isFinal ? btcTx.vsize : null,
+        vsize: btcTx.vsize,
         outs: Array.from({ length: btcTx.outputsLength }, (_, i) => i).map((index) => {
             const output = btcTx.getOutput(index);
             return {
@@ -93,9 +92,7 @@ class MempoolBitcoinRpc {
      *  transaction was replaced or was confirmed in the meantime
      */
     async getConfirmationDelay(tx, requiredConfirmations) {
-        if (tx.confirmations > requiredConfirmations)
-            return 0;
-        if (tx.confirmations === 0) {
+        if (tx.confirmations == null || tx.confirmations === 0) {
             //Get CPFP data
             const cpfpData = await this.api.getCPFPData(tx.txid);
             if (cpfpData.effectiveFeePerVsize == null) {
@@ -107,31 +104,46 @@ class MempoolBitcoinRpc {
                 confirmationDelay += (requiredConfirmations - 1) * BITCOIN_BLOCKTIME;
             return confirmationDelay;
         }
+        if (tx.confirmations > requiredConfirmations)
+            return 0;
         return ((requiredConfirmations - tx.confirmations) * BITCOIN_BLOCKTIME);
     }
     /**
-     * Converts mempool API's transaction to BtcTx object
+     * Converts mempool API's transaction to BtcTx object while fetching the raw tx separately
      * @param tx Transaction to convert
-     * @param getRaw If the raw transaction field should be filled (requires one more network request)
      * @private
      */
-    async toBtcTx(tx, getRaw = true) {
-        const rawTx = !getRaw ? null : await this.api.getRawTransaction(tx.txid);
+    async toBtcTx(tx) {
+        const base = await this.toBtcTxWithoutRawData(tx);
+        if (base == null)
+            return null;
+        const rawTx = await this.api.getRawTransaction(tx.txid);
+        if (rawTx == null)
+            return null;
+        //Strip witness data
+        const btcTx = btc_signer_1.Transaction.fromRaw(rawTx, {
+            allowLegacyWitnessUtxo: true,
+            allowUnknownInputs: true,
+            allowUnknownOutputs: true,
+            disableScriptCheck: true
+        });
+        const strippedRawTx = buffer_1.Buffer.from(btcTx.toBytes(true, false)).toString("hex");
+        return {
+            ...base,
+            hex: strippedRawTx,
+            raw: rawTx.toString("hex")
+        };
+    }
+    /**
+     * Converts mempool API's transaction to BtcTx object, doesn't populate raw and hex fields
+     * @param tx Transaction to convert
+     * @private
+     */
+    async toBtcTxWithoutRawData(tx) {
         let confirmations = 0;
         if (tx.status != null && tx.status.confirmed) {
             const blockheight = await this.api.getTipBlockHeight();
             confirmations = blockheight - tx.status.block_height + 1;
-        }
-        let strippedRawTx;
-        if (rawTx != null) {
-            //Strip witness data
-            const btcTx = btc_signer_1.Transaction.fromRaw(rawTx, {
-                allowLegacyWitnessUtxo: true,
-                allowUnknownInputs: true,
-                allowUnknownOutputs: true,
-                disableScriptCheck: true
-            });
-            strippedRawTx = buffer_1.Buffer.from(btcTx.toBytes(true, false)).toString("hex");
         }
         return {
             locktime: tx.locktime,
@@ -141,8 +153,6 @@ class MempoolBitcoinRpc {
             confirmations,
             txid: tx.txid,
             vsize: tx.weight / 4,
-            hex: strippedRawTx,
-            raw: rawTx == null ? null : rawTx.toString("hex"),
             outs: tx.vout.map((e, index) => {
                 return {
                     value: e.value,
@@ -232,7 +242,7 @@ class MempoolBitcoinRpc {
         if (relevantTxs.length === 0)
             return null;
         return {
-            tx: await this.toBtcTx(relevantTxs[0].tx, false),
+            tx: await this.toBtcTxWithoutRawData(relevantTxs[0].tx),
             vout: relevantTxs[0].vout
         };
     }
@@ -253,18 +263,18 @@ class MempoolBitcoinRpc {
             await (0, Utils_1.timeoutPromise)((intervalSeconds || 5) * 1000, abortSignal);
             const result = await this.checkAddressTxos(address, txoHash);
             if (result == null) {
-                stateUpdateCbk(null, null, null, null);
+                stateUpdateCbk();
                 continue;
             }
             const confirmationDelay = await this.getConfirmationDelay(result.tx, requiredConfirmations);
             if (confirmationDelay == null)
                 continue;
             if (stateUpdateCbk != null)
-                stateUpdateCbk(result.tx.confirmations, result.tx.txid, result.vout, confirmationDelay);
+                stateUpdateCbk(result.tx.confirmations ?? 0, result.tx.txid, result.vout, confirmationDelay);
             if (confirmationDelay === 0)
                 return result;
         }
-        abortSignal.throwIfAborted();
+        throw abortSignal.reason;
     }
     async waitForTransaction(txId, requiredConfirmations, stateUpdateCbk, abortSignal, intervalSeconds) {
         if (abortSignal != null)
@@ -273,7 +283,7 @@ class MempoolBitcoinRpc {
             await (0, Utils_1.timeoutPromise)((intervalSeconds || 5) * 1000, abortSignal);
             const result = await this.getTransaction(txId);
             if (result == null) {
-                stateUpdateCbk(null, null, null);
+                stateUpdateCbk();
                 continue;
             }
             const confirmationDelay = await this.getConfirmationDelay(result, requiredConfirmations);
@@ -284,10 +294,12 @@ class MempoolBitcoinRpc {
             if (confirmationDelay === 0)
                 return result;
         }
-        abortSignal.throwIfAborted();
+        throw abortSignal.reason;
     }
     async getLNNodeLiquidity(pubkey) {
         const nodeInfo = await this.api.getLNNodeInfo(pubkey);
+        if (nodeInfo == null)
+            return null;
         return {
             publicKey: nodeInfo.public_key,
             capacity: BigInt(nodeInfo.capacity),

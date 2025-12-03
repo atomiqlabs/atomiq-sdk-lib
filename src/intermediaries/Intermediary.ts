@@ -35,12 +35,12 @@ export class Intermediary {
             [chainIdentifier: string]: {
                 [tokenAddress: string]: {
                     input: {
-                        min: bigint,
-                        max: bigint
+                        min?: bigint,
+                        max?: bigint
                     },
                     output: {
-                        min: bigint,
-                        max: bigint
+                        min?: bigint,
+                        max?: bigint
                     }
                 }
             }
@@ -48,7 +48,7 @@ export class Intermediary {
     }
     reputation: { [chainIdentifier: string]: SingleChainReputationType } = {};
     liquidity: { [chainIdentifier: string]: SCLiquidity } = {};
-    lnData: LNNodeLiquidity;
+    lnData?: LNNodeLiquidity;
 
     constructor(
         url: string,
@@ -64,23 +64,23 @@ export class Intermediary {
         this.swapBounds = {};
         for(let _swapType in this.services) {
             const swapType: SwapType = parseInt(_swapType);
-            const serviceInfo: SwapHandlerInfoType = this.services[_swapType];
+            const serviceInfo = this.services[swapType]!;
             const btcBounds = {min: BigInt(serviceInfo.min), max: BigInt(serviceInfo.max)};
             const isSend = swapType===SwapType.TO_BTC || swapType===SwapType.TO_BTCLN;
             this.swapBounds[swapType] = {};
             for(let chainIdentifier in serviceInfo.chainTokens) {
-                this.swapBounds[swapType][chainIdentifier] = {};
+                this.swapBounds[swapType]![chainIdentifier] = {};
                 for(let tokenAddress of serviceInfo.chainTokens[chainIdentifier]) {
-                    this.swapBounds[swapType][chainIdentifier][tokenAddress] = {
-                        input: isSend ? {min: null, max: null} : btcBounds,
-                        output: !isSend ? {min: null, max: null} : btcBounds,
+                    this.swapBounds[swapType]![chainIdentifier][tokenAddress] = {
+                        input: isSend ? {} : btcBounds,
+                        output: !isSend ? {} : btcBounds,
                     };
                 }
             }
         }
     }
 
-    getSwapLimits(swapType: SwapType, chainId: string, tokenAddress: string): {input: {min: bigint, max: bigint}, output: {min: bigint, max: bigint}} {
+    getSwapLimits(swapType: SwapType, chainId: string, tokenAddress: string): {input: {min?: bigint, max?: bigint}, output: {min?: bigint, max?: bigint}} | undefined {
         return this.swapBounds[swapType]?.[chainId]?.[tokenAddress];
     }
 
@@ -102,11 +102,8 @@ export class Intermediary {
         const swapTypes = new Set(swapTypesArr);
         let tokens: Set<string> = new Set<string>();
         swapTypes.forEach((swapType) => {
-            if(
-                this.services[swapType]!=null &&
-                this.services[swapType].chainTokens!=null &&
-                this.services[swapType].chainTokens[chainIdentifier]!=null
-            ) this.services[swapType].chainTokens[chainIdentifier].forEach(token => tokens.add(token));
+            const supportedTokens = this.services[swapType]?.chainTokens?.[chainIdentifier];
+            if(supportedTokens!=null) supportedTokens.forEach(token => tokens.add(token));
         });
         return tokens;
     }
@@ -135,9 +132,9 @@ export class Intermediary {
             promises.push(
                 tryWithRetries(() =>
                     swapContract.getIntermediaryReputation(this.getAddress(chainIdentifier), token),
-                    null, null, abortSignal
+                    undefined, undefined, abortSignal
                 ).then(result => {
-                    reputation[token] = result;
+                    if(result!=null) reputation[token] = result;
                 })
             );
         }
@@ -168,7 +165,7 @@ export class Intermediary {
     ): Promise<bigint> {
         const result = await tryWithRetries(() =>
             swapContract.getBalance(this.getAddress(chainIdentifier), token, true),
-            null, null, abortSignal
+            undefined, undefined, abortSignal
         );
 
         this.liquidity ??= {};

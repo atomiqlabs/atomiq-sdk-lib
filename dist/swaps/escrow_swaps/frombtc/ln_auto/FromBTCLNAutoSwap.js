@@ -53,16 +53,30 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         this.broadcastTickCounter = 0;
         if (isFromBTCLNAutoSwapInit(initOrObject)) {
             this.state = FromBTCLNAutoSwapState.PR_CREATED;
+            this.pr = initOrObject.pr;
+            this.secret = initOrObject.secret;
+            this.initialSwapData = initOrObject.initialSwapData;
+            this.btcAmountSwap = initOrObject.btcAmountSwap;
+            this.btcAmountGas = initOrObject.btcAmountGas;
+            this.gasSwapFeeBtc = initOrObject.gasSwapFeeBtc;
+            this.gasSwapFee = initOrObject.gasSwapFee;
+            this.lnurl = initOrObject.lnurl;
+            this.lnurlK1 = initOrObject.lnurlK1;
+            this.lnurlCallback = initOrObject.lnurlCallback;
         }
         else {
             this.pr = initOrObject.pr;
             this.secret = initOrObject.secret;
-            this.initialSwapData = initOrObject.initialSwapData == null ? null : base_1.SwapData.deserialize(initOrObject.initialSwapData);
-            this.btcAmountSwap = initOrObject.btcAmountSwap == null ? null : BigInt(initOrObject.btcAmountSwap);
-            this.btcAmountGas = initOrObject.btcAmountGas == null ? null : BigInt(initOrObject.btcAmountGas);
-            this.gasSwapFeeBtc = initOrObject.gasSwapFeeBtc == null ? null : BigInt(initOrObject.gasSwapFeeBtc);
-            this.gasSwapFee = initOrObject.gasSwapFee == null ? null : BigInt(initOrObject.gasSwapFee);
-            this.data = initOrObject.data == null ? null : base_1.SwapData.deserialize(initOrObject.data);
+            if (initOrObject.initialSwapData == null) {
+                this.initialSwapData = this.data;
+            }
+            else {
+                this.initialSwapData = base_1.SwapData.deserialize(initOrObject.initialSwapData);
+            }
+            this.btcAmountSwap = (0, Utils_1.toBigInt)(initOrObject.btcAmountSwap);
+            this.btcAmountGas = (0, Utils_1.toBigInt)(initOrObject.btcAmountGas);
+            this.gasSwapFeeBtc = (0, Utils_1.toBigInt)(initOrObject.gasSwapFeeBtc);
+            this.gasSwapFee = (0, Utils_1.toBigInt)(initOrObject.gasSwapFee);
             this.commitTxId = initOrObject.commitTxId;
             this.claimTxId = initOrObject.claimTxId;
             this.lnurl = initOrObject.lnurl;
@@ -79,6 +93,8 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
      * @protected
      */
     tryRecomputeSwapPrice() {
+        if (this.pricingInfo == null)
+            return;
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputAmountWithoutFee(), this.getSwapData().getToken());
         }
@@ -87,7 +103,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
     //// Pricing
     async refreshPriceData() {
         if (this.pricingInfo == null)
-            return null;
+            return;
         this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputAmountWithoutFee(), this.getSwapData().getToken());
     }
     //////////////////////////////
@@ -106,7 +122,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         return this._getInitiator();
     }
     getOutputTxId() {
-        return this.claimTxId;
+        return this.claimTxId ?? null;
     }
     requiresAction() {
         return this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED;
@@ -118,9 +134,9 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         return paymentHashBuffer.toString("hex") + this.randomNonce;
     }
     getPaymentHash() {
-        if (this.pr == null)
-            return null;
         const decodedPR = (0, bolt11_1.decode)(this.pr);
+        if (decodedPR.tagsObject.payment_hash == null)
+            throw new Error("Swap invoice doesn't contain payment hash field!");
         return buffer_1.Buffer.from(decodedPR.tagsObject.payment_hash, "hex");
     }
     getInputTxId() {
@@ -140,9 +156,11 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
      *  if the LP doesn't make it expired sooner
      */
     getDefinitiveExpiryTime() {
-        if (this.pr == null)
-            return null;
         const decoded = (0, bolt11_1.decode)(this.pr);
+        if (decoded.tagsObject.min_final_cltv_expiry == null)
+            throw new Error("Swap invoice doesn't contain final ctlv delta field!");
+        if (decoded.timeExpireDate == null)
+            throw new Error("Swap invoice doesn't contain expiry date field!");
         const finalCltvExpiryDelta = decoded.tagsObject.min_final_cltv_expiry ?? 144;
         const finalCltvExpiryDelay = finalCltvExpiryDelta * this.wrapper.options.bitcoinBlocktime * this.wrapper.options.safetyFactor;
         return (decoded.timeExpireDate + finalCltvExpiryDelay) * 1000;
@@ -181,6 +199,8 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
     //// Amounts & fees
     getLightningInvoiceSats() {
         const parsed = (0, bolt11_1.decode)(this.pr);
+        if (parsed.millisatoshis == null)
+            throw new Error("Swap invoice doesn't contain msat amount field!");
         return (BigInt(parsed.millisatoshis) + 999n) / 1000n;
     }
     getWatchtowerFeeAmountBtc() {
@@ -211,6 +231,8 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         return (0, Tokens_1.toTokenAmount)(this.getSwapData().getSecurityDeposit() - this.getSwapData().getClaimerBounty(), this.wrapper.tokens[this.getSwapData().getDepositToken()], this.wrapper.prices);
     }
     getSwapFee() {
+        if (this.pricingInfo == null)
+            throw new Error("No pricing info known, cannot estimate fee!");
         const outputToken = this.wrapper.tokens[this.getSwapData().getToken()];
         const gasSwapFeeInOutputToken = this.gasSwapFeeBtc
             * (10n ** BigInt(outputToken.decimals))
@@ -229,6 +251,8 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         };
     }
     getWatchtowerFee() {
+        if (this.pricingInfo == null)
+            throw new Error("No pricing info known, cannot estimate fee!");
         const btcWatchtowerFee = this.getWatchtowerFeeAmountBtc();
         const outputToken = this.wrapper.tokens[this.getSwapData().getToken()];
         const watchtowerFeeInOutputToken = btcWatchtowerFee
@@ -295,7 +319,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
                     const abortController = new AbortController();
                     paymentPromise.catch(e => abortController.abort(e));
                     if (options?.abortSignal != null)
-                        options.abortSignal.addEventListener("abort", () => abortController.abort(options.abortSignal.reason));
+                        options.abortSignal.addEventListener("abort", () => abortController.abort(options?.abortSignal?.reason));
                     abortSignal = abortController.signal;
                 }
             }
@@ -313,6 +337,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
                 callbacks.onSwapSettled(this.getOutputTxId());
             return success;
         }
+        throw new Error("Invalid state reached!");
     }
     //////////////////////////////
     //// Payment
@@ -354,7 +379,6 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         await this.checkIntermediaryReturnedData(data);
         if (this.state === FromBTCLNAutoSwapState.PR_CREATED || this.state === FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
             this.state = FromBTCLNAutoSwapState.PR_PAID;
-            delete this.initialSwapData;
             this.data = data;
             this.initiated = true;
             if (save)
@@ -419,7 +443,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         if (abortSignal != null)
             abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
         let save = false;
-        if (this.lnurl != null && !this.prPosted) {
+        if (this.lnurl != null && this.lnurlK1 != null && this.lnurlCallback != null && !this.prPosted) {
             LNURL_1.LNURL.postInvoiceToLNURLWithdraw({ k1: this.lnurlK1, callback: this.lnurlCallback }, this.pr).catch(e => {
                 this.lnurlFailSignal.abort(e);
             });
@@ -525,6 +549,8 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
     async txsClaim(_signer) {
         if (this.state !== FromBTCLNAutoSwapState.CLAIM_COMMITED)
             throw new Error("Must be in CLAIM_COMMITED state!");
+        if (this.data == null)
+            throw new Error("Unknown data, wrong state?");
         return await this.wrapper.contract.txsClaimWithSecret(_signer == null ?
             this._getInitiator() :
             ((0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer)), this.data, this.secret, true, true);
@@ -620,7 +646,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
      * Gets the used LNURL or null if this is not an LNURL-withdraw swap
      */
     getLNURL() {
-        return this.lnurl;
+        return this.lnurl ?? null;
     }
     /**
      * Pay the generated lightning network invoice with LNURL-withdraw
@@ -663,7 +689,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             lnurlK1: this.lnurlK1,
             lnurlCallback: this.lnurlCallback,
             prPosted: this.prPosted,
-            initialSwapData: this.initialSwapData == null ? null : this.initialSwapData.serialize()
+            initialSwapData: this.initialSwapData.serialize()
         };
     }
     //////////////////////////////
@@ -715,6 +741,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
                 return true;
             }
         }
+        return false;
     }
     _shouldFetchCommitStatus() {
         return this.state === FromBTCLNAutoSwapState.PR_PAID || this.state === FromBTCLNAutoSwapState.CLAIM_COMMITED || this.state === FromBTCLNAutoSwapState.EXPIRED;
@@ -761,6 +788,8 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
     async _broadcastSecret(noCheckExpiry) {
         if (this.state !== FromBTCLNAutoSwapState.CLAIM_COMMITED)
             throw new Error("Must be in CLAIM_COMMITED state to broadcast swap secret!");
+        if (this.data == null)
+            throw new Error("Unknown data, wrong state?");
         if (!noCheckExpiry) {
             if (await this.wrapper.contract.isExpired(this._getInitiator(), this.data))
                 throw new Error("On-chain HTLC already expired!");
@@ -804,6 +833,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
                 }
                 break;
         }
+        return false;
     }
 }
 exports.FromBTCLNAutoSwap = FromBTCLNAutoSwap;

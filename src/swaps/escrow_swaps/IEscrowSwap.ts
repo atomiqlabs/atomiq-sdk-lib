@@ -8,7 +8,7 @@ import {
     SwapNotCommitedState,
     SwapPaidState
 } from "@atomiqlabs/base";
-import {IEscrowSwapWrapper} from "./IEscrowSwapWrapper";
+import {IEscrowSwapDefinition, IEscrowSwapWrapper} from "./IEscrowSwapWrapper";
 import {timeoutPromise} from "../../utils/Utils";
 import {Buffer} from "buffer";
 
@@ -24,30 +24,31 @@ export function isIEscrowSwapInit<T extends SwapData>(obj: any): obj is IEscrowS
 
 export abstract class IEscrowSwap<
     T extends ChainType = ChainType,
+    D extends IEscrowSwapDefinition<T, IEscrowSwapWrapper<T, D>, IEscrowSwap<T, D, S>> = IEscrowSwapDefinition<T, IEscrowSwapWrapper<T, any>, IEscrowSwap<T, any, any>>,
     S extends number = number
-> extends ISwap<T, S> {
-
-    protected readonly wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>;
+> extends ISwap<T, D, S> {
 
     data?: T["Data"];
 
     /**
      * Transaction IDs for the swap on the smart chain side
      */
-    commitTxId: string;
+    commitTxId?: string;
     refundTxId?: string;
     claimTxId?: string;
 
-    protected constructor(wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>, obj: any);
-    protected constructor(wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>, swapInit: IEscrowSwapInit<T["Data"]>);
+    protected constructor(wrapper: D["Wrapper"], obj: any);
+    protected constructor(wrapper: D["Wrapper"], swapInit: IEscrowSwapInit<T["Data"]>);
     protected constructor(
-        wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>,
+        wrapper: D["Wrapper"],
         swapInitOrObj: IEscrowSwapInit<T["Data"]> | any,
     ) {
         super(wrapper, swapInitOrObj);
 
-        if(!isIEscrowSwapInit(swapInitOrObj)) {
-            this.data = swapInitOrObj.data!=null ? new wrapper.swapDataDeserializer(swapInitOrObj.data) : null;
+        if(isIEscrowSwapInit(swapInitOrObj)) {
+            this.data = swapInitOrObj.data;
+        } else {
+            if(swapInitOrObj.data!=null) this.data = new wrapper.swapDataDeserializer(swapInitOrObj.data);
 
             this.commitTxId = swapInitOrObj.commitTxId;
             this.claimTxId = swapInitOrObj.claimTxId;
@@ -55,6 +56,7 @@ export abstract class IEscrowSwap<
         }
     }
 
+    protected abstract getSwapData(): T["Data"];
 
     //////////////////////////////
     //// Identifiers
@@ -75,12 +77,11 @@ export abstract class IEscrowSwap<
      */
     protected getIdentifierHashString(): string {
         const identifierHash = this.getIdentifierHash();
-        if(identifierHash==null) return null;
         return identifierHash.toString("hex");
     }
 
     _getEscrowHash(): string | null {
-        return this.data?.getEscrowHash();
+        return this.data?.getEscrowHash() ?? null;
     }
 
     /**
@@ -94,7 +95,7 @@ export abstract class IEscrowSwap<
      * Returns the claim data hash - i.e. hash passed to the claim handler
      */
     getClaimHash(): string {
-        return this.data?.getClaimHash();
+        return this.getSwapData().getClaimHash();
     }
 
     getId(): string {
@@ -113,6 +114,8 @@ export abstract class IEscrowSwap<
      * @protected
      */
     protected async watchdogWaitTillCommited(intervalSeconds?: number, abortSignal?: AbortSignal): Promise<boolean> {
+        if(this.data==null) throw new Error("Tried to await commitment but data is null, invalid state?");
+
         intervalSeconds ??= 5;
         let status: SwapCommitState = {type: SwapCommitStateType.NOT_COMMITED};
         while(status?.type===SwapCommitStateType.NOT_COMMITED) {
@@ -141,6 +144,8 @@ export abstract class IEscrowSwap<
     protected async watchdogWaitTillResult(intervalSeconds?: number, abortSignal?: AbortSignal): Promise<
         SwapPaidState | SwapExpiredState | SwapNotCommitedState
     > {
+        if(this.data==null) throw new Error("Tried to await result but data is null, invalid state?");
+
         intervalSeconds ??= 5;
         let status: SwapCommitState = {type: SwapCommitStateType.COMMITED};
         while(status?.type===SwapCommitStateType.COMMITED || status?.type===SwapCommitStateType.REFUNDABLE) {

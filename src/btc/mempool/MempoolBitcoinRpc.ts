@@ -15,12 +15,11 @@ function bitcoinTxToBtcTx(btcTx: Transaction): BtcTx {
     return {
         locktime: btcTx.lockTime,
         version: btcTx.version,
-        blockhash: null,
         confirmations: 0,
         txid: Buffer.from(sha256(sha256(btcTx.toBytes(true, false)))).reverse().toString("hex"),
         hex: Buffer.from(btcTx.toBytes(true, false)).toString("hex"),
         raw: Buffer.from(btcTx.toBytes(true, true)).toString("hex"),
-        vsize: btcTx.isFinal ? btcTx.vsize : null,
+        vsize: btcTx.vsize,
 
         outs: Array.from({length: btcTx.outputsLength}, (_, i) => i).map((index) => {
             const output = btcTx.getOutput(index);
@@ -28,21 +27,21 @@ function bitcoinTxToBtcTx(btcTx: Transaction): BtcTx {
                 value: Number(output.amount),
                 n: index,
                 scriptPubKey: {
-                    asm: Script.decode(output.script).map(val => typeof(val)==="object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
-                    hex: Buffer.from(output.script).toString("hex")
+                    asm: Script.decode(output.script!).map(val => typeof(val)==="object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: Buffer.from(output.script!).toString("hex")
                 }
             }
         }),
         ins: Array.from({length: btcTx.inputsLength}, (_, i) => i).map(index => {
             const input = btcTx.getInput(index);
             return {
-                txid: Buffer.from(input.txid).toString("hex"),
-                vout: input.index,
+                txid: Buffer.from(input.txid!).toString("hex"),
+                vout: input.index!,
                 scriptSig: {
-                    asm: Script.decode(input.finalScriptSig).map(val => typeof(val)==="object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
-                    hex: Buffer.from(input.finalScriptSig).toString("hex")
+                    asm: Script.decode(input.finalScriptSig!).map(val => typeof(val)==="object" ? Buffer.from(val).toString("hex") : val.toString()).join(" "),
+                    hex: Buffer.from(input.finalScriptSig!).toString("hex")
                 },
-                sequence: input.sequence,
+                sequence: input.sequence!,
                 txinwitness: input.finalScriptWitness==null ? [] : input.finalScriptWitness.map(witness => Buffer.from(witness).toString("hex"))
             }
         })
@@ -101,9 +100,8 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
      * @returns estimated confirmation delay, -1 if the transaction won't confirm in the near future, null if the
      *  transaction was replaced or was confirmed in the meantime
      */
-    async getConfirmationDelay(tx: BtcTx, requiredConfirmations: number): Promise<number | null> {
-        if(tx.confirmations>requiredConfirmations) return 0;
-        if(tx.confirmations===0) {
+    async getConfirmationDelay(tx: {txid: string, confirmations?: number}, requiredConfirmations: number): Promise<number | null> {
+        if(tx.confirmations==null || tx.confirmations===0) {
             //Get CPFP data
             const cpfpData = await this.api.getCPFPData(tx.txid);
             if(cpfpData.effectiveFeePerVsize==null) {
@@ -114,34 +112,46 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
             if(confirmationDelay!==-1) confirmationDelay += (requiredConfirmations-1)*BITCOIN_BLOCKTIME;
             return confirmationDelay;
         }
+        if(tx.confirmations>requiredConfirmations) return 0;
         return ((requiredConfirmations-tx.confirmations)*BITCOIN_BLOCKTIME);
     }
 
     /**
-     * Converts mempool API's transaction to BtcTx object
+     * Converts mempool API's transaction to BtcTx object while fetching the raw tx separately
      * @param tx Transaction to convert
-     * @param getRaw If the raw transaction field should be filled (requires one more network request)
      * @private
      */
-    private async toBtcTx(tx: BitcoinTransaction, getRaw: boolean = true): Promise<BtcTxWithBlockheight> {
-        const rawTx: Buffer = !getRaw ? null : await this.api.getRawTransaction(tx.txid);
+    private async toBtcTx(tx: BitcoinTransaction): Promise<BtcTxWithBlockheight | null> {
+        const base = await this.toBtcTxWithoutRawData(tx);
+        if(base==null) return null;
+        const rawTx = await this.api.getRawTransaction(tx.txid);
+        if(rawTx==null) return null;
+        //Strip witness data
+        const btcTx = Transaction.fromRaw(rawTx, {
+            allowLegacyWitnessUtxo: true,
+            allowUnknownInputs: true,
+            allowUnknownOutputs: true,
+            disableScriptCheck: true
+        });
+        const strippedRawTx = Buffer.from(btcTx.toBytes(true, false)).toString("hex");
 
+        return {
+            ...base,
+            hex: strippedRawTx,
+            raw: rawTx.toString("hex")
+        }
+    }
+
+    /**
+     * Converts mempool API's transaction to BtcTx object, doesn't populate raw and hex fields
+     * @param tx Transaction to convert
+     * @private
+     */
+    private async toBtcTxWithoutRawData(tx: BitcoinTransaction): Promise<Omit<BtcTxWithBlockheight, "raw" | "hex">> {
         let confirmations: number = 0;
         if(tx.status!=null && tx.status.confirmed) {
             const blockheight = await this.api.getTipBlockHeight();
             confirmations = blockheight-tx.status.block_height+1;
-        }
-
-        let strippedRawTx: string;
-        if(rawTx!=null) {
-            //Strip witness data
-            const btcTx = Transaction.fromRaw(rawTx, {
-                allowLegacyWitnessUtxo: true,
-                allowUnknownInputs: true,
-                allowUnknownOutputs: true,
-                disableScriptCheck: true
-            });
-            strippedRawTx = Buffer.from(btcTx.toBytes(true, false)).toString("hex");
         }
 
         return {
@@ -152,8 +162,6 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
             confirmations,
             txid: tx.txid,
             vsize: tx.weight/4,
-            hex: strippedRawTx,
-            raw: rawTx==null ? null : rawTx.toString("hex"),
             outs: tx.vout.map((e, index) => {
                 return {
                     value: e.value,
@@ -202,7 +210,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
         };
     }
 
-    async getTransaction(txId: string): Promise<BtcTxWithBlockheight> {
+    async getTransaction(txId: string): Promise<BtcTxWithBlockheight | null> {
         const tx = await this.api.getTransaction(txId);
         if(tx==null) return null;
         return await this.toBtcTx(tx);
@@ -236,7 +244,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
     }
 
     async checkAddressTxos(address: string, txoHash: Buffer): Promise<{
-        tx: BtcTxWithBlockheight,
+        tx: Omit<BtcTxWithBlockheight, "hex" | "raw">,
         vout: number
     } | null> {
         const allTxs = await this.api.getAddressTransactions(address);
@@ -259,7 +267,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
         if(relevantTxs.length===0) return null;
 
         return {
-            tx: await this.toBtcTx(relevantTxs[0].tx, false),
+            tx: await this.toBtcTxWithoutRawData(relevantTxs[0].tx),
             vout: relevantTxs[0].vout
         };
     }
@@ -278,11 +286,11 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
         address: string,
         txoHash: Buffer,
         requiredConfirmations: number,
-        stateUpdateCbk:(confirmations: number, txId: string, vout: number, txEtaMS: number) => void,
+        stateUpdateCbk: (confirmations?: number, txId?: string, vout?: number, txEtaMS?: number) => void,
         abortSignal?: AbortSignal,
         intervalSeconds?: number
     ): Promise<{
-        tx: BtcTxWithBlockheight,
+        tx: Omit<BtcTxWithBlockheight, "hex" | "raw">,
         vout: number
     }> {
         if(abortSignal!=null) abortSignal.throwIfAborted();
@@ -292,7 +300,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
 
             const result = await this.checkAddressTxos(address, txoHash);
             if(result==null) {
-                stateUpdateCbk(null, null, null, null);
+                stateUpdateCbk();
                 continue;
             }
 
@@ -300,7 +308,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
             if(confirmationDelay==null) continue;
 
             if(stateUpdateCbk!=null) stateUpdateCbk(
-                result.tx.confirmations,
+                result.tx.confirmations ?? 0,
                 result.tx.txid,
                 result.vout,
                 confirmationDelay
@@ -309,13 +317,13 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
             if(confirmationDelay===0) return result;
         }
 
-        abortSignal.throwIfAborted();
+        throw abortSignal.reason;
     }
 
 
     async waitForTransaction(
         txId: string, requiredConfirmations: number,
-        stateUpdateCbk: (confirmations: number, txId: string, txEtaMS: number) => void,
+        stateUpdateCbk: (confirmations?: number, txId?: string, txEtaMS?: number) => void,
         abortSignal?: AbortSignal, intervalSeconds?: number
     ): Promise<BtcTxWithBlockheight> {
         if(abortSignal!=null) abortSignal.throwIfAborted();
@@ -325,7 +333,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
 
             const result = await this.getTransaction(txId);
             if(result==null) {
-                stateUpdateCbk(null, null, null);
+                stateUpdateCbk();
                 continue;
             }
 
@@ -341,11 +349,12 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
             if(confirmationDelay===0) return result;
         }
 
-        abortSignal.throwIfAborted();
+        throw abortSignal.reason;
     }
 
-    async getLNNodeLiquidity(pubkey: string): Promise<LNNodeLiquidity> {
+    async getLNNodeLiquidity(pubkey: string): Promise<LNNodeLiquidity | null> {
         const nodeInfo = await this.api.getLNNodeInfo(pubkey);
+        if(nodeInfo==null) return null;
         return {
             publicKey: nodeInfo.public_key,
             capacity: BigInt(nodeInfo.capacity),
