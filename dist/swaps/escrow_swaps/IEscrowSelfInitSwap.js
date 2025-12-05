@@ -6,9 +6,9 @@ const base_1 = require("@atomiqlabs/base");
 const Tokens_1 = require("../../Tokens");
 const Utils_1 = require("../../utils/Utils");
 function isIEscrowSelfInitSwapInit(obj) {
-    return typeof obj === 'object' &&
-        obj.feeRate != null &&
-        (obj.signatureData == null || (typeof (obj.signatureData) === 'object' &&
+    return typeof obj === "object" &&
+        typeof (obj.feeRate) === "string" &&
+        (obj.signatureData == null || (typeof (obj.signatureData) === "object" &&
             typeof (obj.signatureData.prefix) === "string" &&
             typeof (obj.signatureData.timeout) === "string" &&
             typeof (obj.signatureData.signature) === "string")) &&
@@ -18,7 +18,11 @@ exports.isIEscrowSelfInitSwapInit = isIEscrowSelfInitSwapInit;
 class IEscrowSelfInitSwap extends IEscrowSwap_1.IEscrowSwap {
     constructor(wrapper, swapInitOrObj) {
         super(wrapper, swapInitOrObj);
-        if (!isIEscrowSelfInitSwapInit(swapInitOrObj)) {
+        if (isIEscrowSelfInitSwapInit(swapInitOrObj)) {
+            this.feeRate = swapInitOrObj.feeRate;
+            this.signatureData = swapInitOrObj.signatureData;
+        }
+        else {
             if (swapInitOrObj.signature != null)
                 this.signatureData = {
                     prefix: swapInitOrObj.prefix,

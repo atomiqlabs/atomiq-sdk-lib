@@ -11,10 +11,10 @@ export type IEscrowSelfInitSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
 };
 
 export function isIEscrowSelfInitSwapInit<T extends SwapData>(obj: any): obj is IEscrowSelfInitSwapInit<T> {
-    return typeof obj === 'object' &&
-        obj.feeRate != null &&
+    return typeof obj === "object" &&
+        typeof(obj.feeRate) === "string" &&
         (obj.signatureData == null || (
-            typeof(obj.signatureData) === 'object' &&
+            typeof(obj.signatureData) === "object" &&
             typeof(obj.signatureData.prefix)==="string" &&
             typeof(obj.signatureData.timeout)==="string" &&
             typeof(obj.signatureData.signature)==="string"
@@ -30,8 +30,8 @@ export abstract class IEscrowSelfInitSwap<
     S extends number = number
 > extends IEscrowSwap<T, D, S> {
 
+    feeRate: string;
     signatureData?: SignatureData;
-    feeRate?: string;
 
     protected constructor(wrapper: D["Wrapper"], obj: any);
     protected constructor(wrapper: D["Wrapper"], swapInit: IEscrowSelfInitSwapInit<T["Data"]>);
@@ -41,7 +41,10 @@ export abstract class IEscrowSelfInitSwap<
     ) {
         super(wrapper, swapInitOrObj);
 
-        if(!isIEscrowSelfInitSwapInit(swapInitOrObj)) {
+        if(isIEscrowSelfInitSwapInit(swapInitOrObj)) {
+            this.feeRate = swapInitOrObj.feeRate;
+            this.signatureData = swapInitOrObj.signatureData;
+        } else {
             if(swapInitOrObj.signature!=null) this.signatureData ={
                 prefix: swapInitOrObj.prefix,
                 timeout: swapInitOrObj.timeout,

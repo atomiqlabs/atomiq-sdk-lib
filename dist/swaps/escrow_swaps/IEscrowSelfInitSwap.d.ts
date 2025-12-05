@@ -10,8 +10,8 @@ export type IEscrowSelfInitSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
 export declare function isIEscrowSelfInitSwapInit<T extends SwapData>(obj: any): obj is IEscrowSelfInitSwapInit<T>;
 export type IEscrowSelfInitSwapDefinition<T extends ChainType, W extends IEscrowSwapWrapper<T, any>, S extends IEscrowSelfInitSwap<T>> = SwapTypeDefinition<T, W, S>;
 export declare abstract class IEscrowSelfInitSwap<T extends ChainType = ChainType, D extends IEscrowSelfInitSwapDefinition<T, IEscrowSwapWrapper<T, D>, IEscrowSelfInitSwap<T, D, S>> = IEscrowSwapDefinition<T, IEscrowSwapWrapper<T, any>, IEscrowSelfInitSwap<T, any, any>>, S extends number = number> extends IEscrowSwap<T, D, S> {
+    feeRate: string;
     signatureData?: SignatureData;
-    feeRate?: string;
     protected constructor(wrapper: D["Wrapper"], obj: any);
     protected constructor(wrapper: D["Wrapper"], swapInit: IEscrowSelfInitSwapInit<T["Data"]>);
     /**
