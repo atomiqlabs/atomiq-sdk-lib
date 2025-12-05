@@ -6,6 +6,16 @@ import {
     MinimalBitcoinWalletInterfaceWithSigner
 } from "../btc/wallet/MinimalBitcoinWalletInterface";
 
+export function isIBTCWalletSwap(obj: any): obj is IBTCWalletSwap {
+    return obj!=null &&
+        typeof(obj.getFundedPsbt) === "function" &&
+        typeof(obj.submitPsbt) === "function" &&
+        typeof(obj.estimateBitcoinFee) === "function" &&
+        typeof(obj.sendBitcoinTransaction) === "function" &&
+        typeof(obj.waitForBitcoinTransaction) === "function" &&
+        typeof(obj.getRequiredConfirmationsCount) === "function";
+}
+
 export interface IBTCWalletSwap {
 
     /**

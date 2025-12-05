@@ -18,6 +18,7 @@ import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {Fee, FeeType} from "../../fee/Fee";
 import {ppmToPercentage} from "../../ISwap";
 import {IEscrowSelfInitSwap, IEscrowSelfInitSwapInit, isIEscrowSelfInitSwapInit} from "../IEscrowSelfInitSwap";
+import {IRefundableSwap} from "../../IRefundableSwap";
 
 export type IToBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
     signatureData: SignatureData,
@@ -42,7 +43,7 @@ export function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwa
 export abstract class IToBTCSwap<
     T extends ChainType = ChainType,
     D extends IToBTCDefinition<T, IToBTCWrapper<T, D>, IToBTCSwap<T, D>> = IToBTCDefinition<T, IToBTCWrapper<T, any>, IToBTCSwap<T, any>>,
-> extends IEscrowSelfInitSwap<T, D, ToBTCSwapState> {
+> extends IEscrowSelfInitSwap<T, D, ToBTCSwapState> implements IRefundableSwap<T, D, ToBTCSwapState> {
     protected readonly networkFee: bigint;
     protected networkFeeBtc: bigint;
     protected readonly abstract outputToken: BtcToken;
