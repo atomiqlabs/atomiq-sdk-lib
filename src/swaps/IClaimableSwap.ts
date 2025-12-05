@@ -2,6 +2,12 @@ import {ChainType} from "@atomiqlabs/base";
 import { ISwap } from "./ISwap";
 import {ISwapWrapper, SwapTypeDefinition} from "./ISwapWrapper";
 
+export function isIClaimableSwap(obj: any): obj is IClaimableSwap {
+    return obj!=null &&
+        typeof(obj.isClaimable) === "function" &&
+        typeof(obj.txsClaim) === "function" &&
+        typeof(obj.claim) === "function";
+}
 
 export interface IClaimableSwap<
     T extends ChainType = ChainType,
