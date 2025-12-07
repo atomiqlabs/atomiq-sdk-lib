@@ -603,7 +603,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                         payRequest, BigInt(amountSats), options?.comment,
                         this.options.getRequestTimeout, abortSignal
                     );
-                    successActions[invoice] = successAction;
+                    if(successAction!=null) successActions[invoice] = successAction;
                     return invoice;
                 },
                 minMsats: BigInt(payRequest.minSendable),

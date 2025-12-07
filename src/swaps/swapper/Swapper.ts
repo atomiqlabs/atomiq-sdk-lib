@@ -897,8 +897,8 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         tokenAddress: string,
         service: InvoiceCreateService,
         amount: bigint,
-        exactIn?: boolean,
-        additionalParams: Record<string, any>  = this.options.defaultAdditionalParameters,
+        exactIn: boolean = false,
+        additionalParams: Record<string, any> | undefined = this.options.defaultAdditionalParameters,
         options?: ToBTCLNOptions
     ): Promise<ToBTCLNSwap<T[ChainIdentifier]>> {
         if(this.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
@@ -1325,6 +1325,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                         if(amount==null) throw new Error("Amount cannot be null for to btcln swaps via LNURL-pay!");
                         return this.createToBTCLNSwapViaLNURL(srcToken.chainId, src, srcToken.address, dst, amount, !!exactIn, undefined, options as any);
                     } else if(isInvoiceCreateService(dst)) {
+                        if(amount==null) throw new Error("Amount cannot be null for to btcln swaps via InvoiceCreateService!");
                         return this.createToBTCLNSwapViaInvoiceCreateService(srcToken.chainId, src, srcToken.address, dst, amount, !!exactIn, undefined, options as any);
                     } else if(this.Utils.isLightningInvoice(dst)) {
                         if(!this.Utils.isValidLightningInvoice(dst))

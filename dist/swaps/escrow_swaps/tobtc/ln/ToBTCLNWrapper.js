@@ -422,7 +422,8 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             return {
                 getInvoice: async (amountSats, abortSignal) => {
                     const { invoice, successAction } = await LNURL_1.LNURL.useLNURLPay(payRequest, BigInt(amountSats), options?.comment, this.options.getRequestTimeout, abortSignal);
-                    successActions[invoice] = successAction;
+                    if (successAction != null)
+                        successActions[invoice] = successAction;
                     return invoice;
                 },
                 minMsats: BigInt(payRequest.minSendable),

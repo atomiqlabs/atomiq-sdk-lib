@@ -571,7 +571,7 @@ class Swapper extends events_1.EventEmitter {
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      * @param options
      */
-    async createToBTCLNSwapViaInvoiceCreateService(chainIdentifier, signer, tokenAddress, service, amount, exactIn, additionalParams = this.options.defaultAdditionalParameters, options) {
+    async createToBTCLNSwapViaInvoiceCreateService(chainIdentifier, signer, tokenAddress, service, amount, exactIn = false, additionalParams = this.options.defaultAdditionalParameters, options) {
         if (this.chains[chainIdentifier] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
         if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer, true))
@@ -861,6 +861,8 @@ class Swapper extends events_1.EventEmitter {
                         return this.createToBTCLNSwapViaLNURL(srcToken.chainId, src, srcToken.address, dst, amount, !!exactIn, undefined, options);
                     }
                     else if ((0, ToBTCLNWrapper_1.isInvoiceCreateService)(dst)) {
+                        if (amount == null)
+                            throw new Error("Amount cannot be null for to btcln swaps via InvoiceCreateService!");
                         return this.createToBTCLNSwapViaInvoiceCreateService(srcToken.chainId, src, srcToken.address, dst, amount, !!exactIn, undefined, options);
                     }
                     else if (this.Utils.isLightningInvoice(dst)) {
