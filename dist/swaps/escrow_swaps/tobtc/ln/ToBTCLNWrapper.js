@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ToBTCLNWrapper = void 0;
+exports.ToBTCLNWrapper = exports.isInvoiceCreateService = void 0;
 const bolt11_1 = require("@atomiqlabs/bolt11");
 const ToBTCLNSwap_1 = require("./ToBTCLNSwap");
 const IToBTCWrapper_1 = require("../IToBTCWrapper");
@@ -13,6 +13,13 @@ const IntermediaryAPI_1 = require("../../../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../../../errors/RequestError");
 const LNURL_1 = require("../../../../utils/LNURL");
 const IToBTCSwap_1 = require("../IToBTCSwap");
+function isInvoiceCreateService(obj) {
+    return typeof (obj) === "object" &&
+        typeof (obj.getInvoice) === "function" &&
+        (obj.minMsats == null || typeof (obj.minMsats) === "bigint") &&
+        (obj.maxMSats == null || typeof (obj.maxMSats) === "bigint");
+}
+exports.isInvoiceCreateService = isInvoiceCreateService;
 class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     constructor(chainIdentifier, unifiedStorage, unifiedChainEvents, chain, contract, prices, tokens, swapDataDeserializer, options, events) {
         if (options == null)
@@ -204,7 +211,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      *
      * @param signer Smartchain signer's address initiating the swap
      * @param amountData
-     * @param payRequest Parsed LNURL-pay params
+     * @param invoiceCreateService Service for creating fixed amount invoices
      * @param lp Intermediary
      * @param dummyPr Dummy minimum value bolt11 lightning invoice returned from the LNURL-pay
      * @param options Options as passed to the swap create function
@@ -213,7 +220,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
      * @param additionalParams Additional params to be sent to the intermediary
      * @private
      */
-    async getIntermediaryQuoteExactIn(signer, amountData, payRequest, lp, dummyPr, options, preFetches, abortSignal, additionalParams) {
+    async getIntermediaryQuoteExactIn(signer, amountData, invoiceCreateService, lp, dummyPr, options, preFetches, abortSignal, additionalParams) {
         const abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const reputationPromise = this.preFetchIntermediaryReputation(amountData, lp, abortController);
         try {
@@ -234,13 +241,16 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             }, null, e => e instanceof RequestError_1.RequestError, abortController.signal);
             if (prepareResp.amount <= 0n)
                 throw new IntermediaryError_1.IntermediaryError("Invalid amount returned (zero or negative)");
-            const min = BigInt(payRequest.minSendable) / 1000n;
-            const max = BigInt(payRequest.maxSendable) / 1000n;
-            if (prepareResp.amount < min)
-                throw new UserError_1.UserError("Amount less than minimum");
-            if (prepareResp.amount > max)
-                throw new UserError_1.UserError("Amount more than maximum");
-            const { invoice, parsedInvoice, successAction } = await LNURL_1.LNURL.useLNURLPay(payRequest, prepareResp.amount, options.comment, this.options.getRequestTimeout, abortController.signal);
+            if (invoiceCreateService.minMsats != null) {
+                if (prepareResp.amount < invoiceCreateService.minMsats / 1000n)
+                    throw new UserError_1.UserError("Amount less than minimum");
+            }
+            if (invoiceCreateService.maxMSats != null) {
+                if (prepareResp.amount > invoiceCreateService.maxMSats / 1000n)
+                    throw new UserError_1.UserError("Amount more than maximum");
+            }
+            const invoice = await invoiceCreateService.getInvoice(Number(prepareResp.amount), abortController.signal);
+            const parsedInvoice = (0, bolt11_1.decode)(invoice);
             const resp = await (0, Utils_1.tryWithRetries)((retryCount) => IntermediaryAPI_1.IntermediaryAPI.initToBTCLNExactIn(lp.url, {
                 pr: invoice,
                 reqId: prepareResp.reqId,
@@ -270,8 +280,6 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                 networkFeeBtc: resp.routingFeeSats,
                 confidence: resp.confidence,
                 pr: invoice,
-                lnurl: payRequest.url,
-                successAction,
                 exactIn: true
             });
             await quote._save();
@@ -283,17 +291,17 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         }
     }
     /**
-     * Returns a newly created swap, paying for 'lnurl' - a lightning LNURL-pay
+     * Returns a newly created swap, allowing exactIn swaps with invoice creation service
      *
      * @param signer                Smartchain signer's address initiating the swap
-     * @param lnurl                 LMURL-pay you wish to pay
+     * @param invoiceCreateServicePromise
      * @param amountData            Amount of token & amount to swap
      * @param lps                   LPs (liquidity providers/intermediaries) to get the quotes from
      * @param options               Quote options
      * @param additionalParams      Additional parameters sent to the intermediary when creating the swap
      * @param abortSignal           Abort signal for aborting the process
      */
-    async createViaLNURL(signer, lnurl, amountData, lps, options, additionalParams, abortSignal) {
+    async createViaInvoiceCreateService(signer, invoiceCreateServicePromise, amountData, lps, options, additionalParams, abortSignal) {
         if (!this.isInitialized)
             throw new Error("Not initialized, call init() first!");
         options ??= {};
@@ -314,15 +322,12 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             options.maxFee = this.calculateFeeForAmount(amountData.amount, options.maxRoutingBaseFee, options.maxRoutingPPM);
         }
         try {
-            let payRequest = await this.getLNURLPay(lnurl, _abortController.signal);
-            if (options.comment != null &&
-                (payRequest.commentAllowed == null || options.comment.length > payRequest.commentAllowed))
-                throw new UserError_1.UserError("Comment not allowed or too long");
+            const invoiceCreateService = await invoiceCreateServicePromise;
             if (amountData.exactIn) {
-                const { invoice: dummyInvoice } = await LNURL_1.LNURL.useLNURLPay(payRequest, BigInt(payRequest.minSendable) / 1000n, null, this.options.getRequestTimeout, _abortController.signal);
+                const dummyInvoice = await invoiceCreateService.getInvoice(invoiceCreateService.minMsats == null ? 1 : Number(invoiceCreateService.minMsats / 1000n), _abortController.signal);
                 return lps.map(lp => {
                     return {
-                        quote: this.getIntermediaryQuoteExactIn(signer, amountData, payRequest, lp, dummyInvoice, options, {
+                        quote: this.getIntermediaryQuoteExactIn(signer, amountData, invoiceCreateService, lp, dummyInvoice, options, {
                             pricePreFetchPromise,
                             feeRatePromise
                         }, _abortController.signal, additionalParams),
@@ -331,33 +336,71 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                 });
             }
             else {
-                const min = BigInt(payRequest.minSendable) / 1000n;
-                const max = BigInt(payRequest.maxSendable) / 1000n;
-                if (amountData.amount < min)
-                    throw new UserError_1.UserError("Amount less than minimum");
-                if (amountData.amount > max)
-                    throw new UserError_1.UserError("Amount more than maximum");
-                const { invoice, parsedInvoice, successAction } = await LNURL_1.LNURL.useLNURLPay(payRequest, amountData.amount, options.comment, this.options.getRequestTimeout, _abortController.signal);
+                if (invoiceCreateService.minMsats != null) {
+                    if (amountData.amount < invoiceCreateService.minMsats / 1000n)
+                        throw new UserError_1.UserError("Amount less than minimum");
+                }
+                if (invoiceCreateService.maxMSats != null) {
+                    if (amountData.amount > invoiceCreateService.maxMSats / 1000n)
+                        throw new UserError_1.UserError("Amount more than maximum");
+                }
+                const invoice = await invoiceCreateService.getInvoice(Number(amountData.amount), _abortController.signal);
                 return (await this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
                     feeRatePromise,
                     pricePreFetchPromise,
                     signDataPrefetchPromise
-                })).map(data => {
-                    return {
-                        quote: data.quote.then(quote => {
-                            quote.lnurl = payRequest.url;
-                            quote.successAction = successAction;
-                            return quote;
-                        }),
-                        intermediary: data.intermediary
-                    };
-                });
+                }));
             }
         }
         catch (e) {
             _abortController.abort(e);
             throw e;
         }
+    }
+    /**
+     * Returns a newly created swap, paying for 'lnurl' - a lightning LNURL-pay
+     *
+     * @param signer                Smartchain signer's address initiating the swap
+     * @param lnurl                 LMURL-pay you wish to pay
+     * @param amountData            Amount of token & amount to swap
+     * @param lps                   LPs (liquidity providers/intermediaries) to get the quotes from
+     * @param options               Quote options
+     * @param additionalParams      Additional parameters sent to the intermediary when creating the swap
+     * @param abortSignal           Abort signal for aborting the process
+     */
+    async createViaLNURL(signer, lnurl, amountData, lps, options, additionalParams, abortSignal) {
+        let successActions = {};
+        const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
+        const invoiceCreateService = (async () => {
+            let payRequest = await this.getLNURLPay(lnurl, _abortController.signal);
+            if (options?.comment != null &&
+                (payRequest.commentAllowed == null || options.comment.length > payRequest.commentAllowed))
+                throw new UserError_1.UserError("Comment not allowed or too long");
+            return {
+                getInvoice: async (amountSats, abortSignal) => {
+                    const { invoice, successAction } = await LNURL_1.LNURL.useLNURLPay(payRequest, BigInt(amountSats), options?.comment, this.options.getRequestTimeout, abortSignal);
+                    successActions[invoice] = successAction;
+                    return invoice;
+                },
+                minMsat: BigInt(payRequest.minSendable),
+                maxMsat: BigInt(payRequest.maxSendable),
+                url: payRequest.url
+            };
+        })();
+        const quotes = await this.createViaInvoiceCreateService(signer, invoiceCreateService, amountData, lps, options, additionalParams, _abortController.signal);
+        _abortController.signal.throwIfAborted();
+        const resolved = await invoiceCreateService;
+        _abortController.signal.throwIfAborted();
+        return quotes.map(value => ({
+            quote: value.quote.then(quote => {
+                quote.lnurl = resolved.url;
+                const successAction = successActions[quote.getOutputAddress()];
+                if (successAction != null)
+                    quote.successAction = successAction;
+                return quote;
+            }),
+            intermediary: value.intermediary
+        }));
     }
 }
 exports.ToBTCLNWrapper = ToBTCLNWrapper;

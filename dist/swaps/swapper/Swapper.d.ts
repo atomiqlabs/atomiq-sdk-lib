@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { ISwapPrice } from "../../prices/abstract/ISwapPrice";
 import { BitcoinNetwork, BtcRelay, ChainData, ChainType, Messenger, RelaySynchronizer } from "@atomiqlabs/base";
-import { ToBTCLNOptions, ToBTCLNWrapper } from "../escrow_swaps/tobtc/ln/ToBTCLNWrapper";
+import { InvoiceCreateService, ToBTCLNOptions, ToBTCLNWrapper } from "../escrow_swaps/tobtc/ln/ToBTCLNWrapper";
 import { ToBTCOptions, ToBTCWrapper } from "../escrow_swaps/tobtc/onchain/ToBTCWrapper";
 import { FromBTCLNOptions, FromBTCLNWrapper } from "../escrow_swaps/frombtc/ln/FromBTCLNWrapper";
 import { FromBTCOptions, FromBTCWrapper } from "../escrow_swaps/frombtc/onchain/FromBTCWrapper";
@@ -184,6 +184,19 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
         comment?: string;
     }): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
     /**
+     * Creates To BTCLN swap via InvoiceCreationService
+     *
+     * @param chainIdentifier
+     * @param signer
+     * @param tokenAddress          Token address to pay with
+     * @param service               Invoice create service object which facilitates the creation of fixed amount LN invoices
+     * @param amount                Amount to be paid in sats
+     * @param exactIn               Whether to do an exact in swap instead of exact out
+     * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
+     */
+    createToBTCLNSwapViaInvoiceCreateService<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, service: InvoiceCreateService, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    /**
      * Creates From BTC swap
      *
      * @param chainIdentifier
@@ -286,11 +299,11 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
     swap<C extends ChainIds<T>>(srcToken: BtcToken<true>, dstToken: SCToken<C>, amount: bigint | string, exactIn: boolean | SwapAmountType, src: undefined | string | LNURLWithdraw, dstSmartchainWallet: string, options?: (SupportsSwapType<T[C], SwapType.FROM_BTCLN_AUTO> extends true ? FromBTCLNAutoOptions : FromBTCLNOptions)): Promise<(SupportsSwapType<T[C], SwapType.FROM_BTCLN_AUTO> extends true ? FromBTCLNAutoSwap<T[C]> : FromBTCLNSwap<T[C]>)>;
     swap<C extends ChainIds<T>>(srcToken: BtcToken<false>, dstToken: SCToken<C>, amount: bigint | string, exactIn: boolean | SwapAmountType, src: undefined | string, dstSmartchainWallet: string, options?: (SupportsSwapType<T[C], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCOptions : FromBTCOptions)): Promise<(SupportsSwapType<T[C], SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T[C]> : FromBTCSwap<T[C]>)>;
     swap<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<false>, amount: bigint | string, exactIn: boolean | SwapAmountType, src: string, dstAddress: string, options?: ToBTCOptions): Promise<ToBTCSwap<T[C]>>;
-    swap<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: bigint | string, exactIn: boolean | SwapAmountType, src: string, dstLnurlPay: string | LNURLPay, options?: ToBTCLNOptions & {
+    swap<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: bigint | string, exactIn: boolean | SwapAmountType, src: string, dstLnurlPayOrInvoiceCreateService: string | LNURLPay | InvoiceCreateService, options?: ToBTCLNOptions & {
         comment?: string;
     }): Promise<ToBTCLNSwap<T[C]>>;
     swap<C extends ChainIds<T>>(srcToken: SCToken<C>, dstToken: BtcToken<true>, amount: bigint | string, exactIn: false | SwapAmountType.EXACT_OUT, src: string, dstLightningInvoice: string, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[C]>>;
-    swap<C extends ChainIds<T>>(srcToken: Token<C> | string, dstToken: Token<C> | string, amount: bigint | string, exactIn: boolean | SwapAmountType, src: undefined | string | LNURLWithdraw, dst: string | LNURLPay, options?: FromBTCLNOptions | SpvFromBTCOptions | FromBTCOptions | ToBTCOptions | (ToBTCLNOptions & {
+    swap<C extends ChainIds<T>>(srcToken: Token<C> | string, dstToken: Token<C> | string, amount: bigint | string, exactIn: boolean | SwapAmountType, src: undefined | string | LNURLWithdraw, dst: string | LNURLPay | InvoiceCreateService, options?: FromBTCLNOptions | SpvFromBTCOptions | FromBTCOptions | ToBTCOptions | (ToBTCLNOptions & {
         comment?: string;
     }) | FromBTCLNAutoOptions): Promise<ISwap<T[C]>>;
     /**

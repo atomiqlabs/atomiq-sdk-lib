@@ -39,6 +39,9 @@ class SwapperWithChain {
     createToBTCLNSwapViaLNURL(signer, tokenAddress, lnurlPay, amount, exactIn, additionalParams, options) {
         return this.swapper.createToBTCLNSwapViaLNURL(this.chainIdentifier, signer, tokenAddress, lnurlPay, amount, exactIn, additionalParams, options);
     }
+    createToBTCLNSwapViaInvoiceCreateService(signer, tokenAddress, service, amount, exactIn, additionalParams, options) {
+        return this.swapper.createToBTCLNSwapViaInvoiceCreateService(this.chainIdentifier, signer, tokenAddress, service, amount, exactIn, additionalParams, options);
+    }
     createFromBTCSwap(signer, tokenAddress, amount, exactOut, additionalParams, options) {
         return this.swapper.createFromBTCSwap(this.chainIdentifier, signer, tokenAddress, amount, exactOut, additionalParams, options);
     }

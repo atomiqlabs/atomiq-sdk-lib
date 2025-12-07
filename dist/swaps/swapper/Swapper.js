@@ -554,6 +554,33 @@ class Swapper extends events_1.EventEmitter {
         return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.wrappers[SwapType_1.SwapType.TO_BTCLN].createViaLNURL(signer, typeof (lnurlPay) === "string" ? (lnurlPay.startsWith("lightning:") ? lnurlPay.substring(10) : lnurlPay) : lnurlPay.params, amountData, candidates, options, additionalParams, abortSignal), amountData, SwapType_1.SwapType.TO_BTCLN);
     }
     /**
+     * Creates To BTCLN swap via InvoiceCreationService
+     *
+     * @param chainIdentifier
+     * @param signer
+     * @param tokenAddress          Token address to pay with
+     * @param service               Invoice create service object which facilitates the creation of fixed amount LN invoices
+     * @param amount                Amount to be paid in sats
+     * @param exactIn               Whether to do an exact in swap instead of exact out
+     * @param additionalParams      Additional parameters sent to the LP when creating the swap
+     * @param options
+     */
+    async createToBTCLNSwapViaInvoiceCreateService(chainIdentifier, signer, tokenAddress, service, amount, exactIn, additionalParams = this.options.defaultAdditionalParameters, options) {
+        if (this.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        if (!this.chains[chainIdentifier].chainInterface.isValidAddress(signer, true))
+            throw new Error("Invalid " + chainIdentifier + " address");
+        signer = this.chains[chainIdentifier].chainInterface.normalizeAddress(signer);
+        options ??= {};
+        const amountData = {
+            amount,
+            token: tokenAddress,
+            exactIn
+        };
+        options.expirySeconds ??= 5 * 24 * 3600;
+        return this.createSwap(chainIdentifier, (candidates, abortSignal, chain) => chain.wrappers[SwapType_1.SwapType.TO_BTCLN].createViaInvoiceCreateService(signer, Promise.resolve(service), amountData, candidates, options, additionalParams, abortSignal), amountData, SwapType_1.SwapType.TO_BTCLN);
+    }
+    /**
      * Creates From BTC swap
      *
      * @param chainIdentifier
@@ -822,6 +849,9 @@ class Swapper extends events_1.EventEmitter {
                         throw new Error("Destination LNURL link/lightning invoice must be a string or LNURLPay object!");
                     if ((0, LNURL_1.isLNURLPay)(dst) || this.Utils.isValidLNURL(dst)) {
                         return this.createToBTCLNSwapViaLNURL(srcToken.chainId, src, srcToken.address, dst, amount, !!exactIn, undefined, options);
+                    }
+                    else if ((0, ToBTCLNWrapper_1.isInvoiceCreateService)(dst)) {
+                        return this.createToBTCLNSwapViaInvoiceCreateService(srcToken.chainId, src, srcToken.address, dst, amount, !!exactIn, undefined, options);
                     }
                     else if (this.Utils.isLightningInvoice(dst)) {
                         if (!this.Utils.isValidLightningInvoice(dst))
