@@ -555,8 +555,8 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                     successActions[invoice] = successAction;
                     return invoice;
                 },
-                minMsat: BigInt(payRequest.minSendable),
-                maxMsat: BigInt(payRequest.maxSendable),
+                minMsats: BigInt(payRequest.minSendable),
+                maxMsats: BigInt(payRequest.maxSendable),
                 url: payRequest.url
             }
         })();
