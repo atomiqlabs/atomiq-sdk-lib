@@ -559,8 +559,15 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             commitStatus ??= await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(this._getInitiator(), this.data));
             switch (commitStatus?.type) {
                 case base_1.SwapCommitStateType.PAID:
-                    if (this.claimTxId == null)
+                    if (this.claimTxId == null && commitStatus.getClaimTxId)
                         this.claimTxId = await commitStatus.getClaimTxId();
+                    const eventResult = await commitStatus.getClaimResult();
+                    try {
+                        await this._setPaymentResult({ secret: eventResult, txId: Buffer.from(eventResult, "hex").reverse().toString("hex") });
+                    }
+                    catch (e) {
+                        this.logger.error(`Failed to set payment result ${eventResult} on the swap!`);
+                    }
                     this.state = ToBTCSwapState.CLAIMED;
                     return true;
                 case base_1.SwapCommitStateType.REFUNDABLE:

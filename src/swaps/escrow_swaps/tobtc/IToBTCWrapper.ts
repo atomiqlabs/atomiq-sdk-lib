@@ -74,6 +74,7 @@ export abstract class IToBTCWrapper<
             const swapData = await event.swapData();
             if(swap.data!=null && !swap.data.equals(swapData)) return false;
             if(swap.state===ToBTCSwapState.CREATED || swap.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) swap.state = ToBTCSwapState.COMMITED;
+            if(swap.commitTxId==null) swap.commitTxId = event.meta.txId;
             swap.data = swapData;
             return true;
         }
@@ -82,6 +83,7 @@ export abstract class IToBTCWrapper<
     protected processEventClaim(swap: S, event: ClaimEvent<T["Data"]>): Promise<boolean> {
         if(swap.state!==ToBTCSwapState.REFUNDED && swap.state!==ToBTCSwapState.CLAIMED) {
             swap.state = ToBTCSwapState.CLAIMED;
+            if(swap.claimTxId==null) swap.claimTxId = event.meta.txId;
             swap._setPaymentResult({secret: event.result, txId: Buffer.from(event.result, "hex").reverse().toString("hex")});
             return Promise.resolve(true);
         }
@@ -91,6 +93,7 @@ export abstract class IToBTCWrapper<
     protected processEventRefund(swap: S, event: RefundEvent<T["Data"]>): Promise<boolean> {
         if(swap.state!==ToBTCSwapState.CLAIMED && swap.state!==ToBTCSwapState.REFUNDED) {
             swap.state = ToBTCSwapState.REFUNDED;
+            if(swap.refundTxId==null) swap.refundTxId = event.meta.txId;
             return Promise.resolve(true);
         }
         return Promise.resolve(false);
