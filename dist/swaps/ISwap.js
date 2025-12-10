@@ -1,13 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ISwap = exports.isSwapType = exports.ppmToPercentage = exports.isISwapInit = void 0;
+exports.ISwap = exports.ppmToPercentage = exports.isISwapInit = void 0;
 const SwapType_1 = require("./enums/SwapType");
 const events_1 = require("events");
 const ISwapPrice_1 = require("../prices/abstract/ISwapPrice");
 const Utils_1 = require("../utils/Utils");
 const SwapDirection_1 = require("./enums/SwapDirection");
-const SpvFromBTCSwap_1 = require("./spv_swaps/SpvFromBTCSwap");
-const FromBTCLNAutoSwap_1 = require("./escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap");
 function isISwapInit(obj) {
     return typeof obj === 'object' &&
         obj != null &&
@@ -29,14 +27,6 @@ function ppmToPercentage(ppm) {
     };
 }
 exports.ppmToPercentage = ppmToPercentage;
-function isSwapType(swap, swapType) {
-    if (swap instanceof (SpvFromBTCSwap_1.SpvFromBTCSwap) && swapType === SwapType_1.SwapType.FROM_BTC)
-        return true;
-    if (swap instanceof (FromBTCLNAutoSwap_1.FromBTCLNAutoSwap) && swapType === SwapType_1.SwapType.FROM_BTCLN)
-        return true;
-    return swap != null && swap.getType() === swapType;
-}
-exports.isSwapType = isSwapType;
 class ISwap {
     constructor(wrapper, swapInitOrObj) {
         this.currentVersion = 1;

@@ -8,13 +8,13 @@ const FromBTCLNWrapper_1 = require("../escrow_swaps/frombtc/ln/FromBTCLNWrapper"
 const FromBTCWrapper_1 = require("../escrow_swaps/frombtc/onchain/FromBTCWrapper");
 const IntermediaryDiscovery_1 = require("../../intermediaries/IntermediaryDiscovery");
 const bolt11_1 = require("@atomiqlabs/bolt11");
-const ISwap_1 = require("../ISwap");
 const IntermediaryError_1 = require("../../errors/IntermediaryError");
 const SwapType_1 = require("../enums/SwapType");
 const MempoolBtcRelaySynchronizer_1 = require("../../btc/mempool/synchronizer/MempoolBtcRelaySynchronizer");
 const LnForGasWrapper_1 = require("../trusted/ln/LnForGasWrapper");
 const events_1 = require("events");
 const LNURL_1 = require("../../utils/LNURL");
+const ISwapWrapper_1 = require("../ISwapWrapper");
 const Utils_1 = require("../../utils/Utils");
 const RequestError_1 = require("../../errors/RequestError");
 const SwapperWithChain_1 = require("./SwapperWithChain");
@@ -1083,7 +1083,7 @@ class Swapper extends events_1.EventEmitter {
         queryParams.push({ key: "id", value: id });
         const { unifiedSwapStorage, reviver } = this.chains[chainId];
         const swap = (await unifiedSwapStorage.query([queryParams], reviver))[0];
-        if ((0, ISwap_1.isSwapType)(swap, swapType))
+        if ((0, ISwapWrapper_1.isSwapType)(swap, swapType))
             return swap;
     }
     async syncSwapsForChain(chainId, signer) {

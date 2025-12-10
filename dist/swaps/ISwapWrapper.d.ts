@@ -5,10 +5,18 @@ import { EventEmitter } from "events";
 import { ISwap } from "./ISwap";
 import { ISwapPrice, PriceInfoType } from "../prices/abstract/ISwapPrice";
 import { SCToken } from "../Tokens";
-import { ChainIds, MultiChain } from "./swapper/Swapper";
+import { ChainIds, MultiChain, SupportsSwapType } from "./swapper/Swapper";
 import { UnifiedSwapEventListener } from "../events/UnifiedSwapEventListener";
 import { SwapType } from "./enums/SwapType";
 import { UnifiedSwapStorage } from "../storage/UnifiedSwapStorage";
+import { SpvFromBTCSwap } from "./spv_swaps/SpvFromBTCSwap";
+import { FromBTCSwap } from "./escrow_swaps/frombtc/onchain/FromBTCSwap";
+import { FromBTCLNSwap } from "./escrow_swaps/frombtc/ln/FromBTCLNSwap";
+import { ToBTCSwap } from "./escrow_swaps/tobtc/onchain/ToBTCSwap";
+import { FromBTCLNAutoSwap } from "./escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
+import { ToBTCLNSwap } from "./escrow_swaps/tobtc/ln/ToBTCLNSwap";
+import { OnchainForGasSwap } from "./trusted/onchain/OnchainForGasSwap";
+import { LnForGasSwap } from "./trusted/ln/LnForGasSwap";
 export type AmountData = {
     amount: bigint;
     token: string;
@@ -33,6 +41,17 @@ export type SwapTypeDefinition<T extends ChainType, W extends ISwapWrapper<T, an
     Wrapper: W;
     Swap: S;
 };
+export type SwapTypeMapping<T extends ChainType> = {
+    [SwapType.FROM_BTC]: SupportsSwapType<T, SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T> : FromBTCSwap<T>;
+    [SwapType.FROM_BTCLN]: FromBTCLNSwap<T>;
+    [SwapType.TO_BTC]: ToBTCSwap<T>;
+    [SwapType.TO_BTCLN]: SupportsSwapType<T, SwapType.FROM_BTCLN_AUTO> extends true ? FromBTCLNAutoSwap<T> : ToBTCLNSwap<T>;
+    [SwapType.TRUSTED_FROM_BTC]: OnchainForGasSwap<T>;
+    [SwapType.TRUSTED_FROM_BTCLN]: LnForGasSwap<T>;
+    [SwapType.SPV_VAULT_FROM_BTC]: SpvFromBTCSwap<T>;
+    [SwapType.FROM_BTCLN_AUTO]: FromBTCLNAutoSwap<T>;
+};
+export declare function isSwapType<T extends ChainType, S extends SwapType>(swap: ISwap<T>, swapType: S): swap is SwapTypeMapping<T>[S];
 export declare abstract class ISwapWrapper<T extends ChainType, D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D>>, O extends ISwapWrapperOptions = ISwapWrapperOptions> {
     abstract readonly TYPE: SwapType;
     protected readonly logger: import("../utils/Utils").LoggerType;

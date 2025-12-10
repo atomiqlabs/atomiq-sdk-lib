@@ -8,15 +8,6 @@ import { LoggerType } from "../utils/Utils";
 import { TokenAmount } from "../Tokens";
 import { SwapDirection } from "./enums/SwapDirection";
 import { Fee, FeeBreakdown } from "./fee/Fee";
-import { LnForGasSwap } from "./trusted/ln/LnForGasSwap";
-import { FromBTCSwap } from "./escrow_swaps/frombtc/onchain/FromBTCSwap";
-import { FromBTCLNSwap } from "./escrow_swaps/frombtc/ln/FromBTCLNSwap";
-import { ToBTCSwap } from "./escrow_swaps/tobtc/onchain/ToBTCSwap";
-import { ToBTCLNSwap } from "./escrow_swaps/tobtc/ln/ToBTCLNSwap";
-import { OnchainForGasSwap } from "./trusted/onchain/OnchainForGasSwap";
-import { SpvFromBTCSwap } from "./spv_swaps/SpvFromBTCSwap";
-import { FromBTCLNAutoSwap } from "./escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
-import { SupportsSwapType } from "./swapper/Swapper";
 export type ISwapInit = {
     pricingInfo: PriceInfoType;
     url: string;
@@ -39,17 +30,6 @@ export type SwapExecutionAction<T extends ChainType> = {
     chain: "LIGHTNING" | "BITCOIN" | T["ChainId"];
     txs: any[];
 };
-export type SwapTypeMapping<T extends ChainType> = {
-    [SwapType.FROM_BTC]: SupportsSwapType<T, SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T> : FromBTCSwap<T>;
-    [SwapType.FROM_BTCLN]: FromBTCLNSwap<T>;
-    [SwapType.TO_BTC]: ToBTCSwap<T>;
-    [SwapType.TO_BTCLN]: SupportsSwapType<T, SwapType.FROM_BTCLN_AUTO> extends true ? FromBTCLNAutoSwap<T> : ToBTCLNSwap<T>;
-    [SwapType.TRUSTED_FROM_BTC]: OnchainForGasSwap<T>;
-    [SwapType.TRUSTED_FROM_BTCLN]: LnForGasSwap<T>;
-    [SwapType.SPV_VAULT_FROM_BTC]: SpvFromBTCSwap<T>;
-    [SwapType.FROM_BTCLN_AUTO]: FromBTCLNAutoSwap<T>;
-};
-export declare function isSwapType<T extends ChainType, S extends SwapType>(swap: ISwap<T>, swapType: S): swap is SwapTypeMapping<T>[S];
 export declare abstract class ISwap<T extends ChainType = ChainType, D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D, S>> = SwapTypeDefinition<T, ISwapWrapper<T, any>, ISwap<T, any, any>>, S extends number = number> {
     protected readonly abstract TYPE: SwapType;
     protected readonly abstract logger: LoggerType;

@@ -6,7 +6,7 @@ import { ToBTCOptions, ToBTCWrapper } from "../escrow_swaps/tobtc/onchain/ToBTCW
 import { FromBTCLNOptions, FromBTCLNWrapper } from "../escrow_swaps/frombtc/ln/FromBTCLNWrapper";
 import { FromBTCOptions, FromBTCWrapper } from "../escrow_swaps/frombtc/onchain/FromBTCWrapper";
 import { IntermediaryDiscovery, MultichainSwapBounds, SwapBounds } from "../../intermediaries/IntermediaryDiscovery";
-import { ISwap, SwapTypeMapping } from "../ISwap";
+import { ISwap } from "../ISwap";
 import { SwapType } from "../enums/SwapType";
 import { FromBTCLNSwap } from "../escrow_swaps/frombtc/ln/FromBTCLNSwap";
 import { FromBTCSwap } from "../escrow_swaps/frombtc/onchain/FromBTCSwap";
@@ -20,7 +20,7 @@ import { EventEmitter } from "events";
 import { MempoolBitcoinBlock } from "../../btc/mempool/MempoolBitcoinBlock";
 import { Intermediary } from "../../intermediaries/Intermediary";
 import { LNURLPay, LNURLWithdraw } from "../../utils/LNURL";
-import { WrapperCtorTokens } from "../ISwapWrapper";
+import { SwapTypeMapping, WrapperCtorTokens } from "../ISwapWrapper";
 import { SwapperWithChain } from "./SwapperWithChain";
 import { BtcToken, SCToken, Token, TokenAmount } from "../../Tokens";
 import { OnchainForGasSwap } from "../trusted/onchain/OnchainForGasSwap";

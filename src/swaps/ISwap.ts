@@ -61,23 +61,6 @@ export type SwapExecutionAction<T extends ChainType> = {
     txs: any[]
 };
 
-export type SwapTypeMapping<T extends ChainType> = {
-    [SwapType.FROM_BTC]: SupportsSwapType<T, SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T> : FromBTCSwap<T>,
-    [SwapType.FROM_BTCLN]: FromBTCLNSwap<T>,
-    [SwapType.TO_BTC]: ToBTCSwap<T>,
-    [SwapType.TO_BTCLN]: SupportsSwapType<T, SwapType.FROM_BTCLN_AUTO> extends true ? FromBTCLNAutoSwap<T> : ToBTCLNSwap<T>,
-    [SwapType.TRUSTED_FROM_BTC]: OnchainForGasSwap<T>,
-    [SwapType.TRUSTED_FROM_BTCLN]: LnForGasSwap<T>,
-    [SwapType.SPV_VAULT_FROM_BTC]: SpvFromBTCSwap<T>,
-    [SwapType.FROM_BTCLN_AUTO]: FromBTCLNAutoSwap<T>
-};
-
-export function isSwapType<T extends ChainType, S extends SwapType>(swap: ISwap<T>, swapType: S): swap is SwapTypeMapping<T>[S] {
-    if(swap instanceof SpvFromBTCSwap<T> && swapType===SwapType.FROM_BTC) return true;
-    if(swap instanceof FromBTCLNAutoSwap<T> && swapType===SwapType.FROM_BTCLN) return true;
-    return swap!=null && swap.getType()===swapType;
-}
-
 export abstract class ISwap<
     T extends ChainType = ChainType,
     D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D, S>> = SwapTypeDefinition<T, ISwapWrapper<T, any>, ISwap<T, any, any>>,
