@@ -20,7 +20,7 @@ export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
                     type: "tr",
                     pubkey: outputScript.pubkey
                 }));
-            } catch (e) {
+            } catch (e: any) {
                 let msg = "";
                 if(e.name!=null) msg += ": "+e.name;
                 if(e.message!=null) msg += ": "+e.message;
@@ -29,7 +29,7 @@ export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
                 try {
                     validatePubkey(outputScript.pubkey, PubT.schnorr)
                     msg += ", validatePubkey: success";
-                } catch (e) {
+                } catch (e: any) {
                     msg += ", validatePubkeyError: ";
                     if(e.name!=null) msg += ": "+e.name;
                     if(e.message!=null) msg += ": "+e.message;
@@ -38,6 +38,7 @@ export function toOutputScript(network: BTC_NETWORK, address: string): Buffer {
                 throw new Error(msg);
             }
     }
+    throw new Error(`Unrecognized output script type: ${outputScript.type}`);
 }
 
 export function toCoinselectAddressType(outputScript: Uint8Array): CoinselectAddressTypes {

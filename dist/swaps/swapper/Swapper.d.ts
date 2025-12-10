@@ -98,7 +98,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
 }> {
     protected readonly logger: import("../../utils/Utils").LoggerType;
     protected readonly swapStateListener: (swap: ISwap) => void;
-    private defaultTrustedIntermediary;
+    private defaultTrustedIntermediary?;
     readonly chains: MultiChainData<T>;
     readonly prices: ISwapPrice<T>;
     readonly intermediaryDiscovery: IntermediaryDiscovery;
@@ -121,7 +121,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
     readonly messenger: Messenger;
     constructor(bitcoinRpc: MempoolBitcoinRpc, chainsData: CtorMultiChainData<T>, pricing: ISwapPrice<T>, tokens: WrapperCtorTokens<T>, messenger: Messenger, options?: SwapperOptions);
     private _init;
-    private initPromise;
+    private initPromise?;
     private initialized;
     /**
      * Initializes the swap storage and loads existing swaps, needs to be called before any other action
@@ -156,7 +156,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      * @param options
      */
-    createToBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, address: string, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCOptions): Promise<ToBTCSwap<T[ChainIdentifier]>>;
+    createToBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, address: string, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any> | undefined, options?: ToBTCOptions): Promise<ToBTCSwap<T[ChainIdentifier]>>;
     /**
      * Creates To BTCLN swap
      *
@@ -167,7 +167,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      * @param options
      */
-    createToBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, paymentRequest: string, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    createToBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, paymentRequest: string, additionalParams?: Record<string, any> | undefined, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates To BTCLN swap via LNURL-pay
      *
@@ -180,7 +180,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      * @param options
      */
-    createToBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurlPay: string | LNURLPay, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCLNOptions & {
+    createToBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurlPay: string | LNURLPay, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any> | undefined, options?: ToBTCLNOptions & {
         comment?: string;
     }): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
     /**
@@ -195,7 +195,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      * @param options
      */
-    createToBTCLNSwapViaInvoiceCreateService<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, service: InvoiceCreateService, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any>, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
+    createToBTCLNSwapViaInvoiceCreateService<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, service: InvoiceCreateService, amount: bigint, exactIn?: boolean, additionalParams?: Record<string, any> | undefined, options?: ToBTCLNOptions): Promise<ToBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTC swap
      *
@@ -207,7 +207,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      * @param options
      */
-    createFromBTCSwapNew<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: SpvFromBTCOptions): Promise<SpvFromBTCSwap<T[ChainIdentifier]>>;
+    createFromBTCSwapNew<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any> | undefined, options?: SpvFromBTCOptions): Promise<SpvFromBTCSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTC swap
      *
@@ -219,7 +219,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      * @param options
      */
-    createFromBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCOptions): Promise<FromBTCSwap<T[ChainIdentifier]>>;
+    createFromBTCSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any> | undefined, options?: FromBTCOptions): Promise<FromBTCSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTCLN swap
      *
@@ -231,7 +231,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
      * @param options
      */
-    createFromBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNOptions): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
+    createFromBTCLNSwap<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any> | undefined, options?: FromBTCLNOptions): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTCLN swap, withdrawing from LNURL-withdraw
      *
@@ -243,7 +243,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param exactOut          Whether to use exact out instead of exact in
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
      */
-    createFromBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurl: string | LNURLWithdraw, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
+    createFromBTCLNSwapViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurl: string | LNURLWithdraw, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any> | undefined): Promise<FromBTCLNSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTCLN swap using new protocol
      *
@@ -255,7 +255,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
      * @param options
      */
-    createFromBTCLNSwapNew<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNAutoOptions): Promise<FromBTCLNAutoSwap<T[ChainIdentifier]>>;
+    createFromBTCLNSwapNew<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any> | undefined, options?: FromBTCLNAutoOptions): Promise<FromBTCLNAutoSwap<T[ChainIdentifier]>>;
     /**
      * Creates From BTCLN swap using new protocol, withdrawing from LNURL-withdraw
      *
@@ -268,7 +268,7 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param additionalParams  Additional parameters sent to the LP when creating the swap
      * @param options
      */
-    createFromBTCLNSwapNewViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurl: string | LNURLWithdraw, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any>, options?: FromBTCLNAutoOptions): Promise<FromBTCLNAutoSwap<T[ChainIdentifier]>>;
+    createFromBTCLNSwapNewViaLNURL<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: string, tokenAddress: string, lnurl: string | LNURLWithdraw, amount: bigint, exactOut?: boolean, additionalParams?: Record<string, any> | undefined, options?: FromBTCLNAutoOptions): Promise<FromBTCLNAutoSwap<T[ChainIdentifier]>>;
     /**
      * Creates trusted LN for Gas swap
      *
@@ -442,11 +442,11 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
     getSwapLimits<C extends ChainIds<T>, A extends Token<C>, B extends Token<C>>(srcToken: A, dstToken: B): {
         input: {
             min: TokenAmount<string, A>;
-            max: TokenAmount<string, A>;
+            max?: TokenAmount<string, A>;
         };
         output: {
             min: TokenAmount<string, B>;
-            max: TokenAmount<string, B>;
+            max?: TokenAmount<string, B>;
         };
     };
     /**

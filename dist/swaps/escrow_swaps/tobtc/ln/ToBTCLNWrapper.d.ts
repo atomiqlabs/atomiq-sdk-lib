@@ -1,12 +1,18 @@
 /// <reference types="node" />
 import { ToBTCLNSwap } from "./ToBTCLNSwap";
+<<<<<<< HEAD
 import { IToBTCWrapper } from "../IToBTCWrapper";
 import { ChainType, SwapCommitState } from "@atomiqlabs/base";
+=======
+import { IToBTCDefinition, IToBTCWrapper } from "../IToBTCWrapper";
+import { ChainType } from "@atomiqlabs/base";
+>>>>>>> 9d90343 (Merge ts strict (#16))
 import { Intermediary } from "../../../../intermediaries/Intermediary";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../../ISwapWrapper";
 import { ISwapPrice } from "../../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { SwapType } from "../../../enums/SwapType";
+import { AllOptional } from "../../../../utils/Utils";
 import { LNURLPayParamsWithUrl } from "../../../../utils/LNURL";
 import { UnifiedSwapEventListener } from "../../../../events/UnifiedSwapEventListener";
 import { UnifiedSwapStorage } from "../../../../storage/UnifiedSwapStorage";
@@ -26,16 +32,18 @@ export type ToBTCLNOptions = {
     maxRoutingBaseFee?: bigint;
 };
 export type ToBTCLNWrapperOptions = ISwapWrapperOptions & {
-    lightningBaseFee?: number;
-    lightningFeePPM?: number;
-    paymentTimeoutSeconds?: number;
+    lightningBaseFee: number;
+    lightningFeePPM: number;
+    paymentTimeoutSeconds: number;
 };
-export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCLNSwap<T>, ToBTCLNWrapperOptions> {
+export type ToBTCLNDefinition<T extends ChainType> = IToBTCDefinition<T, ToBTCLNWrapper<T>, ToBTCLNSwap<T>>;
+export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCLNDefinition<T>, ToBTCLNWrapperOptions> {
     readonly TYPE = SwapType.TO_BTCLN;
     readonly swapDeserializer: typeof ToBTCLNSwap;
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options?: ToBTCLNWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], options?: AllOptional<ToBTCLNWrapperOptions>, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
+    private toRequiredSwapOptions;
     private checkPaymentHashWasPaid;
     /**
      * Calculates maximum lightning network routing fee based on amount
@@ -91,9 +99,9 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
      * @param preFetches            Existing pre-fetches for the swap (only used internally for LNURL swaps)
      */
     create(signer: string, bolt11PayRequest: string, amountData: Omit<AmountData, "amount">, lps: Intermediary[], options?: ToBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
-        feeRatePromise: Promise<any>;
-        pricePreFetchPromise: Promise<bigint>;
-        signDataPrefetchPromise?: Promise<any>;
+        feeRatePromise: Promise<string | undefined>;
+        pricePreFetchPromise: Promise<bigint | undefined>;
+        signDataPrefetchPromise?: Promise<T["PreFetchVerification"] | undefined>;
     }): Promise<{
         quote: Promise<ToBTCLNSwap<T>>;
         intermediary: Intermediary;
@@ -133,7 +141,7 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
      * @param additionalParams      Additional parameters sent to the intermediary when creating the swap
      * @param abortSignal           Abort signal for aborting the process
      */
-    createViaInvoiceCreateService(signer: string, invoiceCreateServicePromise: Promise<InvoiceCreateService>, amountData: AmountData, lps: Intermediary[], options: ToBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal): Promise<{
+    createViaInvoiceCreateService(signer: string, invoiceCreateServicePromise: Promise<InvoiceCreateService>, amountData: AmountData, lps: Intermediary[], options?: ToBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal): Promise<{
         quote: Promise<ToBTCLNSwap<T>>;
         intermediary: Intermediary;
     }[]>;

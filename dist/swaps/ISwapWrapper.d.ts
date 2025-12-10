@@ -13,7 +13,7 @@ import { Intermediary } from "../intermediaries/Intermediary";
 export type AmountData = {
     amount: bigint;
     token: string;
-    exactIn?: boolean;
+    exactIn: boolean;
 };
 export type ISwapWrapperOptions = {
     getRequestTimeout?: number;
@@ -30,25 +30,29 @@ export type WrapperCtorTokens<T extends MultiChain = MultiChain> = {
         };
     };
 }[];
-export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<T>, O extends ISwapWrapperOptions = ISwapWrapperOptions> {
+export type SwapTypeDefinition<T extends ChainType, W extends ISwapWrapper<T, any>, S extends ISwap<T>> = {
+    Wrapper: W;
+    Swap: S;
+};
+export declare abstract class ISwapWrapper<T extends ChainType, D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D>>, O extends ISwapWrapperOptions = ISwapWrapperOptions> {
     abstract readonly TYPE: SwapType;
     protected readonly logger: import("../utils/Utils").LoggerType;
-    abstract readonly swapDeserializer: new (wrapper: ISwapWrapper<T, S, O>, data: any) => S;
+    abstract readonly swapDeserializer: new (wrapper: D["Wrapper"], data: any) => D["Swap"];
     readonly unifiedStorage: UnifiedSwapStorage<T>;
     readonly unifiedChainEvents: UnifiedSwapEventListener<T>;
     readonly chainIdentifier: T["ChainId"];
     readonly chain: T["ChainInterface"];
     readonly prices: ISwapPrice;
     readonly events: EventEmitter<{
-        swapState: [ISwap];
+        swapState: [D["Swap"]];
     }>;
     readonly options: O;
     readonly tokens: {
         [tokenAddress: string]: SCToken<T["ChainId"]>;
     };
-    readonly pendingSwaps: Map<string, WeakRef<S>>;
+    readonly pendingSwaps: Map<string, WeakRef<D["Swap"]>>;
     isInitialized: boolean;
-    tickInterval: NodeJS.Timeout;
+    tickInterval?: NodeJS.Timeout;
     /**
      * @param chainIdentifier
      * @param unifiedStorage
@@ -72,7 +76,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
      */
     protected preFetchPrice(amountData: {
         token: string;
-    }, abortSignal?: AbortSignal): Promise<bigint | null>;
+    }, abortSignal?: AbortSignal): Promise<bigint | undefined>;
     /**
      * Verifies returned  price for swaps
      *
@@ -93,29 +97,30 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
         swapFeePPM: number;
     }, send: boolean, amountSats: bigint, amountToken: bigint, token: string, feeData: {
         networkFee?: bigint;
-    }, pricePrefetchPromise?: Promise<bigint>, abortSignal?: AbortSignal): Promise<PriceInfoType>;
-    abstract readonly pendingSwapStates: Array<S["state"]>;
-    abstract readonly tickSwapState: Array<S["state"]>;
+    }, pricePrefetchPromise?: Promise<bigint | undefined>, abortSignal?: AbortSignal): Promise<PriceInfoType>;
+    abstract readonly pendingSwapStates: Array<D["Swap"]["state"]>;
+    abstract readonly tickSwapState?: Array<D["Swap"]["state"]>;
     /**
      * Processes a single SC on-chain event
      * @private
      * @param event
      * @param swap
      */
-    protected abstract processEvent?(event: ChainEvent<T["Data"]>, swap: S): Promise<boolean>;
+    protected abstract processEvent?(event: ChainEvent<T["Data"]>, swap: D["Swap"]): Promise<void>;
     /**
      * Initializes the swap wrapper, needs to be called before any other action can be taken
      */
     init(noTimers?: boolean, noCheckPastSwaps?: boolean): Promise<void>;
     protected startTickInterval(): void;
-    protected _checkPastSwaps(pastSwaps: S[]): Promise<{
-        changedSwaps: S[];
-        removeSwaps: S[];
+    protected _checkPastSwaps(pastSwaps: D["Swap"][]): Promise<{
+        changedSwaps: D["Swap"][];
+        removeSwaps: D["Swap"][];
     }>;
-    checkPastSwaps(pastSwaps?: S[], noSave?: boolean): Promise<{
-        removeSwaps: S[];
-        changedSwaps: S[];
+    checkPastSwaps(pastSwaps?: D["Swap"][], noSave?: boolean): Promise<{
+        removeSwaps: D["Swap"][];
+        changedSwaps: D["Swap"][];
     }>;
+<<<<<<< HEAD
     tick(swaps?: S[]): Promise<void>;
     saveSwapData(swap: S): Promise<void>;
     removeSwapData(swap: S): Promise<void>;
@@ -127,6 +132,11 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
             blockHeight: number;
         }>;
     }, state: SwapCommitState, lp: Intermediary): Promise<S>;
+=======
+    tick(swaps?: D["Swap"][]): Promise<void>;
+    saveSwapData(swap: D["Swap"]): Promise<void>;
+    removeSwapData(swap: D["Swap"]): Promise<void>;
+>>>>>>> 9d90343 (Merge ts strict (#16))
     /**
      * Un-subscribes from event listeners on Solana
      */

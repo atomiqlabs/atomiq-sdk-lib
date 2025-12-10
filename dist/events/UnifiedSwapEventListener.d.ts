@@ -15,7 +15,7 @@ export declare class UnifiedSwapEventListener<T extends ChainType> {
     };
     constructor(unifiedStorage: UnifiedSwapStorage<T>, events: T["Events"]);
     processEvents(events: ChainEvent<T["Data"]>[]): Promise<void>;
-    listener: EventListener<T["Data"]>;
+    listener?: EventListener<T["Data"]>;
     start(): Promise<void>;
     stop(): Promise<void>;
     registerListener<S extends ISwap<T>>(type: SwapType, listener: SwapEventListener<T, S>, reviver: new (val: any) => S): void;

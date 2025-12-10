@@ -2,23 +2,23 @@
 /// <reference types="node" />
 import { ISwap, ISwapInit } from "../ISwap";
 import { ChainType, SwapCommitState, SwapData, SwapExpiredState, SwapNotCommitedState, SwapPaidState } from "@atomiqlabs/base";
-import { IEscrowSwapWrapper } from "./IEscrowSwapWrapper";
+import { IEscrowSwapDefinition, IEscrowSwapWrapper } from "./IEscrowSwapWrapper";
 import { Buffer } from "buffer";
 export type IEscrowSwapInit<T extends SwapData> = ISwapInit & {
     data?: T;
 };
 export declare function isIEscrowSwapInit<T extends SwapData>(obj: any): obj is IEscrowSwapInit<T>;
-export declare abstract class IEscrowSwap<T extends ChainType = ChainType, S extends number = number> extends ISwap<T, S> {
-    protected readonly wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>;
+export declare abstract class IEscrowSwap<T extends ChainType = ChainType, D extends IEscrowSwapDefinition<T, IEscrowSwapWrapper<T, D>, IEscrowSwap<T, D, S>> = IEscrowSwapDefinition<T, IEscrowSwapWrapper<T, any>, IEscrowSwap<T, any, any>>, S extends number = number> extends ISwap<T, D, S> {
     data?: T["Data"];
     /**
      * Transaction IDs for the swap on the smart chain side
      */
-    commitTxId: string;
+    commitTxId?: string;
     refundTxId?: string;
     claimTxId?: string;
-    protected constructor(wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>, obj: any);
-    protected constructor(wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>, swapInit: IEscrowSwapInit<T["Data"]>);
+    protected constructor(wrapper: D["Wrapper"], obj: any);
+    protected constructor(wrapper: D["Wrapper"], swapInit: IEscrowSwapInit<T["Data"]>);
+    protected abstract getSwapData(): T["Data"];
     /**
      * Returns the identification hash of the swap, usually claim data hash, but can be overriden, e.g. for
      *  lightning swaps the identifier hash is used instead of claim data hash

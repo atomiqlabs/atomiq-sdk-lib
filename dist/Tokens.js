@@ -90,6 +90,7 @@ function toDecimal(amount, decimalCount, cut, displayDecimals) {
 exports.toDecimal = toDecimal;
 function toTokenAmount(amount, token, prices) {
     if (amount == null)
+<<<<<<< HEAD
         return {
             rawAmount: null,
             amount: null,
@@ -98,6 +99,9 @@ function toTokenAmount(amount, token, prices) {
             usdValue: () => Promise.resolve(null),
             toString: () => "??? " + token.ticker
         };
+=======
+        return null; //Shouldn't happen
+>>>>>>> 9d90343 (Merge ts strict (#16))
     let amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
     return {
         rawAmount: amount,

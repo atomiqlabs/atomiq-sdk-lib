@@ -47,11 +47,11 @@ export function maxSendable (
     value: number,
     fee: number
 } {
-    if (!isFinite(utils.uintOrNaN(feeRate))) return null;
+    if (!isFinite(utils.uintOrNaN(feeRate))) throw new Error("Invalid feeRate passed!");
 
     const outputs = additionalOutputs ?? [];
     const inputs = requiredInputs ?? [];
-    let bytesAccum = utils.transactionBytes(inputs, (outputs as {script: Buffer}[]).concat([output]) , null);
+    let bytesAccum = utils.transactionBytes(inputs, (outputs as {script: Buffer}[]).concat([output]));
     let cpfpAddFee = 0;
     let inAccum = utils.sumOrNaN(inputs);
     let outAccum = utils.sumOrNaN(outputs);

@@ -82,11 +82,11 @@ export class SwapperUtils<T extends MultiChain> {
     }
 
     /**
-     * Returns satoshi value of BOLT11 bitcoin lightning invoice WITH AMOUNT
+     * Returns satoshi value of BOLT11 bitcoin lightning invoice WITH AMOUNT, returns null otherwise
      *
      * @param lnpr
      */
-    getLightningInvoiceValue(lnpr: string): bigint {
+    getLightningInvoiceValue(lnpr: string): bigint |  null {
         const parsed = bolt11Decode(lnpr);
         if(parsed.millisatoshis!=null) return (BigInt(parsed.millisatoshis) + 999n) / 1000n;
         return null;
@@ -97,8 +97,8 @@ export class SwapperUtils<T extends MultiChain> {
         type: "BITCOIN",
         swapType: SwapType.TO_BTC,
         amount?: TokenAmount
-    } {
-        let _amount: bigint = null;
+    } | null {
+        let _amount: bigint | undefined = undefined;
         if(resultText.includes("?")) {
             const arr = resultText.split("?");
             resultText = arr[0];
@@ -117,16 +117,17 @@ export class SwapperUtils<T extends MultiChain> {
                 address: resultText,
                 type: "BITCOIN",
                 swapType: SwapType.TO_BTC,
-                amount: _amount==null ? null : toTokenAmount(_amount, BitcoinTokens.BTC, this.root.prices)
+                amount: _amount==null ? undefined : toTokenAmount(_amount, BitcoinTokens.BTC, this.root.prices)
             };
         }
+        return null;
     }
 
     private parseLNURLSync(resultText: string): {
         address: string,
         type: "LNURL",
         swapType: null
-    } {
+    } | null {
         if(this.isValidLNURL(resultText)) {
             return {
                 address: resultText,
@@ -134,6 +135,7 @@ export class SwapperUtils<T extends MultiChain> {
                 swapType: null
             };
         }
+        return null;
     }
 
     private async parseLNURL(resultText: string): Promise<{
@@ -144,33 +146,36 @@ export class SwapperUtils<T extends MultiChain> {
         min?: TokenAmount,
         max?: TokenAmount,
         amount?: TokenAmount
-    }> {
+    } | null> {
         if(this.isValidLNURL(resultText)) {
             try {
                 const result = await this.getLNURLTypeAndData(resultText);
                 if(result==null) throw new Error("Invalid LNURL specified!");
+                const swapType = isLNURLPay(result) ? SwapType.TO_BTCLN : isLNURLWithdraw(result) ? SwapType.FROM_BTCLN : null;
+                if(swapType==null) return null;
                 const response = {
                     address: resultText,
                     type: "LNURL",
-                    swapType: isLNURLPay(result) ? SwapType.TO_BTCLN : isLNURLWithdraw(result) ? SwapType.FROM_BTCLN : null,
+                    swapType,
                     lnurl: result
                 } as const;
                 if(result.min===result.max) {
                     return {
                         ...response,
-                        amount: result.min==null ? null : toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices)
+                        amount: result.min==null ? undefined : toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices)
                     }
                 } else {
                     return {
                         ...response,
-                        min: result.min==null ? null : toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices),
-                        max: result.min==null ? null : toTokenAmount(result.max, BitcoinTokens.BTCLN, this.root.prices)
+                        min: result.min==null ? undefined : toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices),
+                        max: result.min==null ? undefined : toTokenAmount(result.max, BitcoinTokens.BTCLN, this.root.prices)
                     }
                 }
             } catch (e) {
                 throw new Error("Failed to contact LNURL service, check your internet connection and retry later.");
             }
         }
+        return null;
     }
 
     private parseLightningInvoice(resultText: string): {
@@ -178,46 +183,41 @@ export class SwapperUtils<T extends MultiChain> {
         type: "LIGHTNING",
         swapType: SwapType.TO_BTCLN,
         amount: TokenAmount
-    } {
+    } | null {
         if(this.isLightningInvoice(resultText)) {
             if(this.isValidLightningInvoice(resultText)) {
-                const amountBN = this.getLightningInvoiceValue(resultText);
+                const amount = this.getLightningInvoiceValue(resultText);
+                if(amount==null) throw new Error();
                 return {
                     address: resultText,
                     type: "LIGHTNING",
                     swapType: SwapType.TO_BTCLN,
-                    amount: toTokenAmount(amountBN, BitcoinTokens.BTCLN, this.root.prices)
+                    amount: toTokenAmount(amount, BitcoinTokens.BTCLN, this.root.prices)
                 }
             } else {
                 throw new Error("Lightning invoice needs to contain an amount!");
             }
         }
+        return null;
     }
 
     private parseSmartchainAddress(resultText: string): {
         address: string,
         type: ChainIds<T>,
-        swapType: SwapType.SPV_VAULT_FROM_BTC,
+        swapType: null,
         min?: TokenAmount,
         max?: TokenAmount
-    } {
+    } | null {
         for(let chainId of this.root.getSmartChains()) {
             if(this.root.chains[chainId].chainInterface.isValidAddress(resultText)) {
-                if(this.root.supportsSwapType(chainId, SwapType.SPV_VAULT_FROM_BTC)) {
-                    return {
-                        address: resultText,
-                        type: chainId,
-                        swapType: SwapType.SPV_VAULT_FROM_BTC
-                    }
-                } else {
-                    return {
-                        address: resultText,
-                        type: chainId,
-                        swapType: null
-                    }
+                return {
+                    address: resultText,
+                    type: chainId,
+                    swapType: null
                 }
             }
         }
+        return null;
     }
 
     /**
@@ -236,7 +236,7 @@ export class SwapperUtils<T extends MultiChain> {
         min?: TokenAmount,
         max?: TokenAmount,
         amount?: TokenAmount
-    }> {
+    } | null> {
         if(addressString.startsWith("bitcoin:")) {
             const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
             if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
@@ -281,7 +281,7 @@ export class SwapperUtils<T extends MultiChain> {
         min?: TokenAmount,
         max?: TokenAmount,
         amount?: TokenAmount
-    } {
+    } | null {
         if(addressString.startsWith("bitcoin:")) {
             const parsedBitcoinAddress = this.parseBitcoinAddress(addressString.substring(8));
             if(parsedBitcoinAddress!=null) return parsedBitcoinAddress;
@@ -361,7 +361,7 @@ export class SwapperUtils<T extends MultiChain> {
         }
 
         return {
-            balance: result.balance==null ? null : toTokenAmount(result.balance, BitcoinTokens.BTC, this.root.prices),
+            balance: toTokenAmount(result.balance, BitcoinTokens.BTC, this.root.prices),
             feeRate: result.feeRate
         }
     }
@@ -394,7 +394,7 @@ export class SwapperUtils<T extends MultiChain> {
                     signer,
                     //Use large amount, such that the fee for wrapping more tokens is always included!
                     await swapContract.createSwapData(
-                        ChainSwapType.HTLC, signer, null, token.address,
+                        ChainSwapType.HTLC, signer, chainInterface.randomAddress(), token.address,
                         0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn,
                         swapContract.getHashForHtlc(randomBytes(32)).toString("hex"),
                         BigIntBufferUtils.fromBuffer(randomBytes(8)), BigInt(Math.floor(Date.now()/1000)),
@@ -411,7 +411,7 @@ export class SwapperUtils<T extends MultiChain> {
             finalBalance = bigIntMax(balance - commitFee, 0n);
         }
 
-        return finalBalance==null ? null : toTokenAmount(finalBalance, token, this.root.prices);
+        return toTokenAmount(finalBalance, token, this.root.prices);
     }
 
     /**

@@ -5,7 +5,7 @@ export type PriceInfoType = {
     differencePPM: bigint;
     satsBaseFee: bigint;
     feePPM: bigint;
-    realPriceUSatPerToken: bigint;
+    realPriceUSatPerToken?: bigint;
     swapPriceUSatPerToken: bigint;
 };
 export declare function isPriceInfoType(obj: any): obj is PriceInfoType;
@@ -35,6 +35,7 @@ export declare abstract class ISwapPrice<T extends MultiChain = MultiChain> {
      * @protected
      */
     protected abstract getUsdPrice(abortSignal?: AbortSignal): Promise<number>;
+    protected getDecimalsThrowing<C extends ChainIds<T>>(chainIdentifier: C, token: string): number;
     /**
      * Recomputes pricing info without fetching the current price
      *
@@ -58,7 +59,7 @@ export declare abstract class ISwapPrice<T extends MultiChain = MultiChain> {
      * @param abortSignal
      * @param preFetchedPrice Already pre-fetched price
      */
-    isValidAmountSend<C extends ChainIds<T>>(chainIdentifier: C, amountSats: bigint, satsBaseFee: bigint, feePPM: bigint, paidToken: bigint, token: string, abortSignal?: AbortSignal, preFetchedPrice?: bigint): Promise<PriceInfoType>;
+    isValidAmountSend<C extends ChainIds<T>>(chainIdentifier: C, amountSats: bigint, satsBaseFee: bigint, feePPM: bigint, paidToken: bigint, token: string, abortSignal?: AbortSignal, preFetchedPrice?: bigint | null): Promise<PriceInfoType>;
     /**
      * Recomputes pricing info without fetching the current price
      *
@@ -82,7 +83,7 @@ export declare abstract class ISwapPrice<T extends MultiChain = MultiChain> {
      * @param abortSignal
      * @param preFetchedPrice Already pre-fetched price
      */
-    isValidAmountReceive<C extends ChainIds<T>>(chainIdentifier: C, amountSats: bigint, satsBaseFee: bigint, feePPM: bigint, receiveToken: bigint, token: string, abortSignal?: AbortSignal, preFetchedPrice?: bigint): Promise<PriceInfoType>;
+    isValidAmountReceive<C extends ChainIds<T>>(chainIdentifier: C, amountSats: bigint, satsBaseFee: bigint, feePPM: bigint, receiveToken: bigint, token: string, abortSignal?: AbortSignal, preFetchedPrice?: bigint | null): Promise<PriceInfoType>;
     preFetchPrice<C extends ChainIds<T>>(chainIdentifier: C, token: string, abortSignal?: AbortSignal): Promise<bigint>;
     preFetchUsdPrice(abortSignal?: AbortSignal): Promise<number>;
     /**
@@ -95,7 +96,7 @@ export declare abstract class ISwapPrice<T extends MultiChain = MultiChain> {
      * @param preFetchedPrice
      * @throws {Error} when token is not found
      */
-    getFromBtcSwapAmount<C extends ChainIds<T>>(chainIdentifier: C, fromAmount: bigint, toToken: string, abortSignal?: AbortSignal, preFetchedPrice?: bigint): Promise<bigint>;
+    getFromBtcSwapAmount<C extends ChainIds<T>>(chainIdentifier: C, fromAmount: bigint, toToken: string, abortSignal?: AbortSignal, preFetchedPrice?: bigint | null): Promise<bigint>;
     /**
      * Returns amount of satoshis that are equivalent to {fromAmount} of {fromToken}
      *

@@ -36,7 +36,7 @@ class IToBTCWrapper extends IEscrowSwapWrapper_1.IEscrowSwapWrapper {
         }).catch(e => {
             this.logger.warn("preFetchIntermediaryReputation(): Error: ", e);
             abortController.abort(e);
-            return null;
+            return undefined;
         });
     }
     /**
@@ -50,30 +50,26 @@ class IToBTCWrapper extends IEscrowSwapWrapper_1.IEscrowSwapWrapper {
      * @returns Fee rate
      */
     preFetchFeeRate(signer, amountData, claimHash, abortController) {
-        return (0, Utils_1.tryWithRetries)(() => this.contract.getInitPayInFeeRate(signer, null, amountData.token, claimHash), null, null, abortController.signal).catch(e => {
+        return (0, Utils_1.tryWithRetries)(() => this.contract.getInitPayInFeeRate(signer, this.chain.randomAddress(), amountData.token, claimHash), undefined, undefined, abortController.signal).catch(e => {
             this.logger.warn("preFetchFeeRate(): Error: ", e);
             abortController.abort(e);
-            return null;
+            return undefined;
         });
     }
     async processEventInitialize(swap, event) {
         if (swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED || swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
-            const swapData = await event.swapData();
-            if (swap.data != null && !swap.data.equals(swapData))
-                return false;
-            if (swap.state === IToBTCSwap_1.ToBTCSwapState.CREATED || swap.state === IToBTCSwap_1.ToBTCSwapState.QUOTE_SOFT_EXPIRED)
-                swap.state = IToBTCSwap_1.ToBTCSwapState.COMMITED;
+            swap.state = IToBTCSwap_1.ToBTCSwapState.COMMITED;
             if (swap.commitTxId == null)
-                swap.commitTxId = event.meta.txId;
-            swap.data = swapData;
+                swap.commitTxId = event.meta?.txId;
             return true;
         }
+        return false;
     }
     processEventClaim(swap, event) {
         if (swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDED && swap.state !== IToBTCSwap_1.ToBTCSwapState.CLAIMED) {
             swap.state = IToBTCSwap_1.ToBTCSwapState.CLAIMED;
             if (swap.claimTxId == null)
-                swap.claimTxId = event.meta.txId;
+                swap.claimTxId = event.meta?.txId;
             swap._setPaymentResult({ secret: event.result, txId: Buffer.from(event.result, "hex").reverse().toString("hex") });
             return Promise.resolve(true);
         }
@@ -83,7 +79,7 @@ class IToBTCWrapper extends IEscrowSwapWrapper_1.IEscrowSwapWrapper {
         if (swap.state !== IToBTCSwap_1.ToBTCSwapState.CLAIMED && swap.state !== IToBTCSwap_1.ToBTCSwapState.REFUNDED) {
             swap.state = IToBTCSwap_1.ToBTCSwapState.REFUNDED;
             if (swap.refundTxId == null)
-                swap.refundTxId = event.meta.txId;
+                swap.refundTxId = event.meta?.txId;
             return Promise.resolve(true);
         }
         return Promise.resolve(false);

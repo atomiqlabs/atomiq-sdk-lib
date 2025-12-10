@@ -13,13 +13,11 @@ function isISwapInit(obj) {
         (obj.url == null || typeof obj.url === 'string') &&
         typeof obj.expiry === 'number' &&
         typeof (obj.swapFee) === "bigint" &&
-        (obj.swapFeeBtc == null || typeof (obj.swapFeeBtc) === "bigint") &&
+        typeof (obj.swapFeeBtc) === "bigint" &&
         (typeof obj.exactIn === 'boolean');
 }
 exports.isISwapInit = isISwapInit;
 function ppmToPercentage(ppm) {
-    if (ppm == null)
-        return null;
     const percentage = Number(ppm) / 10000;
     return {
         ppm,
@@ -33,6 +31,7 @@ class ISwap {
     constructor(wrapper, swapInitOrObj) {
         this.currentVersion = 1;
         this.initiated = false;
+        this.state = 0;
         /**
          * Event emitter emitting "swapState" event when swap's state changes
          */
@@ -40,7 +39,12 @@ class ISwap {
         this.chainIdentifier = wrapper.chainIdentifier;
         this.wrapper = wrapper;
         if (isISwapInit(swapInitOrObj)) {
-            Object.assign(this, swapInitOrObj);
+            this.pricingInfo = swapInitOrObj.pricingInfo;
+            this.url = swapInitOrObj.url;
+            this.expiry = swapInitOrObj.expiry;
+            this.swapFee = swapInitOrObj.swapFee;
+            this.swapFeeBtc = swapInitOrObj.swapFeeBtc;
+            this.exactIn = swapInitOrObj.exactIn;
             this.version = this.currentVersion;
             this.createdAt = Date.now();
             this.randomNonce = (0, Utils_1.randomBytes)(16).toString("hex");
@@ -49,16 +53,19 @@ class ISwap {
             this.expiry = swapInitOrObj.expiry;
             this.url = swapInitOrObj.url;
             this.state = swapInitOrObj.state;
-            this.pricingInfo = {
-                isValid: swapInitOrObj._isValid,
-                differencePPM: swapInitOrObj._differencePPM == null ? null : BigInt(swapInitOrObj._differencePPM),
-                satsBaseFee: swapInitOrObj._satsBaseFee == null ? null : BigInt(swapInitOrObj._satsBaseFee),
-                feePPM: swapInitOrObj._feePPM == null ? null : BigInt(swapInitOrObj._feePPM),
-                realPriceUSatPerToken: swapInitOrObj._realPriceUSatPerToken == null ? null : BigInt(swapInitOrObj._realPriceUSatPerToken),
-                swapPriceUSatPerToken: swapInitOrObj._swapPriceUSatPerToken == null ? null : BigInt(swapInitOrObj._swapPriceUSatPerToken),
-            };
-            this.swapFee = swapInitOrObj.swapFee == null ? null : BigInt(swapInitOrObj.swapFee);
-            this.swapFeeBtc = swapInitOrObj.swapFeeBtc == null ? null : BigInt(swapInitOrObj.swapFeeBtc);
+            if (swapInitOrObj._isValid != null && swapInitOrObj._differencePPM != null && swapInitOrObj._satsBaseFee != null &&
+                swapInitOrObj._feePPM != null && swapInitOrObj._swapPriceUSatPerToken != null) {
+                this.pricingInfo = {
+                    isValid: swapInitOrObj._isValid,
+                    differencePPM: BigInt(swapInitOrObj._differencePPM),
+                    satsBaseFee: BigInt(swapInitOrObj._satsBaseFee),
+                    feePPM: BigInt(swapInitOrObj._feePPM),
+                    realPriceUSatPerToken: (0, Utils_1.toBigInt)(swapInitOrObj._realPriceUSatPerToken),
+                    swapPriceUSatPerToken: BigInt(swapInitOrObj._swapPriceUSatPerToken),
+                };
+            }
+            this.swapFee = (0, Utils_1.toBigInt)(swapInitOrObj.swapFee);
+            this.swapFeeBtc = (0, Utils_1.toBigInt)(swapInitOrObj.swapFeeBtc);
             this.version = swapInitOrObj.version;
             this.initiated = swapInitOrObj.initiated;
             this.exactIn = swapInitOrObj.exactIn;
@@ -99,6 +106,8 @@ class ISwap {
     //////////////////////////////
     //// Pricing
     tryRecomputeSwapPrice() {
+        if (this.pricingInfo == null)
+            return;
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
             if (this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC) {
                 const input = this.getInput();
@@ -115,7 +124,7 @@ class ISwap {
      */
     async refreshPriceData() {
         if (this.pricingInfo == null)
-            return null;
+            return;
         if (this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC) {
             const input = this.getInput();
             this.pricingInfo = await this.wrapper.prices.isValidAmountSend(this.chainIdentifier, this.getOutput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, input.rawAmount, input.token.address);
@@ -129,18 +138,24 @@ class ISwap {
      * Checks if the pricing for the swap is valid, according to max allowed price difference set in the ISwapPrice
      */
     hasValidPrice() {
-        return this.pricingInfo == null ? null : this.pricingInfo.isValid;
+        if (this.pricingInfo == null)
+            throw new Error("Pricing info not found, cannot check price validity!");
+        return this.pricingInfo.isValid;
     }
     /**
      * Returns pricing info about the swap
      */
     getPriceInfo() {
+        if (this.pricingInfo == null)
+            throw new Error("Pricing info not provided and not known!");
         const swapPrice = this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC ?
             100000000000000 / Number(this.pricingInfo.swapPriceUSatPerToken) :
             Number(this.pricingInfo.swapPriceUSatPerToken) / 100000000000000;
-        const marketPrice = this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC ?
-            100000000000000 / Number(this.pricingInfo.realPriceUSatPerToken) :
-            Number(this.pricingInfo.realPriceUSatPerToken) / 100000000000000;
+        let marketPrice;
+        if (this.pricingInfo.realPriceUSatPerToken != null)
+            marketPrice = this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC ?
+                100000000000000 / Number(this.pricingInfo.realPriceUSatPerToken) :
+                Number(this.pricingInfo.realPriceUSatPerToken) / 100000000000000;
         return {
             marketPrice,
             swapPrice,

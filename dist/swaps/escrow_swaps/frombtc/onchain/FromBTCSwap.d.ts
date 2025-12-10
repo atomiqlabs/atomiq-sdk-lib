@@ -1,14 +1,16 @@
-import { IFromBTCSwap } from "../IFromBTCSwap";
+import { IFromBTCSelfInitSwap } from "../IFromBTCSelfInitSwap";
 import { SwapType } from "../../../enums/SwapType";
-import { FromBTCWrapper } from "./FromBTCWrapper";
+import { FromBTCDefinition, FromBTCWrapper } from "./FromBTCWrapper";
 import { ChainType, SwapCommitState, SwapData } from "@atomiqlabs/base";
 import { BtcToken, SCToken, TokenAmount } from "../../../../Tokens";
+import { LoggerType } from "../../../../utils/Utils";
 import { IBitcoinWallet } from "../../../../btc/wallet/IBitcoinWallet";
 import { IBTCWalletSwap } from "../../../IBTCWalletSwap";
 import { Transaction } from "@scure/btc-signer";
 import { MinimalBitcoinWalletInterface, MinimalBitcoinWalletInterfaceWithSigner } from "../../../../btc/wallet/MinimalBitcoinWalletInterface";
 import { IClaimableSwap } from "../../../IClaimableSwap";
 import { IEscrowSelfInitSwapInit } from "../../IEscrowSelfInitSwap";
+import { IAddressSwap } from "../../../IAddressSwap";
 export declare enum FromBTCSwapState {
     FAILED = -4,
     EXPIRED = -3,
@@ -20,15 +22,19 @@ export declare enum FromBTCSwapState {
     CLAIM_CLAIMED = 3
 }
 export type FromBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
+    data: T;
+    feeRate: string;
     address: string;
     amount: bigint;
     requiredConfirmations: number;
 };
 export declare function isFromBTCSwapInit<T extends SwapData>(obj: any): obj is FromBTCSwapInit<T>;
-export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSwap<T, FromBTCSwapState> implements IBTCWalletSwap, IClaimableSwap<T, FromBTCSwapState> {
+export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromBTCSelfInitSwap<T, FromBTCDefinition<T>, FromBTCSwapState> implements IBTCWalletSwap, IClaimableSwap<T, FromBTCDefinition<T>, FromBTCSwapState>, IAddressSwap {
+    protected readonly logger: LoggerType;
     protected readonly inputToken: BtcToken<false>;
     protected readonly TYPE = SwapType.FROM_BTC;
-    readonly wrapper: FromBTCWrapper<T>;
+    readonly data: T["Data"];
+    readonly feeRate: string;
     readonly address: string;
     readonly amount: bigint;
     readonly requiredConfirmations: number;
@@ -36,6 +42,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     vout?: number;
     constructor(wrapper: FromBTCWrapper<T>, init: FromBTCSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCWrapper<T>, obj: any);
+    protected getSwapData(): T["Data"];
     protected upgradeVersion(): void;
     /**
      * Returns bitcoin address where the on-chain BTC should be sent to
@@ -79,7 +86,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * @param abortSignal Abort signal
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitForBitcoinTransaction(updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
+    waitForBitcoinTransaction(updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
     /**
      * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use),
      *  also returns inputs indices that need to be signed by the wallet before submitting the PSBT back to the SDK with
@@ -107,7 +114,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * @param _psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
      */
     submitPsbt(_psbt: Transaction | string): Promise<string>;
-    estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
+    estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>> | null>;
     sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string>;
     /**
      * Executes the swap with the provided bitcoin wallet,
@@ -127,7 +134,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     execute(dstSigner: T["Signer"] | T["NativeSigner"], wallet?: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner | null | undefined, callbacks?: {
         onDestinationCommitSent?: (destinationCommitTxId: string) => void;
         onSourceTransactionSent?: (sourceTxId: string) => void;
-        onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void;
+        onSourceTransactionConfirmationStatus?: (sourceTxId?: string, confirmations?: number, targetConfirations?: number, etaMs?: number) => void;
         onSourceTransactionConfirmed?: (sourceTxId: string) => void;
         onSwapSettled?: (destinationTxId: string) => void;
     }, options?: {
