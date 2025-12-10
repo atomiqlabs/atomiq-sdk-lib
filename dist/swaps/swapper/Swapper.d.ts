@@ -6,7 +6,7 @@ import { ToBTCOptions, ToBTCWrapper } from "../escrow_swaps/tobtc/onchain/ToBTCW
 import { FromBTCLNOptions, FromBTCLNWrapper } from "../escrow_swaps/frombtc/ln/FromBTCLNWrapper";
 import { FromBTCOptions, FromBTCWrapper } from "../escrow_swaps/frombtc/onchain/FromBTCWrapper";
 import { IntermediaryDiscovery, MultichainSwapBounds, SwapBounds } from "../../intermediaries/IntermediaryDiscovery";
-import { ISwap } from "../ISwap";
+import { ISwap, SwapTypeMapping } from "../ISwap";
 import { SwapType } from "../enums/SwapType";
 import { FromBTCLNSwap } from "../escrow_swaps/frombtc/ln/FromBTCLNSwap";
 import { FromBTCSwap } from "../escrow_swaps/frombtc/onchain/FromBTCSwap";
@@ -346,6 +346,15 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
     getSwapById<C extends ChainIds<T>>(id: string, chainId: C, signer?: string): Promise<ISwap<T[C]>>;
+    /**
+     * Returns the swap with a proper return type, or undefined, if not found, or has wrong type
+     *
+     * @param id
+     * @param chainId
+     * @param swapType
+     * @param signer
+     */
+    getTypedSwapById<C extends ChainIds<T>, S extends SwapType>(id: string, chainId: C, swapType: S, signer?: string): Promise<SwapTypeMapping<T[C]>[S] | undefined>;
     private syncSwapsForChain;
     /**
      * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes

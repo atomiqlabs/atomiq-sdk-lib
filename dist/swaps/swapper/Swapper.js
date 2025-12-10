@@ -8,6 +8,7 @@ const FromBTCLNWrapper_1 = require("../escrow_swaps/frombtc/ln/FromBTCLNWrapper"
 const FromBTCWrapper_1 = require("../escrow_swaps/frombtc/onchain/FromBTCWrapper");
 const IntermediaryDiscovery_1 = require("../../intermediaries/IntermediaryDiscovery");
 const bolt11_1 = require("@atomiqlabs/bolt11");
+const ISwap_1 = require("../ISwap");
 const IntermediaryError_1 = require("../../errors/IntermediaryError");
 const SwapType_1 = require("../enums/SwapType");
 const MempoolBtcRelaySynchronizer_1 = require("../../btc/mempool/synchronizer/MempoolBtcRelaySynchronizer");
@@ -1048,6 +1049,42 @@ class Swapper extends events_1.EventEmitter {
             const { unifiedSwapStorage, reviver } = this.chains[chainId];
             return (await unifiedSwapStorage.query([queryParams], reviver))[0];
         }
+    }
+    /**
+     * Returns the swap with a proper return type, or undefined, if not found, or has wrong type
+     *
+     * @param id
+     * @param chainId
+     * @param swapType
+     * @param signer
+     */
+    async getTypedSwapById(id, chainId, swapType, signer) {
+        let _swapType = swapType;
+        if (swapType === SwapType_1.SwapType.FROM_BTC && this.supportsSwapType(chainId, SwapType_1.SwapType.SPV_VAULT_FROM_BTC))
+            _swapType = SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
+        if (swapType === SwapType_1.SwapType.FROM_BTCLN && this.supportsSwapType(chainId, SwapType_1.SwapType.FROM_BTCLN_AUTO))
+            _swapType = SwapType_1.SwapType.FROM_BTCLN_AUTO;
+        const wrapper = this.chains[chainId].wrappers[_swapType];
+        if (wrapper == null)
+            return;
+        const result = wrapper.pendingSwaps.get(id)?.deref();
+        if (result != null) {
+            if (signer != null) {
+                if (result._getInitiator() === signer)
+                    return result;
+            }
+            else {
+                return result;
+            }
+        }
+        const queryParams = [];
+        if (signer != null)
+            queryParams.push({ key: "intiator", value: signer });
+        queryParams.push({ key: "id", value: id });
+        const { unifiedSwapStorage, reviver } = this.chains[chainId];
+        const swap = (await unifiedSwapStorage.query([queryParams], reviver))[0];
+        if ((0, ISwap_1.isSwapType)(swap, swapType))
+            return swap;
     }
     async syncSwapsForChain(chainId, signer) {
         const { unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
