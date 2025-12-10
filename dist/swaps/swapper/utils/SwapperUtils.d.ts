@@ -42,11 +42,11 @@ export declare class SwapperUtils<T extends MultiChain> {
      */
     getLNURLTypeAndData(lnurl: string, shouldRetry?: boolean): Promise<LNURLPay | LNURLWithdraw | null>;
     /**
-     * Returns satoshi value of BOLT11 bitcoin lightning invoice WITH AMOUNT
+     * Returns satoshi value of BOLT11 bitcoin lightning invoice WITH AMOUNT, returns null otherwise
      *
      * @param lnpr
      */
-    getLightningInvoiceValue(lnpr: string): bigint;
+    getLightningInvoiceValue(lnpr: string): bigint | null;
     private parseBitcoinAddress;
     private parseLNURLSync;
     private parseLNURL;
@@ -68,7 +68,7 @@ export declare class SwapperUtils<T extends MultiChain> {
         min?: TokenAmount;
         max?: TokenAmount;
         amount?: TokenAmount;
-    }>;
+    } | null>;
     /**
      * Synchronous general parser for bitcoin addresses, LNURLs, lightning invoices, smart chain addresses, doesn't fetch
      *  LNURL data, reports swapType: null instead to prevent returning a Promise
@@ -84,7 +84,7 @@ export declare class SwapperUtils<T extends MultiChain> {
         min?: TokenAmount;
         max?: TokenAmount;
         amount?: TokenAmount;
-    };
+    } | null;
     /**
      * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
      *  to allow for coinselection algorithm to determine maximum sendable amount there

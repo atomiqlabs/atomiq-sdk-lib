@@ -94,11 +94,17 @@ function getIntermediaryComparator(swapType: SwapType, tokenAddress: string, swa
     }
 
     return (a: Intermediary, b: Intermediary): number => {
+        const aService = a.services[swapType];
+        const bService = b.services[swapType];
+        if(aService==null && bService==null) return 0;
+        if(aService==null) return 1;
+        if(bService==null) return -1;
+
         if(swapAmount==null) {
-            return a.services[swapType].swapFeePPM - b.services[swapType].swapFeePPM;
+            return aService.swapFeePPM - bService.swapFeePPM;
         } else {
-            const feeA = BigInt(a.services[swapType].swapBaseFee) + (swapAmount * BigInt(a.services[swapType].swapFeePPM) / 1000000n);
-            const feeB = BigInt(b.services[swapType].swapBaseFee) + (swapAmount * BigInt(b.services[swapType].swapFeePPM) / 1000000n);
+            const feeA = BigInt(aService.swapBaseFee) + (swapAmount * BigInt(aService.swapFeePPM) / 1000000n);
+            const feeB = BigInt(bService.swapBaseFee) + (swapAmount * BigInt(bService.swapFeePPM) / 1000000n);
 
             return feeA - feeB > 0n ? 1 : feeA === feeB ? 0 : -1;
         }
@@ -190,7 +196,7 @@ export class IntermediaryDiscovery extends EventEmitter {
         //Handle legacy responses
         const info: InfoHandlerResponseEnvelope = JSON.parse(response.envelope);
         for(let swapType in info.services) {
-            const serviceData: SwapHandlerInfoType = info.services[swapType];
+            const serviceData: SwapHandlerInfoType = info.services[swapType as SwapHandlerType]!;
             if(serviceData.chainTokens==null) serviceData.chainTokens = {
                 [DEFAULT_CHAIN]: serviceData.tokens
             };
@@ -205,12 +211,12 @@ export class IntermediaryDiscovery extends EventEmitter {
         };
     }
 
-    private async loadIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary> {
+    private async loadIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary | null> {
         try {
             const nodeInfo = await this.getNodeInfo(url, abortSignal);
             const services: ServicesType = {};
             for(let key in nodeInfo.info.services) {
-                services[swapHandlerTypeToSwapType(key as SwapHandlerType)] = nodeInfo.info.services[key];
+                services[swapHandlerTypeToSwapType(key as SwapHandlerType)] = nodeInfo.info.services[key as SwapHandlerType];
             }
             return new Intermediary(url, nodeInfo.addresses, services);
         } catch (e) {
@@ -233,7 +239,8 @@ export class IntermediaryDiscovery extends EventEmitter {
 
         const promises: Promise<Intermediary | null>[] = urls.map(url => this.loadIntermediary(url, abortSignal));
 
-        const activeNodes: Intermediary[] = (await Promise.all(promises)).filter(intermediary => intermediary!=null);
+        const activeNodes: Intermediary[] = (await Promise.all(promises))
+            .filter(intermediary => intermediary!=null) as Intermediary[];
         if(activeNodes.length===0) throw new Error("No online intermediary found!");
 
         return activeNodes;
@@ -245,7 +252,7 @@ export class IntermediaryDiscovery extends EventEmitter {
      * @param url
      * @param abortSignal
      */
-    getIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary> {
+    getIntermediary(url: string, abortSignal?: AbortSignal): Promise<Intermediary | null> {
         const foundLp = this.intermediaries.find(lp => lp.url===url);
         if(foundLp!=null) return Promise.resolve(foundLp);
         return this.loadIntermediary(url, abortSignal);
@@ -256,7 +263,10 @@ export class IntermediaryDiscovery extends EventEmitter {
      * @param abortSignal
      */
     async reloadIntermediaries(abortSignal?: AbortSignal): Promise<void> {
-        const fetchedIntermediaries = await tryWithRetries<Intermediary[]>(() => this.fetchIntermediaries(abortSignal), null, null, abortSignal);
+        const fetchedIntermediaries = await tryWithRetries<Intermediary[]>(
+            () => this.fetchIntermediaries(abortSignal),
+            undefined, undefined, abortSignal
+        );
         this.intermediaries = fetchedIntermediaries;
         this.emit("added", fetchedIntermediaries);
 
@@ -277,11 +287,10 @@ export class IntermediaryDiscovery extends EventEmitter {
         const bounds: MultichainSwapBounds = {};
 
         this.intermediaries.forEach(intermediary => {
-            for(let swapType in intermediary.services) {
-
-                const swapService: SwapHandlerInfoType = intermediary.services[swapType];
-                bounds[swapType] ??= {};
-                const multichainBounds: MultichainTokenBounds = bounds[swapType];
+            for(let _swapType in intermediary.services) {
+                const swapType = parseInt(_swapType) as SwapType;
+                const swapService: SwapHandlerInfoType = intermediary.services[swapType]!;
+                const multichainBounds: MultichainTokenBounds = (bounds[swapType] ??= {});
                 for(let chainId in swapService.chainTokens) {
                     multichainBounds[chainId] ??= {};
                     const tokenBounds: TokenBounds = multichainBounds[chainId];
@@ -312,12 +321,10 @@ export class IntermediaryDiscovery extends EventEmitter {
         const bounds: SwapBounds = {};
 
         this.intermediaries.forEach(intermediary => {
-            for(let swapType in intermediary.services) {
-
-                const swapService: SwapHandlerInfoType = intermediary.services[swapType];
-                if(bounds[swapType]==null) bounds[swapType] = {};
-                const tokenBounds: TokenBounds = bounds[swapType];
-
+            for(let _swapType in intermediary.services) {
+                const swapType = parseInt(_swapType) as SwapType;
+                const swapService: SwapHandlerInfoType = intermediary.services[swapType]!;
+                const tokenBounds: TokenBounds = (bounds[swapType] ??= {});
                 if(swapService.chainTokens!=null && swapService.chainTokens[chainIdentifier]!=null) {
                     for(let token of swapService.chainTokens[chainIdentifier]) {
                         const tokenMinMax = tokenBounds[token];
@@ -346,17 +353,15 @@ export class IntermediaryDiscovery extends EventEmitter {
      * @param swapType
      * @param token
      */
-    getSwapMinimum(chainIdentifier: string, swapType: SwapType, token: any): number {
+    getSwapMinimum(chainIdentifier: string, swapType: SwapType, token: any): number | null {
         const tokenStr = token.toString();
-        return this.intermediaries.reduce<number>((prevMin, intermediary) => {
+        return this.intermediaries.reduce<number | null>((prevMin: number | null, intermediary: Intermediary) => {
             const swapService = intermediary.services[swapType];
-            if(
-                swapService!=null &&
-                swapService.chainTokens!=null &&
-                swapService.chainTokens[chainIdentifier]!=null &&
-                swapService.chainTokens[chainIdentifier].includes(tokenStr)
-            ) return prevMin==null ? swapService.min : Math.min(prevMin, swapService.min);
-            return prevMin;
+            if(swapService==null) return prevMin;
+            const chainTokens = swapService.chainTokens?.[chainIdentifier];
+            if(chainTokens==null) return prevMin;
+            if(!chainTokens.includes(tokenStr)) return prevMin;
+            return prevMin==null ? swapService.min : Math.min(prevMin, swapService.min);
         }, null);
     }
 
@@ -368,17 +373,15 @@ export class IntermediaryDiscovery extends EventEmitter {
      * @param swapType
      * @param token
      */
-    getSwapMaximum(chainIdentifier: string, swapType: SwapType, token: any): number {
+    getSwapMaximum(chainIdentifier: string, swapType: SwapType, token: any): number | null {
         const tokenStr = token.toString();
-        return this.intermediaries.reduce<number>((prevMax, intermediary) => {
+        return this.intermediaries.reduce<number | null>((prevMax: number | null, intermediary: Intermediary) => {
             const swapService = intermediary.services[swapType];
-            if(
-                swapService!=null &&
-                swapService.chainTokens!=null &&
-                swapService.chainTokens[chainIdentifier]!=null &&
-                swapService.chainTokens[chainIdentifier].includes(tokenStr)
-            ) return prevMax==null ? swapService.max : Math.max(prevMax, swapService.max);
-            return prevMax;
+            if(swapService==null) return prevMax;
+            const chainTokens = swapService.chainTokens?.[chainIdentifier];
+            if(chainTokens==null) return prevMax;
+            if(!chainTokens.includes(tokenStr)) return prevMax;
+            return prevMax==null ? swapService.max : Math.max(prevMax, swapService.max);
         }, null);
     }
 

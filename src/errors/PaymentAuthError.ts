@@ -3,7 +3,7 @@
  */
 export class PaymentAuthError extends Error {
 
-    code: number;
+    code?: number;
     data: any;
 
     constructor(msg: string, code?: number, data?: any) {
@@ -14,7 +14,7 @@ export class PaymentAuthError extends Error {
         Object.setPrototypeOf(this, PaymentAuthError.prototype);
     }
 
-    getCode(): number {
+    getCode(): number | undefined {
         return this.code;
     }
 

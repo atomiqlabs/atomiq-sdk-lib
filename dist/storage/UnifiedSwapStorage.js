@@ -36,18 +36,24 @@ class UnifiedSwapStorage {
      */
     async query(params, reviver) {
         const rawSwaps = await this.storage.query(params);
-        return rawSwaps.map(rawObj => {
+        const result = [];
+        rawSwaps.forEach(rawObj => {
             if (!this.noWeakRefMap) {
                 const savedRef = this.weakRefCache.get(rawObj.id)?.deref();
-                if (savedRef != null)
-                    return savedRef;
+                if (savedRef != null) {
+                    result.push(savedRef);
+                    return;
+                }
                 logger.debug("query(): Reviving new swap instance: " + rawObj.id);
             }
             const value = reviver(rawObj);
+            if (value == null)
+                return;
             if (!this.noWeakRefMap)
                 this.weakRefCache.set(rawObj.id, new WeakRef(value));
-            return value;
+            result.push(value);
         });
+        return result;
     }
     save(value) {
         if (!this.noWeakRefMap)

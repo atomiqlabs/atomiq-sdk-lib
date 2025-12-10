@@ -62,8 +62,7 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
         }
         this.priceApis = priceApis.map(api => {
             return {
-                priceApi: api,
-                operational: null
+                priceApi: api
             };
         });
     }
@@ -82,9 +81,9 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
      * @private
      */
     getMaybeOperationalPriceApis() {
-        let operational = this.priceApis.filter(e => e.operational === true || e.operational === null);
+        let operational = this.priceApis.filter(e => e.operational === true || e.operational === undefined);
         if (operational.length === 0) {
-            this.priceApis.forEach(e => e.operational = null);
+            this.priceApis.forEach(e => e.operational = undefined);
             operational = this.priceApis;
         }
         return operational;
@@ -114,7 +113,8 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
                 }
             })()));
         }
-        catch (e) {
+        catch (_e) {
+            const e = _e;
             if (abortSignal != null)
                 abortSignal.throwIfAborted();
             throw e.find(err => !(err instanceof RequestError_1.RequestError)) || e[0];
@@ -144,12 +144,12 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
                 }
             }
             return await this.fetchPriceFromMaybeOperationalPriceApis(chainIdentifier, token, abortSignal);
-        }, null, RequestError_1.RequestError, abortSignal);
+        }, undefined, RequestError_1.RequestError, abortSignal);
     }
     getDecimals(chainIdentifier, token) {
         if (this.coinsDecimals[chainIdentifier] == null)
             return null;
-        return this.coinsDecimals[chainIdentifier][token.toString()];
+        return this.coinsDecimals[chainIdentifier]?.[token.toString()] ?? null;
     }
     /**
      * Fetches BTC price in USD in parallel from multiple maybe operational price APIs
@@ -174,7 +174,8 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
                 }
             })()));
         }
-        catch (e) {
+        catch (_e) {
+            const e = _e;
             if (abortSignal != null)
                 abortSignal.throwIfAborted();
             throw e.find(err => !(err instanceof RequestError_1.RequestError)) || e[0];
@@ -192,7 +193,7 @@ class RedundantSwapPrice extends ICachedSwapPrice_1.ICachedSwapPrice {
                 });
             }
             return this.fetchUsdPriceFromMaybeOperationalPriceApis(abortSignal);
-        }, null, RequestError_1.RequestError, abortSignal);
+        }, undefined, RequestError_1.RequestError, abortSignal);
     }
 }
 exports.RedundantSwapPrice = RedundantSwapPrice;

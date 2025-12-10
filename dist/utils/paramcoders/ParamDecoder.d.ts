@@ -3,15 +3,15 @@
 import { IParamReader } from "./IParamReader";
 import { Buffer } from "buffer";
 export declare class ParamDecoder implements IParamReader {
-    frameHeader: Buffer;
+    frameHeader?: Buffer;
     frameData: Buffer[];
     frameDataLength: number;
     closed: boolean;
     params: {
         [key: string]: {
             promise: Promise<any>;
-            resolve: (data: any) => void;
-            reject: (err: any) => void;
+            resolve?: (data: any) => void;
+            reject?: (err: any) => void;
         };
     };
     /**

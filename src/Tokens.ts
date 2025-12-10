@@ -130,7 +130,7 @@ export function toTokenAmount<
     token:  T,
     prices: ISwapPrice
 ): TokenAmount<ChainIdentifier, T> {
-    if(amount==null) return null;
+    if(amount==null) return null!; //Shouldn't happen
     let amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
     return {
         rawAmount: amount,

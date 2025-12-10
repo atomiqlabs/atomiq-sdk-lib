@@ -1,5 +1,5 @@
 import {LnForGasSwap, LnForGasSwapInit, LnForGasSwapState} from "./LnForGasSwap";
-import {ISwapWrapper} from "../../ISwapWrapper";
+import {ISwapWrapper, SwapTypeDefinition} from "../../ISwapWrapper";
 import {TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediaryAPI";
 import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
@@ -7,7 +7,9 @@ import {ChainType} from "@atomiqlabs/base";
 import {Intermediary} from "../../../intermediaries/Intermediary";
 import {SwapType} from "../../enums/SwapType";
 
-export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForGasSwap<T>> {
+export type LnForGasSwapTypeDefinition<T extends ChainType> = SwapTypeDefinition<T, LnForGasWrapper<T>, LnForGasSwap<T>>;
+
+export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForGasSwapTypeDefinition<T>> {
     public TYPE = SwapType.TRUSTED_FROM_BTCLN;
     public readonly swapDeserializer = LnForGasSwap;
 
@@ -32,12 +34,14 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
         }, this.options.getRequestTimeout);
 
         const decodedPr = bolt11Decode(resp.pr);
+        if(decodedPr.millisatoshis==null) throw new Error("Invalid payment request returned, no msat amount value!");
+        if(decodedPr.timeExpireDate==null) throw new Error("Invalid payment request returned, no time expire date!");
         const amountIn = (BigInt(decodedPr.millisatoshis) + 999n) / 1000n;
 
         if(resp.total!==amount) throw new IntermediaryError("Invalid total returned");
 
         const pricingInfo = await this.verifyReturnedPrice(
-            typeof(lpOrUrl)==="string" ?
+            typeof(lpOrUrl)==="string" || lpOrUrl.services[SwapType.TRUSTED_FROM_BTCLN]==null ?
                 {swapFeePPM: 10000, swapBaseFee: 10} :
                 lpOrUrl.services[SwapType.TRUSTED_FROM_BTCLN],
             false, amountIn,
@@ -60,7 +64,7 @@ export class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForG
     }
 
     public readonly pendingSwapStates = [LnForGasSwapState.PR_CREATED];
-    public readonly tickSwapState = null;
-    protected processEvent = null;
+    public readonly tickSwapState = undefined;
+    protected processEvent = undefined;
 
 }

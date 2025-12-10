@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FromBTCLNSwap = exports.isFromBTCLNSwapInit = exports.FromBTCLNSwapState = void 0;
 const bolt11_1 = require("@atomiqlabs/bolt11");
-const IFromBTCSwap_1 = require("../IFromBTCSwap");
+const IFromBTCSelfInitSwap_1 = require("../IFromBTCSelfInitSwap");
 const SwapType_1 = require("../../../enums/SwapType");
 const base_1 = require("@atomiqlabs/base");
 const buffer_1 = require("buffer");
@@ -33,7 +33,7 @@ function isFromBTCLNSwapInit(obj) {
         (0, IEscrowSelfInitSwap_1.isIEscrowSelfInitSwapInit)(obj);
 }
 exports.isFromBTCLNSwapInit = isFromBTCLNSwapInit;
-class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
+class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
     getSwapData() {
         return this.data ?? this.initialSwapData;
     }
@@ -47,11 +47,22 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         this.prPosted = false;
         if (isFromBTCLNSwapInit(initOrObject)) {
             this.state = FromBTCLNSwapState.PR_CREATED;
+            this.pr = initOrObject.pr;
+            this.secret = initOrObject.secret;
+            this.initialSwapData = initOrObject.initialSwapData;
+            this.lnurl = initOrObject.lnurl;
+            this.lnurlK1 = initOrObject.lnurlK1;
+            this.lnurlCallback = initOrObject.lnurlCallback;
         }
         else {
             this.pr = initOrObject.pr;
             this.secret = initOrObject.secret;
-            this.initialSwapData = initOrObject.initialSwapData == null ? null : base_1.SwapData.deserialize(initOrObject.initialSwapData);
+            if (initOrObject.initialSwapData == null) {
+                this.initialSwapData = this.data;
+            }
+            else {
+                this.initialSwapData = base_1.SwapData.deserialize(initOrObject.initialSwapData);
+            }
             this.lnurl = initOrObject.lnurl;
             this.lnurlK1 = initOrObject.lnurlK1;
             this.lnurlCallback = initOrObject.lnurlCallback;
@@ -98,9 +109,9 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         return buffer_1.Buffer.concat([paymentHashBuffer, buffer_1.Buffer.from(this.randomNonce, "hex")]);
     }
     getPaymentHash() {
-        if (this.pr == null)
-            return null;
         const decodedPR = (0, bolt11_1.decode)(this.pr);
+        if (decodedPR.tagsObject.payment_hash == null)
+            throw new Error("Swap invoice doesn't contain payment hash field!");
         return buffer_1.Buffer.from(decodedPR.tagsObject.payment_hash, "hex");
     }
     canCommit() {
@@ -123,9 +134,9 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
      *  if the LP doesn't make it expired sooner
      */
     getDefinitiveExpiryTime() {
-        if (this.pr == null)
-            return null;
         const decoded = (0, bolt11_1.decode)(this.pr);
+        if (decoded.timeExpireDate == null)
+            throw new Error("Swap invoice doesn't contain expiry date field!");
         const finalCltvExpiryDelta = decoded.tagsObject.min_final_cltv_expiry ?? 144;
         const finalCltvExpiryDelay = finalCltvExpiryDelta * this.wrapper.options.bitcoinBlocktime * this.wrapper.options.safetyFactor;
         return (decoded.timeExpireDate + finalCltvExpiryDelay) * 1000;
@@ -134,15 +145,17 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
      * Returns timeout time (in UNIX milliseconds) when the LN invoice will expire
      */
     getTimeoutTime() {
-        if (this.pr == null)
-            return null;
         const decoded = (0, bolt11_1.decode)(this.pr);
+        if (decoded.timeExpireDate == null)
+            throw new Error("Swap invoice doesn't contain expiry date field!");
         return (decoded.timeExpireDate * 1000);
     }
     /**
      * Returns timeout time (in UNIX milliseconds) when the swap htlc will expire
      */
     getHtlcTimeoutTime() {
+        if (this.data == null)
+            return -1;
         return Number(this.wrapper.getHtlcTimeout(this.data)) * 1000;
     }
     isFinished() {
@@ -180,6 +193,8 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     //// Amounts & fees
     getInput() {
         const parsed = (0, bolt11_1.decode)(this.pr);
+        if (parsed.millisatoshis == null)
+            throw new Error("Swap invoice doesn't contain msat amount field!");
         const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
         return (0, Tokens_1.toTokenAmount)(amount, this.inputToken, this.wrapper.prices);
     }
@@ -233,7 +248,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                     const abortController = new AbortController();
                     paymentPromise.catch(e => abortController.abort(e));
                     if (options?.abortSignal != null)
-                        options.abortSignal.addEventListener("abort", () => abortController.abort(options.abortSignal.reason));
+                        options.abortSignal.addEventListener("abort", () => abortController.abort(options?.abortSignal?.reason));
                     abortSignal = abortController.signal;
                 }
             }
@@ -285,7 +300,6 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                     await this.checkIntermediaryReturnedAuthData(this._getInitiator(), data, resp.data);
                     this.expiry = await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getInitAuthorizationExpiry(data, resp.data));
                     this.state = FromBTCLNSwapState.PR_PAID;
-                    delete this.initialSwapData;
                     this.data = data;
                     this.signatureData = {
                         prefix: resp.data.prefix,
@@ -343,7 +357,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         if (data.hasSuccessAction())
             throw new IntermediaryError_1.IntermediaryError("Invalid has success action");
         await Promise.all([
-            (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this._getInitiator(), data, signature, this.feeRate), null, base_1.SignatureVerificationError),
+            (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidInitAuthorization(this._getInitiator(), data, signature, this.feeRate), undefined, base_1.SignatureVerificationError),
             (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.getCommitStatus(data.getClaimer(), data)).then(status => {
                 if (status?.type !== base_1.SwapCommitStateType.NOT_COMMITED)
                     throw new Error("Swap already committed on-chain!");
@@ -366,7 +380,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         if (abortSignal != null)
             abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));
         let save = false;
-        if (this.lnurl != null && !this.prPosted) {
+        if (this.lnurl != null && this.lnurlK1 != null && this.lnurlCallback != null && !this.prPosted) {
             LNURL_1.LNURL.postInvoiceToLNURLWithdraw({ k1: this.lnurlK1, callback: this.lnurlCallback }, this.pr).catch(e => {
                 this.lnurlFailSignal.abort(e);
             });
@@ -398,7 +412,6 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             if (onPaymentReceived != null)
                 onPaymentReceived(this.getInputTxId());
             if (this.state === FromBTCLNSwapState.PR_CREATED || this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED) {
-                delete this.initialSwapData;
                 this.data = swapData;
                 this.signatureData = {
                     prefix: sigData.prefix,
@@ -415,6 +428,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             }
             return false;
         }
+        throw new IntermediaryError_1.IntermediaryError("Invalid response from the LP");
     }
     //////////////////////////////
     //// Commit
@@ -485,6 +499,8 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     async txsClaim(_signer) {
         if (this.state !== FromBTCLNSwapState.CLAIM_COMMITED)
             throw new Error("Must be in CLAIM_COMMITED state!");
+        if (this.data == null)
+            throw new Error("Unknown data, wrong state?");
         return await this.wrapper.contract.txsClaimWithSecret(_signer == null ?
             this._getInitiator() :
             ((0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer)), this.data, this.secret, true, true);
@@ -569,7 +585,8 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
         if (res?.type === base_1.SwapCommitStateType.NOT_COMMITED || res?.type === base_1.SwapCommitStateType.EXPIRED) {
             if (this.state !== FromBTCLNSwapState.CLAIM_CLAIMED &&
                 this.state !== FromBTCLNSwapState.FAILED) {
-                this.refundTxId = res.getRefundTxId == null ? null : await res.getRefundTxId();
+                if (res.getRefundTxId != null)
+                    this.refundTxId = await res.getRefundTxId();
                 await this._saveAndEmit(FromBTCLNSwapState.FAILED);
             }
             throw new Error("Swap expired while waiting for claim!");
@@ -609,10 +626,13 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
     async txsCommitAndClaim(skipChecks) {
         if (this.state === FromBTCLNSwapState.CLAIM_COMMITED)
             return await this.txsClaim();
-        if (this.state !== FromBTCLNSwapState.PR_PAID && (this.state !== FromBTCLNSwapState.QUOTE_SOFT_EXPIRED || this.signatureData == null))
+        if (this.state !== FromBTCLNSwapState.PR_PAID &&
+            (this.state !== FromBTCLNSwapState.QUOTE_SOFT_EXPIRED || this.signatureData == null))
             throw new Error("Must be in PR_PAID state!");
+        if (this.data == null)
+            throw new Error("Unknown data, wrong state?");
         const initTxs = await this.txsCommit(skipChecks);
-        const claimTxs = await this.wrapper.contract.txsClaimWithSecret(this._getInitiator(), this.data, this.secret, true, true, null, true);
+        const claimTxs = await this.wrapper.contract.txsClaimWithSecret(this._getInitiator(), this.data, this.secret, true, true, undefined);
         return initTxs.concat(claimTxs);
     }
     /**
@@ -634,7 +654,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             throw new Error("Cannot commitAndClaim in single action, please run commit and claim separately!");
         this.checkSigner(signer);
         if (this.state === FromBTCLNSwapState.CLAIM_COMMITED)
-            return [null, await this.claim(signer, abortSignal, onBeforeClaimTxSent)];
+            return [await this.claim(signer, abortSignal, onBeforeClaimTxSent)];
         let txCount = 0;
         const txs = await this.txsCommitAndClaim(skipChecks);
         const result = await this.wrapper.chain.sendAndConfirm(signer, txs, true, abortSignal, undefined, (txId) => {
@@ -664,7 +684,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
      * Gets the used LNURL or null if this is not an LNURL-withdraw swap
      */
     getLNURL() {
-        return this.lnurl;
+        return this.lnurl ?? null;
     }
     /**
      * Pay the generated lightning network invoice with LNURL-withdraw
@@ -700,7 +720,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
             lnurlK1: this.lnurlK1,
             lnurlCallback: this.lnurlCallback,
             prPosted: this.prPosted,
-            initialSwapData: this.initialSwapData == null ? null : this.initialSwapData.serialize()
+            initialSwapData: this.initialSwapData.serialize()
         };
     }
     //////////////////////////////
@@ -759,6 +779,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                 return true;
             }
         }
+        return false;
     }
     _shouldFetchExpiryStatus() {
         return this.state === FromBTCLNSwapState.PR_PAID || (this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData != null);
@@ -827,6 +848,7 @@ class FromBTCLNSwap extends IFromBTCSwap_1.IFromBTCSwap {
                 }
                 break;
         }
+        return false;
     }
 }
 exports.FromBTCLNSwap = FromBTCLNSwap;

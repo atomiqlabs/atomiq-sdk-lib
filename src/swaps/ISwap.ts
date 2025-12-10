@@ -1,9 +1,9 @@
 import {SwapType} from "./enums/SwapType";
 import {EventEmitter} from "events";
-import {ISwapWrapper} from "./ISwapWrapper";
+import {ISwapWrapper, SwapTypeDefinition} from "./ISwapWrapper";
 import {ChainType} from "@atomiqlabs/base";
 import {isPriceInfoType, PriceInfoType} from "../prices/abstract/ISwapPrice";
-import {LoggerType, randomBytes} from "../utils/Utils";
+import {LoggerType, randomBytes, toBigInt} from "../utils/Utils";
 import {SCToken, TokenAmount} from "../Tokens";
 import {SwapDirection} from "./enums/SwapDirection";
 import {Fee, FeeBreakdown} from "./fee/Fee";
@@ -13,7 +13,7 @@ export type ISwapInit = {
     url: string,
     expiry: number,
     swapFee: bigint,
-    swapFeeBtc?: bigint,
+    swapFeeBtc: bigint,
     exactIn: boolean
 };
 
@@ -24,7 +24,7 @@ export function isISwapInit(obj: any): obj is ISwapInit {
         typeof obj.url === 'string' &&
         typeof obj.expiry === 'number' &&
         typeof(obj.swapFee) === "bigint" &&
-        (obj.swapFeeBtc == null || typeof(obj.swapFeeBtc) === "bigint") &&
+        typeof(obj.swapFeeBtc) === "bigint" &&
         (typeof obj.exactIn === 'boolean');
 }
 
@@ -36,7 +36,6 @@ export type PercentagePPM = {
 };
 
 export function ppmToPercentage(ppm: bigint): PercentagePPM {
-    if(ppm==null) return null;
     const percentage = Number(ppm)/10_000;
     return {
         ppm,
@@ -48,11 +47,15 @@ export function ppmToPercentage(ppm: bigint): PercentagePPM {
 
 export abstract class ISwap<
     T extends ChainType = ChainType,
+    D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D, S>> = SwapTypeDefinition<T, ISwapWrapper<T, any>, ISwap<T, any, any>>,
     S extends number = number
 > {
     protected readonly abstract TYPE: SwapType;
+    protected readonly abstract logger: LoggerType;
+
     protected readonly currentVersion: number = 1;
-    protected readonly wrapper: ISwapWrapper<T, ISwap<T, S>>;
+    protected readonly wrapper: D["Wrapper"];
+
     readonly url: string;
 
     readonly chainIdentifier: T["ChainId"];
@@ -61,14 +64,13 @@ export abstract class ISwap<
 
     protected version: number;
     protected initiated: boolean = false;
-    protected logger: LoggerType;
 
-    expiry?: number;
-    state: S;
-    pricingInfo: PriceInfoType;
+    state: S = 0 as S;
+    expiry: number;
+    pricingInfo?: PriceInfoType;
 
     protected swapFee: bigint;
-    protected swapFeeBtc?: bigint;
+    protected swapFeeBtc: bigint;
 
     /**
      * Random nonce to differentiate the swap from others with the same identifier hash (i.e. when quoting the same swap
@@ -79,18 +81,23 @@ export abstract class ISwap<
     /**
      * Event emitter emitting "swapState" event when swap's state changes
      */
-    events: EventEmitter<{swapState: [ISwap]}> = new EventEmitter();
+    events: EventEmitter<{swapState: [D["Swap"]]}> = new EventEmitter();
 
-    protected constructor(wrapper: ISwapWrapper<T, ISwap<T, S>>, obj: any);
-    protected constructor(wrapper: ISwapWrapper<T, ISwap<T, S>>, swapInit: ISwapInit);
+    protected constructor(wrapper: D["Wrapper"], obj: any);
+    protected constructor(wrapper: D["Wrapper"], swapInit: ISwapInit);
     protected constructor(
-        wrapper: ISwapWrapper<T, ISwap<T, S>>,
+        wrapper: D["Wrapper"],
         swapInitOrObj: ISwapInit | any,
     ) {
         this.chainIdentifier = wrapper.chainIdentifier;
         this.wrapper = wrapper;
         if(isISwapInit(swapInitOrObj)) {
-            Object.assign(this, swapInitOrObj);
+            this.pricingInfo = swapInitOrObj.pricingInfo;
+            this.url = swapInitOrObj.url;
+            this.expiry = swapInitOrObj.expiry;
+            this.swapFee = swapInitOrObj.swapFee;
+            this.swapFeeBtc = swapInitOrObj.swapFeeBtc;
+            this.exactIn = swapInitOrObj.exactIn;
             this.version = this.currentVersion;
             this.createdAt = Date.now();
             this.randomNonce = randomBytes(16).toString("hex");
@@ -100,17 +107,22 @@ export abstract class ISwap<
 
             this.state = swapInitOrObj.state;
 
-            this.pricingInfo = {
-                isValid: swapInitOrObj._isValid,
-                differencePPM: swapInitOrObj._differencePPM==null ? null : BigInt(swapInitOrObj._differencePPM),
-                satsBaseFee: swapInitOrObj._satsBaseFee==null ? null : BigInt(swapInitOrObj._satsBaseFee),
-                feePPM: swapInitOrObj._feePPM==null ? null : BigInt(swapInitOrObj._feePPM),
-                realPriceUSatPerToken: swapInitOrObj._realPriceUSatPerToken==null ? null : BigInt(swapInitOrObj._realPriceUSatPerToken),
-                swapPriceUSatPerToken: swapInitOrObj._swapPriceUSatPerToken==null ? null : BigInt(swapInitOrObj._swapPriceUSatPerToken),
-            };
+            if(
+                swapInitOrObj._isValid!=null && swapInitOrObj._differencePPM!=null && swapInitOrObj._satsBaseFee!=null &&
+                swapInitOrObj._feePPM!=null && swapInitOrObj._swapPriceUSatPerToken!=null
+            ) {
+                this.pricingInfo = {
+                    isValid: swapInitOrObj._isValid,
+                    differencePPM: BigInt(swapInitOrObj._differencePPM),
+                    satsBaseFee: BigInt(swapInitOrObj._satsBaseFee),
+                    feePPM: BigInt(swapInitOrObj._feePPM),
+                    realPriceUSatPerToken: toBigInt(swapInitOrObj._realPriceUSatPerToken),
+                    swapPriceUSatPerToken: BigInt(swapInitOrObj._swapPriceUSatPerToken),
+                };
+            }
 
-            this.swapFee = swapInitOrObj.swapFee==null ? null : BigInt(swapInitOrObj.swapFee);
-            this.swapFeeBtc = swapInitOrObj.swapFeeBtc==null ? null : BigInt(swapInitOrObj.swapFeeBtc);
+            this.swapFee = toBigInt(swapInitOrObj.swapFee);
+            this.swapFeeBtc = toBigInt(swapInitOrObj.swapFeeBtc);
 
             this.version = swapInitOrObj.version;
             this.initiated = swapInitOrObj.initiated;
@@ -137,7 +149,7 @@ export abstract class ISwap<
      */
     protected waitTillState(targetState: S, type: "eq" | "gte" | "neq" = "eq", abortSignal?: AbortSignal): Promise<void> {
         return new Promise((resolve, reject) => {
-            let listener;
+            let listener: (swap: D["Swap"]) => void;
             listener = (swap) => {
                 if(type==="eq" ? swap.state===targetState : type==="gte" ? swap.state>=targetState : swap.state!=targetState) {
                     resolve();
@@ -157,6 +169,7 @@ export abstract class ISwap<
     //// Pricing
 
     protected tryRecomputeSwapPrice(): void {
+        if(this.pricingInfo==null) return;
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
             if(this.getDirection()===SwapDirection.TO_BTC) {
                 const input = this.getInput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
@@ -186,7 +199,7 @@ export abstract class ISwap<
      * Re-fetches & revalidates the price data
      */
     async refreshPriceData(): Promise<void> {
-        if(this.pricingInfo==null) return null;
+        if(this.pricingInfo==null) return;
         if(this.getDirection()===SwapDirection.TO_BTC) {
             const input = this.getInput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
             this.pricingInfo = await this.wrapper.prices.isValidAmountSend(
@@ -214,23 +227,29 @@ export abstract class ISwap<
      * Checks if the pricing for the swap is valid, according to max allowed price difference set in the ISwapPrice
      */
     hasValidPrice(): boolean {
-        return this.pricingInfo==null ? null : this.pricingInfo.isValid;
+        if(this.pricingInfo==null) throw new Error("Pricing info not found, cannot check price validity!");
+        return this.pricingInfo.isValid;
     }
 
     /**
      * Returns pricing info about the swap
      */
     getPriceInfo(): {
-        marketPrice: number,
+        marketPrice?: number,
         swapPrice: number,
         difference: PercentagePPM
     } {
+        if(this.pricingInfo==null) throw new Error("Pricing info not provided and not known!");
+
         const swapPrice = this.getDirection()===SwapDirection.TO_BTC ?
             100_000_000_000_000/Number(this.pricingInfo.swapPriceUSatPerToken) :
             Number(this.pricingInfo.swapPriceUSatPerToken)/100_000_000_000_000;
-        const marketPrice = this.getDirection()===SwapDirection.TO_BTC ?
-            100_000_000_000_000/Number(this.pricingInfo.realPriceUSatPerToken) :
-            Number(this.pricingInfo.realPriceUSatPerToken)/100_000_000_000_000;
+
+        let marketPrice: number | undefined;
+        if(this.pricingInfo.realPriceUSatPerToken!=null)
+            marketPrice = this.getDirection()===SwapDirection.TO_BTC ?
+                100_000_000_000_000/Number(this.pricingInfo.realPriceUSatPerToken) :
+                Number(this.pricingInfo.realPriceUSatPerToken)/100_000_000_000_000;
 
         return {
             marketPrice,
@@ -243,7 +262,7 @@ export abstract class ISwap<
     //////////////////////////////
     //// Getters & utils
 
-    abstract _getEscrowHash(): string;
+    abstract _getEscrowHash(): string | null;
 
     /**
      * @param signer Signer to check with this swap's initiator

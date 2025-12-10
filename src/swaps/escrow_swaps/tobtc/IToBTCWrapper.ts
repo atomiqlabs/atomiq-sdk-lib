@@ -1,17 +1,19 @@
 import {IToBTCSwap, ToBTCSwapState} from "./IToBTCSwap";
 import {ChainType, ClaimEvent, InitializeEvent, RefundEvent} from "@atomiqlabs/base";
-import {AmountData, ISwapWrapperOptions} from "../../ISwapWrapper";
+import {AmountData, ISwapWrapperOptions, SwapTypeDefinition} from "../../ISwapWrapper";
 import {tryWithRetries} from "../../../utils/Utils";
 import {Intermediary, SingleChainReputationType} from "../../../intermediaries/Intermediary";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {IEscrowSwapWrapper} from "../IEscrowSwapWrapper";
 
 
+export type IToBTCDefinition<T extends ChainType, W extends IToBTCWrapper<T, any>, S extends IToBTCSwap<T>> = SwapTypeDefinition<T, W, S>;
+
 export abstract class IToBTCWrapper<
     T extends ChainType,
-    S extends IToBTCSwap<T> = IToBTCSwap<T>,
+    D extends IToBTCDefinition<T, IToBTCWrapper<T, D>, IToBTCSwap<T, D>>,
     O extends ISwapWrapperOptions = ISwapWrapperOptions
-> extends IEscrowSwapWrapper<T, S, O> {
+> extends IEscrowSwapWrapper<T, D, O> {
 
     /**
      * Pre-fetches intermediary's reputation, doesn't throw, instead aborts via abortController and returns null
@@ -27,14 +29,14 @@ export abstract class IToBTCWrapper<
         amountData: Omit<AmountData, "amount">,
         lp: Intermediary,
         abortController: AbortController
-    ): Promise<SingleChainReputationType | null> {
+    ): Promise<SingleChainReputationType | undefined> {
         return lp.getReputation(this.chainIdentifier, this.contract, [amountData.token.toString()], abortController.signal).then(res => {
             if(res==null) throw new IntermediaryError("Invalid data returned - invalid LP vault");
             return res;
         }).catch(e => {
             this.logger.warn("preFetchIntermediaryReputation(): Error: ", e);
             abortController.abort(e);
-            return null;
+            return undefined;
         });
     }
 
@@ -48,14 +50,14 @@ export abstract class IToBTCWrapper<
      * @protected
      * @returns Fee rate
      */
-    protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, claimHash: string | null, abortController: AbortController): Promise<any | null> {
+    protected preFetchFeeRate(signer: string, amountData: Omit<AmountData, "amount">, claimHash: string | undefined, abortController: AbortController): Promise<string | undefined> {
         return tryWithRetries(
-            () => this.contract.getInitPayInFeeRate(signer, null, amountData.token, claimHash),
-            null, null, abortController.signal
+            () => this.contract.getInitPayInFeeRate(signer, this.chain.randomAddress(), amountData.token, claimHash),
+            undefined, undefined, abortController.signal
         ).catch(e => {
             this.logger.warn("preFetchFeeRate(): Error: ", e);
             abortController.abort(e);
-            return null;
+            return undefined;
         });
     }
 
@@ -69,31 +71,29 @@ export abstract class IToBTCWrapper<
     public readonly tickSwapState = [ToBTCSwapState.CREATED, ToBTCSwapState.COMMITED, ToBTCSwapState.SOFT_CLAIMED];
     public readonly refundableSwapStates = [ToBTCSwapState.REFUNDABLE];
 
-    protected async processEventInitialize(swap: S, event: InitializeEvent<T["Data"]>): Promise<boolean> {
+    protected async processEventInitialize(swap: D["Swap"], event: InitializeEvent<T["Data"]>): Promise<boolean> {
         if(swap.state===ToBTCSwapState.CREATED || swap.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) {
-            const swapData = await event.swapData();
-            if(swap.data!=null && !swap.data.equals(swapData)) return false;
-            if(swap.state===ToBTCSwapState.CREATED || swap.state===ToBTCSwapState.QUOTE_SOFT_EXPIRED) swap.state = ToBTCSwapState.COMMITED;
-            if(swap.commitTxId==null) swap.commitTxId = event.meta.txId;
-            swap.data = swapData;
+            swap.state = ToBTCSwapState.COMMITED;
+            if(swap.commitTxId==null) swap.commitTxId = event.meta?.txId;
             return true;
         }
+        return false;
     }
 
-    protected processEventClaim(swap: S, event: ClaimEvent<T["Data"]>): Promise<boolean> {
+    protected processEventClaim(swap: D["Swap"], event: ClaimEvent<T["Data"]>): Promise<boolean> {
         if(swap.state!==ToBTCSwapState.REFUNDED && swap.state!==ToBTCSwapState.CLAIMED) {
             swap.state = ToBTCSwapState.CLAIMED;
-            if(swap.claimTxId==null) swap.claimTxId = event.meta.txId;
+            if(swap.claimTxId==null) swap.claimTxId = event.meta?.txId;
             swap._setPaymentResult({secret: event.result, txId: Buffer.from(event.result, "hex").reverse().toString("hex")});
             return Promise.resolve(true);
         }
         return Promise.resolve(false);
     }
 
-    protected processEventRefund(swap: S, event: RefundEvent<T["Data"]>): Promise<boolean> {
+    protected processEventRefund(swap: D["Swap"], event: RefundEvent<T["Data"]>): Promise<boolean> {
         if(swap.state!==ToBTCSwapState.CLAIMED && swap.state!==ToBTCSwapState.REFUNDED) {
             swap.state = ToBTCSwapState.REFUNDED;
-            if(swap.refundTxId==null) swap.refundTxId = event.meta.txId;
+            if(swap.refundTxId==null) swap.refundTxId = event.meta?.txId;
             return Promise.resolve(true);
         }
         return Promise.resolve(false);

@@ -45,7 +45,7 @@ declare function transactionBytes(inputs: {
 }[], outputs: {
     script?: Buffer;
     type?: CoinselectAddressTypes;
-}[], changeType: CoinselectAddressTypes): number;
+}[], changeType?: CoinselectAddressTypes): number;
 declare function uintOrNaN(v: number): number;
 declare function sumForgiving(range: {
     value: number;

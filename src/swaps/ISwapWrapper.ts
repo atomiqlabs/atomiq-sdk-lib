@@ -21,7 +21,7 @@ import {UnifiedSwapStorage} from "../storage/UnifiedSwapStorage";
 export type AmountData = {
     amount: bigint,
     token: string,
-    exactIn?: boolean
+    exactIn: boolean
 }
 
 export type ISwapWrapperOptions = {
@@ -39,15 +39,20 @@ export type WrapperCtorTokens<T extends MultiChain = MultiChain> = {
     }}
 }[];
 
+export type SwapTypeDefinition<T extends ChainType, W extends ISwapWrapper<T, any>, S extends ISwap<T>> = {
+    Wrapper: W;
+    Swap: S;
+};
+
 export abstract class ISwapWrapper<
     T extends ChainType,
-    S extends ISwap<T>,
+    D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D>>,
     O extends ISwapWrapperOptions = ISwapWrapperOptions
 > {
     abstract readonly TYPE: SwapType;
     protected readonly logger = getLogger(this.constructor.name+": ");
 
-    public readonly abstract swapDeserializer: new (wrapper: ISwapWrapper<T, S, O>, data: any) => S;
+    public readonly abstract swapDeserializer: new (wrapper: D["Wrapper"], data: any) => D["Swap"];
 
     readonly unifiedStorage: UnifiedSwapStorage<T>;
     readonly unifiedChainEvents: UnifiedSwapEventListener<T>;
@@ -55,15 +60,15 @@ export abstract class ISwapWrapper<
     readonly chainIdentifier: T["ChainId"];
     readonly chain: T["ChainInterface"];
     readonly prices: ISwapPrice;
-    readonly events: EventEmitter<{swapState: [ISwap]}>;
+    readonly events: EventEmitter<{swapState: [D["Swap"]]}>;
     readonly options: O;
     readonly tokens: {
         [tokenAddress: string]: SCToken<T["ChainId"]>
     };
-    readonly pendingSwaps: Map<string, WeakRef<S>> = new Map();
+    readonly pendingSwaps: Map<string, WeakRef<D["Swap"]>> = new Map();
 
     isInitialized: boolean = false;
-    tickInterval: NodeJS.Timeout = null;
+    tickInterval?: NodeJS.Timeout;
 
     /**
      * @param chainIdentifier
@@ -117,10 +122,10 @@ export abstract class ISwapWrapper<
      * @protected
      * @returns Price of the token in uSats (micro sats)
      */
-    protected preFetchPrice(amountData: { token: string }, abortSignal?: AbortSignal): Promise<bigint | null> {
+    protected preFetchPrice(amountData: { token: string }, abortSignal?: AbortSignal): Promise<bigint | undefined> {
         return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
             this.logger.error("preFetchPrice(): Error: ", e);
-            return null;
+            return undefined;
         });
     }
 
@@ -148,12 +153,12 @@ export abstract class ISwapWrapper<
         feeData: {
             networkFee?: bigint
         },
-        pricePrefetchPromise: Promise<bigint> = Promise.resolve(null),
+        pricePrefetchPromise: Promise<bigint | undefined> = Promise.resolve(undefined),
         abortSignal?: AbortSignal
     ): Promise<PriceInfoType> {
         const swapBaseFee = BigInt(lpServiceData.swapBaseFee);
         const swapFeePPM = BigInt(lpServiceData.swapFeePPM);
-        if(send) amountToken = amountToken - feeData.networkFee;
+        if(send && feeData.networkFee!=null) amountToken = amountToken - feeData.networkFee;
 
         const isValidAmount = await (
             send ?
@@ -165,8 +170,8 @@ export abstract class ISwapWrapper<
         return isValidAmount;
     }
 
-    public abstract readonly pendingSwapStates: Array<S["state"]>;
-    public abstract readonly tickSwapState: Array<S["state"]>;
+    public abstract readonly pendingSwapStates: Array<D["Swap"]["state"]>;
+    public abstract readonly tickSwapState?: Array<D["Swap"]["state"]>;
 
     /**
      * Processes a single SC on-chain event
@@ -174,7 +179,7 @@ export abstract class ISwapWrapper<
      * @param event
      * @param swap
      */
-    protected abstract processEvent?(event: ChainEvent<T["Data"]>, swap: S): Promise<boolean>;
+    protected abstract processEvent?(event: ChainEvent<T["Data"]>, swap: D["Swap"]): Promise<void>;
 
     /**
      * Initializes the swap wrapper, needs to be called before any other action can be taken
@@ -182,23 +187,21 @@ export abstract class ISwapWrapper<
     public async init(noTimers: boolean = false, noCheckPastSwaps: boolean = false): Promise<void> {
         if(this.isInitialized) return;
 
-        const hasEventListener = this.processEvent!=null;
-
         //Save events received in the meantime into the event queue and process them only after we've checked and
         // processed all the past swaps
         let eventQueue: {
             event: ChainEvent<T["Data"]>,
-            swap: S
+            swap: D["Swap"]
         }[] = [];
-        const initListener = (event: SwapEvent<T["Data"]>, swap: S) => {
+        const initListener = (event: ChainEvent<T["Data"]>, swap: D["Swap"]) => {
             eventQueue.push({event, swap});
             return Promise.resolve();
         }
-        if(hasEventListener) this.unifiedChainEvents.registerListener(this.TYPE, initListener, this.swapDeserializer.bind(null, this));
+        if(this.processEvent!=null) this.unifiedChainEvents.registerListener(this.TYPE, initListener, this.swapDeserializer.bind(null, this));
 
         if(!noCheckPastSwaps) await this.checkPastSwaps();
 
-        if(hasEventListener) {
+        if(this.processEvent!=null) {
             //Process accumulated event queue
             for(let event of eventQueue) {
                 await this.processEvent(event.event, event.swap);
@@ -223,11 +226,11 @@ export abstract class ISwapWrapper<
         }, 1000);
     }
 
-    protected async _checkPastSwaps(pastSwaps: S[]): Promise<{changedSwaps: S[], removeSwaps: S[]}> {
-        const changedSwaps: S[] = [];
-        const removeSwaps: S[] = [];
+    protected async _checkPastSwaps(pastSwaps: D["Swap"][]): Promise<{changedSwaps: D["Swap"][], removeSwaps: D["Swap"][]}> {
+        const changedSwaps: D["Swap"][] = [];
+        const removeSwaps: D["Swap"][] = [];
 
-        await Promise.all(pastSwaps.map((swap: S) =>
+        await Promise.all(pastSwaps.map((swap: D["Swap"]) =>
             swap._sync(false).then(changed => {
                 if(swap.isQuoteExpired()) {
                     removeSwaps.push(swap);
@@ -241,8 +244,8 @@ export abstract class ISwapWrapper<
         return {changedSwaps, removeSwaps};
     }
 
-    async checkPastSwaps(pastSwaps?: S[], noSave?: boolean): Promise<{ removeSwaps: S[], changedSwaps: S[] }> {
-        if (pastSwaps == null) pastSwaps = await this.unifiedStorage.query<S>(
+    async checkPastSwaps(pastSwaps?: D["Swap"][], noSave?: boolean): Promise<{ removeSwaps: D["Swap"][], changedSwaps: D["Swap"][] }> {
+        if (pastSwaps == null) pastSwaps = await this.unifiedStorage.query<D["Swap"]>(
             [[{key: "type", value: this.TYPE}, {key: "state", value: this.pendingSwapStates}]],
             (val: any) => new this.swapDeserializer(this, val)
         );
@@ -260,8 +263,8 @@ export abstract class ISwapWrapper<
         }
     }
 
-    async tick(swaps?: S[]): Promise<void> {
-        if(swaps==null) swaps = await this.unifiedStorage.query<S>(
+    async tick(swaps?: D["Swap"][]): Promise<void> {
+        if(swaps==null) swaps = await this.unifiedStorage.query<D["Swap"]>(
             [[{key: "type", value: this.TYPE}, {key: "state", value: this.tickSwapState}]],
             (val: any) => new this.swapDeserializer(this, val)
         );
@@ -276,10 +279,10 @@ export abstract class ISwapWrapper<
         });
     }
 
-    saveSwapData(swap: S): Promise<void> {
+    saveSwapData(swap: D["Swap"]): Promise<void> {
         if(!swap.isInitiated()) {
             this.logger.debug("saveSwapData(): Swap "+swap.getId()+" not initiated, saving to pending swaps");
-            this.pendingSwaps.set(swap.getId(), new WeakRef<S>(swap));
+            this.pendingSwaps.set(swap.getId(), new WeakRef<D["Swap"]>(swap));
             return Promise.resolve();
         } else {
             this.pendingSwaps.delete(swap.getId());
@@ -287,7 +290,7 @@ export abstract class ISwapWrapper<
         return this.unifiedStorage.save(swap);
     }
 
-    removeSwapData(swap: S): Promise<void> {
+    removeSwapData(swap: D["Swap"]): Promise<void> {
         this.pendingSwaps.delete(swap.getId());
         if(!swap.isInitiated()) return Promise.resolve();
         return this.unifiedStorage.remove(swap);

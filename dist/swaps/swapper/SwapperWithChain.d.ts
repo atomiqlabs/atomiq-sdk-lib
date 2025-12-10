@@ -154,11 +154,11 @@ export declare class SwapperWithChain<T extends MultiChain, ChainIdentifier exte
     getSwapLimits<A extends Token<ChainIdentifier>, B extends Token<ChainIdentifier>>(srcToken: A, dstToken: B): {
         input: {
             min: TokenAmount<string, A>;
-            max: TokenAmount<string, A>;
+            max?: TokenAmount<string, A>;
         };
         output: {
             min: TokenAmount<string, B>;
-            max: TokenAmount<string, B>;
+            max?: TokenAmount<string, B>;
         };
     };
     /**

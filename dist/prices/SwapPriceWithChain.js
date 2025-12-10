@@ -5,6 +5,7 @@ class SwapPriceWithChain {
     constructor(swapPrice, chainIdentifier) {
         this.swapPrice = swapPrice;
         this.chainIdentifier = chainIdentifier;
+        this.maxAllowedFeeDifferencePPM = swapPrice.maxAllowedFeeDifferencePPM;
     }
     /**
      * Checks whether the swap amounts are valid given the current market rate for a given pair

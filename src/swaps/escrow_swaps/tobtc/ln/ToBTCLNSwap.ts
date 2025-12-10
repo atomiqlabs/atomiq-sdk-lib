@@ -1,5 +1,5 @@
 import {decode as bolt11Decode} from "@atomiqlabs/bolt11";
-import {ToBTCLNWrapper} from "./ToBTCLNWrapper";
+import {ToBTCLNDefinition, ToBTCLNWrapper} from "./ToBTCLNWrapper";
 import {isIToBTCSwapInit, IToBTCSwap, IToBTCSwapInit} from "../IToBTCSwap";
 import {SwapType} from "../../../enums/SwapType";
 import {ChainType, SwapData} from "@atomiqlabs/base";
@@ -8,7 +8,7 @@ import {sha256} from "@noble/hashes/sha2";
 import {IntermediaryError} from "../../../../errors/IntermediaryError";
 import {LNURL, LNURLDecodedSuccessAction, LNURLPaySuccessAction, isLNURLPaySuccessAction} from "../../../../utils/LNURL";
 import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../../../Tokens";
-import {getLogger} from "../../../../utils/Utils";
+import {getLogger, LoggerType} from "../../../../utils/Utils";
 
 export type ToBTCLNSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     confidence: number;
@@ -31,9 +31,10 @@ const SNOWFLAKE_LIST: Set<string> = new Set([
     "03a6ce61fcaacd38d31d4e3ce2d506602818e3856b4b44faff1dde9642ba705976"
 ]);
 
-export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
+export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T, ToBTCLNDefinition<T>> {
     protected outputToken: BtcToken<true> = BitcoinTokens.BTCLN;
     protected readonly TYPE = SwapType.TO_BTCLN;
+    protected readonly logger: LoggerType;
 
     private readonly confidence: number;
     private readonly pr: string;
@@ -51,7 +52,12 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
     constructor(wrapper: ToBTCLNWrapper<T>, initOrObj: ToBTCLNSwapInit<T["Data"]> | any) {
         if(isToBTCLNSwapInit(initOrObj)) initOrObj.url += "/tobtcln";
         super(wrapper, initOrObj);
-        if(!isToBTCLNSwapInit(initOrObj)) {
+        if(isToBTCLNSwapInit(initOrObj)) {
+            this.confidence = initOrObj.confidence;
+            this.pr = initOrObj.pr;
+            this.lnurl = initOrObj.lnurl;
+            this.successAction = initOrObj.successAction;
+        } else {
             this.confidence = initOrObj.confidence;
             this.pr = initOrObj.pr;
             this.lnurl = initOrObj.lnurl;
@@ -83,6 +89,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
 
     getOutput(): TokenAmount<T["ChainId"], BtcToken<true>> {
         const parsedPR = bolt11Decode(this.pr);
+        if(parsedPR.millisatoshis==null) throw new Error("Swap invoice has no msat amount field!");
         const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
         return toTokenAmount(amount, this.outputToken, this.wrapper.prices);
     }
@@ -106,7 +113,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
      * Returns payment secret (pre-image) as a proof of payment
      */
     getSecret(): string | null {
-        return this.secret;
+        return this.secret ?? null;
     }
 
     /**
@@ -154,14 +161,14 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
     }
 
     getPaymentHash(): Buffer {
-        if(this.pr==null) return null;
         const parsed = bolt11Decode(this.pr);
+        if(parsed.tagsObject.payment_hash==null) throw new Error("Swap invoice has no payment hash field!");
         return Buffer.from(parsed.tagsObject.payment_hash, "hex");
     }
 
     protected getLpIdentifier(): string {
-        if(this.pr==null) return null;
         const parsed = bolt11Decode(this.pr);
+        if(parsed.tagsObject.payment_hash==null) throw new Error("Swap invoice has no payment hash field!");
         return parsed.tagsObject.payment_hash;
     }
 
@@ -180,7 +187,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
      * Gets the used LNURL or null if this is not an LNURL-pay swap
      */
     getLNURL(): string | null {
-        return this.lnurl;
+        return this.lnurl ?? null;
     }
 
     /**

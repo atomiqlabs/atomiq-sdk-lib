@@ -1,7 +1,7 @@
-import {IToBTCWrapper} from "./IToBTCWrapper";
+import {IToBTCDefinition, IToBTCWrapper} from "./IToBTCWrapper";
 import {
     ChainType,
-    isAbstractSigner,
+    isAbstractSigner, SignatureData,
     SignatureVerificationError,
     SwapCommitState,
     SwapCommitStateType,
@@ -13,41 +13,65 @@ import {
     RefundAuthorizationResponseCodes
 } from "../../../intermediaries/IntermediaryAPI";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
-import {extendAbortController, timeoutPromise, tryWithRetries} from "../../../utils/Utils";
+import {extendAbortController, timeoutPromise, toBigInt, tryWithRetries} from "../../../utils/Utils";
 import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {Fee, FeeType} from "../../fee/Fee";
 import {ppmToPercentage} from "../../ISwap";
 import {IEscrowSelfInitSwap, IEscrowSelfInitSwapInit, isIEscrowSelfInitSwapInit} from "../IEscrowSelfInitSwap";
+import {IRefundableSwap} from "../../IRefundableSwap";
 
 export type IToBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
+    signatureData: SignatureData,
+    data: T,
     networkFee: bigint,
-    networkFeeBtc?: bigint
+    networkFeeBtc: bigint
 };
 
 export function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T> {
     return typeof(obj.networkFee) === "bigint" &&
-        (obj.networkFeeBtc==null || typeof(obj.networkFeeBtc) === "bigint") &&
+        typeof(obj.networkFeeBtc) === "bigint" &&
+        (
+            typeof(obj.signatureData) === 'object' &&
+            typeof(obj.signatureData.prefix)==="string" &&
+            typeof(obj.signatureData.timeout)==="string" &&
+            typeof(obj.signatureData.signature)==="string"
+        ) &&
+        typeof(obj.data) === 'object' &&
         isIEscrowSelfInitSwapInit<T>(obj);
 }
 
-export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscrowSelfInitSwap<T, ToBTCSwapState> {
+export abstract class IToBTCSwap<
+    T extends ChainType = ChainType,
+    D extends IToBTCDefinition<T, IToBTCWrapper<T, D>, IToBTCSwap<T, D>> = IToBTCDefinition<T, IToBTCWrapper<T, any>, IToBTCSwap<T, any>>,
+> extends IEscrowSelfInitSwap<T, D, ToBTCSwapState> implements IRefundableSwap<T, D, ToBTCSwapState> {
     protected readonly networkFee: bigint;
-    protected networkFeeBtc?: bigint;
+    protected networkFeeBtc: bigint;
     protected readonly abstract outputToken: BtcToken;
 
-    protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, serializedObject: any);
-    protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, init: IToBTCSwapInit<T["Data"]>);
+    readonly data!: T["Data"];
+    readonly signatureData!: SignatureData;
+
+    protected constructor(wrapper: D["Wrapper"], serializedObject: any);
+    protected constructor(wrapper: D["Wrapper"], init: IToBTCSwapInit<T["Data"]>);
     protected constructor(
-        wrapper: IToBTCWrapper<T, IToBTCSwap<T>>,
+        wrapper: D["Wrapper"],
         initOrObject: IToBTCSwapInit<T["Data"]> | any
     ) {
         super(wrapper, initOrObject);
         if(isIToBTCSwapInit<T["Data"]>(initOrObject)) {
             this.state = ToBTCSwapState.CREATED;
+            this.networkFee = initOrObject.networkFee;
+            this.networkFeeBtc = initOrObject.networkFeeBtc;
+            this.data = initOrObject.data;
+            this.signatureData = initOrObject.signatureData;
         } else {
-            this.networkFee = initOrObject.networkFee==null ? null : BigInt(initOrObject.networkFee);
-            this.networkFeeBtc = initOrObject.networkFeeBtc==null ? null : BigInt(initOrObject.networkFeeBtc);
+            this.networkFee = toBigInt(initOrObject.networkFee);
+            this.networkFeeBtc = toBigInt(initOrObject.networkFeeBtc);
         }
+    }
+
+    protected getSwapData(): T["Data"] {
+        return this.data;
     }
 
     protected upgradeVersion() {
@@ -113,7 +137,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
     //// Getters & utils
 
     getInputTxId(): string | null {
-        return this.commitTxId;
+        return this.commitTxId ?? null;
     }
 
     requiresAction(): boolean {
@@ -156,6 +180,8 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
     //// Amounts & fees
 
     protected getSwapFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken> {
+        if(this.pricingInfo==null) throw new Error("No pricing info known, cannot estimate fee!");
+
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
 
@@ -223,7 +249,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
     async hasEnoughBalance(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
         const [balance, commitFee] = await Promise.all([
             this.wrapper.contract.getBalance(this._getInitiator(), this.data.getToken(), false),
-            this.data.getToken()===this.wrapper.chain.getNativeCurrencyAddress() ? this.getCommitFee() : Promise.resolve<bigint>(null)
+            this.data.getToken()===this.wrapper.chain.getNativeCurrencyAddress() ? this.getCommitFee() : Promise.resolve(null)
         ]);
         let required = this.data.getAmount();
         if(commitFee!=null) required = required + commitFee;
@@ -292,12 +318,14 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         if(this.state===ToBTCSwapState.COMMITED) {
             const success = await this.waitForPayment(options?.maxWaitTillSwapProcessedSeconds ?? 120, options?.paymentCheckIntervalSeconds, options?.abortSignal);
             if(success) {
-                if(callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
+                if(callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId()!);
                 return true;
             } else {
                 return false;
             }
         }
+
+        throw new Error("Unexpected state reached!");
     }
 
 
@@ -403,7 +431,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
     ): Promise<RefundAuthorizationResponse> {
         checkIntervalSeconds ??= 5;
         let resp: RefundAuthorizationResponse = {code: RefundAuthorizationResponseCodes.PENDING, msg: ""};
-        while(!abortSignal.aborted && (
+        while(!abortSignal?.aborted && (
             resp.code===RefundAuthorizationResponseCodes.PENDING || resp.code===RefundAuthorizationResponseCodes.NOT_FOUND
         )) {
             resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
@@ -450,7 +478,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
             case RefundAuthorizationResponseCodes.REFUND_DATA:
                 await tryWithRetries(
                     () => this.wrapper.contract.isValidRefundAuthorization(this.data, resp.data),
-                    null, SignatureVerificationError
+                    undefined, SignatureVerificationError
                 );
                 this.state = ToBTCSwapState.REFUNDABLE;
                 if(save) await this._saveAndEmit();
@@ -522,7 +550,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
                         this.data,
                         resultData
                     ),
-                    null, SignatureVerificationError, abortSignal
+                    undefined, SignatureVerificationError, abortSignal
                 );
                 await this._saveAndEmit(ToBTCSwapState.REFUNDABLE);
                 return false;
@@ -531,8 +559,10 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
                 throw new IntermediaryError("Swap expired");
             case RefundAuthorizationResponseCodes.NOT_FOUND:
                 if((this.state as ToBTCSwapState)===ToBTCSwapState.CLAIMED) return true;
-                throw new Error("Intermediary swap not found");
+                throw new Error("LP swap not found");
         }
+
+        throw new Error("Invalid response code returned by the LP");
     }
 
 
@@ -712,6 +742,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
                 }
             }
         }
+        return false;
     }
 
     _shouldFetchCommitStatus(): boolean {

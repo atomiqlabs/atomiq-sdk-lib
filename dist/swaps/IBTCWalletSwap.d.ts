@@ -2,6 +2,7 @@ import { IBitcoinWallet } from "../btc/wallet/IBitcoinWallet";
 import { BtcToken, TokenAmount } from "../Tokens";
 import { Transaction } from "@scure/btc-signer";
 import { MinimalBitcoinWalletInterface, MinimalBitcoinWalletInterfaceWithSigner } from "../btc/wallet/MinimalBitcoinWalletInterface";
+export declare function isIBTCWalletSwap(obj: any): obj is IBTCWalletSwap;
 export interface IBTCWalletSwap {
     /**
      * Returns the PSBT that is already funded with wallet's UTXOs (runs a coin-selection algorithm to choose UTXOs to use),
@@ -30,7 +31,7 @@ export interface IBTCWalletSwap {
      * @param psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
      */
     submitPsbt(psbt: Transaction | string): Promise<string>;
-    estimateBitcoinFee(wallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
+    estimateBitcoinFee(wallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>> | null>;
     sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string>;
     /**
      * Waits till the bitcoin transaction confirms
@@ -40,6 +41,6 @@ export interface IBTCWalletSwap {
      * @param abortSignal Abort signal
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitForBitcoinTransaction(updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
+    waitForBitcoinTransaction(updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
     getRequiredConfirmationsCount(): number;
 }

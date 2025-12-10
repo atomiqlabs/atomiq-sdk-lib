@@ -8,25 +8,28 @@ import { BitcoinRpcWithAddressIndex } from "../../../../btc/BitcoinRpcWithAddres
 import { ISwapPrice } from "../../../../prices/abstract/ISwapPrice";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../../ISwapWrapper";
 import { SwapType } from "../../../enums/SwapType";
+import { AllOptional } from "../../../../utils/Utils";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
 import { UnifiedSwapEventListener } from "../../../../events/UnifiedSwapEventListener";
 import { UnifiedSwapStorage } from "../../../../storage/UnifiedSwapStorage";
 import { ISwap } from "../../../ISwap";
 import { IClaimableSwapWrapper } from "../../../IClaimableSwapWrapper";
+import { IFromBTCSelfInitDefinition } from "../IFromBTCSelfInitSwap";
 export type FromBTCOptions = {
     feeSafetyFactor?: bigint;
     blockSafetyFactor?: number;
     unsafeZeroWatchtowerFee?: boolean;
 };
 export type FromBTCWrapperOptions = ISwapWrapperOptions & {
-    safetyFactor?: number;
-    blocksTillTxConfirms?: number;
-    maxConfirmations?: number;
-    minSendWindow?: number;
-    bitcoinNetwork?: BTC_NETWORK;
-    bitcoinBlocktime?: number;
+    safetyFactor: number;
+    blocksTillTxConfirms: number;
+    maxConfirmations: number;
+    minSendWindow: number;
+    bitcoinNetwork: BTC_NETWORK;
+    bitcoinBlocktime: number;
 };
-export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper<T, FromBTCSwap<T>, FromBTCWrapperOptions> implements IClaimableSwapWrapper<FromBTCSwap<T>> {
+export type FromBTCDefinition<T extends ChainType> = IFromBTCSelfInitDefinition<T, FromBTCWrapper<T>, FromBTCSwap<T>>;
+export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper<T, FromBTCDefinition<T>, FromBTCWrapperOptions> implements IClaimableSwapWrapper<FromBTCSwap<T>> {
     readonly claimableSwapStates: FromBTCSwapState[];
     readonly TYPE = SwapType.FROM_BTC;
     readonly swapDeserializer: typeof FromBTCSwap;
@@ -48,7 +51,7 @@ export declare class FromBTCWrapper<T extends ChainType> extends IFromBTCWrapper
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithAddressIndex<any>, options?: FromBTCWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithAddressIndex<any>, options?: AllOptional<FromBTCWrapperOptions>, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     readonly pendingSwapStates: FromBTCSwapState[];

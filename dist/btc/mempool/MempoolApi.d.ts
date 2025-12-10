@@ -227,7 +227,7 @@ export declare class MempoolApi {
      *
      * @param txId
      */
-    getRawTransaction(txId: string): Promise<Buffer>;
+    getRawTransaction(txId: string): Promise<Buffer | null>;
     /**
      * Returns confirmed & unconfirmed balance of the specific bitcoin address
      *

@@ -6,6 +6,16 @@ import {
     MinimalBitcoinWalletInterfaceWithSigner
 } from "../btc/wallet/MinimalBitcoinWalletInterface";
 
+export function isIBTCWalletSwap(obj: any): obj is IBTCWalletSwap {
+    return obj!=null &&
+        typeof(obj.getFundedPsbt) === "function" &&
+        typeof(obj.submitPsbt) === "function" &&
+        typeof(obj.estimateBitcoinFee) === "function" &&
+        typeof(obj.sendBitcoinTransaction) === "function" &&
+        typeof(obj.waitForBitcoinTransaction) === "function" &&
+        typeof(obj.getRequiredConfirmationsCount) === "function";
+}
+
 export interface IBTCWalletSwap {
 
     /**
@@ -31,7 +41,7 @@ export interface IBTCWalletSwap {
     submitPsbt(psbt: Transaction | string): Promise<string>;
 
 
-    estimateBitcoinFee(wallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
+    estimateBitcoinFee(wallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>> | null>;
 
 
     sendBitcoinTransaction(
@@ -48,7 +58,7 @@ export interface IBTCWalletSwap {
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
     waitForBitcoinTransaction(
-        updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void,
+        updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void,
         checkIntervalSeconds?: number,
         abortSignal?: AbortSignal,
     ): Promise<string>;

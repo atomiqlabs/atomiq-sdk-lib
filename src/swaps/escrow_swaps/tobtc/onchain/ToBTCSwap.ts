@@ -1,11 +1,11 @@
-import {ToBTCWrapper} from "./ToBTCWrapper";
+import {ToBTCDefinition, ToBTCWrapper} from "./ToBTCWrapper";
 import {isIToBTCSwapInit, IToBTCSwap, IToBTCSwapInit} from "../IToBTCSwap";
 import {SwapType} from "../../../enums/SwapType";
 import {ChainType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 import {IntermediaryError} from "../../../../errors/IntermediaryError";
 import {BtcToken, TokenAmount, Token, BitcoinTokens, toTokenAmount} from "../../../../Tokens";
-import {getLogger} from "../../../../utils/Utils";
+import {getLogger, LoggerType, toBigInt} from "../../../../utils/Utils";
 
 
 export type ToBTCSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
@@ -22,14 +22,15 @@ export function isToBTCSwapInit<T extends SwapData>(obj: any): obj is ToBTCSwapI
         typeof(obj.amount) === "bigint" &&
         typeof (obj.confirmationTarget) === "number" &&
         typeof (obj.satsPerVByte) === "number" &&
+        typeof (obj.requiredConfirmations) === "number" &&
+        typeof (obj.nonce) === "bigint" &&
         isIToBTCSwapInit<T>(obj);
 }
 
-export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
+export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T, ToBTCDefinition<T>> {
     protected readonly outputToken: BtcToken<false> = BitcoinTokens.BTC;
     protected readonly TYPE = SwapType.TO_BTC;
-
-    protected readonly wrapper: ToBTCWrapper<T>;
+    protected readonly logger: LoggerType;
 
     private readonly address: string;
     private readonly amount: bigint;
@@ -49,7 +50,14 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
     ) {
         if(isToBTCSwapInit(initOrObject)) initOrObject.url += "/tobtc";
         super(wrapper, initOrObject);
-        if(!isToBTCSwapInit(initOrObject)) {
+        if(isToBTCSwapInit(initOrObject)) {
+            this.address = initOrObject.address;
+            this.amount = initOrObject.amount;
+            this.confirmationTarget = initOrObject.confirmationTarget;
+            this.satsPerVByte = initOrObject.satsPerVByte;
+            this.requiredConfirmations = initOrObject.requiredConfirmations;
+            this.nonce = initOrObject.nonce;
+        } else {
             this.address = initOrObject.address;
             this.amount = BigInt(initOrObject.amount);
             this.confirmationTarget = initOrObject.confirmationTarget;
@@ -57,7 +65,7 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
             this.txId = initOrObject.txId;
 
             this.requiredConfirmations = initOrObject.requiredConfirmations ?? this.data.getConfirmationsHint();
-            this.nonce = (initOrObject.nonce==null ? null : BigInt(initOrObject.nonce)) ?? this.data.getNonceHint();
+            this.nonce = toBigInt(initOrObject.nonce) ?? this.data.getNonceHint();
         }
         this.logger = getLogger("ToBTC("+this.getIdentifierHashString()+"): ");
         this.tryRecomputeSwapPrice();
@@ -103,7 +111,7 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
     }
 
     getOutputTxId(): string | null {
-        return this.txId;
+        return this.txId ?? null;
     }
 
     /**

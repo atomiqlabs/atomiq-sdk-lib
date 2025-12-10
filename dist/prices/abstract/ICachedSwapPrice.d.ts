@@ -9,7 +9,7 @@ export declare abstract class ICachedSwapPrice<T extends MultiChain> extends ISw
             };
         };
     };
-    usdCache: {
+    usdCache?: {
         price: Promise<number>;
         expiry: number;
     };
