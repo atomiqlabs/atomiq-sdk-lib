@@ -137,6 +137,11 @@ export class FromBTCSwap<T extends ChainType = ChainType>
         return this.address;
     }
 
+    /**
+     * Unsafe bitcoin hyperlink getter, returns the address even before the swap is committed!
+     *
+     * @private
+     */
     private _getHyperlink(): string {
         return "bitcoin:"+this.address+"?amount="+encodeURIComponent((Number(this.amount) / 100000000).toString(10));
     }

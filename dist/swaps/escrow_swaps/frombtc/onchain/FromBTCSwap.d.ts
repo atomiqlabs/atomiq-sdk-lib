@@ -48,6 +48,11 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      * Returns bitcoin address where the on-chain BTC should be sent to
      */
     getAddress(): string;
+    /**
+     * Unsafe bitcoin hyperlink getter, returns the address even before the swap is committed!
+     *
+     * @private
+     */
     private _getHyperlink;
     getHyperlink(): string;
     getInputTxId(): string | null;

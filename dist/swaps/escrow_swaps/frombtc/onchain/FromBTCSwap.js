@@ -95,6 +95,11 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
             throw new Error("Cannot get bitcoin address of non-committed swap");
         return this.address;
     }
+    /**
+     * Unsafe bitcoin hyperlink getter, returns the address even before the swap is committed!
+     *
+     * @private
+     */
     _getHyperlink() {
         return "bitcoin:" + this.address + "?amount=" + encodeURIComponent((Number(this.amount) / 100000000).toString(10));
     }
