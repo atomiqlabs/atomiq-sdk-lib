@@ -165,13 +165,20 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     commit(_signer: T["Signer"] | T["NativeSigner"], abortSignal?: AbortSignal, skipChecks?: boolean, onBeforeTxSent?: (txId: string) => void): Promise<string>;
     waitTillCommited(abortSignal?: AbortSignal): Promise<void>;
     /**
+     * Unsafe txs claim getter without state checking!
+     *
+     * @param _signer
+     * @private
+     */
+    private _txsClaim;
+    /**
      * Returns transactions required for claiming the HTLC and finishing the swap by revealing the HTLC secret
      *  (hash preimage)
      *
      * @param _signer Optional signer address to use for claiming the swap, can also be different from the initializer
      * @throws {Error} If in invalid state (must be CLAIM_COMMITED)
      */
-    txsClaim(_signer?: T["Signer"] | T["NativeSigner"], skipStateChecks?: boolean): Promise<T["TX"][]>;
+    txsClaim(_signer?: T["Signer"] | T["NativeSigner"]): Promise<T["TX"][]>;
     /**
      * Claims and finishes the swap
      *

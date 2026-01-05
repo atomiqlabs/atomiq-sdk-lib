@@ -299,7 +299,7 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
             if (!await this.verifyQuoteValid())
                 throw new Error("Quote already expired or close to expiry!");
             const txsCommit = await this.txsCommit(options?.skipChecks);
-            const txsClaim = await this.txsClaim(undefined, true);
+            const txsClaim = await this._txsClaim(undefined);
             return [
                 {
                     name: "Commit",
@@ -541,20 +541,29 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
     //////////////////////////////
     //// Claim
     /**
+     * Unsafe txs claim getter without state checking!
+     *
+     * @param _signer
+     * @private
+     */
+    async _txsClaim(_signer) {
+        if (this.data == null)
+            throw new Error("Unknown data, wrong state?");
+        return this.wrapper.contract.txsClaimWithSecret(_signer == null ?
+            this._getInitiator() :
+            ((0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer)), this.data, this.secret, true, true);
+    }
+    /**
      * Returns transactions required for claiming the HTLC and finishing the swap by revealing the HTLC secret
      *  (hash preimage)
      *
      * @param _signer Optional signer address to use for claiming the swap, can also be different from the initializer
      * @throws {Error} If in invalid state (must be CLAIM_COMMITED)
      */
-    async txsClaim(_signer, skipStateChecks) {
-        if (!skipStateChecks && this.state !== FromBTCLNSwapState.CLAIM_COMMITED)
+    async txsClaim(_signer) {
+        if (this.state !== FromBTCLNSwapState.CLAIM_COMMITED)
             throw new Error("Must be in CLAIM_COMMITED state!");
-        if (this.data == null)
-            throw new Error("Unknown data, wrong state?");
-        return await this.wrapper.contract.txsClaimWithSecret(_signer == null ?
-            this._getInitiator() :
-            ((0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer)), this.data, this.secret, true, true);
+        return this._txsClaim(_signer);
     }
     /**
      * Claims and finishes the swap
