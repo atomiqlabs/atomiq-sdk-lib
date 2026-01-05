@@ -1083,6 +1083,70 @@ class Swapper extends events_1.EventEmitter {
             await this.syncSwapsForChain(chainId, signer);
         }
     }
+    /**
+     * Attempts to recover partial swap data from on-chain historical data
+     *
+     * @param chainId
+     * @param signer
+     * @param startBlockheight
+     */
+    async recoverSwaps(chainId, signer, startBlockheight) {
+        const { swapContract, unifiedSwapStorage, reviver, wrappers } = this.chains[chainId];
+        if (swapContract.getHistoricalSwaps == null)
+            throw new Error(`Historical swap recovery is not supported for ${chainId}`);
+        const { swaps } = await swapContract.getHistoricalSwaps(signer);
+        const knownSwapsArray = await unifiedSwapStorage.query([[{ key: "escrowHash", value: Object.keys(swaps) }]], reviver);
+        const knownSwaps = {};
+        knownSwapsArray.forEach(val => knownSwaps[val._getEscrowHash()] = val);
+        const recoveredSwaps = [];
+        for (let escrowHash in swaps) {
+            const { data, state } = swaps[escrowHash];
+            const knownSwap = knownSwaps[escrowHash];
+            if (data == null) {
+                if (knownSwap == null)
+                    this.logger.warn(`recoverSwaps(): Fetched ${escrowHash} swap state, but swap not found locally!`);
+                //TODO: Update the existing swaps here
+                continue;
+            }
+            if (knownSwap != null) {
+                //TODO: Update the existing swaps here
+                continue;
+            }
+            //Classify swap
+            let swap;
+            if (data.getType() === base_1.ChainSwapType.HTLC) {
+                if (data.isOfferer(signer)) {
+                    //To BTCLN
+                    const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isClaimer(val.getAddress(chainId)));
+                    swap = await wrappers[SwapType_1.SwapType.TO_BTCLN].recoverFromSwapDataAndState(data, state, lp);
+                }
+                else if (data.isClaimer(signer)) {
+                    //From BTCLN
+                    const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isOfferer(val.getAddress(chainId)));
+                    if (this.supportsSwapType(chainId, SwapType_1.SwapType.FROM_BTCLN_AUTO)) {
+                        swap = await wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO].recoverFromSwapDataAndState(data, state, lp);
+                    }
+                    else {
+                        swap = await wrappers[SwapType_1.SwapType.FROM_BTCLN].recoverFromSwapDataAndState(data, state, lp);
+                    }
+                }
+            }
+            else if (data.getType() === base_1.ChainSwapType.CHAIN_NONCED) {
+                //To BTC
+                const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isClaimer(val.getAddress(chainId)));
+                swap = await wrappers[SwapType_1.SwapType.TO_BTC].recoverFromSwapDataAndState(data, state, lp);
+            }
+            else if (data.getType() === base_1.ChainSwapType.CHAIN) {
+                //From BTC
+                const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isOfferer(val.getAddress(chainId)));
+                swap = await wrappers[SwapType_1.SwapType.FROM_BTC].recoverFromSwapDataAndState(data, state, lp);
+            }
+            if (swap != null) {
+                recoveredSwaps.push(swap);
+            }
+        }
+        return recoveredSwaps;
+    }
     getToken(tickerOrAddress) {
         //Btc tokens - BTC, BTCLN, BTC-LN
         if (tickerOrAddress === "BTC")

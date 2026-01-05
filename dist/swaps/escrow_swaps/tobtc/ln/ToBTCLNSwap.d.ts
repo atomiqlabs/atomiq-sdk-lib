@@ -9,7 +9,7 @@ import { LNURLDecodedSuccessAction, LNURLPaySuccessAction } from "../../../../ut
 import { BtcToken, TokenAmount } from "../../../../Tokens";
 export type ToBTCLNSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     confidence: number;
-    pr: string;
+    pr?: string;
     lnurl?: string;
     successAction?: LNURLPaySuccessAction;
 };

@@ -314,6 +314,8 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
     //////////////////////////////
     //// Payment
     async waitTillIntermediarySwapProcessed(checkIntervalSeconds, abortSignal) {
+        if (this.url == null)
+            throw new Error("LP URL not specified!");
         checkIntervalSeconds ??= 5;
         let resp = { code: IntermediaryAPI_1.RefundAuthorizationResponseCodes.PENDING, msg: "" };
         while (!abortSignal.aborted && (resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.PENDING || resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.NOT_FOUND)) {
@@ -345,7 +347,7 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
      * @private
      */
     async checkIntermediarySwapProcessed(save = true) {
-        if (this.state === ToBTCSwapState.CREATED || this.state == ToBTCSwapState.QUOTE_EXPIRED)
+        if (this.state === ToBTCSwapState.CREATED || this.state == ToBTCSwapState.QUOTE_EXPIRED || this.url == null)
             return false;
         if (this.isFinished() || this.isRefundable())
             return true;

@@ -401,6 +401,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         checkIntervalSeconds?: number,
         abortSignal?: AbortSignal
     ): Promise<RefundAuthorizationResponse> {
+        if(this.url==null) throw new Error("LP URL not specified!");
         checkIntervalSeconds ??= 5;
         let resp: RefundAuthorizationResponse = {code: RefundAuthorizationResponseCodes.PENDING, msg: ""};
         while(!abortSignal.aborted && (
@@ -435,7 +436,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
      * @private
      */
     protected async checkIntermediarySwapProcessed(save: boolean = true): Promise<boolean> {
-        if(this.state===ToBTCSwapState.CREATED || this.state==ToBTCSwapState.QUOTE_EXPIRED) return false;
+        if(this.state===ToBTCSwapState.CREATED || this.state==ToBTCSwapState.QUOTE_EXPIRED || this.url==null) return false;
         if(this.isFinished() || this.isRefundable()) return true;
         //Check if that maybe already concluded according to the LP
         const resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());

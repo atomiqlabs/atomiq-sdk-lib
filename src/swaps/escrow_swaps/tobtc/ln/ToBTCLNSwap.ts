@@ -12,14 +12,14 @@ import {getLogger} from "../../../../utils/Utils";
 
 export type ToBTCLNSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     confidence: number;
-    pr: string;
+    pr?: string;
     lnurl?: string;
     successAction?: LNURLPaySuccessAction;
 };
 
 export function isToBTCLNSwapInit<T extends SwapData>(obj: any): obj is ToBTCLNSwapInit<T> {
     return typeof (obj.confidence) === "number" &&
-        typeof (obj.pr) === "string" &&
+        (obj.pr==null || typeof (obj.pr) === "string") &&
         (obj.lnurl == null || typeof (obj.lnurl) === "string") &&
         (obj.successAction == null || isLNURLPaySuccessAction(obj.successAction)) &&
         isIToBTCSwapInit<T>(obj);
@@ -82,6 +82,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
     //// Amounts & fees
 
     getOutput(): TokenAmount<T["ChainId"], BtcToken<true>> {
+        if(this.pr==null || !this.pr.startsWith("ln")) return null;
         const parsedPR = bolt11Decode(this.pr);
         const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
         return toTokenAmount(amount, this.outputToken, this.wrapper.prices);
@@ -121,6 +122,8 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
      * Checks whether a swap is likely to fail, based on the confidence as reported by the LP
      */
     willLikelyFail(): boolean {
+        if(this.pr==null || !this.pr.startsWith("ln")) return false;
+
         const parsedRequest = bolt11Decode(this.pr);
 
         if(parsedRequest.tagsObject.routing_info!=null) {
@@ -139,6 +142,8 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
      *  for such a wallet to be online when attempting to make a swap
      */
     isPayingToNonCustodialWallet(): boolean {
+        if(this.pr==null || !this.pr.startsWith("ln")) return false;
+
         const parsedRequest = bolt11Decode(this.pr);
 
         if(parsedRequest.tagsObject.routing_info!=null) {
@@ -155,14 +160,20 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
 
     getPaymentHash(): Buffer {
         if(this.pr==null) return null;
-        const parsed = bolt11Decode(this.pr);
-        return Buffer.from(parsed.tagsObject.payment_hash, "hex");
+        if(this.pr.startsWith("ln")) {
+            const parsed = bolt11Decode(this.pr);
+            return Buffer.from(parsed.tagsObject.payment_hash, "hex");
+        }
+        return Buffer.from(this.pr, "hex");
     }
 
     protected getLpIdentifier(): string {
-        if(this.pr==null) return null;
-        const parsed = bolt11Decode(this.pr);
-        return parsed.tagsObject.payment_hash;
+        if(this.pr==null) return this.data.getEscrowHash();
+        if(this.pr.startsWith("ln")) {
+            const parsed = bolt11Decode(this.pr);
+            return parsed.tagsObject.payment_hash;
+        }
+        return this.pr;
     }
 
 

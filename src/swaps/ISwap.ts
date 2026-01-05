@@ -10,7 +10,7 @@ import {Fee, FeeBreakdown} from "./fee/Fee";
 
 export type ISwapInit = {
     pricingInfo: PriceInfoType,
-    url: string,
+    url?: string,
     expiry: number,
     swapFee: bigint,
     swapFeeBtc?: bigint,
@@ -21,7 +21,7 @@ export function isISwapInit(obj: any): obj is ISwapInit {
     return typeof obj === 'object' &&
         obj != null &&
         isPriceInfoType(obj.pricingInfo) &&
-        typeof obj.url === 'string' &&
+        (obj.url==null || typeof obj.url === 'string') &&
         typeof obj.expiry === 'number' &&
         typeof(obj.swapFee) === "bigint" &&
         (obj.swapFeeBtc == null || typeof(obj.swapFeeBtc) === "bigint") &&

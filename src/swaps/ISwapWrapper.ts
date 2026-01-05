@@ -4,7 +4,7 @@ import {
     ClaimEvent,
     InitializeEvent,
     RefundEvent, SignatureData,
-    SignatureVerificationError,
+    SignatureVerificationError, SwapCommitState,
     SwapEvent
 } from "@atomiqlabs/base";
 import {EventEmitter} from "events";
@@ -17,6 +17,7 @@ import {ChainIds, MultiChain} from "./swapper/Swapper";
 import {UnifiedSwapEventListener} from "../events/UnifiedSwapEventListener";
 import {SwapType} from "./enums/SwapType";
 import {UnifiedSwapStorage} from "../storage/UnifiedSwapStorage";
+import {Intermediary} from "../intermediaries/Intermediary";
 
 export type AmountData = {
     amount: bigint,
@@ -291,6 +292,10 @@ export abstract class ISwapWrapper<
         this.pendingSwaps.delete(swap.getId());
         if(!swap.isInitiated()) return Promise.resolve();
         return this.unifiedStorage.remove(swap);
+    }
+
+    recoverFromSwapDataAndState(data: T["Data"], state: SwapCommitState, lp: Intermediary): Promise<S> {
+        return Promise.resolve(null);
     }
 
     /**

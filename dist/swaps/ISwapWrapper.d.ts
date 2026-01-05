@@ -1,6 +1,6 @@
 /// <reference types="node" />
 /// <reference types="node" />
-import { ChainEvent, ChainType } from "@atomiqlabs/base";
+import { ChainEvent, ChainType, SwapCommitState } from "@atomiqlabs/base";
 import { EventEmitter } from "events";
 import { ISwap } from "./ISwap";
 import { ISwapPrice, PriceInfoType } from "../prices/abstract/ISwapPrice";
@@ -9,6 +9,7 @@ import { ChainIds, MultiChain } from "./swapper/Swapper";
 import { UnifiedSwapEventListener } from "../events/UnifiedSwapEventListener";
 import { SwapType } from "./enums/SwapType";
 import { UnifiedSwapStorage } from "../storage/UnifiedSwapStorage";
+import { Intermediary } from "../intermediaries/Intermediary";
 export type AmountData = {
     amount: bigint;
     token: string;
@@ -118,6 +119,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
     tick(swaps?: S[]): Promise<void>;
     saveSwapData(swap: S): Promise<void>;
     removeSwapData(swap: S): Promise<void>;
+    recoverFromSwapDataAndState(data: T["Data"], state: SwapCommitState, lp: Intermediary): Promise<S>;
     /**
      * Un-subscribes from event listeners on Solana
      */

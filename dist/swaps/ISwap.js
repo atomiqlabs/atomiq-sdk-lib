@@ -10,7 +10,7 @@ function isISwapInit(obj) {
     return typeof obj === 'object' &&
         obj != null &&
         (0, ISwapPrice_1.isPriceInfoType)(obj.pricingInfo) &&
-        typeof obj.url === 'string' &&
+        (obj.url == null || typeof obj.url === 'string') &&
         typeof obj.expiry === 'number' &&
         typeof (obj.swapFee) === "bigint" &&
         (obj.swapFeeBtc == null || typeof (obj.swapFeeBtc) === "bigint") &&

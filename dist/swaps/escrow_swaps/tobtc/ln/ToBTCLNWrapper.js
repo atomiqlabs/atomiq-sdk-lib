@@ -13,6 +13,7 @@ const IntermediaryAPI_1 = require("../../../../intermediaries/IntermediaryAPI");
 const RequestError_1 = require("../../../../errors/RequestError");
 const LNURL_1 = require("../../../../utils/LNURL");
 const IToBTCSwap_1 = require("../IToBTCSwap");
+const sha2_1 = require("@noble/hashes/sha2");
 function isInvoiceCreateService(obj) {
     return typeof (obj) === "object" &&
         typeof (obj.getInvoice) === "function" &&
@@ -401,6 +402,126 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             }),
             intermediary: value.intermediary
         }));
+    }
+    async recoverFromSwapDataAndState(data, state, lp) {
+        if (state.type === base_1.SwapCommitStateType.PAID) {
+            //Settled
+            const secret = await state.getClaimResult();
+            const paymentHash = Buffer.from((0, sha2_1.sha256)(Buffer.from(secret, "hex"))).toString("hex");
+            const claimTxId = await state.getClaimTxId();
+            const swap = new ToBTCLNSwap_1.ToBTCLNSwap(this, {
+                pricingInfo: {
+                    isValid: true,
+                    satsBaseFee: 0n,
+                    swapPriceUSatPerToken: 100000000000000n,
+                    realPriceUSatPerToken: 100000000000000n,
+                    differencePPM: 0n,
+                    feePPM: 0n,
+                },
+                url: lp?.url,
+                expiry: 0,
+                swapFee: 0n,
+                feeRate: "",
+                signatureData: null,
+                data,
+                networkFee: 0n,
+                networkFeeBtc: 0n,
+                confidence: 0,
+                pr: paymentHash,
+                exactIn: false
+            });
+            await swap._setPaymentResult({ secret }, false);
+            swap.claimTxId = claimTxId;
+            swap.state = IToBTCSwap_1.ToBTCSwapState.CLAIMED;
+            await swap._save();
+            return swap;
+        }
+        if (state.type === base_1.SwapCommitStateType.NOT_COMMITED || state.type === base_1.SwapCommitStateType.EXPIRED) {
+            //Already refunded
+            if (state.getRefundTxId == null)
+                return null;
+            const refundTxId = await state.getRefundTxId();
+            const swap = new ToBTCLNSwap_1.ToBTCLNSwap(this, {
+                pricingInfo: {
+                    isValid: true,
+                    satsBaseFee: 0n,
+                    swapPriceUSatPerToken: 100000000000000n,
+                    realPriceUSatPerToken: 100000000000000n,
+                    differencePPM: 0n,
+                    feePPM: 0n,
+                },
+                url: lp?.url,
+                expiry: 0,
+                swapFee: 0n,
+                feeRate: "",
+                signatureData: null,
+                data,
+                networkFee: 0n,
+                networkFeeBtc: 0n,
+                confidence: 0,
+                pr: data.getHTLCHashHint(),
+                exactIn: false
+            });
+            swap.refundTxId = refundTxId;
+            swap.state = IToBTCSwap_1.ToBTCSwapState.REFUNDED;
+            await swap._save();
+            return swap;
+        }
+        //Pending
+        if (state.type === base_1.SwapCommitStateType.COMMITED) {
+            const swap = new ToBTCLNSwap_1.ToBTCLNSwap(this, {
+                pricingInfo: {
+                    isValid: true,
+                    satsBaseFee: 0n,
+                    swapPriceUSatPerToken: 100000000000000n,
+                    realPriceUSatPerToken: 100000000000000n,
+                    differencePPM: 0n,
+                    feePPM: 0n,
+                },
+                url: lp?.url,
+                expiry: 0,
+                swapFee: 0n,
+                feeRate: "",
+                signatureData: null,
+                data,
+                networkFee: 0n,
+                networkFeeBtc: 0n,
+                confidence: 0,
+                pr: data.getHTLCHashHint(),
+                exactIn: false
+            });
+            swap.state = IToBTCSwap_1.ToBTCSwapState.COMMITED;
+            //Try to fetch refund signature
+            if (lp != null)
+                await swap._sync(true, false, state);
+            return swap;
+        }
+        if (state.type === base_1.SwapCommitStateType.REFUNDABLE) {
+            const swap = new ToBTCLNSwap_1.ToBTCLNSwap(this, {
+                pricingInfo: {
+                    isValid: true,
+                    satsBaseFee: 0n,
+                    swapPriceUSatPerToken: 100000000000000n,
+                    realPriceUSatPerToken: 100000000000000n,
+                    differencePPM: 0n,
+                    feePPM: 0n,
+                },
+                url: lp?.url,
+                expiry: 0,
+                swapFee: 0n,
+                feeRate: "",
+                signatureData: null,
+                data,
+                networkFee: 0n,
+                networkFeeBtc: 0n,
+                confidence: 0,
+                pr: data.getHTLCHashHint(),
+                exactIn: false
+            });
+            swap.state = IToBTCSwap_1.ToBTCSwapState.REFUNDABLE;
+            await swap._save();
+            return swap;
+        }
     }
 }
 exports.ToBTCLNWrapper = ToBTCLNWrapper;

@@ -12,7 +12,7 @@ const Tokens_1 = require("../../../../Tokens");
 const Utils_1 = require("../../../../utils/Utils");
 function isToBTCLNSwapInit(obj) {
     return typeof (obj.confidence) === "number" &&
-        typeof (obj.pr) === "string" &&
+        (obj.pr == null || typeof (obj.pr) === "string") &&
         (obj.lnurl == null || typeof (obj.lnurl) === "string") &&
         (obj.successAction == null || (0, LNURL_1.isLNURLPaySuccessAction)(obj.successAction)) &&
         (0, IToBTCSwap_1.isIToBTCSwapInit)(obj);
@@ -58,6 +58,8 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     //////////////////////////////
     //// Amounts & fees
     getOutput() {
+        if (this.pr == null || !this.pr.startsWith("ln"))
+            return null;
         const parsedPR = (0, bolt11_1.decode)(this.pr);
         const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
         return (0, Tokens_1.toTokenAmount)(amount, this.outputToken, this.wrapper.prices);
@@ -90,6 +92,8 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
      * Checks whether a swap is likely to fail, based on the confidence as reported by the LP
      */
     willLikelyFail() {
+        if (this.pr == null || !this.pr.startsWith("ln"))
+            return false;
         const parsedRequest = (0, bolt11_1.decode)(this.pr);
         if (parsedRequest.tagsObject.routing_info != null) {
             for (let route of parsedRequest.tagsObject.routing_info) {
@@ -105,6 +109,8 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
      *  for such a wallet to be online when attempting to make a swap
      */
     isPayingToNonCustodialWallet() {
+        if (this.pr == null || !this.pr.startsWith("ln"))
+            return false;
         const parsedRequest = (0, bolt11_1.decode)(this.pr);
         if (parsedRequest.tagsObject.routing_info != null) {
             return parsedRequest.tagsObject.routing_info.length > 0;
@@ -120,14 +126,20 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     getPaymentHash() {
         if (this.pr == null)
             return null;
-        const parsed = (0, bolt11_1.decode)(this.pr);
-        return buffer_1.Buffer.from(parsed.tagsObject.payment_hash, "hex");
+        if (this.pr.startsWith("ln")) {
+            const parsed = (0, bolt11_1.decode)(this.pr);
+            return buffer_1.Buffer.from(parsed.tagsObject.payment_hash, "hex");
+        }
+        return buffer_1.Buffer.from(this.pr, "hex");
     }
     getLpIdentifier() {
         if (this.pr == null)
-            return null;
-        const parsed = (0, bolt11_1.decode)(this.pr);
-        return parsed.tagsObject.payment_hash;
+            return this.data.getEscrowHash();
+        if (this.pr.startsWith("ln")) {
+            const parsed = (0, bolt11_1.decode)(this.pr);
+            return parsed.tagsObject.payment_hash;
+        }
+        return this.pr;
     }
     //////////////////////////////
     //// LNURL-pay

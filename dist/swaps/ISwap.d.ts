@@ -10,7 +10,7 @@ import { SwapDirection } from "./enums/SwapDirection";
 import { Fee, FeeBreakdown } from "./fee/Fee";
 export type ISwapInit = {
     pricingInfo: PriceInfoType;
-    url: string;
+    url?: string;
     expiry: number;
     swapFee: bigint;
     swapFeeBtc?: bigint;

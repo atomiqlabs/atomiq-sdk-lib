@@ -180,6 +180,9 @@ class ISwapWrapper {
             return Promise.resolve();
         return this.unifiedStorage.remove(swap);
     }
+    recoverFromSwapDataAndState(data, state, lp) {
+        return Promise.resolve(null);
+    }
     /**
      * Un-subscribes from event listeners on Solana
      */

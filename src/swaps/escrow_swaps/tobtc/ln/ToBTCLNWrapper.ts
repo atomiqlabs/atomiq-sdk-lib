@@ -2,7 +2,7 @@ import {decode as bolt11Decode, PaymentRequestObject, TagsObject} from "@atomiql
 import {ToBTCLNSwap} from "./ToBTCLNSwap";
 import {IToBTCWrapper} from "../IToBTCWrapper";
 import {UserError} from "../../../../errors/UserError";
-import {ChainSwapType, ChainType} from "@atomiqlabs/base";
+import {ChainSwapType, ChainType, SwapCommitState, SwapCommitStateType} from "@atomiqlabs/base";
 import {Intermediary, SingleChainReputationType} from "../../../../intermediaries/Intermediary";
 import {AmountData, ISwapWrapperOptions, WrapperCtorTokens} from "../../../ISwapWrapper";
 import {ISwapPrice} from "../../../../prices/abstract/ISwapPrice";
@@ -17,6 +17,7 @@ import {IToBTCSwapInit, ToBTCSwapState} from "../IToBTCSwap";
 import {UnifiedSwapEventListener} from "../../../../events/UnifiedSwapEventListener";
 import {UnifiedSwapStorage} from "../../../../storage/UnifiedSwapStorage";
 import {ISwap} from "../../../ISwap";
+import {sha256} from "@noble/hashes/sha2";
 
 export type LightningWalletCallback = (valueSats: number, abortSignal?: AbortSignal) => Promise<string>;
 export type InvoiceCreateService = {
@@ -585,4 +586,124 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
             intermediary: value.intermediary
         }));
     }
+
+    async recoverFromSwapDataAndState(data: T["Data"], state: SwapCommitState, lp: Intermediary): Promise<ToBTCLNSwap<T>> {
+        if(state.type===SwapCommitStateType.PAID) {
+            //Settled
+            const secret = await state.getClaimResult();
+            const paymentHash = Buffer.from(sha256(Buffer.from(secret, "hex"))).toString("hex");
+            const claimTxId = await state.getClaimTxId();
+            const swap = new ToBTCLNSwap(this, {
+                pricingInfo: {
+                    isValid: true,
+                    satsBaseFee: 0n,
+                    swapPriceUSatPerToken: 100_000_000_000_000n,
+                    realPriceUSatPerToken: 100_000_000_000_000n,
+                    differencePPM: 0n,
+                    feePPM: 0n,
+                },
+                url: lp?.url,
+                expiry: 0,
+                swapFee: 0n,
+                feeRate: "",
+                signatureData: null,
+                data,
+                networkFee: 0n,
+                networkFeeBtc: 0n,
+                confidence: 0,
+                pr: paymentHash,
+                exactIn: false
+            } as IToBTCSwapInit<T["Data"]>);
+            await swap._setPaymentResult({secret}, false);
+            swap.claimTxId = claimTxId;
+            swap.state = ToBTCSwapState.CLAIMED;
+            await swap._save();
+            return swap;
+        }
+        if(state.type===SwapCommitStateType.NOT_COMMITED || state.type===SwapCommitStateType.EXPIRED) {
+            //Already refunded
+            if(state.getRefundTxId==null) return null;
+            const refundTxId = await state.getRefundTxId();
+            const swap = new ToBTCLNSwap(this, {
+                pricingInfo: {
+                    isValid: true,
+                    satsBaseFee: 0n,
+                    swapPriceUSatPerToken: 100_000_000_000_000n,
+                    realPriceUSatPerToken: 100_000_000_000_000n,
+                    differencePPM: 0n,
+                    feePPM: 0n,
+                },
+                url: lp?.url,
+                expiry: 0,
+                swapFee: 0n,
+                feeRate: "",
+                signatureData: null,
+                data,
+                networkFee: 0n,
+                networkFeeBtc: 0n,
+                confidence: 0,
+                pr: data.getHTLCHashHint(),
+                exactIn: false
+            } as IToBTCSwapInit<T["Data"]>);
+            swap.refundTxId = refundTxId;
+            swap.state = ToBTCSwapState.REFUNDED;
+            await swap._save();
+            return swap;
+        }
+        //Pending
+        if(state.type===SwapCommitStateType.COMMITED) {
+            const swap = new ToBTCLNSwap(this, {
+                pricingInfo: {
+                    isValid: true,
+                    satsBaseFee: 0n,
+                    swapPriceUSatPerToken: 100_000_000_000_000n,
+                    realPriceUSatPerToken: 100_000_000_000_000n,
+                    differencePPM: 0n,
+                    feePPM: 0n,
+                },
+                url: lp?.url,
+                expiry: 0,
+                swapFee: 0n,
+                feeRate: "",
+                signatureData: null,
+                data,
+                networkFee: 0n,
+                networkFeeBtc: 0n,
+                confidence: 0,
+                pr: data.getHTLCHashHint(),
+                exactIn: false
+            } as IToBTCSwapInit<T["Data"]>);
+            swap.state = ToBTCSwapState.COMMITED;
+            //Try to fetch refund signature
+            if(lp!=null) await swap._sync(true, false, state);
+            return swap;
+        }
+        if(state.type===SwapCommitStateType.REFUNDABLE) {
+            const swap = new ToBTCLNSwap(this, {
+                pricingInfo: {
+                    isValid: true,
+                    satsBaseFee: 0n,
+                    swapPriceUSatPerToken: 100_000_000_000_000n,
+                    realPriceUSatPerToken: 100_000_000_000_000n,
+                    differencePPM: 0n,
+                    feePPM: 0n,
+                },
+                url: lp?.url,
+                expiry: 0,
+                swapFee: 0n,
+                feeRate: "",
+                signatureData: null,
+                data,
+                networkFee: 0n,
+                networkFeeBtc: 0n,
+                confidence: 0,
+                pr: data.getHTLCHashHint(),
+                exactIn: false
+            } as IToBTCSwapInit<T["Data"]>);
+            swap.state = ToBTCSwapState.REFUNDABLE;
+            await swap._save();
+            return swap;
+        }
+    }
+
 }

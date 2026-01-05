@@ -1,5 +1,13 @@
 import {ISwapPrice} from "../../prices/abstract/ISwapPrice";
-import {BitcoinNetwork, BtcRelay, ChainData, ChainType, Messenger, RelaySynchronizer} from "@atomiqlabs/base";
+import {
+    BitcoinNetwork,
+    BtcRelay,
+    ChainData,
+    ChainSwapType,
+    ChainType,
+    Messenger,
+    RelaySynchronizer
+} from "@atomiqlabs/base";
 import {
     InvoiceCreateService,
     isInvoiceCreateService,
@@ -1577,6 +1585,72 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         } else {
             await this.syncSwapsForChain(chainId, signer);
         }
+    }
+
+    /**
+     * Attempts to recover partial swap data from on-chain historical data
+     *
+     * @param chainId
+     * @param signer
+     * @param startBlockheight
+     */
+    async recoverSwaps<C extends ChainIds<T>>(chainId: C, signer: string, startBlockheight?: number): Promise<ISwap<T[C]>[]> {
+        const {swapContract, unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
+
+        if(swapContract.getHistoricalSwaps==null) throw new Error(`Historical swap recovery is not supported for ${chainId}`);
+
+        const {swaps} = await swapContract.getHistoricalSwaps(signer);
+
+        const knownSwapsArray = await unifiedSwapStorage.query([[{key: "escrowHash", value: Object.keys(swaps)}]], reviver);
+        const knownSwaps: {[escrowHash: string]: ISwap<T[C]>} = {};
+        knownSwapsArray.forEach(val => knownSwaps[val._getEscrowHash()] = val);
+
+        const recoveredSwaps: ISwap<T[C]>[] = [];
+
+        for(let escrowHash in swaps) {
+            const {data, state} = swaps[escrowHash];
+            const knownSwap = knownSwaps[escrowHash];
+            if(data==null) {
+                if(knownSwap==null) this.logger.warn(`recoverSwaps(): Fetched ${escrowHash} swap state, but swap not found locally!`);
+                //TODO: Update the existing swaps here
+                continue;
+            }
+            if(knownSwap!=null) {
+                //TODO: Update the existing swaps here
+                continue;
+            }
+            //Classify swap
+            let swap: ISwap<T[C]>;
+            if(data.getType()===ChainSwapType.HTLC) {
+                if(data.isOfferer(signer)) {
+                    //To BTCLN
+                    const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isClaimer(val.getAddress(chainId)));
+                    swap = await wrappers[SwapType.TO_BTCLN].recoverFromSwapDataAndState(data, state, lp);
+                } else if(data.isClaimer(signer)) {
+                    //From BTCLN
+                    const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isOfferer(val.getAddress(chainId)));
+                    if(this.supportsSwapType(chainId, SwapType.FROM_BTCLN_AUTO)) {
+                        swap = await wrappers[SwapType.FROM_BTCLN_AUTO].recoverFromSwapDataAndState(data, state, lp);
+                    } else {
+                        swap = await wrappers[SwapType.FROM_BTCLN].recoverFromSwapDataAndState(data, state, lp);
+                    }
+                }
+            } else if(data.getType()===ChainSwapType.CHAIN_NONCED) {
+                //To BTC
+                const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isClaimer(val.getAddress(chainId)));
+                swap = await wrappers[SwapType.TO_BTC].recoverFromSwapDataAndState(data, state, lp);
+            } else if(data.getType()===ChainSwapType.CHAIN) {
+                //From BTC
+                const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isOfferer(val.getAddress(chainId)));
+                swap = await wrappers[SwapType.FROM_BTC].recoverFromSwapDataAndState(data, state, lp);
+            }
+            
+            if(swap!=null) {
+                recoveredSwaps.push(swap);
+            }
+        }
+
+        return recoveredSwaps;
     }
 
     getToken(tickerOrAddress: string): Token {

@@ -354,6 +354,14 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * @param signer
      */
     _syncSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<void>;
+    /**
+     * Attempts to recover partial swap data from on-chain historical data
+     *
+     * @param chainId
+     * @param signer
+     * @param startBlockheight
+     */
+    recoverSwaps<C extends ChainIds<T>>(chainId: C, signer: string, startBlockheight?: number): Promise<ISwap<T[C]>[]>;
     getToken(tickerOrAddress: string): Token;
     /**
      * Creates a child swapper instance with a given smart chain

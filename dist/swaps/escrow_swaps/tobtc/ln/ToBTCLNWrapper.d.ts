@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { ToBTCLNSwap } from "./ToBTCLNSwap";
 import { IToBTCWrapper } from "../IToBTCWrapper";
-import { ChainType } from "@atomiqlabs/base";
+import { ChainType, SwapCommitState } from "@atomiqlabs/base";
 import { Intermediary } from "../../../../intermediaries/Intermediary";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../../ISwapWrapper";
 import { ISwapPrice } from "../../../../prices/abstract/ISwapPrice";
@@ -154,4 +154,5 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
         quote: Promise<ToBTCLNSwap<T>>;
         intermediary: Intermediary;
     }[]>;
+    recoverFromSwapDataAndState(data: T["Data"], state: SwapCommitState, lp: Intermediary): Promise<ToBTCLNSwap<T>>;
 }
