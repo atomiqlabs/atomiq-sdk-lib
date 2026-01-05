@@ -12,9 +12,9 @@ import { LnForGasSwap } from "../swaps/trusted/ln/LnForGasSwap";
 import { ISwap } from "../swaps/ISwap";
 export type SwapTypeMapping<T extends ChainType> = {
     [SwapType.FROM_BTC]: SupportsSwapType<T, SwapType.SPV_VAULT_FROM_BTC> extends true ? SpvFromBTCSwap<T> : FromBTCSwap<T>;
-    [SwapType.FROM_BTCLN]: FromBTCLNSwap<T>;
+    [SwapType.FROM_BTCLN]: SupportsSwapType<T, SwapType.FROM_BTCLN_AUTO> extends true ? FromBTCLNAutoSwap<T> : FromBTCLNSwap<T>;
     [SwapType.TO_BTC]: ToBTCSwap<T>;
-    [SwapType.TO_BTCLN]: SupportsSwapType<T, SwapType.FROM_BTCLN_AUTO> extends true ? FromBTCLNAutoSwap<T> : ToBTCLNSwap<T>;
+    [SwapType.TO_BTCLN]: ToBTCLNSwap<T>;
     [SwapType.TRUSTED_FROM_BTC]: OnchainForGasSwap<T>;
     [SwapType.TRUSTED_FROM_BTCLN]: LnForGasSwap<T>;
     [SwapType.SPV_VAULT_FROM_BTC]: SpvFromBTCSwap<T>;
