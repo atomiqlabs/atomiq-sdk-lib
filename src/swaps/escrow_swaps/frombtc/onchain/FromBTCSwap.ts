@@ -501,8 +501,12 @@ export class FromBTCSwap<T extends ChainType = ChainType>
                         options?.bitcoinWallet==null ? {
                             address: this.address,
                             amount: Number(this.amount),
-                            hyperlink: this._getHyperlink()
-                        } : await this.getFundedPsbt(options.bitcoinWallet)
+                            hyperlink: this._getHyperlink(),
+                            type: "ADDRESS"
+                        } : {
+                            ...await this.getFundedPsbt(options.bitcoinWallet),
+                            type: "FUNDED_PSBT"
+                        }
                     ]
                 }
             ];
@@ -519,8 +523,12 @@ export class FromBTCSwap<T extends ChainType = ChainType>
                         options?.bitcoinWallet==null ? {
                             address: this.address,
                             amount: Number(this.amount),
-                            hyperlink: this._getHyperlink()
-                        } : await this.getFundedPsbt(options.bitcoinWallet)
+                            hyperlink: this._getHyperlink(),
+                            type: "ADDRESS"
+                        } : {
+                            ...await this.getFundedPsbt(options.bitcoinWallet),
+                            type: "FUNDED_PSBT"
+                        }
                     ]
                 }
             ];

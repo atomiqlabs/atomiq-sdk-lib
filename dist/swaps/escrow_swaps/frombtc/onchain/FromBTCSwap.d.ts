@@ -163,14 +163,19 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
         description: string;
         chain: string;
         txs: ({
+            address: string;
+            amount: number;
+            hyperlink: string;
+            type: string;
+        } | {
+            type: string;
             psbt: Transaction;
             psbtHex: string;
             psbtBase64: string;
             signInputs: number[];
-        } | {
-            address: string;
-            amount: number;
-            hyperlink: string;
+            address?: undefined;
+            amount?: undefined;
+            hyperlink?: undefined;
         })[];
     })[]>;
     /**

@@ -371,8 +371,12 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
                         options?.bitcoinWallet==null ? {
                             address: this.address,
                             amount: Number(this.inputAmount),
-                            hyperlink: this.getHyperlink()
-                        } : await this.getFundedPsbt(options.bitcoinWallet)
+                            hyperlink: this.getHyperlink(),
+                            type: "ADDRESS"
+                        } : {
+                            ...await this.getFundedPsbt(options.bitcoinWallet),
+                            type: "FUNDED_PSBT"
+                        }
                     ]
                 }
             ];
