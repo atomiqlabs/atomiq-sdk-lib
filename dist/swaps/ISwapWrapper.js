@@ -180,7 +180,7 @@ class ISwapWrapper {
             return Promise.resolve();
         return this.unifiedStorage.remove(swap);
     }
-    recoverFromSwapDataAndState(data, state, lp) {
+    recoverFromSwapDataAndState(init, state, lp) {
         return Promise.resolve(null);
     }
     /**

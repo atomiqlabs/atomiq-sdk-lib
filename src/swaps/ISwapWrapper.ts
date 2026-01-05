@@ -294,7 +294,11 @@ export abstract class ISwapWrapper<
         return this.unifiedStorage.remove(swap);
     }
 
-    recoverFromSwapDataAndState(data: T["Data"], state: SwapCommitState, lp: Intermediary): Promise<S> {
+    recoverFromSwapDataAndState(
+        init: {data: T["Data"], getInitTxId: () => Promise<string>, getTxBlock: () => Promise<{blockTime: number, blockHeight: number}>},
+        state: SwapCommitState,
+        lp: Intermediary
+    ): Promise<S> {
         return Promise.resolve(null);
     }
 

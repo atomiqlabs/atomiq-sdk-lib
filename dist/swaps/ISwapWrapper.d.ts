@@ -119,7 +119,14 @@ export declare abstract class ISwapWrapper<T extends ChainType, S extends ISwap<
     tick(swaps?: S[]): Promise<void>;
     saveSwapData(swap: S): Promise<void>;
     removeSwapData(swap: S): Promise<void>;
-    recoverFromSwapDataAndState(data: T["Data"], state: SwapCommitState, lp: Intermediary): Promise<S>;
+    recoverFromSwapDataAndState(init: {
+        data: T["Data"];
+        getInitTxId: () => Promise<string>;
+        getTxBlock: () => Promise<{
+            blockTime: number;
+            blockHeight: number;
+        }>;
+    }, state: SwapCommitState, lp: Intermediary): Promise<S>;
     /**
      * Un-subscribes from event listeners on Solana
      */

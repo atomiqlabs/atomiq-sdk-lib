@@ -154,5 +154,12 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
         quote: Promise<ToBTCLNSwap<T>>;
         intermediary: Intermediary;
     }[]>;
-    recoverFromSwapDataAndState(data: T["Data"], state: SwapCommitState, lp: Intermediary): Promise<ToBTCLNSwap<T>>;
+    recoverFromSwapDataAndState(init: {
+        data: T["Data"];
+        getInitTxId: () => Promise<string>;
+        getTxBlock: () => Promise<{
+            blockTime: number;
+            blockHeight: number;
+        }>;
+    }, state: SwapCommitState, lp: Intermediary): Promise<ToBTCLNSwap<T>>;
 }

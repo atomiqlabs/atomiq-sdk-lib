@@ -1100,9 +1100,9 @@ class Swapper extends events_1.EventEmitter {
         knownSwapsArray.forEach(val => knownSwaps[val._getEscrowHash()] = val);
         const recoveredSwaps = [];
         for (let escrowHash in swaps) {
-            const { data, state } = swaps[escrowHash];
+            const { init, state } = swaps[escrowHash];
             const knownSwap = knownSwaps[escrowHash];
-            if (data == null) {
+            if (init == null) {
                 if (knownSwap == null)
                     this.logger.warn(`recoverSwaps(): Fetched ${escrowHash} swap state, but swap not found locally!`);
                 //TODO: Update the existing swaps here
@@ -1112,34 +1112,35 @@ class Swapper extends events_1.EventEmitter {
                 //TODO: Update the existing swaps here
                 continue;
             }
+            const data = init.data;
             //Classify swap
             let swap;
             if (data.getType() === base_1.ChainSwapType.HTLC) {
                 if (data.isOfferer(signer)) {
                     //To BTCLN
                     const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isClaimer(val.getAddress(chainId)));
-                    swap = await wrappers[SwapType_1.SwapType.TO_BTCLN].recoverFromSwapDataAndState(data, state, lp);
+                    swap = await wrappers[SwapType_1.SwapType.TO_BTCLN].recoverFromSwapDataAndState(init, state, lp);
                 }
                 else if (data.isClaimer(signer)) {
                     //From BTCLN
                     const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isOfferer(val.getAddress(chainId)));
                     if (this.supportsSwapType(chainId, SwapType_1.SwapType.FROM_BTCLN_AUTO)) {
-                        swap = await wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO].recoverFromSwapDataAndState(data, state, lp);
+                        swap = await wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO].recoverFromSwapDataAndState(init, state, lp);
                     }
                     else {
-                        swap = await wrappers[SwapType_1.SwapType.FROM_BTCLN].recoverFromSwapDataAndState(data, state, lp);
+                        swap = await wrappers[SwapType_1.SwapType.FROM_BTCLN].recoverFromSwapDataAndState(init, state, lp);
                     }
                 }
             }
             else if (data.getType() === base_1.ChainSwapType.CHAIN_NONCED) {
                 //To BTC
                 const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isClaimer(val.getAddress(chainId)));
-                swap = await wrappers[SwapType_1.SwapType.TO_BTC].recoverFromSwapDataAndState(data, state, lp);
+                swap = await wrappers[SwapType_1.SwapType.TO_BTC].recoverFromSwapDataAndState(init, state, lp);
             }
             else if (data.getType() === base_1.ChainSwapType.CHAIN) {
                 //From BTC
                 const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isOfferer(val.getAddress(chainId)));
-                swap = await wrappers[SwapType_1.SwapType.FROM_BTC].recoverFromSwapDataAndState(data, state, lp);
+                swap = await wrappers[SwapType_1.SwapType.FROM_BTC].recoverFromSwapDataAndState(init, state, lp);
             }
             if (swap != null) {
                 recoveredSwaps.push(swap);

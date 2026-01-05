@@ -57,7 +57,7 @@ export abstract class ISwap<
 
     readonly chainIdentifier: T["ChainId"];
     readonly exactIn: boolean;
-    readonly createdAt: number;
+    createdAt: number;
 
     protected version: number;
     protected initiated: boolean = false;

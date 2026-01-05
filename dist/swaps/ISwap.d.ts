@@ -31,7 +31,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     readonly url: string;
     readonly chainIdentifier: T["ChainId"];
     readonly exactIn: boolean;
-    readonly createdAt: number;
+    createdAt: number;
     protected version: number;
     protected initiated: boolean;
     protected logger: LoggerType;
