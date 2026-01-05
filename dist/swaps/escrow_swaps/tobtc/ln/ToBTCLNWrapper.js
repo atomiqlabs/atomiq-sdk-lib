@@ -435,6 +435,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         swap.commitTxId = await init.getInitTxId();
         const blockData = await init.getTxBlock();
         swap.createdAt = blockData.blockTime * 1000;
+        swap._setInitiated();
         switch (state.type) {
             case base_1.SwapCommitStateType.PAID:
                 const secret = await state.getClaimResult();

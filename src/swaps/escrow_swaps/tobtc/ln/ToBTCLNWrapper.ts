@@ -625,6 +625,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         swap.commitTxId = await init.getInitTxId();
         const blockData = await init.getTxBlock();
         swap.createdAt = blockData.blockTime * 1000;
+        swap._setInitiated();
 
         switch(state.type) {
             case SwapCommitStateType.PAID:
