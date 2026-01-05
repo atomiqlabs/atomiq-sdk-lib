@@ -747,6 +747,28 @@ export class SpvFromBTCSwap<T extends ChainType>
         throw new Error("Unexpected state reached!");
     }
 
+    async txsExecute(options?: {
+        bitcoinWallet?: MinimalBitcoinWalletInterface,
+    }) {
+        if(this.state===SpvFromBTCSwapState.CREATED) {
+            if (!await this.verifyQuoteValid()) throw new Error("Quote already expired or close to expiry!");
+            return [
+                {
+                    name: "Payment" as const,
+                    description: "Send funds to the bitcoin swap address",
+                    chain: "BITCOIN",
+                    txs: [
+                        options?.bitcoinWallet==null
+                            ? {...await this.getPsbt(), type: "RAW_PSBT"}
+                            : {...await this.getFundedPsbt(options.bitcoinWallet), type: "FUNDED_PSBT"}
+                    ]
+                }
+            ];
+        }
+
+        throw new Error("Invalid swap state to obtain execution txns, required CREATED");
+    }
+
 
     //////////////////////////////
     //// Bitcoin tx listener

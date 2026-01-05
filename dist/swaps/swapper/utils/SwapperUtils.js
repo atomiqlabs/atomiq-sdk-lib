@@ -104,11 +104,7 @@ class SwapperUtils {
                 address: resultText,
                 type: "BITCOIN",
                 swapType: SwapType_1.SwapType.TO_BTC,
-<<<<<<< HEAD
-                amount: _amount == null ? null : (0, Tokens_1.toTokenAmount)(_amount, Tokens_1.BitcoinTokens.BTC, this.root.prices)
-=======
                 amount: _amount == null ? undefined : (0, Tokens_1.toTokenAmount)(_amount, Tokens_1.BitcoinTokens.BTC, this.root.prices)
->>>>>>> 9d90343 (Merge ts strict (#16))
             };
         }
         return null;
@@ -141,14 +137,14 @@ class SwapperUtils {
                 if (result.min === result.max) {
                     return {
                         ...response,
-                        amount: result.min == null ? null : (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
+                        amount: result.min == null ? undefined : (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
                     };
                 }
                 else {
                     return {
                         ...response,
-                        min: result.min == null ? null : (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices),
-                        max: result.min == null ? null : (0, Tokens_1.toTokenAmount)(result.max, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
+                        min: result.min == null ? undefined : (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices),
+                        max: result.min == null ? undefined : (0, Tokens_1.toTokenAmount)(result.max, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
                     };
                 }
             }
@@ -300,7 +296,7 @@ class SwapperUtils {
             result = await bitcoinWallet.getSpendableBalance(undefined, feeRate);
         }
         return {
-            balance: result.balance == null ? null : (0, Tokens_1.toTokenAmount)(result.balance, Tokens_1.BitcoinTokens.BTC, this.root.prices),
+            balance: (0, Tokens_1.toTokenAmount)(result.balance, Tokens_1.BitcoinTokens.BTC, this.root.prices),
             feeRate: result.feeRate
         };
     }
@@ -335,7 +331,7 @@ class SwapperUtils {
             }
             finalBalance = (0, Utils_1.bigIntMax)(balance - commitFee, 0n);
         }
-        return finalBalance == null ? null : (0, Tokens_1.toTokenAmount)(finalBalance, token, this.root.prices);
+        return (0, Tokens_1.toTokenAmount)(finalBalance, token, this.root.prices);
     }
     /**
      * Returns the address of the native currency of the chain
@@ -364,6 +360,22 @@ class SwapperUtils {
         if (this.root.chains[chainIdentifier] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
         return this.root.chains[chainIdentifier].chainInterface.randomAddress();
+    }
+    /**
+     * Signs and broadcasts the supplied smart chain transaction
+     */
+    sendAndConfirm(chainIdentifier, signer, txs, abortSignal, onBeforePublish) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.sendAndConfirm(signer, txs, true, abortSignal, false, onBeforePublish);
+    }
+    /**
+     * Broadcasts already signed smart chain transactions
+     */
+    sendSignedAndConfirm(chainIdentifier, txs, abortSignal, onBeforePublish) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.sendSignedAndConfirm(txs, true, abortSignal, false, onBeforePublish);
     }
 }
 exports.SwapperUtils = SwapperUtils;

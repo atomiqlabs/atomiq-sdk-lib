@@ -24,6 +24,12 @@ export type PercentagePPM = {
     toString: (decimal?: number) => string;
 };
 export declare function ppmToPercentage(ppm: bigint): PercentagePPM;
+export type SwapExecutionAction<T extends ChainType> = {
+    name: "Payment" | "Commit" | "Claim";
+    description: string;
+    chain: "LIGHTNING" | "BITCOIN" | T["ChainId"];
+    txs: any[];
+};
 export declare abstract class ISwap<T extends ChainType = ChainType, D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D, S>> = SwapTypeDefinition<T, ISwapWrapper<T, any>, ISwap<T, any, any>>, S extends number = number> {
     protected readonly abstract TYPE: SwapType;
     protected readonly abstract logger: LoggerType;
@@ -63,6 +69,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, D extends S
      * @protected
      */
     protected waitTillState(targetState: S, type?: "eq" | "gte" | "neq", abortSignal?: AbortSignal): Promise<void>;
+    abstract txsExecute(options?: any): Promise<SwapExecutionAction<T>[]>;
     protected tryRecomputeSwapPrice(): void;
     /**
      * Re-fetches & revalidates the price data

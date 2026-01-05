@@ -226,6 +226,27 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     //////////////////////////////
     //// Payment
 
+    async txsExecute() {
+        if(this.state===LnForGasSwapState.PR_CREATED) {
+            if (!await this.verifyQuoteValid()) throw new Error("Quote already expired or close to expiry!");
+            return [
+                {
+                    name: "Payment" as const,
+                    description: "Initiates the swap by paying up the lightning network invoice",
+                    chain: "LIGHTNING",
+                    txs: [
+                        {
+                            address: this.pr,
+                            hyperlink: this.getHyperlink()
+                        }
+                    ]
+                }
+            ];
+        }
+
+        throw new Error("Invalid swap state to obtain execution txns, required PR_CREATED");
+    }
+
     protected async checkInvoicePaid(save: boolean = true): Promise<boolean | null> {
         if(this.state===LnForGasSwapState.FAILED || this.state===LnForGasSwapState.EXPIRED) return false;
         if(this.state===LnForGasSwapState.FINISHED) return true;

@@ -13,7 +13,7 @@ import {ISwapPrice, PriceInfoType} from "../prices/abstract/ISwapPrice";
 import {IntermediaryError} from "../errors/IntermediaryError";
 import {getLogger, tryWithRetries} from "../utils/Utils";
 import {SCToken} from "../Tokens";
-import {ChainIds, MultiChain} from "./swapper/Swapper";
+import {ChainIds, MultiChain, SupportsSwapType} from "./swapper/Swapper";
 import {UnifiedSwapEventListener} from "../events/UnifiedSwapEventListener";
 import {SwapType} from "./enums/SwapType";
 import {UnifiedSwapStorage} from "../storage/UnifiedSwapStorage";

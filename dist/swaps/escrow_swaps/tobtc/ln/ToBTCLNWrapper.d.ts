@@ -1,12 +1,7 @@
 /// <reference types="node" />
 import { ToBTCLNSwap } from "./ToBTCLNSwap";
-<<<<<<< HEAD
-import { IToBTCWrapper } from "../IToBTCWrapper";
-import { ChainType, SwapCommitState } from "@atomiqlabs/base";
-=======
 import { IToBTCDefinition, IToBTCWrapper } from "../IToBTCWrapper";
-import { ChainType } from "@atomiqlabs/base";
->>>>>>> 9d90343 (Merge ts strict (#16))
+import { ChainType, SwapCommitState } from "@atomiqlabs/base";
 import { Intermediary } from "../../../../intermediaries/Intermediary";
 import { AmountData, ISwapWrapperOptions, WrapperCtorTokens } from "../../../ISwapWrapper";
 import { ISwapPrice } from "../../../../prices/abstract/ISwapPrice";

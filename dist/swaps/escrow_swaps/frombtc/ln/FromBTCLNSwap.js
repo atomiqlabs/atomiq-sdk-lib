@@ -277,6 +277,57 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
                 callbacks.onSwapSettled(this.getOutputTxId());
         }
     }
+    async txsExecute(options) {
+        if (this.state === FromBTCLNSwapState.PR_CREATED) {
+            if (!await this.verifyQuoteValid())
+                throw new Error("Quote already expired or close to expiry!");
+            return [
+                {
+                    name: "Payment",
+                    description: "Initiates the swap by paying up the lightning network invoice",
+                    chain: "LIGHTNING",
+                    txs: [
+                        {
+                            address: this.pr,
+                            hyperlink: this.getHyperlink()
+                        }
+                    ]
+                }
+            ];
+        }
+        if (this.state === FromBTCLNSwapState.PR_PAID) {
+            if (!await this.verifyQuoteValid())
+                throw new Error("Quote already expired or close to expiry!");
+            const txsCommit = await this.txsCommit(options?.skipChecks);
+            const txsClaim = await this._txsClaim(undefined);
+            return [
+                {
+                    name: "Commit",
+                    description: `Creates the HTLC escrow on the ${this.chainIdentifier} side`,
+                    chain: this.chainIdentifier,
+                    txs: txsCommit
+                },
+                {
+                    name: "Claim",
+                    description: `Settles & claims the funds from the HTLC escrow on the ${this.chainIdentifier} side`,
+                    chain: this.chainIdentifier,
+                    txs: txsClaim
+                },
+            ];
+        }
+        if (this.state === FromBTCLNSwapState.CLAIM_COMMITED) {
+            const txsClaim = await this.txsClaim();
+            return [
+                {
+                    name: "Claim",
+                    description: `Settles & claims the funds from the HTLC escrow on the ${this.chainIdentifier} side`,
+                    chain: this.chainIdentifier,
+                    txs: txsClaim
+                },
+            ];
+        }
+        throw new Error("Invalid swap state to obtain execution txns, required PR_CREATED, PR_PAID or CLAIM_COMMITED");
+    }
     //////////////////////////////
     //// Payment
     /**
@@ -490,6 +541,19 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
     //////////////////////////////
     //// Claim
     /**
+     * Unsafe txs claim getter without state checking!
+     *
+     * @param _signer
+     * @private
+     */
+    async _txsClaim(_signer) {
+        if (this.data == null)
+            throw new Error("Unknown data, wrong state?");
+        return this.wrapper.contract.txsClaimWithSecret(_signer == null ?
+            this._getInitiator() :
+            ((0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer)), this.data, this.secret, true, true);
+    }
+    /**
      * Returns transactions required for claiming the HTLC and finishing the swap by revealing the HTLC secret
      *  (hash preimage)
      *
@@ -499,11 +563,7 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
     async txsClaim(_signer) {
         if (this.state !== FromBTCLNSwapState.CLAIM_COMMITED)
             throw new Error("Must be in CLAIM_COMMITED state!");
-        if (this.data == null)
-            throw new Error("Unknown data, wrong state?");
-        return await this.wrapper.contract.txsClaimWithSecret(_signer == null ?
-            this._getInitiator() :
-            ((0, base_1.isAbstractSigner)(_signer) ? _signer : await this.wrapper.chain.wrapSigner(_signer)), this.data, this.secret, true, true);
+        return this._txsClaim(_signer);
     }
     /**
      * Claims and finishes the swap

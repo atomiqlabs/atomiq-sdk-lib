@@ -132,11 +132,12 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
         return buffer_1.Buffer.concat([paymentHashBuffer, buffer_1.Buffer.from(this.randomNonce, "hex")]);
     }
     getPaymentHash() {
-<<<<<<< HEAD
         if (this.pr == null)
             return null;
         if (this.pr.startsWith("ln")) {
             const parsed = (0, bolt11_1.decode)(this.pr);
+            if (parsed.tagsObject.payment_hash == null)
+                throw new Error("Swap invoice has no payment hash field!");
             return buffer_1.Buffer.from(parsed.tagsObject.payment_hash, "hex");
         }
         return buffer_1.Buffer.from(this.pr, "hex");
@@ -146,21 +147,11 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
             return this.data.getEscrowHash();
         if (this.pr.startsWith("ln")) {
             const parsed = (0, bolt11_1.decode)(this.pr);
+            if (parsed.tagsObject.payment_hash == null)
+                throw new Error("Swap invoice has no payment hash field!");
             return parsed.tagsObject.payment_hash;
         }
         return this.pr;
-=======
-        const parsed = (0, bolt11_1.decode)(this.pr);
-        if (parsed.tagsObject.payment_hash == null)
-            throw new Error("Swap invoice has no payment hash field!");
-        return buffer_1.Buffer.from(parsed.tagsObject.payment_hash, "hex");
-    }
-    getLpIdentifier() {
-        const parsed = (0, bolt11_1.decode)(this.pr);
-        if (parsed.tagsObject.payment_hash == null)
-            throw new Error("Swap invoice has no payment hash field!");
-        return parsed.tagsObject.payment_hash;
->>>>>>> 9d90343 (Merge ts strict (#16))
     }
     //////////////////////////////
     //// LNURL-pay
