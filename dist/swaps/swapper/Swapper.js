@@ -1095,9 +1095,11 @@ class Swapper extends events_1.EventEmitter {
         if (swapContract.getHistoricalSwaps == null)
             throw new Error(`Historical swap recovery is not supported for ${chainId}`);
         const { swaps } = await swapContract.getHistoricalSwaps(signer);
+        this.logger.debug(`recoverSwaps(): Fetching if swap escrowHashes are known: ${Object.keys(swaps)}`);
         const knownSwapsArray = await unifiedSwapStorage.query([[{ key: "escrowHash", value: Object.keys(swaps) }]], reviver);
         const knownSwaps = {};
         knownSwapsArray.forEach(val => knownSwaps[val._getEscrowHash()] = val);
+        this.logger.debug(`recoverSwaps(): Fetched known swaps escrowHashes: ${Object.keys(knownSwaps)}`);
         const recoveredSwaps = [];
         for (let escrowHash in swaps) {
             const { init, state } = swaps[escrowHash];

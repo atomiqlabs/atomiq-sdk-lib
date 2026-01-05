@@ -1601,9 +1601,11 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
 
         const {swaps} = await swapContract.getHistoricalSwaps(signer);
 
+        this.logger.debug(`recoverSwaps(): Fetching if swap escrowHashes are known: ${Object.keys(swaps)}`);
         const knownSwapsArray = await unifiedSwapStorage.query([[{key: "escrowHash", value: Object.keys(swaps)}]], reviver);
         const knownSwaps: {[escrowHash: string]: ISwap<T[C]>} = {};
         knownSwapsArray.forEach(val => knownSwaps[val._getEscrowHash()] = val);
+        this.logger.debug(`recoverSwaps(): Fetched known swaps escrowHashes: ${Object.keys(knownSwaps)}`);
 
         const recoveredSwaps: ISwap<T[C]>[] = [];
 
