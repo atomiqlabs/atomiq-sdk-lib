@@ -86,6 +86,7 @@ __exportStar(require("./swaps/trusted/onchain/OnchainForGasWrapper"), exports);
 __exportStar(require("./swaps/spv_swaps/SpvFromBTCSwap"), exports);
 __exportStar(require("./swaps/spv_swaps/SpvFromBTCWrapper"), exports);
 __exportStar(require("./utils/LNURL"), exports);
+__exportStar(require("./utils/SwapUtils"), exports);
 __exportStar(require("./storage/IUnifiedStorage"), exports);
 __exportStar(require("./browser-storage/IndexedDBUnifiedStorage"), exports);
 __exportStar(require("./swaps/fee/Fee"), exports);

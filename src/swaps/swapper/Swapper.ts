@@ -27,7 +27,7 @@ import {EventEmitter} from "events";
 import {MempoolBitcoinBlock} from "../../btc/mempool/MempoolBitcoinBlock";
 import {Intermediary} from "../../intermediaries/Intermediary";
 import {isLNURLPay, isLNURLWithdraw, LNURLPay, LNURLWithdraw} from "../../utils/LNURL";
-import {AmountData, isSwapType, ISwapWrapper, SwapTypeMapping, WrapperCtorTokens} from "../ISwapWrapper";
+import {AmountData, ISwapWrapper, WrapperCtorTokens} from "../ISwapWrapper";
 import {
     bigIntCompare,
     bigIntMax,
@@ -71,6 +71,7 @@ import {UserError} from "../../errors/UserError";
 import {SwapAmountType} from "../enums/SwapAmountType";
 import {IClaimableSwap} from "../IClaimableSwap";
 import {correctClock} from "../../utils/AutomaticClockDriftCorrection";
+import {isSwapType, SwapTypeMapping} from "../../utils/SwapUtils";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],

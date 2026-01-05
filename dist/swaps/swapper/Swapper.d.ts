@@ -20,7 +20,7 @@ import { EventEmitter } from "events";
 import { MempoolBitcoinBlock } from "../../btc/mempool/MempoolBitcoinBlock";
 import { Intermediary } from "../../intermediaries/Intermediary";
 import { LNURLPay, LNURLWithdraw } from "../../utils/LNURL";
-import { SwapTypeMapping, WrapperCtorTokens } from "../ISwapWrapper";
+import { WrapperCtorTokens } from "../ISwapWrapper";
 import { SwapperWithChain } from "./SwapperWithChain";
 import { BtcToken, SCToken, Token, TokenAmount } from "../../Tokens";
 import { OnchainForGasSwap } from "../trusted/onchain/OnchainForGasSwap";
@@ -37,6 +37,7 @@ import { FromBTCLNAutoOptions, FromBTCLNAutoWrapper } from "../escrow_swaps/from
 import { FromBTCLNAutoSwap } from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
 import { SwapAmountType } from "../enums/SwapAmountType";
 import { IClaimableSwap } from "../IClaimableSwap";
+import { SwapTypeMapping } from "../../utils/SwapUtils";
 export type SwapperOptions = {
     intermediaryUrl?: string | string[];
     registryUrl?: string;

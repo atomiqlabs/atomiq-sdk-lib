@@ -1,20 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ISwapWrapper = exports.isSwapType = void 0;
+exports.ISwapWrapper = void 0;
 const events_1 = require("events");
 const IntermediaryError_1 = require("../errors/IntermediaryError");
 const Utils_1 = require("../utils/Utils");
-const SwapType_1 = require("./enums/SwapType");
-const SpvFromBTCSwap_1 = require("./spv_swaps/SpvFromBTCSwap");
-const FromBTCLNAutoSwap_1 = require("./escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap");
-function isSwapType(swap, swapType) {
-    if (swap instanceof (SpvFromBTCSwap_1.SpvFromBTCSwap) && swapType === SwapType_1.SwapType.FROM_BTC)
-        return true;
-    if (swap instanceof (FromBTCLNAutoSwap_1.FromBTCLNAutoSwap) && swapType === SwapType_1.SwapType.FROM_BTCLN)
-        return true;
-    return swap != null && swap.getType() === swapType;
-}
-exports.isSwapType = isSwapType;
 class ISwapWrapper {
     /**
      * @param chainIdentifier
