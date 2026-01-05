@@ -71,6 +71,7 @@ import {UserError} from "../../errors/UserError";
 import {SwapAmountType} from "../enums/SwapAmountType";
 import {IClaimableSwap} from "../IClaimableSwap";
 import {correctClock} from "../../utils/AutomaticClockDriftCorrection";
+import {isSwapType, SwapTypeMapping} from "../../utils/SwapUtils";
 
 export type SwapperOptions = {
     intermediaryUrl?: string | string[],
@@ -1357,7 +1358,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     getAllSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
     async getAllSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<ISwap[]> {
         const queryParams: QueryParams[] = [];
-        if(signer!=null) queryParams.push({key: "intiator", value: signer});
+        if(signer!=null) queryParams.push({key: "initiator", value: signer});
 
         if(chainId==null) {
             const res: ISwap[][] = await Promise.all(Object.keys(this.chains).map((chainId) => {
@@ -1387,7 +1388,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 for(let key in wrappers) {
                     const wrapper = wrappers[key as unknown as SwapType];
                     const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
-                    if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+                    if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
                     swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
                     queryParams.push(swapTypeQueryParams);
                 }
@@ -1400,7 +1401,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             for(let key in wrappers) {
                 const wrapper = wrappers[key as unknown as SwapType];
                 const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
-                if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+                if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
                 swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
                 queryParams.push(swapTypeQueryParams);
             }
@@ -1521,7 +1522,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         }
 
         const queryParams: QueryParams[] = [];
-        if(signer!=null) queryParams.push({key: "intiator", value: signer});
+        if(signer!=null) queryParams.push({key: "initiator", value: signer});
         queryParams.push({key: "id", value: id});
         if(chainId==null) {
             const res: ISwap[][] = await Promise.all(Object.keys(this.chains).map((chainId) => {
@@ -1535,13 +1536,48 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         }
     }
 
+    /**
+     * Returns the swap with a proper return type, or undefined, if not found, or has wrong type
+     *
+     * @param id
+     * @param chainId
+     * @param swapType
+     * @param signer
+     */
+    async getTypedSwapById<C extends ChainIds<T>, S extends SwapType>(id: string, chainId: C, swapType: S, signer?: string): Promise<SwapTypeMapping<T[C]>[S] | undefined> {
+        let _swapType: SwapType = swapType;
+        if(swapType===SwapType.FROM_BTC && this.supportsSwapType(chainId, SwapType.SPV_VAULT_FROM_BTC))
+            _swapType = SwapType.SPV_VAULT_FROM_BTC;
+        if(swapType===SwapType.FROM_BTCLN && this.supportsSwapType(chainId, SwapType.FROM_BTCLN_AUTO))
+            _swapType = SwapType.FROM_BTCLN_AUTO;
+
+        const wrapper = this.chains[chainId].wrappers[_swapType];
+        if(wrapper==null) return;
+
+        const result = wrapper.pendingSwaps.get(id)?.deref();
+        if(result!=null) {
+            if (signer != null) {
+                if (result._getInitiator() === signer) return result as any;
+            } else {
+                return result as any;
+            }
+        }
+
+        const queryParams: QueryParams[] = [];
+        if(signer!=null) queryParams.push({key: "initiator", value: signer});
+        queryParams.push({key: "id", value: id});
+        const {unifiedSwapStorage, reviver} = this.chains[chainId];
+        const swap = (await unifiedSwapStorage.query([queryParams], reviver))[0];
+        if(isSwapType(swap, swapType)) return swap;
+    }
+
     private async syncSwapsForChain<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<void> {
         const {unifiedSwapStorage, reviver, wrappers} = this.chains[chainId];
         const queryParams: Array<QueryParams[]> = [];
         for(let key in wrappers) {
             const wrapper = wrappers[key as unknown as SwapType];
             const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
-            if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+            if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
             swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
             queryParams.push(swapTypeQueryParams);
         }

@@ -135,6 +135,15 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
         lightningTxCheckIntervalSeconds?: number;
         maxWaitTillAutomaticSettlementSeconds?: number;
     }): Promise<boolean>;
+    txsExecute(): Promise<{
+        name: "Payment";
+        description: string;
+        chain: string;
+        txs: {
+            address: string;
+            hyperlink: string;
+        }[];
+    }[]>;
     /**
      * Checks whether the LP received the LN payment and we can continue by committing & claiming the HTLC on-chain
      *

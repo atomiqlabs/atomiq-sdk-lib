@@ -37,6 +37,7 @@ import { FromBTCLNAutoOptions, FromBTCLNAutoWrapper } from "../escrow_swaps/from
 import { FromBTCLNAutoSwap } from "../escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
 import { SwapAmountType } from "../enums/SwapAmountType";
 import { IClaimableSwap } from "../IClaimableSwap";
+import { SwapTypeMapping } from "../../utils/SwapUtils";
 export type SwapperOptions = {
     intermediaryUrl?: string | string[];
     registryUrl?: string;
@@ -346,6 +347,15 @@ export declare class Swapper<T extends MultiChain> extends EventEmitter<{
      * Returns swap with a specific id (identifier) on a specific chain and optionally with a signer
      */
     getSwapById<C extends ChainIds<T>>(id: string, chainId: C, signer?: string): Promise<ISwap<T[C]>>;
+    /**
+     * Returns the swap with a proper return type, or undefined, if not found, or has wrong type
+     *
+     * @param id
+     * @param chainId
+     * @param swapType
+     * @param signer
+     */
+    getTypedSwapById<C extends ChainIds<T>, S extends SwapType>(id: string, chainId: C, swapType: S, signer?: string): Promise<SwapTypeMapping<T[C]>[S] | undefined>;
     private syncSwapsForChain;
     /**
      * Synchronizes swaps from chain, this is usually ran when SDK is initialized, deletes expired quotes

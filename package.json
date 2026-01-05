@@ -1,6 +1,6 @@
 {
   "name": "@atomiqlabs/sdk-lib",
-  "version": "16.3.2",
+  "version": "17.0.2",
   "description": "Basic SDK functionality library for atomiq",
   "main": "./dist/index.js",
   "types:": "./dist/index.d.ts",
@@ -24,7 +24,7 @@
   "author": "adambor",
   "license": "ISC",
   "dependencies": {
-    "@atomiqlabs/base": "github:atomiqlabs/atomiq-base#ab/ts-strict",
+    "@atomiqlabs/base": "github:atomiqlabs/atomiq-base#ab/signed-txs",
     "@atomiqlabs/bolt11": "1.6.1",
     "@noble/ciphers": "^1.2.1",
     "@noble/hashes": "^1.7.1",

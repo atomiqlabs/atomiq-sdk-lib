@@ -13,10 +13,18 @@ import {ISwapPrice, PriceInfoType} from "../prices/abstract/ISwapPrice";
 import {IntermediaryError} from "../errors/IntermediaryError";
 import {getLogger, tryWithRetries} from "../utils/Utils";
 import {SCToken} from "../Tokens";
-import {ChainIds, MultiChain} from "./swapper/Swapper";
+import {ChainIds, MultiChain, SupportsSwapType} from "./swapper/Swapper";
 import {UnifiedSwapEventListener} from "../events/UnifiedSwapEventListener";
 import {SwapType} from "./enums/SwapType";
 import {UnifiedSwapStorage} from "../storage/UnifiedSwapStorage";
+import {SpvFromBTCSwap} from "./spv_swaps/SpvFromBTCSwap";
+import {FromBTCSwap} from "./escrow_swaps/frombtc/onchain/FromBTCSwap";
+import {FromBTCLNSwap} from "./escrow_swaps/frombtc/ln/FromBTCLNSwap";
+import {ToBTCSwap} from "./escrow_swaps/tobtc/onchain/ToBTCSwap";
+import {FromBTCLNAutoSwap} from "./escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
+import {ToBTCLNSwap} from "./escrow_swaps/tobtc/ln/ToBTCLNSwap";
+import {OnchainForGasSwap} from "./trusted/onchain/OnchainForGasSwap";
+import {LnForGasSwap} from "./trusted/ln/LnForGasSwap";
 
 export type AmountData = {
     amount: bigint,

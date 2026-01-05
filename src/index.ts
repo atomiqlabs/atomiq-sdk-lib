@@ -75,6 +75,7 @@ export * from "./swaps/spv_swaps/SpvFromBTCSwap";
 export * from "./swaps/spv_swaps/SpvFromBTCWrapper";
 
 export * from "./utils/LNURL";
+export * from "./utils/SwapUtils";
 
 export * from "./storage/IUnifiedStorage";
 export * from "./browser-storage/IndexedDBUnifiedStorage";

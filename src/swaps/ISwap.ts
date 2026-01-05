@@ -7,6 +7,15 @@ import {LoggerType, randomBytes, toBigInt} from "../utils/Utils";
 import {SCToken, TokenAmount} from "../Tokens";
 import {SwapDirection} from "./enums/SwapDirection";
 import {Fee, FeeBreakdown} from "./fee/Fee";
+import {LnForGasSwap} from "./trusted/ln/LnForGasSwap";
+import {FromBTCSwap} from "./escrow_swaps/frombtc/onchain/FromBTCSwap";
+import {FromBTCLNSwap} from "./escrow_swaps/frombtc/ln/FromBTCLNSwap";
+import {ToBTCSwap} from "./escrow_swaps/tobtc/onchain/ToBTCSwap";
+import {ToBTCLNSwap} from "./escrow_swaps/tobtc/ln/ToBTCLNSwap";
+import {OnchainForGasSwap} from "./trusted/onchain/OnchainForGasSwap";
+import {SpvFromBTCSwap} from "./spv_swaps/SpvFromBTCSwap";
+import {FromBTCLNAutoSwap} from "./escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
+import {SupportsSwapType} from "./swapper/Swapper";
 
 export type ISwapInit = {
     pricingInfo: PriceInfoType,
@@ -44,6 +53,13 @@ export function ppmToPercentage(ppm: bigint): PercentagePPM {
         toString: (decimals?: number) => (decimals!=null ? percentage.toFixed(decimals) : percentage)+"%"
     }
 }
+
+export type SwapExecutionAction<T extends ChainType> = {
+    name: "Payment" | "Commit" | "Claim",
+    description: string,
+    chain: "LIGHTNING" | "BITCOIN" | T["ChainId"],
+    txs: any[]
+};
 
 export abstract class ISwap<
     T extends ChainType = ChainType,
@@ -164,6 +180,7 @@ export abstract class ISwap<
         });
     }
 
+    abstract txsExecute(options?: any): Promise<SwapExecutionAction<T>[]>;
 
     //////////////////////////////
     //// Pricing

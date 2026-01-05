@@ -361,5 +361,21 @@ class SwapperUtils {
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
         return this.root.chains[chainIdentifier].chainInterface.randomAddress();
     }
+    /**
+     * Signs and broadcasts the supplied smart chain transaction
+     */
+    sendAndConfirm(chainIdentifier, signer, txs, abortSignal, onBeforePublish) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.sendAndConfirm(signer, txs, true, abortSignal, false, onBeforePublish);
+    }
+    /**
+     * Broadcasts already signed smart chain transactions
+     */
+    sendSignedAndConfirm(chainIdentifier, txs, abortSignal, onBeforePublish) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.sendSignedAndConfirm(txs, true, abortSignal, false, onBeforePublish);
+    }
 }
 exports.SwapperUtils = SwapperUtils;

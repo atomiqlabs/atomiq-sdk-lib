@@ -131,4 +131,12 @@ export declare class SwapperUtils<T extends MultiChain> {
      * @param chainIdentifier
      */
     randomAddress<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): string;
+    /**
+     * Signs and broadcasts the supplied smart chain transaction
+     */
+    sendAndConfirm<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: T[ChainIdentifier]["NativeSigner"] | T[ChainIdentifier]["Signer"], txs: T[ChainIdentifier]["TX"][], abortSignal?: AbortSignal, onBeforePublish?: (txId: string, rawTx: string) => Promise<void>): Promise<string[]>;
+    /**
+     * Broadcasts already signed smart chain transactions
+     */
+    sendSignedAndConfirm<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, txs: T[ChainIdentifier]["SignedTXType"][], abortSignal?: AbortSignal, onBeforePublish?: (txId: string, rawTx: string) => Promise<void>): Promise<string[]>;
 }

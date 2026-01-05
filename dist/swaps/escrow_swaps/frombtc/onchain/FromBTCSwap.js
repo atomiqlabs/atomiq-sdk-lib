@@ -95,10 +95,18 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
             throw new Error("Cannot get bitcoin address of non-committed swap");
         return this.address;
     }
+    /**
+     * Unsafe bitcoin hyperlink getter, returns the address even before the swap is committed!
+     *
+     * @private
+     */
+    _getHyperlink() {
+        return "bitcoin:" + this.address + "?amount=" + encodeURIComponent((Number(this.amount) / 100000000).toString(10));
+    }
     getHyperlink() {
         if (this.state === FromBTCSwapState.PR_CREATED)
             throw new Error("Cannot get bitcoin address of non-committed swap");
-        return "bitcoin:" + this.address + "?amount=" + encodeURIComponent((Number(this.amount) / 100000000).toString(10));
+        return this._getHyperlink();
     }
     getInputTxId() {
         return this.txId ?? null;
@@ -209,9 +217,12 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
      * @param feeRate Optional fee rate for the transaction, needs to be at least as big as {minimumBtcFeeRate} field
      * @param additionalOutputs additional outputs to add to the PSBT - can be used to collect fees from users
      */
-    async getFundedPsbt(_bitcoinWallet, feeRate, additionalOutputs) {
+    getFundedPsbt(_bitcoinWallet, feeRate, additionalOutputs) {
         if (this.state !== FromBTCSwapState.CLAIM_COMMITED)
             throw new Error("Swap not committed yet, please initiate the swap first with commit() call!");
+        return this._getFundedPsbt(_bitcoinWallet, feeRate, additionalOutputs);
+    }
+    async _getFundedPsbt(_bitcoinWallet, feeRate, additionalOutputs) {
         let bitcoinWallet;
         if ((0, IBitcoinWallet_1.isIBitcoinWallet)(_bitcoinWallet)) {
             bitcoinWallet = _bitcoinWallet;
@@ -353,6 +364,61 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
             return success;
         }
         throw new Error("Invalid state reached!");
+    }
+    async txsExecute(options) {
+        if (this.state === FromBTCSwapState.PR_CREATED) {
+            if (!await this.verifyQuoteValid())
+                throw new Error("Quote already expired or close to expiry!");
+            if (this.getTimeoutTime() < Date.now())
+                throw new Error("Swap address already expired or close to expiry!");
+            return [
+                {
+                    name: "Commit",
+                    description: `Opens up the bitcoin swap address on the ${this.chainIdentifier} side`,
+                    chain: this.chainIdentifier,
+                    txs: await this.txsCommit(options?.skipChecks)
+                },
+                {
+                    name: "Payment",
+                    description: "Send funds to the bitcoin swap address",
+                    chain: "BITCOIN",
+                    txs: [
+                        options?.bitcoinWallet == null ? {
+                            address: this.address,
+                            amount: Number(this.amount),
+                            hyperlink: this._getHyperlink(),
+                            type: "ADDRESS"
+                        } : {
+                            ...await this.getFundedPsbt(options.bitcoinWallet),
+                            type: "FUNDED_PSBT"
+                        }
+                    ]
+                }
+            ];
+        }
+        if (this.state === FromBTCSwapState.CLAIM_COMMITED) {
+            if (this.getTimeoutTime() < Date.now())
+                throw new Error("Swap address already expired or close to expiry!");
+            return [
+                {
+                    name: "Payment",
+                    description: "Send funds to the bitcoin swap address",
+                    chain: "BITCOIN",
+                    txs: [
+                        options?.bitcoinWallet == null ? {
+                            address: this.address,
+                            amount: Number(this.amount),
+                            hyperlink: this._getHyperlink(),
+                            type: "ADDRESS"
+                        } : {
+                            ...await this.getFundedPsbt(options.bitcoinWallet),
+                            type: "FUNDED_PSBT"
+                        }
+                    ]
+                }
+            ];
+        }
+        throw new Error("Invalid swap state to obtain execution txns, required PR_CREATED or CLAIM_COMMITED");
     }
     //////////////////////////////
     //// Commit
