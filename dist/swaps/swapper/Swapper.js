@@ -877,7 +877,7 @@ class Swapper extends events_1.EventEmitter {
     async getAllSwaps(chainId, signer) {
         const queryParams = [];
         if (signer != null)
-            queryParams.push({ key: "intiator", value: signer });
+            queryParams.push({ key: "initiator", value: signer });
         if (chainId == null) {
             const res = await Promise.all(Object.keys(this.chains).map((chainId) => {
                 const { unifiedSwapStorage, reviver } = this.chains[chainId];
@@ -899,7 +899,7 @@ class Swapper extends events_1.EventEmitter {
                     const wrapper = wrappers[key];
                     const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
                     if (signer != null)
-                        swapTypeQueryParams.push({ key: "intiator", value: signer });
+                        swapTypeQueryParams.push({ key: "initiator", value: signer });
                     swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });
                     queryParams.push(swapTypeQueryParams);
                 }
@@ -914,7 +914,7 @@ class Swapper extends events_1.EventEmitter {
                 const wrapper = wrappers[key];
                 const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
                 if (signer != null)
-                    swapTypeQueryParams.push({ key: "intiator", value: signer });
+                    swapTypeQueryParams.push({ key: "initiator", value: signer });
                 swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });
                 queryParams.push(swapTypeQueryParams);
             }
@@ -1021,7 +1021,7 @@ class Swapper extends events_1.EventEmitter {
         }
         const queryParams = [];
         if (signer != null)
-            queryParams.push({ key: "intiator", value: signer });
+            queryParams.push({ key: "initiator", value: signer });
         queryParams.push({ key: "id", value: id });
         if (chainId == null) {
             const res = await Promise.all(Object.keys(this.chains).map((chainId) => {
@@ -1042,7 +1042,7 @@ class Swapper extends events_1.EventEmitter {
             const wrapper = wrappers[key];
             const swapTypeQueryParams = [{ key: "type", value: wrapper.TYPE }];
             if (signer != null)
-                swapTypeQueryParams.push({ key: "intiator", value: signer });
+                swapTypeQueryParams.push({ key: "initiator", value: signer });
             swapTypeQueryParams.push({ key: "state", value: wrapper.pendingSwapStates });
             queryParams.push(swapTypeQueryParams);
         }

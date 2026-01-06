@@ -1357,7 +1357,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
     getAllSwaps<C extends ChainIds<T>>(chainId: C, signer?: string): Promise<ISwap<T[C]>[]>;
     async getAllSwaps<C extends ChainIds<T>>(chainId?: C, signer?: string): Promise<ISwap[]> {
         const queryParams: QueryParams[] = [];
-        if(signer!=null) queryParams.push({key: "intiator", value: signer});
+        if(signer!=null) queryParams.push({key: "initiator", value: signer});
 
         if(chainId==null) {
             const res: ISwap[][] = await Promise.all(Object.keys(this.chains).map((chainId) => {
@@ -1387,7 +1387,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 for(let key in wrappers) {
                     const wrapper = wrappers[key];
                     const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
-                    if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+                    if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
                     swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
                     queryParams.push(swapTypeQueryParams);
                 }
@@ -1400,7 +1400,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             for(let key in wrappers) {
                 const wrapper = wrappers[key];
                 const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
-                if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+                if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
                 swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
                 queryParams.push(swapTypeQueryParams);
             }
@@ -1521,7 +1521,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         }
 
         const queryParams: QueryParams[] = [];
-        if(signer!=null) queryParams.push({key: "intiator", value: signer});
+        if(signer!=null) queryParams.push({key: "initiator", value: signer});
         queryParams.push({key: "id", value: id});
         if(chainId==null) {
             const res: ISwap[][] = await Promise.all(Object.keys(this.chains).map((chainId) => {
@@ -1541,7 +1541,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         for(let key in wrappers) {
             const wrapper = wrappers[key];
             const swapTypeQueryParams: QueryParams[] = [{key: "type", value: wrapper.TYPE}];
-            if(signer!=null) swapTypeQueryParams.push({key: "intiator", value: signer});
+            if(signer!=null) swapTypeQueryParams.push({key: "initiator", value: signer});
             swapTypeQueryParams.push({key: "state", value: wrapper.pendingSwapStates});
             queryParams.push(swapTypeQueryParams);
         }
