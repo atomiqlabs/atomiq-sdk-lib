@@ -1120,12 +1120,12 @@ class Swapper extends events_1.EventEmitter {
             if (data.getType() === base_1.ChainSwapType.HTLC) {
                 if (data.isOfferer(signer)) {
                     //To BTCLN
-                    const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isClaimer(val.getAddress(chainId)));
+                    const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isClaimer(val.getAddress(chainId)));
                     swap = await wrappers[SwapType_1.SwapType.TO_BTCLN].recoverFromSwapDataAndState(init, state, lp);
                 }
                 else if (data.isClaimer(signer)) {
                     //From BTCLN
-                    const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isOfferer(val.getAddress(chainId)));
+                    const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isOfferer(val.getAddress(chainId)));
                     if (this.supportsSwapType(chainId, SwapType_1.SwapType.FROM_BTCLN_AUTO)) {
                         swap = await wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO].recoverFromSwapDataAndState(init, state, lp);
                     }
@@ -1136,12 +1136,12 @@ class Swapper extends events_1.EventEmitter {
             }
             else if (data.getType() === base_1.ChainSwapType.CHAIN_NONCED) {
                 //To BTC
-                const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isClaimer(val.getAddress(chainId)));
+                const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isClaimer(val.getAddress(chainId)));
                 swap = await wrappers[SwapType_1.SwapType.TO_BTC].recoverFromSwapDataAndState(init, state, lp);
             }
             else if (data.getType() === base_1.ChainSwapType.CHAIN) {
                 //From BTC
-                const lp = this.intermediaryDiscovery.intermediaries.find(val => data.isOfferer(val.getAddress(chainId)));
+                const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isOfferer(val.getAddress(chainId)));
                 swap = await wrappers[SwapType_1.SwapType.FROM_BTC].recoverFromSwapDataAndState(init, state, lp);
             }
             if (swap != null) {
