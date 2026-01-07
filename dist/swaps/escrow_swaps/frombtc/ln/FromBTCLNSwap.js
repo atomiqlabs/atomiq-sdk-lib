@@ -118,7 +118,7 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
         return this.state === FromBTCLNSwapState.PR_PAID;
     }
     getInputAddress() {
-        return this.pr;
+        return this.lnurl ?? this.pr;
     }
     getInputTxId() {
         return this.getPaymentHash().toString("hex");
