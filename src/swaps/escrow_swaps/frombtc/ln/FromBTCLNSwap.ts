@@ -165,7 +165,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType>
     }
 
     getInputAddress(): string | null {
-        return this.pr;
+        return this.lnurl ?? this.pr;
     }
 
     getInputTxId(): string {

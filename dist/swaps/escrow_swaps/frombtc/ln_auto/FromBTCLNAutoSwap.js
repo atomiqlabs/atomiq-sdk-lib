@@ -140,7 +140,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         return buffer_1.Buffer.from(decodedPR.tagsObject.payment_hash, "hex");
     }
     getInputAddress() {
-        return this.pr;
+        return this.lnurl ?? this.pr;
     }
     getInputTxId() {
         return this.getPaymentHash().toString("hex");
