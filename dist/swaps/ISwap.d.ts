@@ -97,6 +97,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, D extends S
      * Checks if the swap's quote is still valid
      */
     abstract verifyQuoteValid(): Promise<boolean>;
+    abstract getInputAddress(): string | null;
     abstract getOutputAddress(): string | null;
     abstract getInputTxId(): string | null;
     abstract getOutputTxId(): string | null;

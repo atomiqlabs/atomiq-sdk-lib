@@ -11,7 +11,7 @@ import {SwapType} from "../enums/SwapType";
 import {SpvFromBTCTypeDefinition, SpvFromBTCWrapper} from "./SpvFromBTCWrapper";
 import {
     extendAbortController,
-    getLogger, LoggerType,
+    getLogger, getTxoHash, LoggerType,
     timeoutPromise
 } from "../../utils/Utils";
 import {
@@ -21,7 +21,7 @@ import {
 import {
     parsePsbtTransaction,toBitcoinWallet
 } from "../../utils/BitcoinHelpers";
-import {getInputType, Transaction} from "@scure/btc-signer";
+import {Address, getInputType, OutScript, Transaction} from "@scure/btc-signer";
 import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
 import {Buffer} from "buffer";
 import {Fee, FeeType} from "../fee/Fee";
@@ -34,6 +34,7 @@ import {
     MinimalBitcoinWalletInterfaceWithSigner
 } from "../../btc/wallet/MinimalBitcoinWalletInterface";
 import {IClaimableSwap} from "../IClaimableSwap";
+import {BtcTxWithBlockheight} from "../../btc/BitcoinRpcWithAddressIndex";
 
 export enum SpvFromBTCSwapState {
     CLOSED = -5,
@@ -145,6 +146,8 @@ export class SpvFromBTCSwap<T extends ChainType>
 
     readonly genesisSmartChainBlockHeight: number;
 
+    senderAddress?: string;
+
     claimTxId?: string;
     frontTxId?: string;
     data?: T["SpvVaultWithdrawalData"];
@@ -208,6 +211,7 @@ export class SpvFromBTCSwap<T extends ChainType>
             this.frontingFeeShare = BigInt(initOrObject.frontingFeeShare);
             this.executionFeeShare = BigInt(initOrObject.executionFeeShare);
             this.genesisSmartChainBlockHeight = initOrObject.genesisSmartChainBlockHeight;
+            this.senderAddress = initOrObject.senderAddress;
             this.claimTxId = initOrObject.claimTxId;
             this.frontTxId = initOrObject.frontTxId;
             if(initOrObject.data!=null) this.data = new this.wrapper.spvWithdrawalDataDeserializer(initOrObject.data);
@@ -285,6 +289,10 @@ export class SpvFromBTCSwap<T extends ChainType>
 
     getOutputTxId(): string | null {
         return this.frontTxId ?? this.claimTxId ?? null;
+    }
+
+    getInputAddress(): string | null {
+        return this.senderAddress ?? null;
     }
 
     getInputTxId(): string | null {
@@ -779,7 +787,8 @@ export class SpvFromBTCSwap<T extends ChainType>
     protected async getBitcoinPayment(): Promise<{
         txId: string,
         confirmations: number,
-        targetConfirmations: number
+        targetConfirmations: number,
+        inputAddresses?: string[]
     } | null> {
         if(this.data?.btcTx?.txid==null) return null;
 
@@ -789,7 +798,8 @@ export class SpvFromBTCSwap<T extends ChainType>
         return {
             txId: result.txid,
             confirmations: result.confirmations ?? 0,
-            targetConfirmations: this.vaultRequiredConfirmations
+            targetConfirmations: this.vaultRequiredConfirmations,
+            inputAddresses: result.inputAddresses
         }
     }
 
@@ -816,12 +826,19 @@ export class SpvFromBTCSwap<T extends ChainType>
         const result = await this.wrapper.btcRpc.waitForTransaction(
             this.data.btcTx.txid,
             this.vaultRequiredConfirmations,
-            (confirmations?: number, txId?: string, txEtaMs?: number) => {
-                if(updateCallback!=null) updateCallback(txId, confirmations, this.vaultRequiredConfirmations, txEtaMs);
-                if(
-                    txId!=null &&
-                    (this.state===SpvFromBTCSwapState.POSTED || this.state==SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED)
-                ) this._saveAndEmit(SpvFromBTCSwapState.BROADCASTED);
+            (btcTx?: BtcTxWithBlockheight, txEtaMs?: number) => {
+                if(updateCallback!=null) updateCallback(btcTx?.txid, btcTx?.confirmations, this.vaultRequiredConfirmations, txEtaMs);
+                if(btcTx==null) return;
+                let save = false;
+                if(btcTx.inputAddresses!=null && this.senderAddress==null) {
+                    this.senderAddress = btcTx.inputAddresses[0];
+                    save = true;
+                }
+                if(this.state===SpvFromBTCSwapState.POSTED || this.state==SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED) {
+                    this.state = SpvFromBTCSwapState.BROADCASTED;
+                    save = true;
+                }
+                if(save) this._saveAndEmit();
             },
             abortSignal,
             checkIntervalSeconds
@@ -829,12 +846,19 @@ export class SpvFromBTCSwap<T extends ChainType>
 
         if(abortSignal!=null) abortSignal.throwIfAborted();
 
+        let save = false;
+        if(result.inputAddresses!=null && this.senderAddress==null) {
+            this.senderAddress = result.inputAddresses[0];
+            save = true;
+        }
         if(
             (this.state as SpvFromBTCSwapState)!==SpvFromBTCSwapState.FRONTED &&
             (this.state as SpvFromBTCSwapState)!==SpvFromBTCSwapState.CLAIMED
         ) {
-            await this._saveAndEmit(SpvFromBTCSwapState.BTC_TX_CONFIRMED);
+            this.state = SpvFromBTCSwapState.BTC_TX_CONFIRMED;
+            save = true;
         }
+        if(save) await this._saveAndEmit();
 
         return result.txid;
     }
@@ -1096,6 +1120,7 @@ export class SpvFromBTCSwap<T extends ChainType>
             executionFeeShare: this.executionFeeShare.toString(10),
             genesisSmartChainBlockHeight: this.genesisSmartChainBlockHeight,
 
+            senderAddress: this.senderAddress,
             claimTxId: this.claimTxId,
             frontTxId: this.frontTxId,
             data: this.data?.serialize()
@@ -1105,6 +1130,22 @@ export class SpvFromBTCSwap<T extends ChainType>
 
     //////////////////////////////
     //// Swap ticks & sync
+
+    /**
+     * For internal use! Used to set the txId of the bitcoin payment from the on-chain events listener
+     *
+     * @param txId
+     */
+    async _setBitcoinTxId(txId: string) {
+        if(this.data==null) return;
+        if(txId!=this.data.btcTx.txid) return;
+
+        if(this.senderAddress!=null) return;
+        const btcTx = await this.wrapper.btcRpc.getTransaction(txId);
+        if(btcTx==null || btcTx.inputAddresses==null) return;
+
+        this.senderAddress = btcTx.inputAddresses[0];
+    }
 
     async _syncStateFromBitcoin(save?: boolean) {
         if(this.data?.btcTx==null) return false;
@@ -1132,6 +1173,11 @@ export class SpvFromBTCSwap<T extends ChainType>
                 }
             }
         } else {
+            let needsSave = false;
+            if(res.inputAddresses!=null && this.senderAddress==null) {
+                this.senderAddress = res.inputAddresses[0];
+                needsSave = true;
+            }
             if(res.confirmations>=this.vaultRequiredConfirmations) {
                 if(
                     this.state!==SpvFromBTCSwapState.BTC_TX_CONFIRMED &&
@@ -1139,8 +1185,7 @@ export class SpvFromBTCSwap<T extends ChainType>
                     this.state!==SpvFromBTCSwapState.CLAIMED
                 ) {
                     this.state = SpvFromBTCSwapState.BTC_TX_CONFIRMED;
-                    if(save) await this._saveAndEmit();
-                    return true;
+                    needsSave = true;
                 }
             } else if(
                 this.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED ||
@@ -1149,9 +1194,10 @@ export class SpvFromBTCSwap<T extends ChainType>
                 this.state===SpvFromBTCSwapState.DECLINED
             ) {
                 this.state = SpvFromBTCSwapState.BROADCASTED;
-                if(save) await this._saveAndEmit();
-                return true;
+                needsSave = true;
             }
+            if(needsSave && save) await this._saveAndEmit();
+            return needsSave;
         }
         return false;
     }

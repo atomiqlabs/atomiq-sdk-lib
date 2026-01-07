@@ -50,6 +50,7 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
         else {
             this.address = initOrObject.address;
             this.amount = BigInt(initOrObject.amount);
+            this.senderAddress = initOrObject.senderAddress;
             this.txId = initOrObject.txId;
             this.vout = initOrObject.vout;
             this.requiredConfirmations = initOrObject.requiredConfirmations ?? this.data.getConfirmationsHint();
@@ -107,6 +108,9 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
         if (this.state === FromBTCSwapState.PR_CREATED)
             throw new Error("Cannot get bitcoin address of non-committed swap");
         return this._getHyperlink();
+    }
+    getInputAddress() {
+        return this.senderAddress ?? null;
     }
     getInputTxId() {
         return this.txId ?? null;
@@ -173,11 +177,49 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
         if (result == null)
             return null;
         return {
+            inputAddresses: result.tx.inputAddresses,
             txId: result.tx.txid,
             vout: result.vout,
             confirmations: result.tx.confirmations ?? 0,
             targetConfirmations: this.requiredConfirmations
         };
+    }
+    /**
+     * For internal use! Used to set the txId of the bitcoin payment from the on-chain events listener
+     *
+     * @param txId
+     */
+    async _setBitcoinTxId(txId) {
+        if (this.txId !== txId || this.address == null || this.vout == null || this.senderAddress == null || this.amount == null) {
+            const btcTx = await this.wrapper.btcRpc.getTransaction(txId);
+            if (btcTx == null)
+                return;
+            const txoHashHint = this.data.getTxoHashHint();
+            if (txoHashHint != null) {
+                const expectedTxoHash = buffer_1.Buffer.from(txoHashHint, "hex");
+                const vout = btcTx.outs.findIndex(out => (0, Utils_1.getTxoHash)(out.scriptPubKey.hex, out.value).equals(expectedTxoHash));
+                if (vout !== -1) {
+                    this.vout = vout;
+                    //If amount or address are not known, parse them from the bitcoin tx
+                    // this can happen if the swap is recovered from on-chain data and
+                    // hence doesn't contain the address and amount data
+                    if (this.amount == null)
+                        this.amount = BigInt(btcTx.outs[vout].value);
+                    if (this.address == null)
+                        try {
+                            const addressData = btc_signer_1.OutScript.decode(buffer_1.Buffer.from(btcTx.outs[vout].scriptPubKey.hex, "hex"));
+                            this.address = (0, btc_signer_1.Address)(this.wrapper.options.bitcoinNetwork).encode(addressData);
+                        }
+                        catch (e) {
+                            this.logger.warn("_setBitcoinTxId(): Failed to parse address from output script: ", e);
+                        }
+                }
+            }
+            if (btcTx.inputAddresses != null) {
+                this.senderAddress = btcTx.inputAddresses[0];
+            }
+        }
+        this.txId = txId;
     }
     /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
@@ -544,6 +586,8 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
                 this.logger.info("claim(): Transaction commit status is PAID, swap was successfully claimed by the watchtower");
                 if (this.claimTxId == null)
                     this.claimTxId = await status.getClaimTxId();
+                const txId = buffer_1.Buffer.from(await status.getClaimResult(), "hex").reverse().toString("hex");
+                await this._setBitcoinTxId(txId);
                 await this._saveAndEmit(FromBTCSwapState.CLAIM_CLAIMED);
                 return this.claimTxId;
             }
@@ -605,7 +649,10 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
         this.logger.debug("waitTillClaimed(): Resolved from watchdog");
         if (res?.type === base_1.SwapCommitStateType.PAID) {
             if (this.state !== FromBTCSwapState.CLAIM_CLAIMED) {
-                this.claimTxId = await res.getClaimTxId();
+                if (this.claimTxId == null)
+                    this.claimTxId = await res.getClaimTxId();
+                const txId = buffer_1.Buffer.from(await res.getClaimResult(), "hex").reverse().toString("hex");
+                await this._setBitcoinTxId(txId);
                 await this._saveAndEmit(FromBTCSwapState.CLAIM_CLAIMED);
             }
         }
@@ -628,6 +675,7 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
             address: this.address,
             amount: this.amount.toString(10),
             requiredConfirmations: this.requiredConfirmations,
+            senderAddress: this.senderAddress,
             txId: this.txId,
             vout: this.vout
         };
@@ -656,6 +704,8 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
                 case base_1.SwapCommitStateType.PAID:
                     if (this.claimTxId == null)
                         this.claimTxId = await status.getClaimTxId();
+                    const txId = buffer_1.Buffer.from(await status.getClaimResult(), "hex").reverse().toString("hex");
+                    await this._setBitcoinTxId(txId);
                     this.state = FromBTCSwapState.CLAIM_CLAIMED;
                     return true;
             }
@@ -671,6 +721,8 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
                 case base_1.SwapCommitStateType.PAID:
                     if (this.claimTxId == null)
                         this.claimTxId = await status.getClaimTxId();
+                    const txId = buffer_1.Buffer.from(await status.getClaimResult(), "hex").reverse().toString("hex");
+                    await this._setBitcoinTxId(txId);
                     this.state = FromBTCSwapState.CLAIM_CLAIMED;
                     return true;
                 case base_1.SwapCommitStateType.NOT_COMMITED:
@@ -682,6 +734,8 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
                 case base_1.SwapCommitStateType.COMMITED:
                     const res = await this.getBitcoinPayment();
                     if (res != null && res.confirmations >= this.requiredConfirmations) {
+                        if (res.inputAddresses != null)
+                            this.senderAddress = res.inputAddresses[0];
                         this.txId = res.txId;
                         this.vout = res.vout;
                         this.state = FromBTCSwapState.BTC_TX_CONFIRMED;
@@ -729,6 +783,8 @@ class FromBTCSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
                     try {
                         const res = await this.getBitcoinPayment();
                         if (res != null && res.confirmations >= this.requiredConfirmations) {
+                            if (res.inputAddresses != null)
+                                this.senderAddress = res.inputAddresses[0];
                             this.txId = res.txId;
                             this.vout = res.vout;
                             this.state = FromBTCSwapState.BTC_TX_CONFIRMED;

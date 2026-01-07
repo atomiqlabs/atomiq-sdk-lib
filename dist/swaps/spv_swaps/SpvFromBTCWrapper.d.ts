@@ -59,9 +59,9 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
     }>);
     readonly pendingSwapStates: Array<SpvFromBTCSwap<T>["state"]>;
     readonly tickSwapState: Array<SpvFromBTCSwap<T>["state"]>;
-    protected processEventFront(event: SpvVaultFrontEvent, swap: SpvFromBTCSwap<T>): boolean;
-    protected processEventClaim(event: SpvVaultClaimEvent, swap: SpvFromBTCSwap<T>): boolean;
-    protected processEventClose(event: SpvVaultCloseEvent, swap: SpvFromBTCSwap<T>): boolean;
+    protected processEventFront(event: SpvVaultFrontEvent, swap: SpvFromBTCSwap<T>): Promise<boolean>;
+    protected processEventClaim(event: SpvVaultClaimEvent, swap: SpvFromBTCSwap<T>): Promise<boolean>;
+    protected processEventClose(event: SpvVaultCloseEvent, swap: SpvFromBTCSwap<T>): Promise<boolean>;
     protected processEvent(event: ChainEvent<T["Data"]>, swap: SpvFromBTCSwap<T>): Promise<void>;
     /**
      * Pre-fetches latest finalized block height of the smart chain

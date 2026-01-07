@@ -294,6 +294,7 @@ export abstract class ISwap<
      */
     abstract verifyQuoteValid(): Promise<boolean>;
 
+    abstract getInputAddress(): string | null;
     abstract getOutputAddress(): string | null;
 
     abstract getInputTxId(): string | null;

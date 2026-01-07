@@ -1,10 +1,10 @@
-import {BigIntBufferUtils, BtcBlockWithTxs, BtcSyncInfo, BtcTx} from "@atomiqlabs/base";
+import {BtcBlockWithTxs, BtcSyncInfo, BtcTx} from "@atomiqlabs/base";
 import {MempoolBitcoinBlock} from "./MempoolBitcoinBlock";
 import {BitcoinTransaction, MempoolApi, TxVout} from "./MempoolApi";
 import {Buffer} from "buffer";
 import {BitcoinRpcWithAddressIndex, BtcTxWithBlockheight} from "../BitcoinRpcWithAddressIndex";
 import {LightningNetworkApi, LNNodeLiquidity} from "../LightningNetworkApi";
-import {timeoutPromise} from "../../utils/Utils";
+import {getTxoHash, timeoutPromise} from "../../utils/Utils";
 import {Script, Transaction} from "@scure/btc-signer";
 import {sha256} from "@noble/hashes/sha2";
 
@@ -63,10 +63,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
      * @private
      */
     private static getTxoHash(vout: TxVout): Buffer {
-        return Buffer.from(sha256(Buffer.concat([
-            BigIntBufferUtils.toBuffer(BigInt(vout.value), "le", 8),
-            Buffer.from(vout.scriptpubkey, "hex")
-        ])));
+        return getTxoHash(vout.scriptpubkey, vout.value);
     }
 
     /**
@@ -184,6 +181,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
                     txinwitness: e.witness
                 }
             }),
+            inputAddresses: tx.vin.map(e => e.prevout.scriptpubkey_address)
         };
     }
 
@@ -323,7 +321,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
 
     async waitForTransaction(
         txId: string, requiredConfirmations: number,
-        stateUpdateCbk: (confirmations?: number, txId?: string, txEtaMS?: number) => void,
+        stateUpdateCbk: (btcTx?: BtcTxWithBlockheight, txEtaMS?: number) => void,
         abortSignal?: AbortSignal, intervalSeconds?: number
     ): Promise<BtcTxWithBlockheight> {
         if(abortSignal!=null) abortSignal.throwIfAborted();
@@ -341,8 +339,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
             if(confirmationDelay==null) continue;
 
             if(stateUpdateCbk!=null) stateUpdateCbk(
-                result.confirmations,
-                result.txid,
+                result,
                 confirmationDelay
             );
 

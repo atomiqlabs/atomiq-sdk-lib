@@ -94,6 +94,10 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
     getOutputAddress() {
         return this.recipient;
     }
+    getInputAddress() {
+        //TODO: Fuck this, it's not used anyway
+        return null;
+    }
     getInputTxId() {
         return this.txId ?? null;
     }

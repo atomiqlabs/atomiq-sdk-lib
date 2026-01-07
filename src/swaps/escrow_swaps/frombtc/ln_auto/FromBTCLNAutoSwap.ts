@@ -228,6 +228,10 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         return Buffer.from(decodedPR.tagsObject.payment_hash, "hex");
     }
 
+    getInputAddress(): string | null {
+        return this.pr;
+    }
+
     getInputTxId(): string {
         return this.getPaymentHash().toString("hex");
     }

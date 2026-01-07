@@ -1,6 +1,8 @@
 import {RequestError} from "../errors/RequestError";
 import {Buffer} from "buffer";
 import {randomBytes as randomBytesNoble} from "@noble/hashes/utils";
+import {sha256} from "@noble/hashes/sha2";
+import {BigIntBufferUtils} from "@atomiqlabs/base";
 
 export type AllOptional<T> = {
     [K in keyof T]?: T[K];
@@ -346,4 +348,11 @@ export function throwIfUndefined<T>(promise: Promise<T | undefined>, msg?: strin
         if(val==undefined) throw new Error(msg ?? "Promise value is undefined!");
         return val;
     })
+}
+
+export function getTxoHash(outputScriptHex: string, value: number) {
+    return Buffer.from(sha256(Buffer.concat([
+        BigIntBufferUtils.toBuffer(BigInt(value), "le", 8),
+        Buffer.from(outputScriptHex, "hex")
+    ])));
 }

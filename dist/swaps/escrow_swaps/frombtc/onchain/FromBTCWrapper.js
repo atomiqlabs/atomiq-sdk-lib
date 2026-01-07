@@ -59,12 +59,15 @@ class FromBTCWrapper extends IFromBTCWrapper_1.IFromBTCWrapper {
         }
         return Promise.resolve(false);
     }
-    processEventClaim(swap, event) {
+    async processEventClaim(swap, event) {
         if (swap.state !== FromBTCSwap_1.FromBTCSwapState.FAILED && swap.state !== FromBTCSwap_1.FromBTCSwapState.CLAIM_CLAIMED) {
+            await swap._setBitcoinTxId(buffer_1.Buffer.from(event.result, "hex").reverse().toString("hex")).catch(e => {
+                this.logger.warn("processEventClaim(): Error setting bitcoin txId: ", e);
+            });
             swap.state = FromBTCSwap_1.FromBTCSwapState.CLAIM_CLAIMED;
-            return Promise.resolve(true);
+            return true;
         }
-        return Promise.resolve(false);
+        return false;
     }
     processEventRefund(swap, event) {
         if (swap.state !== FromBTCSwap_1.FromBTCSwapState.CLAIM_CLAIMED && swap.state !== FromBTCSwap_1.FromBTCSwapState.FAILED) {

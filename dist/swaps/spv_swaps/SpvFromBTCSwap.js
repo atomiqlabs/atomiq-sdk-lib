@@ -118,6 +118,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             this.frontingFeeShare = BigInt(initOrObject.frontingFeeShare);
             this.executionFeeShare = BigInt(initOrObject.executionFeeShare);
             this.genesisSmartChainBlockHeight = initOrObject.genesisSmartChainBlockHeight;
+            this.senderAddress = initOrObject.senderAddress;
             this.claimTxId = initOrObject.claimTxId;
             this.frontTxId = initOrObject.frontTxId;
             if (initOrObject.data != null)
@@ -168,6 +169,9 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     }
     getOutputTxId() {
         return this.frontTxId ?? this.claimTxId ?? null;
+    }
+    getInputAddress() {
+        return this.senderAddress ?? null;
     }
     getInputTxId() {
         return this.data?.btcTx?.txid ?? null;
@@ -567,7 +571,8 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         return {
             txId: result.txid,
             confirmations: result.confirmations ?? 0,
-            targetConfirmations: this.vaultRequiredConfirmations
+            targetConfirmations: this.vaultRequiredConfirmations,
+            inputAddresses: result.inputAddresses
         };
     }
     /**
@@ -585,19 +590,37 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             throw new Error("Must be in POSTED or BROADCASTED state!");
         if (this.data == null)
             throw new Error("Expected swap to have withdrawal data filled!");
-        const result = await this.wrapper.btcRpc.waitForTransaction(this.data.btcTx.txid, this.vaultRequiredConfirmations, (confirmations, txId, txEtaMs) => {
+        const result = await this.wrapper.btcRpc.waitForTransaction(this.data.btcTx.txid, this.vaultRequiredConfirmations, (btcTx, txEtaMs) => {
             if (updateCallback != null)
-                updateCallback(txId, confirmations, this.vaultRequiredConfirmations, txEtaMs);
-            if (txId != null &&
-                (this.state === SpvFromBTCSwapState.POSTED || this.state == SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED))
-                this._saveAndEmit(SpvFromBTCSwapState.BROADCASTED);
+                updateCallback(btcTx?.txid, btcTx?.confirmations, this.vaultRequiredConfirmations, txEtaMs);
+            if (btcTx == null)
+                return;
+            let save = false;
+            if (btcTx.inputAddresses != null && this.senderAddress == null) {
+                this.senderAddress = btcTx.inputAddresses[0];
+                save = true;
+            }
+            if (this.state === SpvFromBTCSwapState.POSTED || this.state == SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED) {
+                this.state = SpvFromBTCSwapState.BROADCASTED;
+                save = true;
+            }
+            if (save)
+                this._saveAndEmit();
         }, abortSignal, checkIntervalSeconds);
         if (abortSignal != null)
             abortSignal.throwIfAborted();
+        let save = false;
+        if (result.inputAddresses != null && this.senderAddress == null) {
+            this.senderAddress = result.inputAddresses[0];
+            save = true;
+        }
         if (this.state !== SpvFromBTCSwapState.FRONTED &&
             this.state !== SpvFromBTCSwapState.CLAIMED) {
-            await this._saveAndEmit(SpvFromBTCSwapState.BTC_TX_CONFIRMED);
+            this.state = SpvFromBTCSwapState.BTC_TX_CONFIRMED;
+            save = true;
         }
+        if (save)
+            await this._saveAndEmit();
         return result.txid;
     }
     //////////////////////////////
@@ -826,6 +849,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             frontingFeeShare: this.frontingFeeShare.toString(10),
             executionFeeShare: this.executionFeeShare.toString(10),
             genesisSmartChainBlockHeight: this.genesisSmartChainBlockHeight,
+            senderAddress: this.senderAddress,
             claimTxId: this.claimTxId,
             frontTxId: this.frontTxId,
             data: this.data?.serialize()
@@ -833,6 +857,23 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Swap ticks & sync
+    /**
+     * For internal use! Used to set the txId of the bitcoin payment from the on-chain events listener
+     *
+     * @param txId
+     */
+    async _setBitcoinTxId(txId) {
+        if (this.data == null)
+            return;
+        if (txId != this.data.btcTx.txid)
+            return;
+        if (this.senderAddress != null)
+            return;
+        const btcTx = await this.wrapper.btcRpc.getTransaction(txId);
+        if (btcTx == null || btcTx.inputAddresses == null)
+            return;
+        this.senderAddress = btcTx.inputAddresses[0];
+    }
     async _syncStateFromBitcoin(save) {
         if (this.data?.btcTx == null)
             return false;
@@ -860,14 +901,17 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             }
         }
         else {
+            let needsSave = false;
+            if (res.inputAddresses != null && this.senderAddress == null) {
+                this.senderAddress = res.inputAddresses[0];
+                needsSave = true;
+            }
             if (res.confirmations >= this.vaultRequiredConfirmations) {
                 if (this.state !== SpvFromBTCSwapState.BTC_TX_CONFIRMED &&
                     this.state !== SpvFromBTCSwapState.FRONTED &&
                     this.state !== SpvFromBTCSwapState.CLAIMED) {
                     this.state = SpvFromBTCSwapState.BTC_TX_CONFIRMED;
-                    if (save)
-                        await this._saveAndEmit();
-                    return true;
+                    needsSave = true;
                 }
             }
             else if (this.state === SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED ||
@@ -875,10 +919,11 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
                 this.state === SpvFromBTCSwapState.SIGNED ||
                 this.state === SpvFromBTCSwapState.DECLINED) {
                 this.state = SpvFromBTCSwapState.BROADCASTED;
-                if (save)
-                    await this._saveAndEmit();
-                return true;
+                needsSave = true;
             }
+            if (needsSave && save)
+                await this._saveAndEmit();
+            return needsSave;
         }
         return false;
     }

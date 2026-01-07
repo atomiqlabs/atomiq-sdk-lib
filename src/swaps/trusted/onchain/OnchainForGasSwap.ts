@@ -145,6 +145,11 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         return this.recipient;
     }
 
+    getInputAddress(): string | null {
+        //TODO: Fuck this, it's not used anyway
+        return null;
+    }
+
     getInputTxId(): string | null {
         return this.txId ?? null;
     }

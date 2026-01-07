@@ -35,9 +35,10 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     protected readonly TYPE = SwapType.FROM_BTC;
     readonly data: T["Data"];
     readonly feeRate: string;
-    readonly address: string;
-    readonly amount: bigint;
+    address: string;
+    amount: bigint;
     readonly requiredConfirmations: number;
+    senderAddress?: string;
     txId?: string;
     vout?: number;
     constructor(wrapper: FromBTCWrapper<T>, init: FromBTCSwapInit<T["Data"]>);
@@ -55,6 +56,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
      */
     private _getHyperlink;
     getHyperlink(): string;
+    getInputAddress(): string | null;
     getInputTxId(): string | null;
     /**
      * Returns timeout time (in UNIX milliseconds) when the on-chain address will expire and no funds should be sent
@@ -83,7 +85,14 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
         vout: number;
         confirmations: number;
         targetConfirmations: number;
+        inputAddresses?: string[];
     } | null>;
+    /**
+     * For internal use! Used to set the txId of the bitcoin payment from the on-chain events listener
+     *
+     * @param txId
+     */
+    _setBitcoinTxId(txId: string): Promise<void>;
     /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
      *

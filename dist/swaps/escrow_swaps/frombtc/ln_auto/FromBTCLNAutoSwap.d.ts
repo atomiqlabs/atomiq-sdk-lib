@@ -70,6 +70,7 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     requiresAction(): boolean;
     protected getIdentifierHashString(): string;
     protected getPaymentHash(): Buffer;
+    getInputAddress(): string | null;
     getInputTxId(): string;
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap

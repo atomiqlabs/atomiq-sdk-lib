@@ -1,9 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.throwIfUndefined = exports.toBigInt = exports.randomBytes = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
+exports.getTxoHash = exports.throwIfUndefined = exports.toBigInt = exports.randomBytes = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
 const RequestError_1 = require("../errors/RequestError");
 const buffer_1 = require("buffer");
 const utils_1 = require("@noble/hashes/utils");
+const sha2_1 = require("@noble/hashes/sha2");
+const base_1 = require("@atomiqlabs/base");
 function isConstructor(fn) {
     return (typeof fn === 'function' &&
         fn.prototype != null &&
@@ -316,3 +318,10 @@ function throwIfUndefined(promise, msg) {
     });
 }
 exports.throwIfUndefined = throwIfUndefined;
+function getTxoHash(outputScriptHex, value) {
+    return buffer_1.Buffer.from((0, sha2_1.sha256)(buffer_1.Buffer.concat([
+        base_1.BigIntBufferUtils.toBuffer(BigInt(value), "le", 8),
+        buffer_1.Buffer.from(outputScriptHex, "hex")
+    ])));
+}
+exports.getTxoHash = getTxoHash;

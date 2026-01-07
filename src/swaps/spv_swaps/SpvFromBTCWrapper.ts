@@ -147,40 +147,46 @@ export class SpvFromBTCWrapper<
         SpvFromBTCSwapState.BROADCASTED
     ];
 
-    protected processEventFront(event: SpvVaultFrontEvent, swap: SpvFromBTCSwap<T>): boolean {
+    protected async processEventFront(event: SpvVaultFrontEvent, swap: SpvFromBTCSwap<T>): Promise<boolean> {
         if(
             swap.state===SpvFromBTCSwapState.SIGNED || swap.state===SpvFromBTCSwapState.POSTED ||
             swap.state===SpvFromBTCSwapState.BROADCASTED || swap.state===SpvFromBTCSwapState.DECLINED ||
             swap.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED || swap.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED
         ) {
+            await swap._setBitcoinTxId(event.btcTxId).catch(e => {
+                this.logger.warn("processEventFront(): Failed to set bitcoin txId: ", e);
+            });
             swap.state = SpvFromBTCSwapState.FRONTED;
             return true;
         }
         return false;
     }
 
-    protected processEventClaim(event: SpvVaultClaimEvent, swap: SpvFromBTCSwap<T>): boolean {
+    protected async processEventClaim(event: SpvVaultClaimEvent, swap: SpvFromBTCSwap<T>): Promise<boolean> {
         if(
             swap.state===SpvFromBTCSwapState.SIGNED || swap.state===SpvFromBTCSwapState.POSTED ||
             swap.state===SpvFromBTCSwapState.BROADCASTED || swap.state===SpvFromBTCSwapState.DECLINED ||
             swap.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED || swap.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED
         ) {
+            await swap._setBitcoinTxId(event.btcTxId).catch(e => {
+                this.logger.warn("processEventFront(): Failed to set bitcoin txId: ", e);
+            });
             swap.state = SpvFromBTCSwapState.CLAIMED;
             return true;
         }
         return false;
     }
 
-    protected processEventClose(event: SpvVaultCloseEvent, swap: SpvFromBTCSwap<T>): boolean {
+    protected processEventClose(event: SpvVaultCloseEvent, swap: SpvFromBTCSwap<T>): Promise<boolean> {
         if(
             swap.state===SpvFromBTCSwapState.SIGNED || swap.state===SpvFromBTCSwapState.POSTED ||
             swap.state===SpvFromBTCSwapState.BROADCASTED || swap.state===SpvFromBTCSwapState.DECLINED ||
             swap.state===SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED || swap.state===SpvFromBTCSwapState.BTC_TX_CONFIRMED
         ) {
             swap.state = SpvFromBTCSwapState.CLOSED;
-            return true;
+            return Promise.resolve(true);
         }
-        return false;
+        return Promise.resolve(false);
     }
 
     protected async processEvent(event: ChainEvent<T["Data"]>, swap: SpvFromBTCSwap<T>): Promise<void> {
@@ -188,21 +194,21 @@ export class SpvFromBTCWrapper<
 
         let swapChanged: boolean = false;
         if(event instanceof SpvVaultFrontEvent) {
-            swapChanged = this.processEventFront(event, swap);
+            swapChanged = await this.processEventFront(event, swap);
             if(event.meta?.txId!=null && swap.frontTxId!==event.meta.txId) {
                 swap.frontTxId = event.meta.txId;
                 swapChanged ||= true;
             }
         }
         if(event instanceof SpvVaultClaimEvent) {
-            swapChanged = this.processEventClaim(event, swap);
+            swapChanged = await this.processEventClaim(event, swap);
             if(event.meta?.txId!=null && swap.claimTxId!==event.meta.txId) {
                 swap.claimTxId = event.meta.txId;
                 swapChanged ||= true;
             }
         }
         if(event instanceof SpvVaultCloseEvent) {
-            swapChanged = this.processEventClose(event, swap);
+            swapChanged = await this.processEventClose(event, swap);
         }
 
         this.logger.info("processEvents(): "+event.constructor.name+" processed for "+swap.getId()+" swap: ", swap);

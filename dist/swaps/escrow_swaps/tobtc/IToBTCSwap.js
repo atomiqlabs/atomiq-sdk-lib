@@ -85,6 +85,9 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
     }
     //////////////////////////////
     //// Getters & utils
+    getInputAddress() {
+        return this._getInitiator();
+    }
     getInputTxId() {
         return this.commitTxId ?? null;
     }

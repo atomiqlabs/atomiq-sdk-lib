@@ -4,6 +4,7 @@ import { BitcoinRpc, BtcBlock, BtcTx } from "@atomiqlabs/base";
 import { Buffer } from "buffer";
 export type BtcTxWithBlockheight = BtcTx & {
     blockheight?: number;
+    inputAddresses?: string[];
 };
 export type BtcAddressUtxo = {
     txid: string;
@@ -26,7 +27,7 @@ export interface BitcoinRpcWithAddressIndex<T extends BtcBlock> extends BitcoinR
         adjustedVsize: number;
     }>;
     getTransaction(txId: string): Promise<BtcTxWithBlockheight | null>;
-    waitForTransaction(txId: string, requiredConfirmations: number, stateUpdateCbk: (confirmations?: number, txId?: string, txEtaMS?: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<BtcTxWithBlockheight>;
+    waitForTransaction(txId: string, requiredConfirmations: number, stateUpdateCbk: (btcTx?: BtcTxWithBlockheight, txEtaMS?: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<BtcTxWithBlockheight>;
     /**
      * Returns an estimate after which time the tx will confirm with the required amount of confirmations,
      *  confirmationDelay of -1 means the transaction won't confirm in the near future

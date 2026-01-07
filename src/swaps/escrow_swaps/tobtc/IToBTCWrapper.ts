@@ -80,14 +80,19 @@ export abstract class IToBTCWrapper<
         return false;
     }
 
-    protected processEventClaim(swap: D["Swap"], event: ClaimEvent<T["Data"]>): Promise<boolean> {
+    protected async processEventClaim(swap: D["Swap"], event: ClaimEvent<T["Data"]>): Promise<boolean> {
         if(swap.state!==ToBTCSwapState.REFUNDED && swap.state!==ToBTCSwapState.CLAIMED) {
+            await swap._setPaymentResult({
+                secret: event.result,
+                txId: Buffer.from(event.result, "hex").reverse().toString("hex")
+            }).catch(e => {
+                this.logger.warn(`processEventClaim(): Failed to set payment result ${event.result}: `, e);
+            });
             swap.state = ToBTCSwapState.CLAIMED;
             if(swap.claimTxId==null) swap.claimTxId = event.meta?.txId;
-            swap._setPaymentResult({secret: event.result, txId: Buffer.from(event.result, "hex").reverse().toString("hex")});
-            return Promise.resolve(true);
+            return true;
         }
-        return Promise.resolve(false);
+        return false;
     }
 
     protected processEventRefund(swap: D["Swap"], event: RefundEvent<T["Data"]>): Promise<boolean> {

@@ -164,6 +164,10 @@ export class FromBTCLNSwap<T extends ChainType = ChainType>
         return this.state===FromBTCLNSwapState.PR_PAID;
     }
 
+    getInputAddress(): string | null {
+        return this.pr;
+    }
+
     getInputTxId(): string {
         return this.getPaymentHash().toString("hex");
     }

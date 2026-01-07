@@ -83,6 +83,9 @@ class LnForGasSwap extends ISwap_1.ISwap {
     getOutputAddress() {
         return this.recipient;
     }
+    getInputAddress() {
+        return this.pr;
+    }
     getInputTxId() {
         return this.getId();
     }
