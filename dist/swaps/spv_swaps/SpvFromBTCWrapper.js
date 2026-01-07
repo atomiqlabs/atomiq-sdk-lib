@@ -89,7 +89,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
             swap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.BROADCASTED || swap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.DECLINED ||
             swap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED || swap.state === SpvFromBTCSwap_1.SpvFromBTCSwapState.BTC_TX_CONFIRMED) {
             await swap._setBitcoinTxId(event.btcTxId).catch(e => {
-                this.logger.warn("processEventFront(): Failed to set bitcoin txId: ", e);
+                this.logger.warn("processEventClaim(): Failed to set bitcoin txId: ", e);
             });
             swap.state = SpvFromBTCSwap_1.SpvFromBTCSwapState.CLAIMED;
             return true;
