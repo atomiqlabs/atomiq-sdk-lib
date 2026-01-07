@@ -39,6 +39,7 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
     protected tryRecomputeSwapPrice(): void;
     _getEscrowHash(): string;
     getOutputAddress(): string | null;
+    getInputAddress(): string | null;
     getInputTxId(): string | null;
     getOutputTxId(): string | null;
     getId(): string;

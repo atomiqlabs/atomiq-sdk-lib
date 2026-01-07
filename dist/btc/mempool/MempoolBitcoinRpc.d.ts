@@ -83,7 +83,7 @@ export declare class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<Mem
         tx: Omit<BtcTxWithBlockheight, "hex" | "raw">;
         vout: number;
     }>;
-    waitForTransaction(txId: string, requiredConfirmations: number, stateUpdateCbk: (confirmations?: number, txId?: string, txEtaMS?: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<BtcTxWithBlockheight>;
+    waitForTransaction(txId: string, requiredConfirmations: number, stateUpdateCbk: (btcTx?: BtcTxWithBlockheight, txEtaMS?: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<BtcTxWithBlockheight>;
     getLNNodeLiquidity(pubkey: string): Promise<LNNodeLiquidity | null>;
     sendRawTransaction(rawTx: string): Promise<string>;
     sendRawPackage(rawTx: string[]): Promise<string[]>;

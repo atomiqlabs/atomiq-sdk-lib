@@ -139,6 +139,9 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             throw new Error("Swap invoice doesn't contain payment hash field!");
         return buffer_1.Buffer.from(decodedPR.tagsObject.payment_hash, "hex");
     }
+    getInputAddress() {
+        return this.pr;
+    }
     getInputTxId() {
         return this.getPaymentHash().toString("hex");
     }

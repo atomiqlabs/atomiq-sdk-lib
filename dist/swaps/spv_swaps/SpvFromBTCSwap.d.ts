@@ -79,6 +79,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     readonly frontingFeeShare: bigint;
     readonly executionFeeShare: bigint;
     readonly genesisSmartChainBlockHeight: number;
+    senderAddress?: string;
     claimTxId?: string;
     frontTxId?: string;
     data?: T["SpvVaultWithdrawalData"];
@@ -98,6 +99,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     verifyQuoteValid(): Promise<boolean>;
     getOutputAddress(): string | null;
     getOutputTxId(): string | null;
+    getInputAddress(): string | null;
     getInputTxId(): string | null;
     requiresAction(): boolean;
     isFinished(): boolean;
@@ -228,6 +230,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         txId: string;
         confirmations: number;
         targetConfirmations: number;
+        inputAddresses?: string[];
     } | null>;
     /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
@@ -281,6 +284,12 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      */
     waitTillExecuted(updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<void>;
     serialize(): any;
+    /**
+     * For internal use! Used to set the txId of the bitcoin payment from the on-chain events listener
+     *
+     * @param txId
+     */
+    _setBitcoinTxId(txId: string): Promise<void>;
     _syncStateFromBitcoin(save?: boolean): Promise<boolean>;
     /**
      * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain

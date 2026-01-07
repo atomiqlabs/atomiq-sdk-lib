@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MempoolBitcoinRpc = void 0;
-const base_1 = require("@atomiqlabs/base");
 const MempoolBitcoinBlock_1 = require("./MempoolBitcoinBlock");
 const MempoolApi_1 = require("./MempoolApi");
 const buffer_1 = require("buffer");
@@ -56,10 +55,7 @@ class MempoolBitcoinRpc {
      * @private
      */
     static getTxoHash(vout) {
-        return buffer_1.Buffer.from((0, sha2_1.sha256)(buffer_1.Buffer.concat([
-            base_1.BigIntBufferUtils.toBuffer(BigInt(vout.value), "le", 8),
-            buffer_1.Buffer.from(vout.scriptpubkey, "hex")
-        ])));
+        return (0, Utils_1.getTxoHash)(vout.scriptpubkey, vout.value);
     }
     /**
      * Returns delay in milliseconds till an unconfirmed transaction is expected to confirm, returns -1
@@ -175,6 +171,7 @@ class MempoolBitcoinRpc {
                     txinwitness: e.witness
                 };
             }),
+            inputAddresses: tx.vin.map(e => e.prevout.scriptpubkey_address)
         };
     }
     getTipHeight() {
@@ -290,7 +287,7 @@ class MempoolBitcoinRpc {
             if (confirmationDelay == null)
                 continue;
             if (stateUpdateCbk != null)
-                stateUpdateCbk(result.confirmations, result.txid, confirmationDelay);
+                stateUpdateCbk(result, confirmationDelay);
             if (confirmationDelay === 0)
                 return result;
         }

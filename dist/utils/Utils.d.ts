@@ -118,4 +118,5 @@ export declare function randomBytes(bytesLength: number): Buffer;
 export declare function toBigInt(value: string): bigint;
 export declare function toBigInt(value: undefined): undefined;
 export declare function throwIfUndefined<T>(promise: Promise<T | undefined>, msg?: string): Promise<T>;
+export declare function getTxoHash(outputScriptHex: string, value: number): Buffer;
 export {};

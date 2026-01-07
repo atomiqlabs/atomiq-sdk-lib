@@ -136,6 +136,10 @@ export abstract class IToBTCSwap<
     //////////////////////////////
     //// Getters & utils
 
+    getInputAddress(): string | null {
+        return this._getInitiator();
+    }
+
     getInputTxId(): string | null {
         return this.commitTxId ?? null;
     }

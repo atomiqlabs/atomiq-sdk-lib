@@ -129,12 +129,15 @@ export class FromBTCWrapper<
         return Promise.resolve(false);
     }
 
-    protected processEventClaim(swap: FromBTCSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean> {
+    protected async processEventClaim(swap: FromBTCSwap<T>, event: ClaimEvent<T["Data"]>): Promise<boolean> {
         if(swap.state!==FromBTCSwapState.FAILED && swap.state!==FromBTCSwapState.CLAIM_CLAIMED) {
+            await swap._setBitcoinTxId(Buffer.from(event.result, "hex").reverse().toString("hex")).catch(e => {
+                this.logger.warn("processEventClaim(): Error setting bitcoin txId: ", e);
+            });
             swap.state = FromBTCSwapState.CLAIM_CLAIMED;
-            return Promise.resolve(true);
+            return true;
         }
-        return Promise.resolve(false);
+        return false;
     }
 
     protected processEventRefund(swap: FromBTCSwap<T>, event: RefundEvent<T["Data"]>): Promise<boolean> {

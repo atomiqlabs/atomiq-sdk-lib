@@ -3,6 +3,7 @@ import {Buffer} from "buffer";
 
 export type BtcTxWithBlockheight = BtcTx & {
     blockheight?: number,
+    inputAddresses?: string[]
 };
 
 export type BtcAddressUtxo = {
@@ -31,7 +32,7 @@ export interface BitcoinRpcWithAddressIndex<T extends BtcBlock> extends BitcoinR
     waitForTransaction(
         txId: string,
         requiredConfirmations: number,
-        stateUpdateCbk: (confirmations?: number, txId?: string, txEtaMS?: number) => void,
+        stateUpdateCbk: (btcTx?: BtcTxWithBlockheight, txEtaMS?: number) => void,
         abortSignal?: AbortSignal,
         intervalSeconds?: number
     ): Promise<BtcTxWithBlockheight>;

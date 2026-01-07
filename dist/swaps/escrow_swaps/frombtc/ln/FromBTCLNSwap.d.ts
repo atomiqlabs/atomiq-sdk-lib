@@ -50,6 +50,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     protected getIdentifierHash(): Buffer;
     protected getPaymentHash(): Buffer;
     protected canCommit(): boolean;
+    getInputAddress(): string | null;
     getInputTxId(): string;
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap

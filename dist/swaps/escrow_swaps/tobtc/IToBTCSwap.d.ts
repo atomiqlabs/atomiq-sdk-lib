@@ -44,6 +44,7 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType, D exte
         secret?: string;
         txId?: string;
     }, check?: boolean): Promise<boolean>;
+    getInputAddress(): string | null;
     getInputTxId(): string | null;
     requiresAction(): boolean;
     /**

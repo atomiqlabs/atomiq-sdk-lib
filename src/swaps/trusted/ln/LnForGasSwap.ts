@@ -110,6 +110,10 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         return this.recipient;
     }
 
+    getInputAddress(): string | null {
+        return this.pr;
+    }
+
     getInputTxId(): string | null {
         return this.getId();
     }
