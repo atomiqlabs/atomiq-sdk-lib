@@ -377,5 +377,25 @@ class SwapperUtils {
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
         return this.root.chains[chainIdentifier].chainInterface.sendSignedAndConfirm(txs, true, abortSignal, false, onBeforePublish);
     }
+    serializeUnsignedTransaction(chainIdentifier, tx) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.serializeTx(tx);
+    }
+    deserializeUnsignedTransaction(chainIdentifier, tx) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.deserializeTx(tx);
+    }
+    serializeSignedTransaction(chainIdentifier, tx) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.serializeSignedTx(tx);
+    }
+    deserializeSignedTransaction(chainIdentifier, tx) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.deserializeSignedTx(tx);
+    }
 }
 exports.SwapperUtils = SwapperUtils;

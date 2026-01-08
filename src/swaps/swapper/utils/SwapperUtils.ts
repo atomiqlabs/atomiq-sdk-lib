@@ -469,4 +469,24 @@ export class SwapperUtils<T extends MultiChain> {
         return this.root.chains[chainIdentifier].chainInterface.sendSignedAndConfirm(txs, true, abortSignal, false, onBeforePublish);
     }
 
+    serializeUnsignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: T[ChainIdentifier]["TX"]): Promise<string> {
+        if(this.root.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.serializeTx(tx);
+    }
+
+    deserializeUnsignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: string): Promise<T[ChainIdentifier]["TX"]> {
+        if(this.root.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.deserializeTx(tx);
+    }
+
+    serializeSignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: T[ChainIdentifier]["SignedTXType"]): Promise<string> {
+        if(this.root.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.serializeSignedTx(tx);
+    }
+
+    deserializeSignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: string): Promise<T[ChainIdentifier]["SignedTXType"]> {
+        if(this.root.chains[chainIdentifier]==null) throw new Error("Invalid chain identifier! Unknown chain: "+chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.deserializeSignedTx(tx);
+    }
+
 }
