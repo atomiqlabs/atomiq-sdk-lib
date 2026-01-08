@@ -830,6 +830,7 @@ export class FromBTCLNSwap<T extends ChainType = ChainType>
         const claimTxs = await this.wrapper.contract.txsClaimWithSecret(
             this._getInitiator(), this.data, this.secret,
             true, true, undefined,
+            true
         );
 
         return initTxs.concat(claimTxs);

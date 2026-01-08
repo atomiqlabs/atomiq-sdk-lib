@@ -695,7 +695,7 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
         if (this.data == null)
             throw new Error("Unknown data, wrong state?");
         const initTxs = await this.txsCommit(skipChecks);
-        const claimTxs = await this.wrapper.contract.txsClaimWithSecret(this._getInitiator(), this.data, this.secret, true, true, undefined);
+        const claimTxs = await this.wrapper.contract.txsClaimWithSecret(this._getInitiator(), this.data, this.secret, true, true, undefined, true);
         return initTxs.concat(claimTxs);
     }
     /**
