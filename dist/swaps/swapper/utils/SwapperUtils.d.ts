@@ -10,6 +10,7 @@ export declare class SwapperUtils<T extends MultiChain> {
     readonly bitcoinNetwork: BTC_NETWORK;
     private readonly root;
     constructor(root: Swapper<T>);
+    isValidSmartChainAddress(address: string, chainId?: ChainIds<T>): boolean;
     /**
      * Returns true if string is a valid BOLT11 bitcoin lightning invoice
      *

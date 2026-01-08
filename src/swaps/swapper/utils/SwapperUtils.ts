@@ -22,6 +22,17 @@ export class SwapperUtils<T extends MultiChain> {
         this.root = root;
     }
 
+    isValidSmartChainAddress(address: string, chainId?: ChainIds<T>): boolean {
+        if(chainId!=null) {
+            if(this.root.chains[chainId]==null) throw new Error(`Unknown chain id: ${chainId}`);
+            return this.root.chains[chainId].chainInterface.isValidAddress(address);
+        }
+        for(let chainId of this.root.getSmartChains()) {
+            if(this.root.chains[chainId].chainInterface.isValidAddress(address)) return true;
+        }
+        return false;
+    }
+
     /**
      * Returns true if string is a valid BOLT11 bitcoin lightning invoice
      *
