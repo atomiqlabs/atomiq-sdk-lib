@@ -624,7 +624,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         });
 
         if(this.state===FromBTCLNAutoSwapState.PR_CREATED) {
-            const paymentResult = await Promise.any([
+            const paymentResult = await Promise.race([
                 this.waitTillState(FromBTCLNAutoSwapState.PR_PAID, "gte", abortController.signal).then(() => true),
                 (async () => {
                     let resp: InvoiceStatusResponse = {code: InvoiceStatusResponseCodes.PENDING, msg: ""};

@@ -487,7 +487,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
                 this.logger.warn("waitForPayment(): Failed to warmup messenger: ", e);
             });
         if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
-            const paymentResult = await Promise.any([
+            const paymentResult = await Promise.race([
                 this.waitTillState(FromBTCLNAutoSwapState.PR_PAID, "gte", abortController.signal).then(() => true),
                 (async () => {
                     let resp = { code: IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING, msg: "" };
