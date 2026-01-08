@@ -139,4 +139,8 @@ export declare class SwapperUtils<T extends MultiChain> {
      * Broadcasts already signed smart chain transactions
      */
     sendSignedAndConfirm<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, txs: T[ChainIdentifier]["SignedTXType"][], abortSignal?: AbortSignal, onBeforePublish?: (txId: string, rawTx: string) => Promise<void>): Promise<string[]>;
+    serializeUnsignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: T[ChainIdentifier]["TX"]): Promise<string>;
+    deserializeUnsignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: string): Promise<T[ChainIdentifier]["TX"]>;
+    serializeSignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: T[ChainIdentifier]["SignedTXType"]): Promise<string>;
+    deserializeSignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: string): Promise<T[ChainIdentifier]["SignedTXType"]>;
 }
