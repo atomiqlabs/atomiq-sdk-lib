@@ -81,6 +81,8 @@ class MempoolBtcRelaySynchronizer {
                 spvTipBlockHeight = retrievedHeaders[0].height;
                 await (0, Utils_1.timeoutPromise)(1000);
             }
+            else
+                break;
         }
         if (headerCache.length > 0)
             await saveHeaders(headerCache);
