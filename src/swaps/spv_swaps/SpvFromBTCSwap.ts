@@ -831,7 +831,7 @@ export class SpvFromBTCSwap<T extends ChainType>
                 if(btcTx==null) return;
                 let save = false;
                 if(btcTx.inputAddresses!=null && this.senderAddress==null) {
-                    this.senderAddress = btcTx.inputAddresses[0];
+                    this.senderAddress = btcTx.inputAddresses[1];
                     save = true;
                 }
                 if(this.state===SpvFromBTCSwapState.POSTED || this.state==SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED) {
@@ -848,7 +848,7 @@ export class SpvFromBTCSwap<T extends ChainType>
 
         let save = false;
         if(result.inputAddresses!=null && this.senderAddress==null) {
-            this.senderAddress = result.inputAddresses[0];
+            this.senderAddress = result.inputAddresses[1];
             save = true;
         }
         if(
@@ -1144,7 +1144,7 @@ export class SpvFromBTCSwap<T extends ChainType>
         const btcTx = await this.wrapper.btcRpc.getTransaction(txId);
         if(btcTx==null || btcTx.inputAddresses==null) return;
 
-        this.senderAddress = btcTx.inputAddresses[0];
+        this.senderAddress = btcTx.inputAddresses[1];
     }
 
     async _syncStateFromBitcoin(save?: boolean) {
@@ -1175,7 +1175,7 @@ export class SpvFromBTCSwap<T extends ChainType>
         } else {
             let needsSave = false;
             if(res.inputAddresses!=null && this.senderAddress==null) {
-                this.senderAddress = res.inputAddresses[0];
+                this.senderAddress = res.inputAddresses[1];
                 needsSave = true;
             }
             if(res.confirmations>=this.vaultRequiredConfirmations) {
