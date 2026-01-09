@@ -597,7 +597,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
                 return;
             let save = false;
             if (btcTx.inputAddresses != null && this.senderAddress == null) {
-                this.senderAddress = btcTx.inputAddresses[0];
+                this.senderAddress = btcTx.inputAddresses[1];
                 save = true;
             }
             if (this.state === SpvFromBTCSwapState.POSTED || this.state == SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED) {
@@ -611,7 +611,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             abortSignal.throwIfAborted();
         let save = false;
         if (result.inputAddresses != null && this.senderAddress == null) {
-            this.senderAddress = result.inputAddresses[0];
+            this.senderAddress = result.inputAddresses[1];
             save = true;
         }
         if (this.state !== SpvFromBTCSwapState.FRONTED &&
@@ -872,7 +872,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         const btcTx = await this.wrapper.btcRpc.getTransaction(txId);
         if (btcTx == null || btcTx.inputAddresses == null)
             return;
-        this.senderAddress = btcTx.inputAddresses[0];
+        this.senderAddress = btcTx.inputAddresses[1];
     }
     async _syncStateFromBitcoin(save) {
         if (this.data?.btcTx == null)
@@ -903,7 +903,7 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         else {
             let needsSave = false;
             if (res.inputAddresses != null && this.senderAddress == null) {
-                this.senderAddress = res.inputAddresses[0];
+                this.senderAddress = res.inputAddresses[1];
                 needsSave = true;
             }
             if (res.confirmations >= this.vaultRequiredConfirmations) {
