@@ -1095,11 +1095,13 @@ class Swapper extends events_1.EventEmitter {
         if (swapContract.getHistoricalSwaps == null)
             throw new Error(`Historical swap recovery is not supported for ${chainId}`);
         const { swaps } = await swapContract.getHistoricalSwaps(signer);
-        this.logger.debug(`recoverSwaps(): Fetching if swap escrowHashes are known: ${Object.keys(swaps)}`);
-        const knownSwapsArray = await unifiedSwapStorage.query([[{ key: "escrowHash", value: Object.keys(swaps) }]], reviver);
+        const escrowHashes = Object.keys(swaps);
+        this.logger.debug(`recoverSwaps(): Loaded on-chain data for ${escrowHashes.length} swaps`);
+        this.logger.debug(`recoverSwaps(): Fetching if swap escrowHashes are known: ${escrowHashes.join(", ")}`);
+        const knownSwapsArray = await unifiedSwapStorage.query([[{ key: "escrowHash", value: escrowHashes }]], reviver);
         const knownSwaps = {};
         knownSwapsArray.forEach(val => knownSwaps[val._getEscrowHash()] = val);
-        this.logger.debug(`recoverSwaps(): Fetched known swaps escrowHashes: ${Object.keys(knownSwaps)}`);
+        this.logger.debug(`recoverSwaps(): Fetched known swaps escrowHashes: ${Object.keys(knownSwaps).join(", ")}`);
         const recoveredSwaps = [];
         for (let escrowHash in swaps) {
             const { init, state } = swaps[escrowHash];
@@ -1108,23 +1110,28 @@ class Swapper extends events_1.EventEmitter {
                 if (knownSwap == null)
                     this.logger.warn(`recoverSwaps(): Fetched ${escrowHash} swap state, but swap not found locally!`);
                 //TODO: Update the existing swaps here
+                this.logger.debug(`recoverSwaps(): Skipping ${escrowHash} swap: swap already known and in local storage!`);
                 continue;
             }
             if (knownSwap != null) {
                 //TODO: Update the existing swaps here
+                this.logger.debug(`recoverSwaps(): Skipping ${escrowHash} swap: swap already known and in local storage!`);
                 continue;
             }
             const data = init.data;
             //Classify swap
             let swap;
+            let typeIdentified = false;
             if (data.getType() === base_1.ChainSwapType.HTLC) {
                 if (data.isOfferer(signer)) {
                     //To BTCLN
+                    typeIdentified = true;
                     const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isClaimer(val.getAddress(chainId)));
                     swap = await wrappers[SwapType_1.SwapType.TO_BTCLN].recoverFromSwapDataAndState(init, state, lp);
                 }
                 else if (data.isClaimer(signer)) {
                     //From BTCLN
+                    typeIdentified = true;
                     const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isOfferer(val.getAddress(chainId)));
                     if (this.supportsSwapType(chainId, SwapType_1.SwapType.FROM_BTCLN_AUTO)) {
                         swap = await wrappers[SwapType_1.SwapType.FROM_BTCLN_AUTO].recoverFromSwapDataAndState(init, state, lp);
@@ -1136,18 +1143,25 @@ class Swapper extends events_1.EventEmitter {
             }
             else if (data.getType() === base_1.ChainSwapType.CHAIN_NONCED) {
                 //To BTC
+                typeIdentified = true;
                 const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isClaimer(val.getAddress(chainId)));
                 swap = await wrappers[SwapType_1.SwapType.TO_BTC].recoverFromSwapDataAndState(init, state, lp);
             }
             else if (data.getType() === base_1.ChainSwapType.CHAIN) {
                 //From BTC
+                typeIdentified = true;
                 const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isOfferer(val.getAddress(chainId)));
                 swap = await wrappers[SwapType_1.SwapType.FROM_BTC].recoverFromSwapDataAndState(init, state, lp);
             }
             if (swap != null) {
                 recoveredSwaps.push(swap);
             }
+            else {
+                if (typeIdentified)
+                    this.logger.debug(`recoverSwaps(): Swap data type correctly identified but swap returned is null for swap ${escrowHash}`);
+            }
         }
+        this.logger.debug(`recoverSwaps(): Successfully recovered ${recoveredSwaps.length} swaps!`);
         return recoveredSwaps;
     }
     getToken(tickerOrAddress) {

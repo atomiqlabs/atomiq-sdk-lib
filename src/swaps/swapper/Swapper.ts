@@ -1601,11 +1601,13 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
 
         const {swaps} = await swapContract.getHistoricalSwaps(signer);
 
-        this.logger.debug(`recoverSwaps(): Fetching if swap escrowHashes are known: ${Object.keys(swaps)}`);
-        const knownSwapsArray = await unifiedSwapStorage.query([[{key: "escrowHash", value: Object.keys(swaps)}]], reviver);
+        const escrowHashes = Object.keys(swaps);
+        this.logger.debug(`recoverSwaps(): Loaded on-chain data for ${escrowHashes.length} swaps`);
+        this.logger.debug(`recoverSwaps(): Fetching if swap escrowHashes are known: ${escrowHashes.join(", ")}`);
+        const knownSwapsArray = await unifiedSwapStorage.query([[{key: "escrowHash", value: escrowHashes}]], reviver);
         const knownSwaps: {[escrowHash: string]: ISwap<T[C]>} = {};
         knownSwapsArray.forEach(val => knownSwaps[val._getEscrowHash()] = val);
-        this.logger.debug(`recoverSwaps(): Fetched known swaps escrowHashes: ${Object.keys(knownSwaps)}`);
+        this.logger.debug(`recoverSwaps(): Fetched known swaps escrowHashes: ${Object.keys(knownSwaps).join(", ")}`);
 
         const recoveredSwaps: ISwap<T[C]>[] = [];
 
@@ -1615,23 +1617,28 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             if(init==null) {
                 if(knownSwap==null) this.logger.warn(`recoverSwaps(): Fetched ${escrowHash} swap state, but swap not found locally!`);
                 //TODO: Update the existing swaps here
+                this.logger.debug(`recoverSwaps(): Skipping ${escrowHash} swap: swap already known and in local storage!`);
                 continue;
             }
             if(knownSwap!=null) {
                 //TODO: Update the existing swaps here
+                this.logger.debug(`recoverSwaps(): Skipping ${escrowHash} swap: swap already known and in local storage!`);
                 continue;
             }
             const data = init.data;
 
             //Classify swap
             let swap: ISwap<T[C]>;
+            let typeIdentified: boolean = false;
             if(data.getType()===ChainSwapType.HTLC) {
                 if(data.isOfferer(signer)) {
                     //To BTCLN
+                    typeIdentified = true;
                     const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isClaimer(val.getAddress(chainId)));
                     swap = await wrappers[SwapType.TO_BTCLN].recoverFromSwapDataAndState(init, state, lp);
                 } else if(data.isClaimer(signer)) {
                     //From BTCLN
+                    typeIdentified = true;
                     const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isOfferer(val.getAddress(chainId)));
                     if(this.supportsSwapType(chainId, SwapType.FROM_BTCLN_AUTO)) {
                         swap = await wrappers[SwapType.FROM_BTCLN_AUTO].recoverFromSwapDataAndState(init, state, lp);
@@ -1641,18 +1648,24 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
                 }
             } else if(data.getType()===ChainSwapType.CHAIN_NONCED) {
                 //To BTC
+                typeIdentified = true;
                 const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isClaimer(val.getAddress(chainId)));
                 swap = await wrappers[SwapType.TO_BTC].recoverFromSwapDataAndState(init, state, lp);
             } else if(data.getType()===ChainSwapType.CHAIN) {
                 //From BTC
+                typeIdentified = true;
                 const lp = this.intermediaryDiscovery.intermediaries.find(val => val.supportsChain(chainId) && data.isOfferer(val.getAddress(chainId)));
                 swap = await wrappers[SwapType.FROM_BTC].recoverFromSwapDataAndState(init, state, lp);
             }
             
             if(swap!=null) {
                 recoveredSwaps.push(swap);
+            } else {
+                if(typeIdentified) this.logger.debug(`recoverSwaps(): Swap data type correctly identified but swap returned is null for swap ${escrowHash}`);
             }
         }
+
+        this.logger.debug(`recoverSwaps(): Successfully recovered ${recoveredSwaps.length} swaps!`);
 
         return recoveredSwaps;
     }
