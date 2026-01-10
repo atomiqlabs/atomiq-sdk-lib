@@ -79,7 +79,7 @@ export declare class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<Mem
      * @param abortSignal
      * @param intervalSeconds
      */
-    waitForAddressTxo(address: string, txoHash: Buffer, requiredConfirmations: number, stateUpdateCbk: (confirmations?: number, txId?: string, vout?: number, txEtaMS?: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<{
+    waitForAddressTxo(address: string, txoHash: Buffer, requiredConfirmations: number, stateUpdateCbk: (btcTx?: Omit<BtcTxWithBlockheight, "hex" | "raw">, vout?: number, txEtaMS?: number) => void, abortSignal?: AbortSignal, intervalSeconds?: number): Promise<{
         tx: Omit<BtcTxWithBlockheight, "hex" | "raw">;
         vout: number;
     }>;

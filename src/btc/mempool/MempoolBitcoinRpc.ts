@@ -284,7 +284,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
         address: string,
         txoHash: Buffer,
         requiredConfirmations: number,
-        stateUpdateCbk: (confirmations?: number, txId?: string, vout?: number, txEtaMS?: number) => void,
+        stateUpdateCbk: (btcTx?: Omit<BtcTxWithBlockheight, "hex" | "raw">, vout?: number, txEtaMS?: number) => void,
         abortSignal?: AbortSignal,
         intervalSeconds?: number
     ): Promise<{
@@ -306,8 +306,7 @@ export class MempoolBitcoinRpc implements BitcoinRpcWithAddressIndex<MempoolBitc
             if(confirmationDelay==null) continue;
 
             if(stateUpdateCbk!=null) stateUpdateCbk(
-                result.tx.confirmations ?? 0,
-                result.tx.txid,
+                result.tx,
                 result.vout,
                 confirmationDelay
             );
