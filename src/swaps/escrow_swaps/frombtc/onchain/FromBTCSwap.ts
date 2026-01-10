@@ -27,6 +27,7 @@ import {IClaimableSwap} from "../../../IClaimableSwap";
 import {IEscrowSelfInitSwapInit, isIEscrowSelfInitSwapInit} from "../../IEscrowSelfInitSwap";
 import {IAddressSwap} from "../../../IAddressSwap";
 import {add} from "@noble/hashes/_u64";
+import {BtcTxWithBlockheight} from "../../../../btc/BitcoinRpcWithAddressIndex";
 
 export enum FromBTCSwapState {
     FAILED = -4,
@@ -171,7 +172,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
     }
 
     requiresAction(): boolean {
-        return this.isClaimable() || (this.state===FromBTCSwapState.CLAIM_COMMITED && this.getTimeoutTime()>Date.now());
+        return this.isClaimable() || (this.state===FromBTCSwapState.CLAIM_COMMITED && this.getTimeoutTime()>Date.now() && this.txId==null);
     }
 
     isFinished(): boolean {
@@ -187,7 +188,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
     }
 
     isFailed(): boolean {
-        return this.state===FromBTCSwapState.FAILED || (this.state===FromBTCSwapState.EXPIRED && this.txId!=null);
+        return this.state===FromBTCSwapState.FAILED || this.state===FromBTCSwapState.EXPIRED;
     }
 
     isQuoteExpired(): boolean {
@@ -312,8 +313,16 @@ export class FromBTCSwap<T extends ChainType = ChainType>
             this.address,
             Buffer.from(txoHashHint, "hex"),
             this.requiredConfirmations,
-            (confirmations?: number, txId?: string, vout?: number, txEtaMs?: number) => {
-                if(updateCallback!=null) updateCallback(txId, confirmations, this.requiredConfirmations, txEtaMs);
+            (btcTx?: Omit<BtcTxWithBlockheight, "hex" | "raw">, vout?: number, txEtaMs?: number) => {
+                if(updateCallback!=null) updateCallback(btcTx?.txid, btcTx==null ? undefined : (btcTx?.confirmations ?? 0), this.requiredConfirmations, txEtaMs);
+                if(btcTx!=null && btcTx.txid!==this.txId) {
+                    this.txId = btcTx.txid;
+                    this.vout = vout;
+                    if(btcTx.inputAddresses!=null) this.senderAddress = btcTx.inputAddresses[0];
+                    this._saveAndEmit().catch(e => {
+                        this.logger.error("waitForBitcoinTransaction(): Failed to save swap from within waitForAddressTxo callback:", e)
+                    });
+                }
             },
             abortSignal,
             checkIntervalSeconds
@@ -323,6 +332,8 @@ export class FromBTCSwap<T extends ChainType = ChainType>
 
         this.txId = result.tx.txid;
         this.vout = result.vout;
+        if(result.tx.inputAddresses!=null) this.senderAddress = result.tx.inputAddresses[0];
+
         if(
             (this.state as FromBTCSwapState)!==FromBTCSwapState.CLAIM_CLAIMED &&
             (this.state as FromBTCSwapState)!==FromBTCSwapState.FAILED
@@ -670,7 +681,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
 
         const tx = await this.wrapper.btcRpc.getTransaction(this.txId);
         if(tx==null) throw new Error("Bitcoin transaction not found on the network!");
-        if(tx.blockhash==null || tx.confirmations==null || tx.blockheight==null)
+        if(tx.blockhash==null || tx.confirmations==null || tx.blockheight==null || tx.confirmations<this.requiredConfirmations)
             throw new Error("Bitcoin transaction not confirmed yet!");
 
         return await this.wrapper.contract.txsClaimWithTxData(signer ?? this._getInitiator(), this.data, {
@@ -870,12 +881,19 @@ export class FromBTCSwap<T extends ChainType = ChainType>
                     return true;
                 case SwapCommitStateType.COMMITED:
                     const res = await this.getBitcoinPayment();
-                    if(res!=null && res.confirmations>=this.requiredConfirmations) {
-                        if(res.inputAddresses!=null) this.senderAddress = res.inputAddresses[0];
-                        this.txId = res.txId;
-                        this.vout = res.vout;
-                        this.state = FromBTCSwapState.BTC_TX_CONFIRMED;
-                        return true;
+                    if(res!=null) {
+                        let save: boolean = false;
+                        if(this.txId!==res.txId) {
+                            if(res.inputAddresses!=null) this.senderAddress = res.inputAddresses[0];
+                            this.txId = res.txId;
+                            this.vout = res.vout;
+                            save = true;
+                        }
+                        if(res.confirmations>=this.requiredConfirmations) {
+                            this.state = FromBTCSwapState.BTC_TX_CONFIRMED;
+                            save = true;
+                        }
+                        return save;
                     }
                     break;
             }
@@ -920,13 +938,21 @@ export class FromBTCSwap<T extends ChainType = ChainType>
                 if(Math.floor(Date.now()/1000)%120===0) {
                     try {
                         const res = await this.getBitcoinPayment();
-                        if(res!=null && res.confirmations>=this.requiredConfirmations) {
-                            if(res.inputAddresses!=null) this.senderAddress = res.inputAddresses[0];
-                            this.txId = res.txId;
-                            this.vout = res.vout;
-                            this.state = FromBTCSwapState.BTC_TX_CONFIRMED;
-                            if(save) await this._saveAndEmit();
-                            return true;
+                        if(res!=null) {
+                            let shouldSave: boolean = false;
+                            if(this.txId!==res.txId) {
+                                this.txId = res.txId;
+                                this.vout = res.vout;
+                                if(res.inputAddresses!=null) this.senderAddress = res.inputAddresses[0];
+                                shouldSave = true;
+                            }
+                            if(res.confirmations>=this.requiredConfirmations) {
+                                this.state = FromBTCSwapState.BTC_TX_CONFIRMED;
+                                if(save) await this._saveAndEmit();
+                                shouldSave = true;
+                            }
+                            if(shouldSave && save) await this._saveAndEmit();
+                            return shouldSave;
                         }
                     } catch (e) {
                         this.logger.warn("tickSwap("+this.getIdentifierHashString()+"): ", e);

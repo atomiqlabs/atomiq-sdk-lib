@@ -267,7 +267,7 @@ class MempoolBitcoinRpc {
             if (confirmationDelay == null)
                 continue;
             if (stateUpdateCbk != null)
-                stateUpdateCbk(result.tx.confirmations ?? 0, result.tx.txid, result.vout, confirmationDelay);
+                stateUpdateCbk(result.tx, result.vout, confirmationDelay);
             if (confirmationDelay === 0)
                 return result;
         }

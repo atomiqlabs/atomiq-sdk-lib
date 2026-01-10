@@ -76,7 +76,7 @@ export interface BitcoinRpcWithAddressIndex<T extends BtcBlock> extends BitcoinR
         address: string,
         txoHash: Buffer,
         requiredConfirmations: number,
-        stateUpdateCbk: (confirmations?: number, txId?: string, vout?: number, txEtaMS?: number) => void,
+        stateUpdateCbk: (btcTx?: Omit<BtcTxWithBlockheight, "hex" | "raw">, vout?: number, txEtaMS?: number) => void,
         abortSignal?: AbortSignal,
         intervalSeconds?: number
     ): Promise<{
