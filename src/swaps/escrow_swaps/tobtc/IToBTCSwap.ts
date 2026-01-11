@@ -157,7 +157,8 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
 
     protected getSwapFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken> {
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
-        const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
+        const output = this.getOutput();
+        const swapFeePPM = output.rawAmount==null ? 0n : feeWithoutBaseFee * 1000000n / output.rawAmount;
 
         return {
             amountInSrcToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),

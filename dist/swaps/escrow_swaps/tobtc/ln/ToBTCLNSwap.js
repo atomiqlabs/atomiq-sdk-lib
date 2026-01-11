@@ -59,7 +59,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     //// Amounts & fees
     getOutput() {
         if (this.pr == null || !this.pr.startsWith("ln"))
-            return null;
+            return (0, Tokens_1.toTokenAmount)(null, this.outputToken, this.wrapper.prices);
         const parsedPR = (0, bolt11_1.decode)(this.pr);
         const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
         return (0, Tokens_1.toTokenAmount)(amount, this.outputToken, this.wrapper.prices);

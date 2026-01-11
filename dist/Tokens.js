@@ -90,7 +90,14 @@ function toDecimal(amount, decimalCount, cut, displayDecimals) {
 exports.toDecimal = toDecimal;
 function toTokenAmount(amount, token, prices) {
     if (amount == null)
-        return null;
+        return {
+            rawAmount: null,
+            amount: null,
+            _amount: null,
+            token,
+            usdValue: () => Promise.resolve(null),
+            toString: () => "??? " + token.ticker
+        };
     let amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
     return {
         rawAmount: amount,

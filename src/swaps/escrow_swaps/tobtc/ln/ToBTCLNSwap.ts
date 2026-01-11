@@ -82,7 +82,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> 
     //// Amounts & fees
 
     getOutput(): TokenAmount<T["ChainId"], BtcToken<true>> {
-        if(this.pr==null || !this.pr.startsWith("ln")) return null;
+        if(this.pr==null || !this.pr.startsWith("ln")) return toTokenAmount(null, this.outputToken, this.wrapper.prices);
         const parsedPR = bolt11Decode(this.pr);
         const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
         return toTokenAmount(amount, this.outputToken, this.wrapper.prices);
