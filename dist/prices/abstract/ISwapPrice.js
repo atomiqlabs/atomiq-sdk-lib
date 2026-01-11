@@ -8,6 +8,7 @@ function isPriceInfoType(obj) {
         typeof (obj.satsBaseFee) === "bigint" &&
         typeof (obj.feePPM) === "bigint" &&
         (obj.realPriceUSatPerToken == null || typeof (obj.realPriceUSatPerToken) === "bigint") &&
+        (obj.realPriceUsdPerBitcoin == null || typeof (obj.realPriceUsdPerBitcoin) === "number") &&
         typeof (obj.swapPriceUSatPerToken) === "bigint";
 }
 exports.isPriceInfoType = isPriceInfoType;

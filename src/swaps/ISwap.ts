@@ -133,6 +133,7 @@ export abstract class ISwap<
                     satsBaseFee: BigInt(swapInitOrObj._satsBaseFee),
                     feePPM: BigInt(swapInitOrObj._feePPM),
                     realPriceUSatPerToken: toBigInt(swapInitOrObj._realPriceUSatPerToken),
+                    realPriceUsdPerBitcoin: swapInitOrObj._realPriceUsdPerBitcoin,
                     swapPriceUSatPerToken: BigInt(swapInitOrObj._swapPriceUSatPerToken),
                 };
             }
@@ -188,6 +189,7 @@ export abstract class ISwap<
     protected tryRecomputeSwapPrice(): void {
         if(this.pricingInfo==null) return;
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
+            const priceUsdPerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
             if(this.getDirection()===SwapDirection.TO_BTC) {
                 const input = this.getInput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
                 this.pricingInfo = this.wrapper.prices.recomputePriceInfoSend(
@@ -198,6 +200,7 @@ export abstract class ISwap<
                     input.rawAmount,
                     input.token.address
                 );
+                this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
             } else {
                 const output = this.getOutput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
                 this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
@@ -208,6 +211,7 @@ export abstract class ISwap<
                     output.rawAmount,
                     output.token.address
                 );
+                this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
             }
         }
     }
@@ -217,6 +221,7 @@ export abstract class ISwap<
      */
     async refreshPriceData(): Promise<void> {
         if(this.pricingInfo==null) return;
+        const priceUsdPerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
         if(this.getDirection()===SwapDirection.TO_BTC) {
             const input = this.getInput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
             this.pricingInfo = await this.wrapper.prices.isValidAmountSend(
@@ -227,6 +232,7 @@ export abstract class ISwap<
                 input.rawAmount,
                 input.token.address
             );
+            this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
         } else {
             const output = this.getOutput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
             this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(
@@ -237,6 +243,7 @@ export abstract class ISwap<
                 output.rawAmount,
                 output.token.address
             );
+            this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
         }
     }
 
@@ -423,6 +430,7 @@ export abstract class ISwap<
             _satsBaseFee: this.pricingInfo.satsBaseFee==null ? null :this.pricingInfo.satsBaseFee.toString(10),
             _feePPM: this.pricingInfo.feePPM==null ? null :this.pricingInfo.feePPM.toString(10),
             _realPriceUSatPerToken: this.pricingInfo.realPriceUSatPerToken==null ? null :this.pricingInfo.realPriceUSatPerToken.toString(10),
+            _realPriceUsdPerBitcoin: this.pricingInfo.realPriceUsdPerBitcoin,
             _swapPriceUSatPerToken: this.pricingInfo.swapPriceUSatPerToken==null ? null :this.pricingInfo.swapPriceUSatPerToken.toString(10),
             state: this.state,
             url: this.url,

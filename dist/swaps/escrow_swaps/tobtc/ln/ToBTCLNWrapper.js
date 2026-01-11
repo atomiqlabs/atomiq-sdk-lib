@@ -158,7 +158,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             data.setOfferer(signer);
             await this.verifyReturnedData(signer, resp, parsedPr, amountData.token, lp, options, data);
             const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
-                this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTCLN], true, amountOut, data.getAmount(), amountData.token, { networkFee: resp.maxFee }, preFetches.pricePreFetchPromise, abortController.signal),
+                this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTCLN], true, amountOut, data.getAmount(), amountData.token, { networkFee: resp.maxFee }, preFetches.pricePreFetchPromise, preFetches.usdPricePrefetchPromise, abortController.signal),
                 this.verifyReturnedSignature(signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal),
                 reputationPromise
             ]);
@@ -224,6 +224,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         const _preFetches = preFetches ?? {
             pricePreFetchPromise: this.preFetchPrice(amountData, _abortController.signal),
             feeRatePromise: this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController),
+            usdPricePrefetchPromise: this.preFetchUsdPrice(_abortController.signal),
             signDataPrefetchPromise: this.contract.preFetchBlockDataForSignatures == null ? this.preFetchSignData(Promise.resolve(true)) : undefined
         };
         return lps.map(lp => {
@@ -312,7 +313,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             data.setOfferer(signer);
             await this.verifyReturnedData(signer, resp, parsedInvoice, amountData.token, lp, options, data, amountData.amount);
             const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
-                this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTCLN], true, prepareResp.amount, data.getAmount(), amountData.token, { networkFee: resp.maxFee }, preFetches.pricePreFetchPromise, abortSignal),
+                this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTCLN], true, prepareResp.amount, data.getAmount(), amountData.token, { networkFee: resp.maxFee }, preFetches.pricePreFetchPromise, preFetches.usdPricePrefetchPromise, abortSignal),
                 this.verifyReturnedSignature(signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal),
                 reputationPromise
             ]);
@@ -359,6 +360,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             throw new Error("Not initialized, call init() first!");
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePreFetchPromise = this.preFetchPrice(amountData, _abortController.signal);
+        const usdPricePrefetchPromise = this.preFetchUsdPrice(_abortController.signal);
         const feeRatePromise = this.preFetchFeeRate(signer, amountData, undefined, _abortController);
         const signDataPrefetchPromise = this.contract.preFetchBlockDataForSignatures == null ?
             this.preFetchSignData(Promise.resolve(true)) :
@@ -372,6 +374,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                     return {
                         quote: this.getIntermediaryQuoteExactIn(signer, amountData, invoiceCreateService, lp, dummyInvoice, _options, {
                             pricePreFetchPromise,
+                            usdPricePrefetchPromise,
                             feeRatePromise
                         }, _abortController.signal, additionalParams),
                         intermediary: lp
@@ -391,6 +394,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                 return (await this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
                     feeRatePromise,
                     pricePreFetchPromise,
+                    usdPricePrefetchPromise,
                     signDataPrefetchPromise
                 }));
             }

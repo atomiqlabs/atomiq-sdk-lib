@@ -88,15 +88,31 @@ function toDecimal(amount, decimalCount, cut, displayDecimals) {
     return amountStr.substring(0, splitPoint) + "." + decimalPart.substring(0, cutTo);
 }
 exports.toDecimal = toDecimal;
-function toTokenAmount(amount, token, prices) {
+function toTokenAmount(amount, token, prices, pricingInfo) {
     if (amount == null)
         return null; //Shouldn't happen
-    let amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
+    const amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
+    const _amount = parseFloat(amountStr);
+    let usdValue = undefined;
+    if (token.chain === "BTC" && token.ticker === "BTC") {
+        if (pricingInfo.realPriceUsdPerBitcoin != null) {
+            usdValue = _amount * pricingInfo.realPriceUsdPerBitcoin;
+        }
+    }
+    else {
+        if (pricingInfo.realPriceUsdPerBitcoin != null && pricingInfo.realPriceUSatPerToken != null) {
+            usdValue = _amount
+                * pricingInfo.realPriceUsdPerBitcoin
+                * Number(pricingInfo.realPriceUSatPerToken)
+                / 100000000000000;
+        }
+    }
     return {
         rawAmount: amount,
         amount: amountStr,
-        _amount: parseFloat(amountStr),
+        _amount,
         token,
+        pastUsdValue: usdValue,
         usdValue: (abortSignal, preFetchedUsdPrice) => prices.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice),
         toString: () => amountStr + " " + token.ticker
     };

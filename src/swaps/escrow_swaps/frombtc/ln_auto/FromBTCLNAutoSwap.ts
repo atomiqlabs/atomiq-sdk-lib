@@ -160,6 +160,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
     protected tryRecomputeSwapPrice() {
         if(this.pricingInfo==null) return;
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
+            const priceUsdPerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
                 this.chainIdentifier,
                 this.btcAmountSwap,
@@ -168,6 +169,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
                 this.getOutputAmountWithoutFee(),
                 this.getSwapData().getToken()
             );
+            this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
         }
     }
 
@@ -177,6 +179,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
 
     async refreshPriceData(): Promise<void> {
         if(this.pricingInfo==null) return;
+        const usdPricePerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
         this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(
             this.chainIdentifier,
             this.btcAmountSwap,
@@ -185,6 +188,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
             this.getOutputAmountWithoutFee(),
             this.getSwapData().getToken()
         );
+        this.pricingInfo.realPriceUsdPerBitcoin = usdPricePerBtc;
     }
 
 

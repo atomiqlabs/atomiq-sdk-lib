@@ -96,6 +96,7 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
     create(signer: string, bolt11PayRequest: string, amountData: Omit<AmountData, "amount">, lps: Intermediary[], options?: ToBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
         feeRatePromise: Promise<string | undefined>;
         pricePreFetchPromise: Promise<bigint | undefined>;
+        usdPricePrefetchPromise: Promise<number | undefined>;
         signDataPrefetchPromise?: Promise<T["PreFetchVerification"] | undefined>;
     }): Promise<{
         quote: Promise<ToBTCLNSwap<T>>;

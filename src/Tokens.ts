@@ -1,4 +1,4 @@
-import {ISwapPrice} from "./prices/abstract/ISwapPrice";
+import {ISwapPrice, PriceInfoType} from "./prices/abstract/ISwapPrice";
 
 export type BtcToken<L = boolean> = {
     chain: "BTC",
@@ -72,6 +72,7 @@ export type TokenAmount<
     amount: string,
     _amount: number,
     token: T,
+    pastUsdValue?: number,
     usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) => Promise<number>,
     toString: () => string
 };
@@ -128,15 +129,33 @@ export function toTokenAmount<
 >(
     amount: bigint,
     token:  T,
-    prices: ISwapPrice
+    prices: ISwapPrice,
+    pricingInfo: PriceInfoType
 ): TokenAmount<ChainIdentifier, T> {
     if(amount==null) return null!; //Shouldn't happen
-    let amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
+    const amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
+    const _amount = parseFloat(amountStr);
+
+    let usdValue: number | undefined = undefined;
+    if(token.chain==="BTC" && token.ticker==="BTC") {
+        if(pricingInfo.realPriceUsdPerBitcoin!=null) {
+            usdValue = _amount * pricingInfo.realPriceUsdPerBitcoin;
+        }
+    } else {
+        if(pricingInfo.realPriceUsdPerBitcoin!=null && pricingInfo.realPriceUSatPerToken!=null) {
+            usdValue = _amount
+                * pricingInfo.realPriceUsdPerBitcoin
+                * Number(pricingInfo.realPriceUSatPerToken)
+                / 100_000_000_000_000;
+        }
+    }
+
     return {
         rawAmount: amount,
         amount: amountStr,
-        _amount: parseFloat(amountStr),
+        _amount,
         token,
+        pastUsdValue: usdValue,
         usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
             prices.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice),
         toString: () => amountStr+" "+token.ticker

@@ -1,4 +1,4 @@
-import { ISwapPrice } from "./prices/abstract/ISwapPrice";
+import { ISwapPrice, PriceInfoType } from "./prices/abstract/ISwapPrice";
 export type BtcToken<L = boolean> = {
     chain: "BTC";
     lightning: L;
@@ -29,9 +29,10 @@ export type TokenAmount<ChainIdentifier extends string = string, T extends Token
     amount: string;
     _amount: number;
     token: T;
+    pastUsdValue?: number;
     usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) => Promise<number>;
     toString: () => string;
 };
 export declare function fromDecimal(amount: string, decimalCount: number): bigint;
 export declare function toDecimal(amount: bigint, decimalCount: number, cut?: boolean, displayDecimals?: number): string;
-export declare function toTokenAmount<ChainIdentifier extends string = string, T extends Token<ChainIdentifier> = Token<ChainIdentifier>>(amount: bigint, token: T, prices: ISwapPrice): TokenAmount<ChainIdentifier, T>;
+export declare function toTokenAmount<ChainIdentifier extends string = string, T extends Token<ChainIdentifier> = Token<ChainIdentifier>>(amount: bigint, token: T, prices: ISwapPrice, pricingInfo: PriceInfoType): TokenAmount<ChainIdentifier, T>;

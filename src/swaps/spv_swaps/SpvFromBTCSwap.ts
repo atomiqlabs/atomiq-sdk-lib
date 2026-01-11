@@ -232,6 +232,7 @@ export class SpvFromBTCSwap<T extends ChainType>
         }
 
         if(this.pricingInfo!=null && this.pricingInfo.swapPriceUSatPerToken==null) {
+            const priceUsdPerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
                 this.chainIdentifier,
                 this.btcAmountSwap,
@@ -240,6 +241,7 @@ export class SpvFromBTCSwap<T extends ChainType>
                 this.getOutputWithoutFee().rawAmount,
                 this.outputSwapToken
             );
+            this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
         }
     }
 
@@ -249,6 +251,7 @@ export class SpvFromBTCSwap<T extends ChainType>
 
     async refreshPriceData(): Promise<void> {
         if(this.pricingInfo==null) return;
+        const usdPricePerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
         this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(
             this.chainIdentifier,
             this.btcAmountSwap,
@@ -257,6 +260,7 @@ export class SpvFromBTCSwap<T extends ChainType>
             this.getOutputWithoutFee().rawAmount,
             this.outputSwapToken
         );
+        this.pricingInfo.realPriceUsdPerBitcoin = usdPricePerBtc;
     }
 
 

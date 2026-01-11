@@ -7,6 +7,7 @@ export type PriceInfoType = {
     satsBaseFee: bigint,
     feePPM: bigint,
     realPriceUSatPerToken?: bigint,
+    realPriceUsdPerBitcoin?: number,
     swapPriceUSatPerToken: bigint
 };
 
@@ -17,6 +18,7 @@ export function isPriceInfoType(obj: any): obj is PriceInfoType {
         typeof(obj.satsBaseFee) === "bigint" &&
         typeof(obj.feePPM) === "bigint" &&
         (obj.realPriceUSatPerToken==null || typeof(obj.realPriceUSatPerToken) === "bigint") &&
+        (obj.realPriceUsdPerBitcoin==null || typeof(obj.realPriceUsdPerBitcoin) === "number") &&
         typeof(obj.swapPriceUSatPerToken) === "bigint";
 }
 

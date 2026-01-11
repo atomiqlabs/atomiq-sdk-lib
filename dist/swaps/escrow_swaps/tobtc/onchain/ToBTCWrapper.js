@@ -135,6 +135,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             undefined;
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const pricePreFetchPromise = this.preFetchPrice(amountData, _abortController.signal);
+        const usdPricePrefetchPromise = this.preFetchUsdPrice(_abortController.signal);
         const feeRatePromise = this.preFetchFeeRate(signer, amountData, _hash, _abortController);
         const _signDataPromise = this.contract.preFetchBlockDataForSignatures == null ?
             this.preFetchSignData(Promise.resolve(true)) :
@@ -171,7 +172,7 @@ class ToBTCWrapper extends IToBTCWrapper_1.IToBTCWrapper {
                         data.setOfferer(signer);
                         this.verifyReturnedData(signer, resp, amountData, lp, _options, data, hash);
                         const [pricingInfo, signatureExpiry, reputation] = await Promise.all([
-                            this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTC], true, resp.amount, data.getAmount(), amountData.token, resp, pricePreFetchPromise, abortController.signal),
+                            this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.TO_BTC], true, resp.amount, data.getAmount(), amountData.token, resp, pricePreFetchPromise, usdPricePrefetchPromise, abortController.signal),
                             this.verifyReturnedSignature(signer, data, resp, feeRatePromise, signDataPromise, abortController.signal),
                             reputationPromise
                         ]);
