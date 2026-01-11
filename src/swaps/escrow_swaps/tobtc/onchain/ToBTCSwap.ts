@@ -96,7 +96,7 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T, To
     //// Amounts & fees
 
     getOutput(): TokenAmount<T["ChainId"], BtcToken<false>> {
-        return toTokenAmount(this.amount, this.outputToken, this.wrapper.prices);
+        return toTokenAmount(this.amount, this.outputToken, this.wrapper.prices, this.pricingInfo);
     }
 
 

@@ -35,6 +35,12 @@ import {
 } from "../../btc/wallet/MinimalBitcoinWalletInterface";
 import {IClaimableSwap} from "../IClaimableSwap";
 import {BtcTxWithBlockheight} from "../../btc/BitcoinRpcWithAddressIndex";
+import {
+    deserializePriceInfoType,
+    isPriceInfoType,
+    PriceInfoType,
+    serializePriceInfoType
+} from "../../prices/abstract/ISwapPrice";
 
 export enum SpvFromBTCSwapState {
     CLOSED = -5,
@@ -76,6 +82,7 @@ export type SpvFromBTCSwapInit = ISwapInit & {
     frontingFeeShare: bigint;
     executionFeeShare: bigint;
     genesisSmartChainBlockHeight: number;
+    gasPricingInfo?: PriceInfoType;
 };
 
 export function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit {
@@ -104,6 +111,7 @@ export function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit {
         typeof(obj.frontingFeeShare)==="bigint" &&
         typeof(obj.executionFeeShare)==="bigint" &&
         typeof(obj.genesisSmartChainBlockHeight)==="number" &&
+        (obj.gasPricingInfo==null || isPriceInfoType(obj.gasPricingInfo)) &&
         isISwapInit(obj);
 }
 
@@ -146,6 +154,8 @@ export class SpvFromBTCSwap<T extends ChainType>
 
     readonly genesisSmartChainBlockHeight: number;
 
+    gasPricingInfo?: PriceInfoType;
+
     senderAddress?: string;
 
     claimTxId?: string;
@@ -183,6 +193,7 @@ export class SpvFromBTCSwap<T extends ChainType>
             this.frontingFeeShare = initOrObject.frontingFeeShare;
             this.executionFeeShare = initOrObject.executionFeeShare;
             this.genesisSmartChainBlockHeight = initOrObject.genesisSmartChainBlockHeight;
+            this.gasPricingInfo = initOrObject.gasPricingInfo;
             const vaultAddressType = toCoinselectAddressType(toOutputScript(this.wrapper.options.bitcoinNetwork, this.vaultBtcAddress));
             if(vaultAddressType!=="p2tr" && vaultAddressType!=="p2wpkh" && vaultAddressType!=="p2wsh")
                 throw new Error("Vault address type must be of witness type: p2tr, p2wpkh, p2wsh");
@@ -214,6 +225,7 @@ export class SpvFromBTCSwap<T extends ChainType>
             this.senderAddress = initOrObject.senderAddress;
             this.claimTxId = initOrObject.claimTxId;
             this.frontTxId = initOrObject.frontTxId;
+            this.gasPricingInfo = deserializePriceInfoType(initOrObject.gasPricingInfo);
             if(initOrObject.data!=null) this.data = new this.wrapper.spvWithdrawalDataDeserializer(initOrObject.data);
         }
         this.tryCalculateSwapFee();
@@ -350,7 +362,7 @@ export class SpvFromBTCSwap<T extends ChainType>
     protected getOutputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
         return toTokenAmount(
             (this.outputTotalSwap * (100_000n + this.callerFeeShare + this.frontingFeeShare + this.executionFeeShare) / 100_000n) + (this.swapFee ?? 0n),
-            this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices
+            this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices, this.pricingInfo
         );
     }
 
@@ -366,13 +378,17 @@ export class SpvFromBTCSwap<T extends ChainType>
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / (this.btcAmount - this.swapFeeBtc - this.gasSwapFeeBtc);
 
+        const amountInSrcToken = toTokenAmount(
+            this.swapFeeBtc + this.gasSwapFeeBtc, BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo
+        );
         return {
-            amountInSrcToken: toTokenAmount(this.swapFeeBtc + this.gasSwapFeeBtc, BitcoinTokens.BTC, this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFee + gasSwapFeeInOutputToken, outputToken, this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.gasSwapFeeBtc, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken,
+            amountInDstToken: toTokenAmount(this.swapFee + gasSwapFeeInOutputToken, outputToken, this.wrapper.prices, this.pricingInfo),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue,
             composition: {
-                base: toTokenAmount(this.pricingInfo.satsBaseFee, BitcoinTokens.BTC, this.wrapper.prices),
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo),
                 percentage: ppmToPercentage(swapFeePPM)
             }
         };
@@ -389,11 +405,16 @@ export class SpvFromBTCSwap<T extends ChainType>
             / this.pricingInfo.swapPriceUSatPerToken
             / 100_000n;
         const feeBtc = this.getInputAmountWithoutFee() * (totalFeeShare + this.executionFeeShare) / 100_000n;
+        const amountInSrcToken = toTokenAmount(feeBtc, BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: toTokenAmount(feeBtc, BitcoinTokens.BTC, this.wrapper.prices),
-            amountInDstToken: toTokenAmount((this.outputTotalSwap * (totalFeeShare + this.executionFeeShare) / 100_000n) + watchtowerFeeInOutputToken, outputToken, this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(feeBtc, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken,
+            amountInDstToken: toTokenAmount(
+                (this.outputTotalSwap * (totalFeeShare + this.executionFeeShare) / 100_000n) + watchtowerFeeInOutputToken,
+                outputToken, this.wrapper.prices, this.pricingInfo
+            ),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue
         };
     }
 
@@ -401,11 +422,19 @@ export class SpvFromBTCSwap<T extends ChainType>
         const swapFee = this.getSwapFee();
         const watchtowerFee = this.getWatchtowerFee();
 
+        const amountInSrcToken = toTokenAmount(
+            swapFee.amountInSrcToken.rawAmount + watchtowerFee.amountInSrcToken.rawAmount,
+            BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo
+        );
         return {
-            amountInSrcToken: toTokenAmount(swapFee.amountInSrcToken.rawAmount + watchtowerFee.amountInSrcToken.rawAmount, BitcoinTokens.BTC, this.wrapper.prices),
-            amountInDstToken: toTokenAmount(swapFee.amountInDstToken.rawAmount + watchtowerFee.amountInDstToken.rawAmount, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(swapFee.amountInSrcToken.rawAmount + watchtowerFee.amountInSrcToken.rawAmount, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken,
+            amountInDstToken: toTokenAmount(
+                swapFee.amountInDstToken.rawAmount + watchtowerFee.amountInDstToken.rawAmount,
+                this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices, this.pricingInfo
+            ),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue
         };
     }
 
@@ -426,19 +455,19 @@ export class SpvFromBTCSwap<T extends ChainType>
     }
 
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.outputTotalSwap, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices);
+        return toTokenAmount(this.outputTotalSwap, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices, this.pricingInfo);
     }
 
     getGasDropOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.outputTotalGas, this.wrapper.tokens[this.outputGasToken], this.wrapper.prices);
+        return toTokenAmount(this.outputTotalGas, this.wrapper.tokens[this.outputGasToken], this.wrapper.prices, this.gasPricingInfo);
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>> {
-        return toTokenAmount(this.getInputAmountWithoutFee(), BitcoinTokens.BTC, this.wrapper.prices);
+        return toTokenAmount(this.getInputAmountWithoutFee(), BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo);
     }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>> {
-        return toTokenAmount(this.btcAmount, BitcoinTokens.BTC, this.wrapper.prices);
+        return toTokenAmount(this.btcAmount, BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo);
     }
 
 
@@ -693,7 +722,7 @@ export class SpvFromBTCSwap<T extends ChainType>
         const bitcoinWallet: IBitcoinWallet = toBitcoinWallet(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
         const txFee = await bitcoinWallet.getFundedPsbtFee((await this.getPsbt()).psbt, feeRate);
         if(txFee==null) return null;
-        return toTokenAmount(BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
+        return toTokenAmount(BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo);
     }
 
     async sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string> {
@@ -1123,6 +1152,7 @@ export class SpvFromBTCSwap<T extends ChainType>
             frontingFeeShare: this.frontingFeeShare.toString(10),
             executionFeeShare: this.executionFeeShare.toString(10),
             genesisSmartChainBlockHeight: this.genesisSmartChainBlockHeight,
+            gasPricingInfo: serializePriceInfoType(this.gasPricingInfo),
 
             senderAddress: this.senderAddress,
             claimTxId: this.claimTxId,

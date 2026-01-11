@@ -189,13 +189,17 @@ export abstract class IToBTCSwap<
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
 
+        const amountInDstToken = toTokenAmount(
+            this.swapFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo
+        );
         return {
-            amountInSrcToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue,
             composition: {
-                base: toTokenAmount(this.pricingInfo.satsBaseFee, this.outputToken, this.wrapper.prices),
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, this.outputToken, this.wrapper.prices, this.pricingInfo),
                 percentage: ppmToPercentage(swapFeePPM)
             }
         };
@@ -206,20 +210,33 @@ export abstract class IToBTCSwap<
      *  paid only once
      */
     protected getNetworkFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken> {
+        const amountInDstToken = toTokenAmount(
+            this.networkFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo
+        );
         return {
-            amountInSrcToken: toTokenAmount(this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.networkFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken: toTokenAmount(
+                this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo
+            ),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue
         };
     }
 
     getFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken> {
+        const amountInDstToken = toTokenAmount(
+            this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo
+        );
         return {
-            amountInSrcToken: toTokenAmount(this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken: toTokenAmount(
+                this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()],
+                this.wrapper.prices, this.pricingInfo
+            ),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue
         }
     }
 
@@ -240,11 +257,17 @@ export abstract class IToBTCSwap<
     }
 
     getInput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getAmount(), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return toTokenAmount(
+            this.data.getAmount(), this.wrapper.tokens[this.data.getToken()],
+            this.wrapper.prices, this.pricingInfo
+        );
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getAmount() - (this.swapFee + this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return toTokenAmount(
+            this.data.getAmount() - (this.swapFee + this.networkFee),
+            this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo
+        );
     }
 
     /**
@@ -259,8 +282,8 @@ export abstract class IToBTCSwap<
         if(commitFee!=null) required = required + commitFee;
         return {
             enoughBalance: balance >= required,
-            balance: toTokenAmount(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            required: toTokenAmount(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices)
+            balance: toTokenAmount(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            required: toTokenAmount(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo)
         };
     }
 

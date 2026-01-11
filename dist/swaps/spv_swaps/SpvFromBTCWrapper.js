@@ -445,7 +445,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                         const callerFeeShare = (await callerFeePrefetchPromise);
                         const [pricingInfo, gasPricingInfo, { vault, vaultUtxoValue }] = await Promise.all([
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], false, resp.btcAmountSwap, resp.total * (100000n + callerFeeShare) / 100000n, amountData.token, {}, pricePrefetchPromise, usdPricePrefetchPromise, abortController.signal),
-                            _options.gasAmount === 0n ? Promise.resolve() : this.verifyReturnedPrice({ ...lp.services[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], swapBaseFee: 0 }, //Base fee should be charged only on the amount, not on gas
+                            _options.gasAmount === 0n ? Promise.resolve(undefined) : this.verifyReturnedPrice({ ...lp.services[SwapType_1.SwapType.SPV_VAULT_FROM_BTC], swapBaseFee: 0 }, //Base fee should be charged only on the amount, not on gas
                             false, resp.btcAmountGas, resp.totalGas * (100000n + callerFeeShare) / 100000n, nativeTokenAddress, {}, gasTokenPricePrefetchPromise, usdPricePrefetchPromise, abortController.signal),
                             this.verifyReturnedData(resp, amountData, lp, _options, callerFeeShare, bitcoinFeeRatePromise, abortController.signal)
                         ]);
@@ -476,6 +476,7 @@ class SpvFromBTCWrapper extends ISwapWrapper_1.ISwapWrapper {
                             outputGasToken: nativeTokenAddress,
                             gasSwapFeeBtc: resp.gasSwapFeeBtc,
                             gasSwapFee: resp.gasSwapFee,
+                            gasPricingInfo,
                             callerFeeShare: resp.callerFeeShare,
                             frontingFeeShare: resp.frontingFeeShare,
                             executionFeeShare: resp.executionFeeShare,

@@ -232,9 +232,9 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
                     const claimerBounty = (await _preFetches.claimerBountyPrefetch);
                     try {
                         this.verifyReturnedData(resp, amountData, lp, _options, decodedPr, paymentHash, claimerBounty);
-                        const [pricingInfo] = await Promise.all([
+                        const [pricingInfo, gasPricingInfo] = await Promise.all([
                             this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.FROM_BTCLN_AUTO], false, resp.btcAmountSwap, resp.total, amountData.token, {}, _preFetches.pricePrefetchPromise, _preFetches.usdPricePrefetchPromise, abortController.signal),
-                            _options.gasAmount === 0n ? Promise.resolve() : this.verifyReturnedPrice({ ...lp.services[SwapType_1.SwapType.FROM_BTCLN_AUTO], swapBaseFee: 0 }, //Base fee should be charged only on the amount, not on gas
+                            _options.gasAmount === 0n ? Promise.resolve(undefined) : this.verifyReturnedPrice({ ...lp.services[SwapType_1.SwapType.FROM_BTCLN_AUTO], swapBaseFee: 0 }, //Base fee should be charged only on the amount, not on gas
                             false, resp.btcAmountGas, resp.totalGas + resp.claimerBounty, nativeTokenAddress, {}, _preFetches.gasTokenPricePrefetchPromise, _preFetches.usdPricePrefetchPromise, abortController.signal),
                             this.verifyIntermediaryLiquidity(resp.total, (0, Utils_1.throwIfUndefined)(liquidityPromise)),
                             _options.unsafeSkipLnNodeCheck ? Promise.resolve() : this.verifyLnNodeCapacity(lp, decodedPr, lnCapacityPromise, abortController.signal)
@@ -249,6 +249,7 @@ class FromBTCLNAutoWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
                             gasSwapFeeBtc: resp.gasSwapFeeBtc,
                             btcAmountGas: resp.btcAmountGas,
                             btcAmountSwap: resp.btcAmountSwap,
+                            gasPricingInfo,
                             initialSwapData: await this.contract.createSwapData(base_1.ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token, resp.total, claimHash.toString("hex"), this.getRandomSequence(), BigInt(Math.floor(Date.now() / 1000)), false, true, _options.gasAmount + resp.claimerBounty, resp.claimerBounty, nativeTokenAddress),
                             pr: resp.pr,
                             secret: secret.toString("hex"),

@@ -125,12 +125,15 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             throw new Error("No pricing info known, cannot estimate fee!");
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getOutput().rawAmount;
+        const amountInDstToken = (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue,
             composition: {
-                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, this.outputToken, this.wrapper.prices),
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, this.outputToken, this.wrapper.prices, this.pricingInfo),
                 percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
             }
         };
@@ -140,17 +143,23 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
      *  paid only once
      */
     getNetworkFee() {
+        const amountInDstToken = (0, Tokens_1.toTokenAmount)(this.networkFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.networkFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue
         };
     }
     getFee() {
+        const amountInDstToken = (0, Tokens_1.toTokenAmount)(this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue
         };
     }
     getFeeBreakdown() {
@@ -166,10 +175,10 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
         ];
     }
     getInput() {
-        return (0, Tokens_1.toTokenAmount)(this.data.getAmount(), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.data.getAmount(), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo);
     }
     getInputWithoutFee() {
-        return (0, Tokens_1.toTokenAmount)(this.data.getAmount() - (this.swapFee + this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.data.getAmount() - (this.swapFee + this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo);
     }
     /**
      * Checks if the intiator/sender has enough balance to go through with the swap
@@ -184,8 +193,8 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             required = required + commitFee;
         return {
             enoughBalance: balance >= required,
-            balance: (0, Tokens_1.toTokenAmount)(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            required: (0, Tokens_1.toTokenAmount)(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices)
+            balance: (0, Tokens_1.toTokenAmount)(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            required: (0, Tokens_1.toTokenAmount)(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo)
         };
     }
     /**

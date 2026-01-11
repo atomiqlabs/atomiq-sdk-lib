@@ -582,7 +582,7 @@ export class SpvFromBTCWrapper<
                                 resp.total * (100_000n + callerFeeShare) / 100_000n,
                                 amountData.token, {}, pricePrefetchPromise, usdPricePrefetchPromise, abortController.signal
                             ),
-                            _options.gasAmount===0n ? Promise.resolve() : this.verifyReturnedPrice(
+                            _options.gasAmount===0n ? Promise.resolve(undefined) : this.verifyReturnedPrice(
                                 {...lp.services[SwapType.SPV_VAULT_FROM_BTC], swapBaseFee: 0}, //Base fee should be charged only on the amount, not on gas
                                 false, resp.btcAmountGas,
                                 resp.totalGas * (100_000n + callerFeeShare) / 100_000n,
@@ -623,6 +623,7 @@ export class SpvFromBTCWrapper<
                             outputGasToken: nativeTokenAddress,
                             gasSwapFeeBtc: resp.gasSwapFeeBtc,
                             gasSwapFee: resp.gasSwapFee,
+                            gasPricingInfo,
 
                             callerFeeShare: resp.callerFeeShare,
                             frontingFeeShare: resp.frontingFeeShare,

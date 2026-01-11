@@ -94,26 +94,35 @@ function toTokenAmount(amount, token, prices, pricingInfo) {
     const amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
     const _amount = parseFloat(amountStr);
     let usdValue = undefined;
-    if (token.chain === "BTC" && token.ticker === "BTC") {
-        if (pricingInfo.realPriceUsdPerBitcoin != null) {
-            usdValue = _amount * pricingInfo.realPriceUsdPerBitcoin;
+    if (pricingInfo != null) {
+        if (token.chain === "BTC" && token.ticker === "BTC") {
+            if (pricingInfo.realPriceUsdPerBitcoin != null) {
+                usdValue = _amount * pricingInfo.realPriceUsdPerBitcoin;
+            }
+        }
+        else {
+            if (pricingInfo.realPriceUsdPerBitcoin != null && pricingInfo.realPriceUSatPerToken != null) {
+                usdValue = _amount
+                    * pricingInfo.realPriceUsdPerBitcoin
+                    * Number(pricingInfo.realPriceUSatPerToken)
+                    / 100000000000000;
+            }
         }
     }
-    else {
-        if (pricingInfo.realPriceUsdPerBitcoin != null && pricingInfo.realPriceUSatPerToken != null) {
-            usdValue = _amount
-                * pricingInfo.realPriceUsdPerBitcoin
-                * Number(pricingInfo.realPriceUSatPerToken)
-                / 100000000000000;
-        }
-    }
+    const currentUsdValue = (abortSignal, preFetchedUsdPrice) => prices.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice);
     return {
         rawAmount: amount,
         amount: amountStr,
         _amount,
         token,
+        currentUsdValue,
         pastUsdValue: usdValue,
-        usdValue: (abortSignal, preFetchedUsdPrice) => prices.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice),
+        usdValue: async (abortSignal, preFetchedUsdPrice) => {
+            if (usdValue == null) {
+                usdValue = await currentUsdValue(abortSignal, preFetchedUsdPrice);
+            }
+            return usdValue;
+        },
         toString: () => amountStr + " " + token.ticker
     };
 }

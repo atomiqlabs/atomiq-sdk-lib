@@ -179,7 +179,10 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     }
 
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices);
+        return toTokenAmount(
+            this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()],
+            this.wrapper.prices, this.pricingInfo
+        );
     }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>> {
@@ -187,7 +190,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         const msats = parsed.millisatoshis;
         if(msats==null) throw new Error("Swap lightning invoice has no msat amount field!");
         const amount = (BigInt(msats) + 999n) / 1000n;
-        return toTokenAmount(amount, BitcoinTokens.BTCLN, this.wrapper.prices);
+        return toTokenAmount(amount, BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<true>> {
@@ -195,7 +198,10 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         const msats = parsed.millisatoshis;
         if(msats==null) throw new Error("Swap lightning invoice has no msat amount field!");
         const amount = (BigInt(msats) + 999n) / 1000n;
-        return toTokenAmount(amount - (this.swapFeeBtc ?? 0n), BitcoinTokens.BTCLN, this.wrapper.prices);
+        return toTokenAmount(
+            amount - (this.swapFeeBtc ?? 0n), BitcoinTokens.BTCLN,
+            this.wrapper.prices, this.pricingInfo
+        );
     }
 
     protected getSwapFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>> {
@@ -203,13 +209,15 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         const feeWithoutBaseFee = this.swapFeeBtc==null ? 0n : this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
 
+        const amountInSrcToken = toTokenAmount(this.swapFeeBtc ?? 0n, BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: toTokenAmount(this.swapFeeBtc ?? 0n, BitcoinTokens.BTCLN, this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFee ?? 0n, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc ?? 0n, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken,
+            amountInDstToken: toTokenAmount(this.swapFee ?? 0n, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices, this.pricingInfo),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue,
             composition: {
-                base: toTokenAmount(this.pricingInfo.satsBaseFee, BitcoinTokens.BTCLN, this.wrapper.prices),
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo),
                 percentage: ppmToPercentage(swapFeePPM)
             }
         };

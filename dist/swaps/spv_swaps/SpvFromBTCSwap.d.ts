@@ -11,6 +11,7 @@ import { IBTCWalletSwap } from "../IBTCWalletSwap";
 import { ISwapWithGasDrop } from "../ISwapWithGasDrop";
 import { MinimalBitcoinWalletInterface, MinimalBitcoinWalletInterfaceWithSigner } from "../../btc/wallet/MinimalBitcoinWalletInterface";
 import { IClaimableSwap } from "../IClaimableSwap";
+import { PriceInfoType } from "../../prices/abstract/ISwapPrice";
 export declare enum SpvFromBTCSwapState {
     CLOSED = -5,
     FAILED = -4,
@@ -50,6 +51,7 @@ export type SpvFromBTCSwapInit = ISwapInit & {
     frontingFeeShare: bigint;
     executionFeeShare: bigint;
     genesisSmartChainBlockHeight: number;
+    gasPricingInfo?: PriceInfoType;
 };
 export declare function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit;
 export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCTypeDefinition<T>> implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCTypeDefinition<T>, SpvFromBTCSwapState> {
@@ -79,6 +81,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     readonly frontingFeeShare: bigint;
     readonly executionFeeShare: bigint;
     readonly genesisSmartChainBlockHeight: number;
+    gasPricingInfo?: PriceInfoType;
     senderAddress?: string;
     claimTxId?: string;
     frontTxId?: string;

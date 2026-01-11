@@ -139,7 +139,7 @@ class LnForGasSwap extends ISwap_1.ISwap {
         return this.outputAmount + (this.swapFee ?? 0n);
     }
     getOutput() {
-        return (0, Tokens_1.toTokenAmount)(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices, this.pricingInfo);
     }
     getInput() {
         const parsed = (0, bolt11_1.decode)(this.pr);
@@ -147,7 +147,7 @@ class LnForGasSwap extends ISwap_1.ISwap {
         if (msats == null)
             throw new Error("Swap lightning invoice has no msat amount field!");
         const amount = (BigInt(msats) + 999n) / 1000n;
-        return (0, Tokens_1.toTokenAmount)(amount, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(amount, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
     }
     getInputWithoutFee() {
         const parsed = (0, bolt11_1.decode)(this.pr);
@@ -155,19 +155,22 @@ class LnForGasSwap extends ISwap_1.ISwap {
         if (msats == null)
             throw new Error("Swap lightning invoice has no msat amount field!");
         const amount = (BigInt(msats) + 999n) / 1000n;
-        return (0, Tokens_1.toTokenAmount)(amount - (this.swapFeeBtc ?? 0n), Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(amount - (this.swapFeeBtc ?? 0n), Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
     }
     getSwapFee() {
         if (this.pricingInfo == null)
             throw new Error("No pricing info known, cannot estimate swap fee!");
         const feeWithoutBaseFee = this.swapFeeBtc == null ? 0n : this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
+        const amountInSrcToken = (0, Tokens_1.toTokenAmount)(this.swapFeeBtc ?? 0n, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc ?? 0n, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee ?? 0n, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc ?? 0n, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken,
+            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee ?? 0n, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices, this.pricingInfo),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue,
             composition: {
-                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices),
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo),
                 percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
             }
         };

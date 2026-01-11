@@ -10,6 +10,8 @@ export type PriceInfoType = {
     swapPriceUSatPerToken: bigint;
 };
 export declare function isPriceInfoType(obj: any): obj is PriceInfoType;
+export declare function serializePriceInfoType(obj: PriceInfoType | undefined): any;
+export declare function deserializePriceInfoType(obj: any): PriceInfoType | undefined;
 export declare abstract class ISwapPrice<T extends MultiChain = MultiChain> {
     maxAllowedFeeDifferencePPM: bigint;
     protected constructor(maxAllowedFeeDifferencePPM: bigint);

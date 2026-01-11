@@ -207,15 +207,21 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
     }
 
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices);
+        return toTokenAmount(
+            this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()],
+            this.wrapper.prices, this.pricingInfo
+        );
     }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>> {
-        return toTokenAmount(this.inputAmount, BitcoinTokens.BTC, this.wrapper.prices);
+        return toTokenAmount(this.inputAmount, BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo);
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>> {
-        return toTokenAmount(this.inputAmount - (this.swapFeeBtc ?? 0n), BitcoinTokens.BTC, this.wrapper.prices);
+        return toTokenAmount(
+            this.inputAmount - (this.swapFeeBtc ?? 0n), BitcoinTokens.BTC,
+            this.wrapper.prices, this.pricingInfo
+        );
     }
 
     protected getSwapFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>> {
@@ -223,13 +229,20 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         const feeWithoutBaseFee = this.swapFeeBtc==null ? 0n : this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
 
+        const amountInSrcToken = toTokenAmount(
+            this.swapFeeBtc ?? 0n, BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo
+        );
         return {
-            amountInSrcToken: toTokenAmount(this.swapFeeBtc ?? 0n, BitcoinTokens.BTC, this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFee ?? 0n, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc ?? 0n, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken,
+            amountInDstToken: toTokenAmount(
+                this.swapFee ?? 0n, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()],
+                this.wrapper.prices, this.pricingInfo
+            ),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue,
             composition: {
-                base: toTokenAmount(this.pricingInfo.satsBaseFee, BitcoinTokens.BTC, this.wrapper.prices),
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo),
                 percentage: ppmToPercentage(swapFeePPM)
             }
         };
@@ -339,7 +352,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         const bitcoinWallet: IBitcoinWallet = toBitcoinWallet(_bitcoinWallet, this.wrapper.btcRpc, this.wrapper.options.bitcoinNetwork);
         const txFee = await bitcoinWallet.getTransactionFee(this.address, this.inputAmount, feeRate);
         if(txFee==null) return null;
-        return toTokenAmount(BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices);
+        return toTokenAmount(BigInt(txFee), BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo);
     }
 
     async sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string> {

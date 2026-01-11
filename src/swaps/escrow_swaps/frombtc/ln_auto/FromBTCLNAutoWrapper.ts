@@ -347,14 +347,14 @@ export class FromBTCLNAutoWrapper<
 
                     try {
                         this.verifyReturnedData(resp, amountData, lp, _options, decodedPr, paymentHash, claimerBounty);
-                        const [pricingInfo] = await Promise.all([
+                        const [pricingInfo, gasPricingInfo] = await Promise.all([
                             this.verifyReturnedPrice(
                                 lp.services[SwapType.FROM_BTCLN_AUTO],
                                 false, resp.btcAmountSwap,
                                 resp.total,
                                 amountData.token, {}, _preFetches.pricePrefetchPromise, _preFetches.usdPricePrefetchPromise, abortController.signal
                             ),
-                            _options.gasAmount===0n ? Promise.resolve() : this.verifyReturnedPrice(
+                            _options.gasAmount===0n ? Promise.resolve(undefined) : this.verifyReturnedPrice(
                                 {...lp.services[SwapType.FROM_BTCLN_AUTO], swapBaseFee: 0}, //Base fee should be charged only on the amount, not on gas
                                 false, resp.btcAmountGas,
                                 resp.totalGas + resp.claimerBounty,
@@ -377,6 +377,8 @@ export class FromBTCLNAutoWrapper<
 
                             btcAmountGas: resp.btcAmountGas,
                             btcAmountSwap: resp.btcAmountSwap,
+
+                            gasPricingInfo,
 
                             initialSwapData: await this.contract.createSwapData(
                                 ChainSwapType.HTLC, lp.getAddress(this.chainIdentifier), signer, amountData.token,
