@@ -14,6 +14,7 @@ const Tokens_1 = require("../../../../Tokens");
 const ISwap_1 = require("../../../ISwap");
 const Fee_1 = require("../../../fee/Fee");
 const IEscrowSwap_1 = require("../../IEscrowSwap");
+const ISwapPrice_1 = require("../../../../prices/abstract/ISwapPrice");
 var FromBTCLNAutoSwapState;
 (function (FromBTCLNAutoSwapState) {
     FromBTCLNAutoSwapState[FromBTCLNAutoSwapState["FAILED"] = -4] = "FAILED";
@@ -32,6 +33,7 @@ function isFromBTCLNAutoSwapInit(obj) {
         typeof obj.btcAmountGas === "bigint" &&
         typeof obj.gasSwapFeeBtc === "bigint" &&
         typeof obj.gasSwapFee === "bigint" &&
+        (obj.gasPricingInfo == null || (0, ISwapPrice_1.isPriceInfoType)(obj.gasPricingInfo)) &&
         (obj.lnurl == null || typeof (obj.lnurl) === "string") &&
         (obj.lnurlK1 == null || typeof (obj.lnurlK1) === "string") &&
         (obj.lnurlCallback == null || typeof (obj.lnurlCallback) === "string") &&
@@ -60,6 +62,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             this.btcAmountGas = initOrObject.btcAmountGas;
             this.gasSwapFeeBtc = initOrObject.gasSwapFeeBtc;
             this.gasSwapFee = initOrObject.gasSwapFee;
+            this.gasPricingInfo = initOrObject.gasPricingInfo;
             this.lnurl = initOrObject.lnurl;
             this.lnurlK1 = initOrObject.lnurlK1;
             this.lnurlCallback = initOrObject.lnurlCallback;
@@ -77,6 +80,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             this.btcAmountGas = (0, Utils_1.toBigInt)(initOrObject.btcAmountGas);
             this.gasSwapFeeBtc = (0, Utils_1.toBigInt)(initOrObject.gasSwapFeeBtc);
             this.gasSwapFee = (0, Utils_1.toBigInt)(initOrObject.gasSwapFee);
+            this.gasPricingInfo = (0, ISwapPrice_1.deserializePriceInfoType)(initOrObject.gasPricingInfo);
             this.commitTxId = initOrObject.commitTxId;
             this.claimTxId = initOrObject.claimTxId;
             this.lnurl = initOrObject.lnurl;
@@ -96,7 +100,9 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         if (this.pricingInfo == null)
             return;
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
+            const priceUsdPerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
             this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputAmountWithoutFee(), this.getSwapData().getToken());
+            this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
         }
     }
     //////////////////////////////
@@ -104,7 +110,9 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
     async refreshPriceData() {
         if (this.pricingInfo == null)
             return;
+        const usdPricePerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
         this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.btcAmountSwap, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, this.getOutputAmountWithoutFee(), this.getSwapData().getToken());
+        this.pricingInfo.realPriceUsdPerBitcoin = usdPricePerBtc;
     }
     //////////////////////////////
     //// Getters & utils
@@ -222,16 +230,16 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         return this.getSwapData().getAmount() + this.swapFee;
     }
     getInput() {
-        return (0, Tokens_1.toTokenAmount)(this.getLightningInvoiceSats(), this.inputToken, this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getLightningInvoiceSats(), this.inputToken, this.wrapper.prices, this.pricingInfo);
     }
     getInputWithoutFee() {
-        return (0, Tokens_1.toTokenAmount)(this.getInputAmountWithoutFee(), this.inputToken, this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getInputAmountWithoutFee(), this.inputToken, this.wrapper.prices, this.pricingInfo);
     }
     getOutput() {
-        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices, this.pricingInfo);
     }
     getGasDropOutput() {
-        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getSecurityDeposit() - this.getSwapData().getClaimerBounty(), this.wrapper.tokens[this.getSwapData().getDepositToken()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getSecurityDeposit() - this.getSwapData().getClaimerBounty(), this.wrapper.tokens[this.getSwapData().getDepositToken()], this.wrapper.prices, this.gasPricingInfo);
     }
     getSwapFee() {
         if (this.pricingInfo == null)
@@ -243,12 +251,15 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             / this.pricingInfo.swapPriceUSatPerToken;
         const feeWithoutBaseFee = this.gasSwapFeeBtc + this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / (this.getLightningInvoiceSats() - this.swapFeeBtc - this.gasSwapFeeBtc);
+        const amountInSrcToken = (0, Tokens_1.toTokenAmount)(this.swapFeeBtc + this.gasSwapFeeBtc, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc + this.gasSwapFeeBtc, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee + gasSwapFeeInOutputToken, outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.gasSwapFeeBtc, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken,
+            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee + gasSwapFeeInOutputToken, outputToken, this.wrapper.prices, this.pricingInfo),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue,
+            usdValue: amountInSrcToken.usdValue,
             composition: {
-                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices),
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo),
                 percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
             }
         };
@@ -262,19 +273,25 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             * (10n ** BigInt(outputToken.decimals))
             * 1000000n
             / this.pricingInfo.swapPriceUSatPerToken;
+        const amountInSrcToken = (0, Tokens_1.toTokenAmount)(btcWatchtowerFee, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(btcWatchtowerFee, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(watchtowerFeeInOutputToken, outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(btcWatchtowerFee, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken,
+            amountInDstToken: (0, Tokens_1.toTokenAmount)(watchtowerFeeInOutputToken, outputToken, this.wrapper.prices, this.pricingInfo),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue
         };
     }
     getFee() {
         const swapFee = this.getSwapFee();
         const watchtowerFee = this.getWatchtowerFee();
+        const amountInSrcToken = (0, Tokens_1.toTokenAmount)(swapFee.amountInSrcToken.rawAmount + watchtowerFee.amountInSrcToken.rawAmount, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(swapFee.amountInSrcToken.rawAmount + watchtowerFee.amountInSrcToken.rawAmount, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(swapFee.amountInDstToken.rawAmount + watchtowerFee.amountInDstToken.rawAmount, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(swapFee.amountInSrcToken.rawAmount + watchtowerFee.amountInSrcToken.rawAmount, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken,
+            amountInDstToken: (0, Tokens_1.toTokenAmount)(swapFee.amountInDstToken.rawAmount + watchtowerFee.amountInDstToken.rawAmount, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices, this.pricingInfo),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue
         };
     }
     getFeeBreakdown() {
@@ -706,6 +723,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             btcAmountGas: this.btcAmountGas == null ? null : this.btcAmountGas.toString(10),
             gasSwapFeeBtc: this.gasSwapFeeBtc == null ? null : this.gasSwapFeeBtc.toString(10),
             gasSwapFee: this.gasSwapFee == null ? null : this.gasSwapFee.toString(10),
+            gasPricingInfo: (0, ISwapPrice_1.serializePriceInfoType)(this.gasPricingInfo),
             pr: this.pr,
             secret: this.secret,
             lnurl: this.lnurl,

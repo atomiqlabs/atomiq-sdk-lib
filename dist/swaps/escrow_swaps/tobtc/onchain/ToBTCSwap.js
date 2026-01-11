@@ -63,7 +63,7 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
     //////////////////////////////
     //// Amounts & fees
     getOutput() {
-        return (0, Tokens_1.toTokenAmount)(this.amount, this.outputToken, this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.amount, this.outputToken, this.wrapper.prices, this.pricingInfo);
     }
     //////////////////////////////
     //// Getters & utils

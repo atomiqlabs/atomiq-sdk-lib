@@ -199,10 +199,10 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
         if (parsed.millisatoshis == null)
             throw new Error("Swap invoice doesn't contain msat amount field!");
         const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
-        return (0, Tokens_1.toTokenAmount)(amount, this.inputToken, this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(amount, this.inputToken, this.wrapper.prices, this.pricingInfo);
     }
     async getSmartChainNetworkFee() {
-        return (0, Tokens_1.toTokenAmount)(await this.getCommitAndClaimFee(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(await this.getCommitAndClaimFee(), this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo);
     }
     async hasEnoughForTxFees() {
         const [balance, feeRate] = await Promise.all([
@@ -214,8 +214,8 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
         const totalFee = commitFee + claimFee + this.getSwapData().getTotalDeposit();
         return {
             enoughBalance: balance >= totalFee,
-            balance: (0, Tokens_1.toTokenAmount)(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
-            required: (0, Tokens_1.toTokenAmount)(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices)
+            balance: (0, Tokens_1.toTokenAmount)(balance, this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo),
+            required: (0, Tokens_1.toTokenAmount)(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo)
         };
     }
     //////////////////////////////

@@ -42,12 +42,15 @@ class IFromBTCSelfInitSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             throw new Error("No pricing info known, cannot estimate fee!");
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
+        const amountInSrcToken = (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, this.inputToken, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, this.inputToken, this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken,
+            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices, this.pricingInfo),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue,
             composition: {
-                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, this.inputToken, this.wrapper.prices),
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, this.inputToken, this.wrapper.prices, this.pricingInfo),
                 percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
             }
         };
@@ -62,16 +65,16 @@ class IFromBTCSelfInitSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             }];
     }
     getOutput() {
-        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices, this.pricingInfo);
     }
     getInputWithoutFee() {
-        return (0, Tokens_1.toTokenAmount)(this.getInput().rawAmount - this.swapFeeBtc, this.inputToken, this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getInput().rawAmount - this.swapFeeBtc, this.inputToken, this.wrapper.prices, this.pricingInfo);
     }
     getSecurityDeposit() {
-        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getSecurityDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getSecurityDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo);
     }
     getTotalDeposit() {
-        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getTotalDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.getSwapData().getTotalDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo);
     }
     async hasEnoughForTxFees() {
         const [balance, commitFee] = await Promise.all([
@@ -81,8 +84,8 @@ class IFromBTCSelfInitSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
         const totalFee = commitFee + this.getSwapData().getTotalDeposit();
         return {
             enoughBalance: balance >= totalFee,
-            balance: (0, Tokens_1.toTokenAmount)(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
-            required: (0, Tokens_1.toTokenAmount)(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices)
+            balance: (0, Tokens_1.toTokenAmount)(balance, this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo),
+            required: (0, Tokens_1.toTokenAmount)(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo)
         };
     }
     //////////////////////////////

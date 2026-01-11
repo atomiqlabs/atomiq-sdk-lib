@@ -359,6 +359,7 @@ export class FromBTCWrapper<
 
         const _abortController = extendAbortController(abortSignal);
         const pricePrefetchPromise: Promise<bigint | undefined> = this.preFetchPrice(amountData, _abortController.signal);
+        const usdPricePrefetchPromise: Promise<number | undefined> = this.preFetchUsdPrice(_abortController.signal);
         const claimerBountyPrefetchPromise = this.preFetchClaimerBounty(signer, amountData, _options, _abortController);
         const nativeTokenAddress = this.chain.getNativeCurrencyAddress();
         const feeRatePromise: Promise<string | undefined> = this.preFetchFeeRate(signer, amountData, undefined, _abortController);
@@ -408,7 +409,7 @@ export class FromBTCWrapper<
                             //Get intermediary's liquidity
                             this.verifyReturnedPrice(
                                 lp.services[SwapType.FROM_BTC], false, resp.amount, resp.total,
-                                amountData.token, {}, pricePrefetchPromise, abortController.signal
+                                amountData.token, {}, pricePrefetchPromise, usdPricePrefetchPromise, abortController.signal
                             ),
                             this.verifyReturnedSignature(signer, data, resp, feeRatePromise, signDataPromise, abortController.signal),
                             this.verifyIntermediaryLiquidity(data.getAmount(), throwIfUndefined(liquidityPromise)),

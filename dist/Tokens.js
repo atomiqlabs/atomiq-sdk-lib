@@ -88,23 +88,50 @@ function toDecimal(amount, decimalCount, cut, displayDecimals) {
     return amountStr.substring(0, splitPoint) + "." + decimalPart.substring(0, cutTo);
 }
 exports.toDecimal = toDecimal;
-function toTokenAmount(amount, token, prices) {
+function toTokenAmount(amount, token, prices, pricingInfo) {
     if (amount == null)
         return {
             rawAmount: null,
             amount: null,
             _amount: null,
             token,
+            currentUsdValue: () => Promise.resolve(null),
+            pastUsdValue: null,
             usdValue: () => Promise.resolve(null),
             toString: () => "??? " + token.ticker
         };
-    let amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
+    const amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
+    const _amount = parseFloat(amountStr);
+    let usdValue = undefined;
+    if (pricingInfo != null) {
+        if (token.chain === "BTC" && token.ticker === "BTC") {
+            if (pricingInfo.realPriceUsdPerBitcoin != null) {
+                usdValue = _amount * pricingInfo.realPriceUsdPerBitcoin;
+            }
+        }
+        else {
+            if (pricingInfo.realPriceUsdPerBitcoin != null && pricingInfo.realPriceUSatPerToken != null) {
+                usdValue = _amount
+                    * pricingInfo.realPriceUsdPerBitcoin
+                    * Number(pricingInfo.realPriceUSatPerToken)
+                    / 100000000000000;
+            }
+        }
+    }
+    const currentUsdValue = (abortSignal, preFetchedUsdPrice) => prices.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice);
     return {
         rawAmount: amount,
         amount: amountStr,
-        _amount: parseFloat(amountStr),
+        _amount,
         token,
-        usdValue: (abortSignal, preFetchedUsdPrice) => prices.getUsdValue(amount, token, abortSignal, preFetchedUsdPrice),
+        currentUsdValue,
+        pastUsdValue: usdValue,
+        usdValue: async (abortSignal, preFetchedUsdPrice) => {
+            if (usdValue == null) {
+                usdValue = await currentUsdValue(abortSignal, preFetchedUsdPrice);
+            }
+            return usdValue;
+        },
         toString: () => amountStr + " " + token.ticker
     };
 }

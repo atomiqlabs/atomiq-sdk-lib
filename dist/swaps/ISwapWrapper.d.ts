@@ -34,6 +34,10 @@ export type SwapTypeDefinition<T extends ChainType, W extends ISwapWrapper<T, an
     Wrapper: W;
     Swap: S;
 };
+export type PricesPrefetch = {
+    token: Promise<bigint | undefined>;
+    usd: Promise<number | undefined>;
+};
 export declare abstract class ISwapWrapper<T extends ChainType, D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D>>, O extends ISwapWrapperOptions = ISwapWrapperOptions> {
     abstract readonly TYPE: SwapType;
     protected readonly logger: import("../utils/Utils").LoggerType;
@@ -78,6 +82,13 @@ export declare abstract class ISwapWrapper<T extends ChainType, D extends SwapTy
         token: string;
     }, abortSignal?: AbortSignal): Promise<bigint | undefined>;
     /**
+     * Pre-fetches bitcoin's USD price
+     *
+     * @param abortSignal
+     * @protected
+     */
+    protected preFetchUsdPrice(abortSignal?: AbortSignal): Promise<number | undefined>;
+    /**
      * Verifies returned  price for swaps
      *
      * @param lpServiceData Service data for the service in question (TO_BTCLN, TO_BTC, etc.) of the given intermediary
@@ -87,6 +98,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, D extends SwapTy
      * @param token Token used in the swap
      * @param feeData Fee data as returned by the intermediary
      * @param pricePrefetchPromise Price pre-fetch promise
+     * @param usdPricePrefetchPromise
      * @param abortSignal
      * @protected
      * @returns Price info object
@@ -97,7 +109,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, D extends SwapTy
         swapFeePPM: number;
     }, send: boolean, amountSats: bigint, amountToken: bigint, token: string, feeData: {
         networkFee?: bigint;
-    }, pricePrefetchPromise?: Promise<bigint | undefined>, abortSignal?: AbortSignal): Promise<PriceInfoType>;
+    }, pricePrefetchPromise?: Promise<bigint | undefined>, usdPricePrefetchPromise?: Promise<number | undefined>, abortSignal?: AbortSignal): Promise<PriceInfoType>;
     abstract readonly pendingSwapStates: Array<D["Swap"]["state"]>;
     abstract readonly tickSwapState?: Array<D["Swap"]["state"]>;
     /**

@@ -77,6 +77,7 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWra
      * @param preFetches
      */
     create(signer: string, amountData: AmountData, lps: Intermediary[], options?: FromBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
+        usdPricePrefetchPromise: Promise<number | undefined>;
         pricePrefetchPromise?: Promise<bigint | undefined>;
         feeRatePromise?: Promise<string | undefined>;
     }): {

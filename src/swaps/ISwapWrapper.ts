@@ -45,6 +45,11 @@ export type SwapTypeDefinition<T extends ChainType, W extends ISwapWrapper<T, an
     Swap: S;
 };
 
+export type PricesPrefetch = {
+    token: Promise<bigint | undefined>,
+    usd: Promise<number | undefined>
+}
+
 export abstract class ISwapWrapper<
     T extends ChainType,
     D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D>>,
@@ -125,9 +130,22 @@ export abstract class ISwapWrapper<
      */
     protected preFetchPrice(amountData: { token: string }, abortSignal?: AbortSignal): Promise<bigint | undefined> {
         return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
-            this.logger.error("preFetchPrice(): Error: ", e);
+            this.logger.error("preFetchPrice.token(): Error: ", e);
             return undefined;
         });
+    }
+
+    /**
+     * Pre-fetches bitcoin's USD price
+     *
+     * @param abortSignal
+     * @protected
+     */
+    protected preFetchUsdPrice(abortSignal?: AbortSignal): Promise<number | undefined> {
+        return this.prices.preFetchUsdPrice(abortSignal).catch(e => {
+            this.logger.error("preFetchPrice.usd(): Error: ", e);
+            return undefined;
+        })
     }
 
     /**
@@ -140,6 +158,7 @@ export abstract class ISwapWrapper<
      * @param token Token used in the swap
      * @param feeData Fee data as returned by the intermediary
      * @param pricePrefetchPromise Price pre-fetch promise
+     * @param usdPricePrefetchPromise
      * @param abortSignal
      * @protected
      * @returns Price info object
@@ -155,18 +174,24 @@ export abstract class ISwapWrapper<
             networkFee?: bigint
         },
         pricePrefetchPromise: Promise<bigint | undefined> = Promise.resolve(undefined),
+        usdPricePrefetchPromise: Promise<number | undefined> = Promise.resolve(undefined),
         abortSignal?: AbortSignal
     ): Promise<PriceInfoType> {
         const swapBaseFee = BigInt(lpServiceData.swapBaseFee);
         const swapFeePPM = BigInt(lpServiceData.swapFeePPM);
         if(send && feeData.networkFee!=null) amountToken = amountToken - feeData.networkFee;
 
-        const isValidAmount = await (
+        const [isValidAmount, usdPrice] = await Promise.all([
             send ?
                 this.prices.isValidAmountSend(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, await pricePrefetchPromise) :
-                this.prices.isValidAmountReceive(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, await pricePrefetchPromise)
-        );
+                this.prices.isValidAmountReceive(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, await pricePrefetchPromise),
+            usdPricePrefetchPromise.then(value => {
+                if(value!=null) return value;
+                return this.prices.preFetchUsdPrice(abortSignal);
+            })
+        ]);
         if(!isValidAmount.isValid) throw new IntermediaryError("Fee too high");
+        isValidAmount.realPriceUsdPerBitcoin = usdPrice;
 
         return isValidAmount;
     }

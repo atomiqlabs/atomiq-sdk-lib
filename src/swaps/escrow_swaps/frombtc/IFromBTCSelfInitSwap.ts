@@ -90,13 +90,15 @@ export abstract class IFromBTCSelfInitSwap<
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
 
+        const amountInSrcToken = toTokenAmount(this.swapFeeBtc, this.inputToken, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: toTokenAmount(this.swapFeeBtc, this.inputToken, this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken,
+            amountInDstToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices, this.pricingInfo),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue,
             composition: {
-                base: toTokenAmount(this.pricingInfo.satsBaseFee, this.inputToken, this.wrapper.prices),
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, this.inputToken, this.wrapper.prices, this.pricingInfo),
                 percentage: ppmToPercentage(swapFeePPM)
             }
         };
@@ -114,19 +116,19 @@ export abstract class IFromBTCSelfInitSwap<
     }
 
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices);
+        return toTokenAmount(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices, this.pricingInfo);
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken> {
-        return toTokenAmount(this.getInput().rawAmount - this.swapFeeBtc, this.inputToken, this.wrapper.prices);
+        return toTokenAmount(this.getInput().rawAmount - this.swapFeeBtc, this.inputToken, this.wrapper.prices, this.pricingInfo);
     }
 
     getSecurityDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.getSwapData().getSecurityDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return toTokenAmount(this.getSwapData().getSecurityDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo);
     }
 
     getTotalDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.getSwapData().getTotalDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices);
+        return toTokenAmount(this.getSwapData().getTotalDeposit(), this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo);
     }
 
     async hasEnoughForTxFees(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
@@ -137,8 +139,8 @@ export abstract class IFromBTCSelfInitSwap<
         const totalFee = commitFee + this.getSwapData().getTotalDeposit();
         return {
             enoughBalance: balance >= totalFee,
-            balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices),
-            required: toTokenAmount(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices)
+            balance: toTokenAmount(balance, this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo),
+            required: toTokenAmount(totalFee, this.wrapper.getNativeToken(), this.wrapper.prices, this.pricingInfo)
         };
     }
 

@@ -210,6 +210,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         preFetches: {
             feeRatePromise: Promise<string | undefined>,
             pricePreFetchPromise: Promise<bigint | undefined>,
+            usdPricePrefetchPromise: Promise<number | undefined>,
             signDataPrefetchPromise?: Promise<T["PreFetchVerification"] | undefined>
         },
         abort: AbortSignal | AbortController,
@@ -250,7 +251,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 this.verifyReturnedPrice(
                     lp.services[SwapType.TO_BTCLN], true, amountOut, data.getAmount(),
                     amountData.token, {networkFee: resp.maxFee},
-                    preFetches.pricePreFetchPromise, abortController.signal
+                    preFetches.pricePreFetchPromise, preFetches.usdPricePrefetchPromise, abortController.signal
                 ),
                 this.verifyReturnedSignature(
                     signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal
@@ -309,6 +310,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         preFetches?: {
             feeRatePromise: Promise<string | undefined>,
             pricePreFetchPromise: Promise<bigint | undefined>,
+            usdPricePrefetchPromise: Promise<number | undefined>,
             signDataPrefetchPromise?: Promise<T["PreFetchVerification"] | undefined>
         }
     ): Promise<{
@@ -340,6 +342,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         const _preFetches = preFetches ?? {
             pricePreFetchPromise: this.preFetchPrice(amountData, _abortController.signal),
             feeRatePromise: this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController),
+            usdPricePrefetchPromise: this.preFetchUsdPrice(_abortController.signal),
             signDataPrefetchPromise: this.contract.preFetchBlockDataForSignatures==null ? this.preFetchSignData(Promise.resolve(true)) : undefined
         };
 
@@ -391,7 +394,8 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         options: AllRequired<ToBTCLNOptions> & {comment?: string},
         preFetches: {
             feeRatePromise: Promise<string | undefined>,
-            pricePreFetchPromise: Promise<bigint | undefined>
+            pricePreFetchPromise: Promise<bigint | undefined>,
+            usdPricePrefetchPromise: Promise<number | undefined>
         },
         abortSignal: AbortSignal,
         additionalParams?: Record<string, any>,
@@ -454,7 +458,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 this.verifyReturnedPrice(
                     lp.services[SwapType.TO_BTCLN], true, prepareResp.amount, data.getAmount(),
                     amountData.token, {networkFee: resp.maxFee},
-                    preFetches.pricePreFetchPromise, abortSignal
+                    preFetches.pricePreFetchPromise, preFetches.usdPricePrefetchPromise, abortSignal
                 ),
                 this.verifyReturnedSignature(
                     signer, data, resp, preFetches.feeRatePromise, signDataPromise, abortController.signal
@@ -517,6 +521,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
 
         const _abortController = extendAbortController(abortSignal);
         const pricePreFetchPromise: Promise<bigint | undefined> = this.preFetchPrice(amountData, _abortController.signal);
+        const usdPricePrefetchPromise: Promise<number | undefined> = this.preFetchUsdPrice(_abortController.signal);
         const feeRatePromise: Promise<string | undefined> = this.preFetchFeeRate(signer, amountData, undefined, _abortController);
         const signDataPrefetchPromise: Promise<T["PreFetchVerification"] | undefined> | undefined = this.contract.preFetchBlockDataForSignatures==null ?
             this.preFetchSignData(Promise.resolve(true)) :
@@ -537,6 +542,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                     return {
                         quote: this.getIntermediaryQuoteExactIn(signer, amountData, invoiceCreateService, lp, dummyInvoice, _options, {
                             pricePreFetchPromise,
+                            usdPricePrefetchPromise,
                             feeRatePromise
                         }, _abortController.signal, additionalParams),
                         intermediary: lp
@@ -555,6 +561,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
                 return (await this.create(signer, invoice, amountData, lps, options, additionalParams, _abortController.signal, {
                     feeRatePromise,
                     pricePreFetchPromise,
+                    usdPricePrefetchPromise,
                     signDataPrefetchPromise
                 }));
             }

@@ -61,6 +61,7 @@ class ISwap {
                     satsBaseFee: BigInt(swapInitOrObj._satsBaseFee),
                     feePPM: BigInt(swapInitOrObj._feePPM),
                     realPriceUSatPerToken: (0, Utils_1.toBigInt)(swapInitOrObj._realPriceUSatPerToken),
+                    realPriceUsdPerBitcoin: swapInitOrObj._realPriceUsdPerBitcoin,
                     swapPriceUSatPerToken: BigInt(swapInitOrObj._swapPriceUSatPerToken),
                 };
             }
@@ -109,13 +110,16 @@ class ISwap {
         if (this.pricingInfo == null)
             return;
         if (this.pricingInfo.swapPriceUSatPerToken == null) {
+            const priceUsdPerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
             if (this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC) {
                 const input = this.getInput();
                 this.pricingInfo = this.wrapper.prices.recomputePriceInfoSend(this.chainIdentifier, this.getOutput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, input.rawAmount, input.token.address);
+                this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
             }
             else {
                 const output = this.getOutput();
                 this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, output.rawAmount, output.token.address);
+                this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
             }
         }
     }
@@ -125,13 +129,16 @@ class ISwap {
     async refreshPriceData() {
         if (this.pricingInfo == null)
             return;
+        const priceUsdPerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
         if (this.getDirection() === SwapDirection_1.SwapDirection.TO_BTC) {
             const input = this.getInput();
             this.pricingInfo = await this.wrapper.prices.isValidAmountSend(this.chainIdentifier, this.getOutput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, input.rawAmount, input.token.address);
+            this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
         }
         else {
             const output = this.getOutput();
             this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(this.chainIdentifier, this.getInput().rawAmount, this.pricingInfo.satsBaseFee, this.pricingInfo.feePPM, output.rawAmount, output.token.address);
+            this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
         }
     }
     /**
@@ -215,6 +222,7 @@ class ISwap {
             _satsBaseFee: this.pricingInfo.satsBaseFee == null ? null : this.pricingInfo.satsBaseFee.toString(10),
             _feePPM: this.pricingInfo.feePPM == null ? null : this.pricingInfo.feePPM.toString(10),
             _realPriceUSatPerToken: this.pricingInfo.realPriceUSatPerToken == null ? null : this.pricingInfo.realPriceUSatPerToken.toString(10),
+            _realPriceUsdPerBitcoin: this.pricingInfo.realPriceUsdPerBitcoin,
             _swapPriceUSatPerToken: this.pricingInfo.swapPriceUSatPerToken == null ? null : this.pricingInfo.swapPriceUSatPerToken.toString(10),
             state: this.state,
             url: this.url,

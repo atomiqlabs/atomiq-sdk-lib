@@ -124,7 +124,8 @@ class FromBTCLNWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
         const _abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const _preFetches = {
             pricePrefetchPromise: preFetches?.pricePrefetchPromise ?? this.preFetchPrice(amountData, _abortController.signal),
-            feeRatePromise: preFetches?.feeRatePromise ?? this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController)
+            feeRatePromise: preFetches?.feeRatePromise ?? this.preFetchFeeRate(signer, amountData, claimHash.toString("hex"), _abortController),
+            usdPricePrefetchPromise: preFetches?.usdPricePrefetchPromise ?? this.preFetchUsdPrice(_abortController.signal),
         };
         return lps.map(lp => {
             return {
@@ -159,7 +160,7 @@ class FromBTCLNWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
                     try {
                         this.verifyReturnedData(resp, amountData, lp, options ?? {}, decodedPr, paymentHash);
                         const [pricingInfo] = await Promise.all([
-                            this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.FROM_BTCLN], false, amountIn, resp.total, amountData.token, {}, _preFetches.pricePrefetchPromise, abortController.signal),
+                            this.verifyReturnedPrice(lp.services[SwapType_1.SwapType.FROM_BTCLN], false, amountIn, resp.total, amountData.token, {}, _preFetches.pricePrefetchPromise, _preFetches.usdPricePrefetchPromise, abortController.signal),
                             this.verifyIntermediaryLiquidity(resp.total, (0, Utils_1.throwIfUndefined)(liquidityPromise)),
                             lnCapacityPromise != null ? this.verifyLnNodeCapacity(lp, decodedPr, lnCapacityPromise, abortController.signal) : Promise.resolve()
                         ]);
@@ -202,6 +203,7 @@ class FromBTCLNWrapper extends IFromBTCLNWrapper_1.IFromBTCLNWrapper {
         const abortController = (0, Utils_1.extendAbortController)(abortSignal);
         const preFetches = {
             pricePrefetchPromise: this.preFetchPrice(amountData, abortController.signal),
+            usdPricePrefetchPromise: this.preFetchUsdPrice(abortController.signal),
             feeRatePromise: this.preFetchFeeRate(signer, amountData, undefined, abortController)
         };
         try {

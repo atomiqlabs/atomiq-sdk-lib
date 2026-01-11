@@ -92,7 +92,7 @@ export class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T, 
         const parsedPR = bolt11Decode(this.pr);
         if(parsedPR.millisatoshis==null) throw new Error("Swap invoice has no msat amount field!");
         const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
-        return toTokenAmount(amount, this.outputToken, this.wrapper.prices);
+        return toTokenAmount(amount, this.outputToken, this.wrapper.prices, this.pricingInfo);
     }
 
 

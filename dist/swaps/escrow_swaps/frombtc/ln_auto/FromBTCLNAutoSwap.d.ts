@@ -13,6 +13,7 @@ import { ISwapWithGasDrop } from "../../../ISwapWithGasDrop";
 import { MinimalLightningNetworkWalletInterface } from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
 import { IClaimableSwap } from "../../../IClaimableSwap";
 import { IEscrowSwap, IEscrowSwapInit } from "../../IEscrowSwap";
+import { PriceInfoType } from "../../../../prices/abstract/ISwapPrice";
 export declare enum FromBTCLNAutoSwapState {
     FAILED = -4,
     QUOTE_EXPIRED = -3,
@@ -31,6 +32,7 @@ export type FromBTCLNAutoSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
     btcAmountGas: bigint;
     gasSwapFeeBtc: bigint;
     gasSwapFee: bigint;
+    gasPricingInfo?: PriceInfoType;
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
@@ -48,6 +50,7 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     protected readonly btcAmountGas: bigint;
     protected readonly gasSwapFeeBtc: bigint;
     protected readonly gasSwapFee: bigint;
+    gasPricingInfo?: PriceInfoType;
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
