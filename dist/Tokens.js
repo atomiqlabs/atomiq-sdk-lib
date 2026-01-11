@@ -106,7 +106,7 @@ function toTokenAmount(amount, token, prices, pricingInfo) {
     if (pricingInfo != null) {
         if (token.chain === "BTC" && token.ticker === "BTC") {
             if (pricingInfo.realPriceUsdPerBitcoin != null) {
-                usdValue = _amount * pricingInfo.realPriceUsdPerBitcoin;
+                usdValue = Number(amount) * pricingInfo.realPriceUsdPerBitcoin;
             }
         }
         else {
@@ -114,7 +114,7 @@ function toTokenAmount(amount, token, prices, pricingInfo) {
                 usdValue = _amount
                     * pricingInfo.realPriceUsdPerBitcoin
                     * Number(pricingInfo.realPriceUSatPerToken)
-                    / 100000000000000;
+                    / 1000000;
             }
         }
     }

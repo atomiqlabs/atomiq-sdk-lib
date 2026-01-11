@@ -188,14 +188,14 @@ export function toTokenAmount<
     if(pricingInfo!=null) {
         if(token.chain==="BTC" && token.ticker==="BTC") {
             if(pricingInfo.realPriceUsdPerBitcoin!=null) {
-                usdValue = _amount * pricingInfo.realPriceUsdPerBitcoin;
+                usdValue = Number(amount) * pricingInfo.realPriceUsdPerBitcoin;
             }
         } else {
             if(pricingInfo.realPriceUsdPerBitcoin!=null && pricingInfo.realPriceUSatPerToken!=null) {
                 usdValue = _amount
                     * pricingInfo.realPriceUsdPerBitcoin
                     * Number(pricingInfo.realPriceUSatPerToken)
-                    / 100_000_000_000_000;
+                    / 1_000_000;
             }
         }
     }
