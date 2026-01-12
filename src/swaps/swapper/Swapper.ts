@@ -1841,11 +1841,11 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         return {
             input: {
                 min: toTokenAmount(result.input.min ?? 1n, srcToken, this.prices),
-                max: toTokenAmount(result.input.max, srcToken, this.prices),
+                max: result.input.max==null ? null : toTokenAmount(result.input.max, srcToken, this.prices),
             },
             output: {
                 min: toTokenAmount(result.output.min ?? 1n, dstToken, this.prices),
-                max: toTokenAmount(result.output.max, dstToken, this.prices),
+                max: result.input.max==null ? null : toTokenAmount(result.output.max, dstToken, this.prices),
             }
         }
     }

@@ -104,7 +104,7 @@ class SwapperUtils {
                 address: resultText,
                 type: "BITCOIN",
                 swapType: SwapType_1.SwapType.TO_BTC,
-                amount: (0, Tokens_1.toTokenAmount)(_amount, Tokens_1.BitcoinTokens.BTC, this.root.prices)
+                amount: _amount == null ? null : (0, Tokens_1.toTokenAmount)(_amount, Tokens_1.BitcoinTokens.BTC, this.root.prices)
             };
         }
     }
@@ -132,14 +132,14 @@ class SwapperUtils {
                 if (result.min === result.max) {
                     return {
                         ...response,
-                        amount: (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
+                        amount: result.min == null ? null : (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
                     };
                 }
                 else {
                     return {
                         ...response,
-                        min: (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices),
-                        max: (0, Tokens_1.toTokenAmount)(result.max, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
+                        min: result.min == null ? null : (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices),
+                        max: result.min == null ? null : (0, Tokens_1.toTokenAmount)(result.max, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
                     };
                 }
             }
@@ -295,7 +295,7 @@ class SwapperUtils {
             result = await bitcoinWallet.getSpendableBalance(undefined, feeRate);
         }
         return {
-            balance: (0, Tokens_1.toTokenAmount)(result.balance, Tokens_1.BitcoinTokens.BTC, this.root.prices),
+            balance: result.balance == null ? null : (0, Tokens_1.toTokenAmount)(result.balance, Tokens_1.BitcoinTokens.BTC, this.root.prices),
             feeRate: result.feeRate
         };
     }
@@ -330,7 +330,7 @@ class SwapperUtils {
             }
             finalBalance = (0, Utils_1.bigIntMax)(balance - commitFee, 0n);
         }
-        return (0, Tokens_1.toTokenAmount)(finalBalance, token, this.root.prices);
+        return finalBalance == null ? null : (0, Tokens_1.toTokenAmount)(finalBalance, token, this.root.prices);
     }
     /**
      * Returns the address of the native currency of the chain

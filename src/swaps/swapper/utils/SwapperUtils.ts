@@ -117,7 +117,7 @@ export class SwapperUtils<T extends MultiChain> {
                 address: resultText,
                 type: "BITCOIN",
                 swapType: SwapType.TO_BTC,
-                amount: toTokenAmount(_amount, BitcoinTokens.BTC, this.root.prices)
+                amount: _amount==null ? null : toTokenAmount(_amount, BitcoinTokens.BTC, this.root.prices)
             };
         }
     }
@@ -158,13 +158,13 @@ export class SwapperUtils<T extends MultiChain> {
                 if(result.min===result.max) {
                     return {
                         ...response,
-                        amount: toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices)
+                        amount: result.min==null ? null : toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices)
                     }
                 } else {
                     return {
                         ...response,
-                        min: toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices),
-                        max: toTokenAmount(result.max, BitcoinTokens.BTCLN, this.root.prices)
+                        min: result.min==null ? null : toTokenAmount(result.min, BitcoinTokens.BTCLN, this.root.prices),
+                        max: result.min==null ? null : toTokenAmount(result.max, BitcoinTokens.BTCLN, this.root.prices)
                     }
                 }
             } catch (e) {
@@ -361,7 +361,7 @@ export class SwapperUtils<T extends MultiChain> {
         }
 
         return {
-            balance: toTokenAmount(result.balance, BitcoinTokens.BTC, this.root.prices),
+            balance: result.balance==null ? null : toTokenAmount(result.balance, BitcoinTokens.BTC, this.root.prices),
             feeRate: result.feeRate
         }
     }
@@ -411,7 +411,7 @@ export class SwapperUtils<T extends MultiChain> {
             finalBalance = bigIntMax(balance - commitFee, 0n);
         }
 
-        return toTokenAmount(finalBalance, token, this.root.prices);
+        return finalBalance==null ? null : toTokenAmount(finalBalance, token, this.root.prices);
     }
 
     /**

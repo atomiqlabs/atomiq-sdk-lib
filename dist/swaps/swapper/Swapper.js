@@ -1284,11 +1284,11 @@ class Swapper extends events_1.EventEmitter {
         return {
             input: {
                 min: (0, Tokens_1.toTokenAmount)(result.input.min ?? 1n, srcToken, this.prices),
-                max: (0, Tokens_1.toTokenAmount)(result.input.max, srcToken, this.prices),
+                max: result.input.max == null ? null : (0, Tokens_1.toTokenAmount)(result.input.max, srcToken, this.prices),
             },
             output: {
                 min: (0, Tokens_1.toTokenAmount)(result.output.min ?? 1n, dstToken, this.prices),
-                max: (0, Tokens_1.toTokenAmount)(result.output.max, dstToken, this.prices),
+                max: result.input.max == null ? null : (0, Tokens_1.toTokenAmount)(result.output.max, dstToken, this.prices),
             }
         };
     }
