@@ -78,6 +78,7 @@ export declare class FromBTCLNSwap<T extends ChainType = ChainType> extends IFro
     isQuoteSoftExpired(): boolean;
     _verifyQuoteDefinitelyExpired(): Promise<boolean>;
     verifyQuoteValid(): Promise<boolean>;
+    getInputToken(): BtcToken<true>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>>;
     getSmartChainNetworkFee(): Promise<TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>>;
     hasEnoughForTxFees(): Promise<{

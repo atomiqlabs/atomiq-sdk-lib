@@ -27,7 +27,7 @@ function isLnForGasSwapInit(obj) {
 exports.isLnForGasSwapInit = isLnForGasSwapInit;
 class LnForGasSwap extends ISwap_1.ISwap {
     constructor(wrapper, initOrObj) {
-        if (isLnForGasSwapInit(initOrObj))
+        if (isLnForGasSwapInit(initOrObj) && initOrObj.url != null)
             initOrObj.url += "/lnforgas";
         super(wrapper, initOrObj);
         this.currentVersion = 2;
@@ -138,8 +138,14 @@ class LnForGasSwap extends ISwap_1.ISwap {
     getOutAmountWithoutFee() {
         return this.outputAmount + (this.swapFee ?? 0n);
     }
+    getOutputToken() {
+        return this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()];
+    }
     getOutput() {
         return (0, Tokens_1.toTokenAmount)(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices, this.pricingInfo);
+    }
+    getInputToken() {
+        return Tokens_1.BitcoinTokens.BTCLN;
     }
     getInput() {
         const parsed = (0, bolt11_1.decode)(this.pr);
@@ -211,6 +217,8 @@ class LnForGasSwap extends ISwap_1.ISwap {
             return false;
         if (this.state === LnForGasSwapState.FINISHED)
             return true;
+        if (this.url == null)
+            return false;
         const decodedPR = (0, bolt11_1.decode)(this.pr);
         const paymentHash = decodedPR.tagsObject.payment_hash;
         if (paymentHash == null)

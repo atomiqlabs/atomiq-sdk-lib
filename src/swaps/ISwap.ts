@@ -4,18 +4,9 @@ import {ISwapWrapper, SwapTypeDefinition} from "./ISwapWrapper";
 import {ChainType} from "@atomiqlabs/base";
 import {isPriceInfoType, PriceInfoType} from "../prices/abstract/ISwapPrice";
 import {LoggerType, randomBytes, toBigInt} from "../utils/Utils";
-import {SCToken, TokenAmount} from "../Tokens";
+import {isSCToken, SCToken, Token, TokenAmount} from "../Tokens";
 import {SwapDirection} from "./enums/SwapDirection";
 import {Fee, FeeBreakdown} from "./fee/Fee";
-import {LnForGasSwap} from "./trusted/ln/LnForGasSwap";
-import {FromBTCSwap} from "./escrow_swaps/frombtc/onchain/FromBTCSwap";
-import {FromBTCLNSwap} from "./escrow_swaps/frombtc/ln/FromBTCLNSwap";
-import {ToBTCSwap} from "./escrow_swaps/tobtc/onchain/ToBTCSwap";
-import {ToBTCLNSwap} from "./escrow_swaps/tobtc/ln/ToBTCLNSwap";
-import {OnchainForGasSwap} from "./trusted/onchain/OnchainForGasSwap";
-import {SpvFromBTCSwap} from "./spv_swaps/SpvFromBTCSwap";
-import {FromBTCLNAutoSwap} from "./escrow_swaps/frombtc/ln_auto/FromBTCLNAutoSwap";
-import {SupportsSwapType} from "./swapper/Swapper";
 
 export type ISwapInit = {
     pricingInfo: PriceInfoType,
@@ -72,7 +63,7 @@ export abstract class ISwap<
     protected readonly currentVersion: number = 1;
     protected readonly wrapper: D["Wrapper"];
 
-    readonly url: string;
+    readonly url?: string;
 
     readonly chainIdentifier: T["ChainId"];
     readonly exactIn: boolean;
@@ -190,22 +181,23 @@ export abstract class ISwap<
         if(this.pricingInfo==null) return;
         if(this.pricingInfo.swapPriceUSatPerToken==null) {
             const priceUsdPerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
-            if(this.getDirection()===SwapDirection.TO_BTC) {
-                const input = this.getInput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+            const input = this.getInput();
+            const output = this.getOutput();
+            if(input==null || output==null) return;
+            if(isSCToken(input.token) && this.getDirection()===SwapDirection.TO_BTC) {
                 this.pricingInfo = this.wrapper.prices.recomputePriceInfoSend(
                     this.chainIdentifier,
-                    this.getOutput().rawAmount,
+                    output.rawAmount,
                     this.pricingInfo.satsBaseFee,
                     this.pricingInfo.feePPM,
                     input.rawAmount,
                     input.token.address
                 );
                 this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
-            } else {
-                const output = this.getOutput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+            } else if(isSCToken(output.token) && this.getDirection()===SwapDirection.FROM_BTC) {
                 this.pricingInfo = this.wrapper.prices.recomputePriceInfoReceive(
                     this.chainIdentifier,
-                    this.getInput().rawAmount,
+                    input.rawAmount,
                     this.pricingInfo.satsBaseFee,
                     this.pricingInfo.feePPM,
                     output.rawAmount,
@@ -222,22 +214,24 @@ export abstract class ISwap<
     async refreshPriceData(): Promise<void> {
         if(this.pricingInfo==null) return;
         const priceUsdPerBtc = this.pricingInfo.realPriceUsdPerBitcoin;
-        if(this.getDirection()===SwapDirection.TO_BTC) {
-            const input = this.getInput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+        const input = this.getInput();
+        const output = this.getOutput();
+        if(input==null || output==null) return;
+
+        if(isSCToken(input.token) && this.getDirection()===SwapDirection.TO_BTC) {
             this.pricingInfo = await this.wrapper.prices.isValidAmountSend(
                 this.chainIdentifier,
-                this.getOutput().rawAmount,
+                output.rawAmount,
                 this.pricingInfo.satsBaseFee,
                 this.pricingInfo.feePPM,
                 input.rawAmount,
                 input.token.address
             );
             this.pricingInfo.realPriceUsdPerBitcoin = priceUsdPerBtc;
-        } else {
-            const output = this.getOutput() as TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+        } else if(isSCToken(output.token) && this.getDirection()===SwapDirection.FROM_BTC) {
             this.pricingInfo = await this.wrapper.prices.isValidAmountReceive(
                 this.chainIdentifier,
-                this.getInput().rawAmount,
+                input.rawAmount,
                 this.pricingInfo.satsBaseFee,
                 this.pricingInfo.feePPM,
                 output.rawAmount,
@@ -390,17 +384,27 @@ export abstract class ISwap<
     /**
      * Returns output amount of the swap, user receives this much
      */
-    abstract getOutput(): TokenAmount;
+    abstract getOutput(): TokenAmount | null;
+
+    /**
+     * Returns the output token of the swap
+     */
+    abstract getOutputToken(): Token<T["ChainId"]>;
 
     /**
      * Returns input amount of the swap, user needs to pay this much
      */
-    abstract getInput(): TokenAmount;
+    abstract getInput(): TokenAmount | null;
+
+    /**
+     * Returns the input token of the swap
+     */
+    abstract getInputToken(): Token<T["ChainId"]>;
 
     /**
      * Returns input amount if the swap without the fees (swap fee, network fee)
      */
-    abstract getInputWithoutFee(): TokenAmount;
+    abstract getInputWithoutFee(): TokenAmount | null;
 
     /**
      * Returns total fee for the swap, the fee is represented in source currency & destination currency, but is

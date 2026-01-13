@@ -45,7 +45,7 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
         return this.data ?? this.initialSwapData;
     }
     constructor(wrapper, initOrObject) {
-        if (isFromBTCLNAutoSwapInit(initOrObject))
+        if (isFromBTCLNAutoSwapInit(initOrObject) && initOrObject.url != null)
             initOrObject.url += "/frombtcln_auto";
         super(wrapper, initOrObject);
         this.inputToken = Tokens_1.BitcoinTokens.BTCLN;
@@ -229,11 +229,17 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
     getOutputAmountWithoutFee() {
         return this.getSwapData().getAmount() + this.swapFee;
     }
+    getInputToken() {
+        return Tokens_1.BitcoinTokens.BTCLN;
+    }
     getInput() {
         return (0, Tokens_1.toTokenAmount)(this.getLightningInvoiceSats(), this.inputToken, this.wrapper.prices, this.pricingInfo);
     }
     getInputWithoutFee() {
         return (0, Tokens_1.toTokenAmount)(this.getInputAmountWithoutFee(), this.inputToken, this.wrapper.prices, this.pricingInfo);
+    }
+    getOutputToken() {
+        return this.wrapper.tokens[this.getSwapData().getToken()];
     }
     getOutput() {
         return (0, Tokens_1.toTokenAmount)(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices, this.pricingInfo);
@@ -394,6 +400,8 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
             return true;
         if (this.state === FromBTCLNAutoSwapState.QUOTE_EXPIRED)
             return false;
+        if (this.url == null)
+            return false;
         const resp = await IntermediaryAPI_1.IntermediaryAPI.getInvoiceStatus(this.url, this.getPaymentHash().toString("hex"));
         switch (resp.code) {
             case IntermediaryAPI_1.InvoiceStatusResponseCodes.PAID:
@@ -504,9 +512,11 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
                 this.logger.warn("waitForPayment(): Failed to warmup messenger: ", e);
             });
         if (this.state === FromBTCLNAutoSwapState.PR_CREATED) {
-            const paymentResult = await Promise.race([
-                this.waitTillState(FromBTCLNAutoSwapState.PR_PAID, "gte", abortController.signal).then(() => true),
-                (async () => {
+            const promises = [
+                this.waitTillState(FromBTCLNAutoSwapState.PR_PAID, "gte", abortController.signal).then(() => true)
+            ];
+            if (this.url != null)
+                promises.push((async () => {
                     let resp = { code: IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING, msg: "" };
                     while (!abortController.signal.aborted && resp.code === IntermediaryAPI_1.InvoiceStatusResponseCodes.PENDING) {
                         resp = await IntermediaryAPI_1.IntermediaryAPI.getInvoiceStatus(this.url, this.getPaymentHash().toString("hex"));
@@ -525,8 +535,8 @@ class FromBTCLNAutoSwap extends IEscrowSwap_1.IEscrowSwap {
                         }
                         return false;
                     }
-                })()
-            ]);
+                })());
+            const paymentResult = await Promise.race(promises);
             abortController.abort();
             if (!paymentResult)
                 return false;

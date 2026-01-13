@@ -9,7 +9,7 @@ import {
     AddressStatusResponseCodes,
     TrustedIntermediaryAPI
 } from "../../../intermediaries/TrustedIntermediaryAPI";
-import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
+import {BitcoinTokens, BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {OnchainForGasSwapTypeDefinition, OnchainForGasWrapper} from "./OnchainForGasWrapper";
 import {Fee, FeeType} from "../../fee/Fee";
 import {IBitcoinWallet, isIBitcoinWallet} from "../../../btc/wallet/IBitcoinWallet";
@@ -85,7 +85,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         wrapper: OnchainForGasWrapper<T>,
         initOrObj: OnchainForGasSwapInit | any
     ) {
-        if(isOnchainForGasSwapInit(initOrObj)) initOrObj.url += "/frombtc_trusted";
+        if(isOnchainForGasSwapInit(initOrObj) && initOrObj.url!=null) initOrObj.url += "/frombtc_trusted";
         super(wrapper, initOrObj);
         this.wrapper = wrapper;
         if(isOnchainForGasSwapInit(initOrObj)) {
@@ -206,11 +206,19 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
         return this.outputAmount + (this.swapFee ?? 0n);
     }
 
+    getOutputToken(): SCToken<T["ChainId"]> {
+        return this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()];
+    }
+
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
         return toTokenAmount(
             this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()],
             this.wrapper.prices, this.pricingInfo
         );
+    }
+
+    getInputToken(): BtcToken<false> {
+        return BitcoinTokens.BTC;
     }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>> {
@@ -414,6 +422,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             this.state===OnchainForGasSwapState.REFUNDED
         ) return false;
         if(this.state===OnchainForGasSwapState.FINISHED) return false;
+        if(this.url==null) return false;
 
         const response = await TrustedIntermediaryAPI.getAddressStatus(
             this.url, this.paymentHash, this.sequence, this.wrapper.options.getRequestTimeout
@@ -483,6 +492,7 @@ export class OnchainForGasSwap<T extends ChainType = ChainType> extends ISwap<T,
             if(this.refundAddress!==refundAddress) throw new Error("Different refund address already set!");
             return;
         }
+        if(this.url==null) throw new Error("LP URL not known, cannot set refund address!");
         await TrustedIntermediaryAPI.setRefundAddress(
             this.url, this.paymentHash, this.sequence, refundAddress, this.wrapper.options.getRequestTimeout
         );

@@ -16,12 +16,13 @@ export type ToBTCLNSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
 };
 export declare function isToBTCLNSwapInit<T extends SwapData>(obj: any): obj is ToBTCLNSwapInit<T>;
 export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTCSwap<T, ToBTCLNDefinition<T>> {
+    private readonly usesClaimHashAsId;
     protected outputToken: BtcToken<true>;
     protected readonly TYPE = SwapType.TO_BTCLN;
     protected readonly logger: LoggerType;
     private readonly confidence;
-    private readonly pr;
-    readonly paymentHash: string;
+    private readonly pr?;
+    readonly paymentHash?: string;
     lnurl?: string;
     successAction?: LNURLPaySuccessAction;
     private secret?;
@@ -31,12 +32,13 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
         secret?: string;
         txId?: string;
     }, check?: boolean): Promise<boolean>;
-    getOutput(): TokenAmount<T["ChainId"], BtcToken<true>>;
+    getOutputToken(): BtcToken<true>;
+    getOutput(): TokenAmount<T["ChainId"], BtcToken<true>> | null;
     getOutputTxId(): string | null;
     /**
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
      */
-    getOutputAddress(): string;
+    getOutputAddress(): string | null;
     /**
      * Returns payment secret (pre-image) as a proof of payment
      */
@@ -56,7 +58,7 @@ export declare class ToBTCLNSwap<T extends ChainType = ChainType> extends IToBTC
      */
     isPayingToNonCustodialWallet(): boolean;
     getIdentifierHash(): Buffer;
-    getPaymentHash(): Buffer;
+    getPaymentHash(): Buffer | null;
     protected getLpIdentifier(): string;
     /**
      * Is this an LNURL-pay swap?

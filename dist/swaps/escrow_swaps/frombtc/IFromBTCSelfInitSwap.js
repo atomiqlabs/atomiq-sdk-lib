@@ -64,6 +64,9 @@ class IFromBTCSelfInitSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
                 fee: this.getSwapFee()
             }];
     }
+    getOutputToken() {
+        return this.wrapper.tokens[this.getSwapData().getToken()];
+    }
     getOutput() {
         return (0, Tokens_1.toTokenAmount)(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices, this.pricingInfo);
     }

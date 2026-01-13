@@ -90,16 +90,7 @@ function toDecimal(amount, decimalCount, cut, displayDecimals) {
 exports.toDecimal = toDecimal;
 function toTokenAmount(amount, token, prices, pricingInfo) {
     if (amount == null)
-        return {
-            rawAmount: null,
-            amount: null,
-            _amount: null,
-            token,
-            currentUsdValue: () => Promise.resolve(null),
-            pastUsdValue: null,
-            usdValue: () => Promise.resolve(null),
-            toString: () => "??? " + token.ticker
-        };
+        return null; //Shouldn't happen
     const amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
     const _amount = parseFloat(amountStr);
     let usdValue = undefined;

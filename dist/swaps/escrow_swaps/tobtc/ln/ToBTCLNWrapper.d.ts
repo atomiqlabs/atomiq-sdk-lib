@@ -165,5 +165,5 @@ export declare class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T
             blockTime: number;
             blockHeight: number;
         }>;
-    }, state: SwapCommitState, lp: Intermediary): Promise<ToBTCLNSwap<T>>;
+    }, state: SwapCommitState, lp?: Intermediary): Promise<ToBTCLNSwap<T> | null>;
 }

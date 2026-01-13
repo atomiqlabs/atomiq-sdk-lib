@@ -69,7 +69,9 @@ export declare class OnchainForGasSwap<T extends ChainType = ChainType> extends 
     isSuccessful(): boolean;
     verifyQuoteValid(): Promise<boolean>;
     protected getOutAmountWithoutFee(): bigint;
+    getOutputToken(): SCToken<T["ChainId"]>;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+    getInputToken(): BtcToken<false>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>>;
     protected getSwapFee(): Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;

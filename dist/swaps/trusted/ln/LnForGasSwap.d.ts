@@ -59,7 +59,9 @@ export declare class LnForGasSwap<T extends ChainType = ChainType> extends ISwap
     isSuccessful(): boolean;
     verifyQuoteValid(): Promise<boolean>;
     protected getOutAmountWithoutFee(): bigint;
+    getOutputToken(): SCToken<T["ChainId"]>;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+    getInputToken(): BtcToken<true>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<true>>;
     protected getSwapFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>>;

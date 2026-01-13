@@ -3,7 +3,7 @@ import {SwapType} from "../../../enums/SwapType";
 import {FromBTCDefinition, FromBTCWrapper} from "./FromBTCWrapper";
 import {ChainType, isAbstractSigner, SwapCommitState, SwapCommitStateType, SwapData} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
-import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../../Tokens";
+import {BitcoinTokens, BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../../../../Tokens";
 import {
     extendAbortController,
     getLogger, getTxoHash, LoggerType,
@@ -78,7 +78,7 @@ export class FromBTCSwap<T extends ChainType = ChainType>
     constructor(wrapper: FromBTCWrapper<T>, init: FromBTCSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCWrapper<T>, obj: any);
     constructor(wrapper: FromBTCWrapper<T>, initOrObject: FromBTCSwapInit<T["Data"]> | any) {
-        if(isFromBTCSwapInit(initOrObject)) initOrObject.url += "/frombtc";
+        if(isFromBTCSwapInit(initOrObject) && initOrObject.url!=null) initOrObject.url += "/frombtc";
         super(wrapper, initOrObject);
         if(isFromBTCSwapInit(initOrObject)) {
             this.state = FromBTCSwapState.PR_CREATED;
@@ -210,6 +210,10 @@ export class FromBTCSwap<T extends ChainType = ChainType>
 
     //////////////////////////////
     //// Amounts & fees
+
+    getInputToken(): BtcToken<false> {
+        return BitcoinTokens.BTC;
+    }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>> {
         return toTokenAmount(this.amount, this.inputToken, this.wrapper.prices);

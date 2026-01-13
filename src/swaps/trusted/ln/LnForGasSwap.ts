@@ -6,7 +6,7 @@ import {PaymentAuthError} from "../../../errors/PaymentAuthError";
 import {getLogger, LoggerType, timeoutPromise, toBigInt} from "../../../utils/Utils";
 import {isISwapInit, ISwap, ISwapInit, ppmToPercentage} from "../../ISwap";
 import {InvoiceStatusResponseCodes, TrustedIntermediaryAPI} from "../../../intermediaries/TrustedIntermediaryAPI";
-import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
+import {BitcoinTokens, BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {Fee, FeeType} from "../../fee/Fee";
 import {IAddressSwap} from "../../IAddressSwap";
 
@@ -53,7 +53,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         wrapper: LnForGasWrapper<T>,
         initOrObj: LnForGasSwapInit | any
     ) {
-        if(isLnForGasSwapInit(initOrObj)) initOrObj.url += "/lnforgas";
+        if(isLnForGasSwapInit(initOrObj) && initOrObj.url!=null) initOrObj.url += "/lnforgas";
         super(wrapper, initOrObj);
         if(isLnForGasSwapInit(initOrObj)) {
             this.pr = initOrObj.pr;
@@ -178,11 +178,19 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
         return this.outputAmount + (this.swapFee ?? 0n);
     }
 
+    getOutputToken(): SCToken<T["ChainId"]> {
+        return this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()];
+    }
+
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
         return toTokenAmount(
             this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()],
             this.wrapper.prices, this.pricingInfo
         );
+    }
+
+    getInputToken(): BtcToken<true> {
+        return BitcoinTokens.BTCLN;
     }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>> {
@@ -262,6 +270,7 @@ export class LnForGasSwap<T extends ChainType = ChainType> extends ISwap<T, LnFo
     protected async checkInvoicePaid(save: boolean = true): Promise<boolean | null> {
         if(this.state===LnForGasSwapState.FAILED || this.state===LnForGasSwapState.EXPIRED) return false;
         if(this.state===LnForGasSwapState.FINISHED) return true;
+        if(this.url==null) return false;
 
         const decodedPR = bolt11Decode(this.pr);
         const paymentHash = decodedPR.tagsObject.payment_hash;

@@ -14,14 +14,14 @@ import {
 } from "../../../intermediaries/IntermediaryAPI";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {extendAbortController, timeoutPromise, toBigInt, tryWithRetries} from "../../../utils/Utils";
-import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
+import {BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {Fee, FeeType} from "../../fee/Fee";
 import {ppmToPercentage} from "../../ISwap";
 import {IEscrowSelfInitSwap, IEscrowSelfInitSwapInit, isIEscrowSelfInitSwapInit} from "../IEscrowSelfInitSwap";
 import {IRefundableSwap} from "../../IRefundableSwap";
 
 export type IToBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
-    signatureData: SignatureData,
+    signatureData?: SignatureData,
     data: T,
     networkFee: bigint,
     networkFeeBtc: bigint
@@ -30,12 +30,12 @@ export type IToBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
 export function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T> {
     return typeof(obj.networkFee) === "bigint" &&
         typeof(obj.networkFeeBtc) === "bigint" &&
-        (
+        (obj.signatureData==null || (
             typeof(obj.signatureData) === 'object' &&
             typeof(obj.signatureData.prefix)==="string" &&
             typeof(obj.signatureData.timeout)==="string" &&
             typeof(obj.signatureData.signature)==="string"
-        ) &&
+        )) &&
         typeof(obj.data) === 'object' &&
         isIEscrowSelfInitSwapInit<T>(obj);
 }
@@ -49,7 +49,7 @@ export abstract class IToBTCSwap<
     protected readonly abstract outputToken: BtcToken;
 
     readonly data!: T["Data"];
-    readonly signatureData!: SignatureData;
+    readonly signatureData?: SignatureData;
 
     protected constructor(wrapper: D["Wrapper"], serializedObject: any);
     protected constructor(wrapper: D["Wrapper"], init: IToBTCSwapInit<T["Data"]>);
@@ -105,11 +105,14 @@ export abstract class IToBTCSwap<
      * @protected
      */
     protected tryRecomputeSwapPrice() {
-        if(this.swapFeeBtc==null) {
-            this.swapFeeBtc = this.swapFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
-        }
-        if(this.networkFeeBtc==null) {
-            this.networkFeeBtc = this.networkFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
+        const output = this.getOutput();
+        if(output!=null) {
+            if(this.swapFeeBtc==null) {
+                this.swapFeeBtc = this.swapFee * output.rawAmount / this.getInputWithoutFee().rawAmount;
+            }
+            if(this.networkFeeBtc==null) {
+                this.networkFeeBtc = this.networkFee * output.rawAmount / this.getInputWithoutFee().rawAmount;
+            }
         }
         super.tryRecomputeSwapPrice();
     }
@@ -188,7 +191,7 @@ export abstract class IToBTCSwap<
 
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const output = this.getOutput();
-        const swapFeePPM = output.rawAmount==null ? 0n : feeWithoutBaseFee * 1000000n / output.rawAmount;
+        const swapFeePPM = output?.rawAmount==null ? 0n : feeWithoutBaseFee * 1000000n / output.rawAmount;
 
         const amountInDstToken = toTokenAmount(
             this.swapFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo
@@ -255,6 +258,10 @@ export abstract class IToBTCSwap<
                 fee: this.getNetworkFee()
             }
         ];
+    }
+
+    getInputToken(): SCToken<T["ChainId"]> {
+        return this.wrapper.tokens[this.data.getToken()];
     }
 
     getInput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
@@ -385,6 +392,7 @@ export abstract class IToBTCSwap<
      */
     async txsCommit(skipChecks?: boolean): Promise<T["TX"][]> {
         if(this.state!==ToBTCSwapState.CREATED) throw new Error("Must be in CREATED state!");
+        if(this.signatureData==null) throw new Error("Init signature data not known, cannot commit!");
 
         if(!this.initiated) {
             this.initiated = true;
@@ -635,6 +643,7 @@ export abstract class IToBTCSwap<
         if(await this.wrapper.contract.isExpired(this._getInitiator(), this.data)) {
             return await this.wrapper.contract.txsRefund(signer, this.data, true, true);
         } else {
+            if(this.url==null) throw new Error("LP URL not known, cannot get cooperative refund message, wait till expiry to refund!");
             const res = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             if(res.code===RefundAuthorizationResponseCodes.REFUND_DATA) {
                 return await this.wrapper.contract.txsRefundWithAuthorization(

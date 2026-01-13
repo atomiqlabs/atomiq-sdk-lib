@@ -25,7 +25,7 @@ const SNOWFLAKE_LIST = new Set([
 ]);
 class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     constructor(wrapper, initOrObj) {
-        if (isToBTCLNSwapInit(initOrObj))
+        if (isToBTCLNSwapInit(initOrObj) && initOrObj.url != null)
             initOrObj.url += "/tobtcln";
         super(wrapper, initOrObj);
         this.outputToken = Tokens_1.BitcoinTokens.BTCLN;
@@ -35,6 +35,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
             this.pr = initOrObj.pr;
             this.lnurl = initOrObj.lnurl;
             this.successAction = initOrObj.successAction;
+            this.usesClaimHashAsId = true;
         }
         else {
             this.confidence = initOrObj.confidence;
@@ -42,8 +43,11 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
             this.lnurl = initOrObj.lnurl;
             this.successAction = initOrObj.successAction;
             this.secret = initOrObj.secret;
+            this.usesClaimHashAsId = initOrObj.usesClaimHashAsId ?? false;
         }
-        this.paymentHash = this.getPaymentHash().toString("hex");
+        const paymentHash = this.getPaymentHash();
+        if (paymentHash != null)
+            this.paymentHash = paymentHash.toString("hex");
         this.logger = (0, Utils_1.getLogger)("ToBTCLN(" + this.getIdentifierHashString() + "): ");
         this.tryRecomputeSwapPrice();
     }
@@ -55,7 +59,9 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
         if (check) {
             const secretBuffer = buffer_1.Buffer.from(result.secret, "hex");
             const hash = buffer_1.Buffer.from((0, sha2_1.sha256)(secretBuffer));
-            if (!hash.equals(this.getPaymentHash()))
+            const claimHash = this.wrapper.contract.getHashForHtlc(hash);
+            const expectedClaimHash = buffer_1.Buffer.from(this.getClaimHash(), "hex");
+            if (!claimHash.equals(expectedClaimHash))
                 throw new IntermediaryError_1.IntermediaryError("Invalid payment secret returned");
         }
         this.secret = result.secret;
@@ -63,9 +69,12 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     }
     //////////////////////////////
     //// Amounts & fees
+    getOutputToken() {
+        return Tokens_1.BitcoinTokens.BTCLN;
+    }
     getOutput() {
         if (this.pr == null || !this.pr.startsWith("ln"))
-            return (0, Tokens_1.toTokenAmount)(null, this.outputToken, this.wrapper.prices);
+            return null;
         const parsedPR = (0, bolt11_1.decode)(this.pr);
         if (parsedPR.millisatoshis == null)
             throw new Error("Swap invoice has no msat amount field!");
@@ -81,7 +90,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
      */
     getOutputAddress() {
-        return this.lnurl ?? this.pr;
+        return this.lnurl ?? this.pr ?? null;
     }
     /**
      * Returns payment secret (pre-image) as a proof of payment
@@ -126,10 +135,12 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
         return false;
     }
     getIdentifierHash() {
-        const paymentHashBuffer = this.getPaymentHash();
+        const idBuffer = this.usesClaimHashAsId
+            ? buffer_1.Buffer.from(this.getClaimHash(), "hex")
+            : this.getPaymentHash();
         if (this.randomNonce == null)
-            return paymentHashBuffer;
-        return buffer_1.Buffer.concat([paymentHashBuffer, buffer_1.Buffer.from(this.randomNonce, "hex")]);
+            return idBuffer;
+        return buffer_1.Buffer.concat([idBuffer, buffer_1.Buffer.from(this.randomNonce, "hex")]);
     }
     getPaymentHash() {
         if (this.pr == null)
@@ -184,12 +195,13 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     serialize() {
         return {
             ...super.serialize(),
-            paymentHash: this.getPaymentHash().toString("hex"),
+            paymentHash: this.getPaymentHash()?.toString("hex"),
             pr: this.pr,
             confidence: this.confidence,
             secret: this.secret,
             lnurl: this.lnurl,
-            successAction: this.successAction
+            successAction: this.successAction,
+            usesClaimHashAsId: this.usesClaimHashAsId
         };
     }
 }

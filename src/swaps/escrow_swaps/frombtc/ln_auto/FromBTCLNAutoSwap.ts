@@ -25,7 +25,7 @@ import {
     toBigInt,
     tryWithRetries
 } from "../../../../utils/Utils";
-import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../../Tokens";
+import {BitcoinTokens, BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../../../../Tokens";
 import {ppmToPercentage} from "../../../ISwap";
 import {Fee, FeeType} from "../../../fee/Fee";
 import {IAddressSwap} from "../../../IAddressSwap";
@@ -119,7 +119,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         wrapper: FromBTCLNAutoWrapper<T>,
         initOrObject: FromBTCLNAutoSwapInit<T["Data"]> | any
     ) {
-        if(isFromBTCLNAutoSwapInit(initOrObject)) initOrObject.url += "/frombtcln_auto";
+        if(isFromBTCLNAutoSwapInit(initOrObject) && initOrObject.url!=null) initOrObject.url += "/frombtcln_auto";
         super(wrapper, initOrObject);
         if(isFromBTCLNAutoSwapInit(initOrObject)) {
             this.state = FromBTCLNAutoSwapState.PR_CREATED;
@@ -344,12 +344,20 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         return this.getSwapData().getAmount() + this.swapFee;
     }
 
+    getInputToken(): BtcToken<true> {
+        return BitcoinTokens.BTCLN;
+    }
+
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>> {
         return toTokenAmount(this.getLightningInvoiceSats(), this.inputToken, this.wrapper.prices, this.pricingInfo);
     }
 
     getInputWithoutFee(): TokenAmount {
         return toTokenAmount(this.getInputAmountWithoutFee(), this.inputToken, this.wrapper.prices, this.pricingInfo);
+    }
+
+    getOutputToken(): SCToken<T["ChainId"]> {
+        return this.wrapper.tokens[this.getSwapData().getToken()];
     }
 
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
@@ -549,6 +557,7 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
             this.state===FromBTCLNAutoSwapState.FAILED
         ) return true;
         if(this.state===FromBTCLNAutoSwapState.QUOTE_EXPIRED) return false;
+        if(this.url==null) return false;
         const resp = await IntermediaryAPI.getInvoiceStatus(this.url, this.getPaymentHash().toString("hex"));
         switch(resp.code) {
             case InvoiceStatusResponseCodes.PAID:
@@ -651,31 +660,32 @@ export class FromBTCLNAutoSwap<T extends ChainType = ChainType>
         });
 
         if(this.state===FromBTCLNAutoSwapState.PR_CREATED) {
-            const paymentResult = await Promise.race([
-                this.waitTillState(FromBTCLNAutoSwapState.PR_PAID, "gte", abortController.signal).then(() => true),
-                (async () => {
-                    let resp: InvoiceStatusResponse = {code: InvoiceStatusResponseCodes.PENDING, msg: ""};
-                    while(!abortController.signal.aborted && resp.code===InvoiceStatusResponseCodes.PENDING) {
-                        resp = await IntermediaryAPI.getInvoiceStatus(this.url, this.getPaymentHash().toString("hex"));
-                        if(resp.code===InvoiceStatusResponseCodes.PENDING)
-                            await timeoutPromise(checkIntervalSeconds*1000, abortController.signal);
-                    }
-                    this.lnurlFailSignal.signal.removeEventListener("abort", lnurlFailListener);
-                    abortController.signal.throwIfAborted();
+            const promises: Promise<boolean | undefined>[] = [
+                this.waitTillState(FromBTCLNAutoSwapState.PR_PAID, "gte", abortController.signal).then(() => true)
+            ];
+            if(this.url!=null) promises.push((async () => {
+                let resp: InvoiceStatusResponse = {code: InvoiceStatusResponseCodes.PENDING, msg: ""};
+                while(!abortController.signal.aborted && resp.code===InvoiceStatusResponseCodes.PENDING) {
+                    resp = await IntermediaryAPI.getInvoiceStatus(this.url!, this.getPaymentHash().toString("hex"));
+                    if(resp.code===InvoiceStatusResponseCodes.PENDING)
+                        await timeoutPromise(checkIntervalSeconds*1000, abortController.signal);
+                }
+                this.lnurlFailSignal.signal.removeEventListener("abort", lnurlFailListener);
+                abortController.signal.throwIfAborted();
 
-                    if(resp.code===InvoiceStatusResponseCodes.PAID) {
-                        const swapData = new this.wrapper.swapDataDeserializer(resp.data.data);
-                        return await this._saveRealSwapData(swapData, true);
-                    }
+                if(resp.code===InvoiceStatusResponseCodes.PAID) {
+                    const swapData = new this.wrapper.swapDataDeserializer(resp.data.data);
+                    return await this._saveRealSwapData(swapData, true);
+                }
 
-                    if(this.state===FromBTCLNAutoSwapState.PR_CREATED || this.state===FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
-                        if(resp.code===InvoiceStatusResponseCodes.EXPIRED) {
-                            await this._saveAndEmit(FromBTCLNAutoSwapState.QUOTE_EXPIRED);
-                        }
-                        return false;
+                if(this.state===FromBTCLNAutoSwapState.PR_CREATED || this.state===FromBTCLNAutoSwapState.QUOTE_SOFT_EXPIRED) {
+                    if(resp.code===InvoiceStatusResponseCodes.EXPIRED) {
+                        await this._saveAndEmit(FromBTCLNAutoSwapState.QUOTE_EXPIRED);
                     }
-                })()
-            ]);
+                    return false;
+                }
+            })());
+            const paymentResult = await Promise.race(promises);
             abortController.abort();
 
             if(!paymentResult) return false;

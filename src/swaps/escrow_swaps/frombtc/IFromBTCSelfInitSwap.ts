@@ -4,7 +4,7 @@ import {
     ChainType,
     SignatureVerificationError,
 } from "@atomiqlabs/base";
-import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
+import {BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {Fee, FeeType} from "../../fee/Fee";
 import {IAddressSwap} from "../../IAddressSwap";
 import {IEscrowSelfInitSwap, IEscrowSelfInitSwapDefinition, IEscrowSelfInitSwapInit} from "../IEscrowSelfInitSwap";
@@ -115,9 +115,15 @@ export abstract class IFromBTCSelfInitSwap<
         }];
     }
 
+    getOutputToken(): SCToken<T["ChainId"]> {
+        return this.wrapper.tokens[this.getSwapData().getToken()];
+    }
+
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
         return toTokenAmount(this.getSwapData().getAmount(), this.wrapper.tokens[this.getSwapData().getToken()], this.wrapper.prices, this.pricingInfo);
     }
+
+    abstract getInput(): TokenAmount<T["ChainId"], BtcToken>;
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken> {
         return toTokenAmount(this.getInput().rawAmount - this.swapFeeBtc, this.inputToken, this.wrapper.prices, this.pricingInfo);

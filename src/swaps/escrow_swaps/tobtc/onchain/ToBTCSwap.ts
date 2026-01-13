@@ -48,7 +48,7 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T, To
         wrapper: ToBTCWrapper<T>,
         initOrObject: ToBTCSwapInit<T["Data"]> | any
     ) {
-        if(isToBTCSwapInit(initOrObject)) initOrObject.url += "/tobtc";
+        if(isToBTCSwapInit(initOrObject) && initOrObject.url!=null) initOrObject.url += "/tobtc";
         super(wrapper, initOrObject);
         if(isToBTCSwapInit(initOrObject)) {
             this.address = initOrObject.address;
@@ -94,6 +94,10 @@ export class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T, To
 
     //////////////////////////////
     //// Amounts & fees
+
+    getOutputToken(): BtcToken<false> {
+        return BitcoinTokens.BTC;
+    }
 
     getOutput(): TokenAmount<T["ChainId"], BtcToken<false>> {
         return toTokenAmount(this.amount, this.outputToken, this.wrapper.prices, this.pricingInfo);

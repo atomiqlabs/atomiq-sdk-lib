@@ -71,6 +71,7 @@ export declare class FromBTCSwap<T extends ChainType = ChainType> extends IFromB
     isQuoteExpired(): boolean;
     isQuoteSoftExpired(): boolean;
     protected canCommit(): boolean;
+    getInputToken(): BtcToken<false>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>>;
     /**
      * Returns claimer bounty, acting as a reward for watchtowers to claim the swap automatically

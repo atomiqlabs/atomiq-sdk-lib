@@ -38,7 +38,7 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
         return this.data ?? this.initialSwapData;
     }
     constructor(wrapper, initOrObject) {
-        if (isFromBTCLNSwapInit(initOrObject))
+        if (isFromBTCLNSwapInit(initOrObject) && initOrObject.url != null)
             initOrObject.url += "/frombtcln";
         super(wrapper, initOrObject);
         this.inputToken = Tokens_1.BitcoinTokens.BTCLN;
@@ -194,6 +194,9 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
     }
     //////////////////////////////
     //// Amounts & fees
+    getInputToken() {
+        return Tokens_1.BitcoinTokens.BTCLN;
+    }
     getInput() {
         const parsed = (0, bolt11_1.decode)(this.pr);
         if (parsed.millisatoshis == null)
@@ -346,6 +349,8 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
             return true;
         if (this.state === FromBTCLNSwapState.QUOTE_EXPIRED || (this.state === FromBTCLNSwapState.QUOTE_SOFT_EXPIRED && this.signatureData != null))
             return false;
+        if (this.url == null)
+            return false;
         const resp = await IntermediaryAPI_1.IntermediaryAPI.getPaymentAuthorization(this.url, this.getPaymentHash().toString("hex"));
         switch (resp.code) {
             case IntermediaryAPI_1.PaymentAuthorizationResponseCodes.AUTH_DATA:
@@ -430,6 +435,8 @@ class FromBTCLNSwap extends IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap {
         if (this.state !== FromBTCLNSwapState.PR_CREATED &&
             (this.state !== FromBTCLNSwapState.QUOTE_SOFT_EXPIRED || this.signatureData != null))
             throw new Error("Must be in PR_CREATED state!");
+        if (this.url == null)
+            throw new Error("LP URL not known, cannot await the payment!");
         const abortController = new AbortController();
         if (abortSignal != null)
             abortSignal.addEventListener("abort", () => abortController.abort(abortSignal.reason));

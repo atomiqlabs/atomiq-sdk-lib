@@ -19,7 +19,7 @@ function isToBTCSwapInit(obj) {
 exports.isToBTCSwapInit = isToBTCSwapInit;
 class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
     constructor(wrapper, initOrObject) {
-        if (isToBTCSwapInit(initOrObject))
+        if (isToBTCSwapInit(initOrObject) && initOrObject.url != null)
             initOrObject.url += "/tobtc";
         super(wrapper, initOrObject);
         this.outputToken = Tokens_1.BitcoinTokens.BTC;
@@ -62,6 +62,9 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
     }
     //////////////////////////////
     //// Amounts & fees
+    getOutputToken() {
+        return Tokens_1.BitcoinTokens.BTC;
+    }
     getOutput() {
         return (0, Tokens_1.toTokenAmount)(this.amount, this.outputToken, this.wrapper.prices, this.pricingInfo);
     }

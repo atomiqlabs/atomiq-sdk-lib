@@ -30,6 +30,7 @@ export declare class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSw
         secret?: string;
         txId?: string;
     }, check?: boolean): Promise<boolean>;
+    getOutputToken(): BtcToken<false>;
     getOutput(): TokenAmount<T["ChainId"], BtcToken<false>>;
     /**
      * Returns the bitcoin address where the BTC will be sent to

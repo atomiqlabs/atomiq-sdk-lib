@@ -325,8 +325,8 @@ export abstract class ISwapWrapper<
     recoverFromSwapDataAndState(
         init: {data: T["Data"], getInitTxId: () => Promise<string>, getTxBlock: () => Promise<{blockTime: number, blockHeight: number}>},
         state: SwapCommitState,
-        lp: Intermediary
-    ): Promise<S> {
+        lp?: Intermediary
+    ): Promise<D["Swap"] | null> {
         return Promise.resolve(null);
     }
 

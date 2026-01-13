@@ -443,9 +443,12 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         return quotes.map(value => ({
             quote: value.quote.then(quote => {
                 quote.lnurl = resolved.url;
-                const successAction = successActions[quote.getOutputAddress()];
-                if (successAction != null)
-                    quote.successAction = successAction;
+                const quoteAddress = quote.getOutputAddress();
+                if (quoteAddress != null) {
+                    const successAction = successActions[quoteAddress];
+                    if (successAction != null)
+                        quote.successAction = successAction;
+                }
                 return quote;
             }),
             intermediary: value.intermediary
@@ -472,7 +475,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
             swapFee: 0n,
             swapFeeBtc: 0n,
             feeRate: "",
-            signatureData: null,
+            signatureData: undefined,
             data,
             networkFee: 0n,
             networkFeeBtc: 0n,

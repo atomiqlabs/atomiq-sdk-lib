@@ -132,10 +132,9 @@ export declare abstract class ISwapWrapper<T extends ChainType, D extends SwapTy
         removeSwaps: D["Swap"][];
         changedSwaps: D["Swap"][];
     }>;
-<<<<<<< HEAD
-    tick(swaps?: S[]): Promise<void>;
-    saveSwapData(swap: S): Promise<void>;
-    removeSwapData(swap: S): Promise<void>;
+    tick(swaps?: D["Swap"][]): Promise<void>;
+    saveSwapData(swap: D["Swap"]): Promise<void>;
+    removeSwapData(swap: D["Swap"]): Promise<void>;
     recoverFromSwapDataAndState(init: {
         data: T["Data"];
         getInitTxId: () => Promise<string>;
@@ -143,12 +142,7 @@ export declare abstract class ISwapWrapper<T extends ChainType, D extends SwapTy
             blockTime: number;
             blockHeight: number;
         }>;
-    }, state: SwapCommitState, lp: Intermediary): Promise<S>;
-=======
-    tick(swaps?: D["Swap"][]): Promise<void>;
-    saveSwapData(swap: D["Swap"]): Promise<void>;
-    removeSwapData(swap: D["Swap"]): Promise<void>;
->>>>>>> 9d90343 (Merge ts strict (#16))
+    }, state: SwapCommitState, lp?: Intermediary): Promise<D["Swap"] | null>;
     /**
      * Un-subscribes from event listeners on Solana
      */

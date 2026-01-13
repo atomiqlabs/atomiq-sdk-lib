@@ -715,10 +715,10 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             quotes.sort((a, b) => {
                 if(amountData.exactIn) {
                     //Compare outputs
-                    return bigIntCompare(b.quote.getOutput().rawAmount, a.quote.getOutput().rawAmount);
+                    return bigIntCompare(b.quote.getOutput()!.rawAmount, a.quote.getOutput()!.rawAmount);
                 } else {
                     //Compare inputs
-                    return bigIntCompare(a.quote.getInput().rawAmount, b.quote.getInput().rawAmount);
+                    return bigIntCompare(a.quote.getInput()!.rawAmount, b.quote.getInput()!.rawAmount);
                 }
             });
 
@@ -1650,7 +1650,10 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
         this.logger.debug(`recoverSwaps(): Fetching if swap escrowHashes are known: ${escrowHashes.join(", ")}`);
         const knownSwapsArray = await unifiedSwapStorage.query([[{key: "escrowHash", value: escrowHashes}]], reviver);
         const knownSwaps: {[escrowHash: string]: ISwap<T[C]>} = {};
-        knownSwapsArray.forEach(val => knownSwaps[val._getEscrowHash()] = val);
+        knownSwapsArray.forEach(val => {
+            const escrowHash = val._getEscrowHash();
+            if(escrowHash!=null) knownSwaps[escrowHash] = val;
+        });
         this.logger.debug(`recoverSwaps(): Fetched known swaps escrowHashes: ${Object.keys(knownSwaps).join(", ")}`);
 
         const recoveredSwaps: ISwap<T[C]>[] = [];
@@ -1672,7 +1675,7 @@ export class Swapper<T extends MultiChain> extends EventEmitter<{
             const data = init.data;
 
             //Classify swap
-            let swap: ISwap<T[C]>;
+            let swap: ISwap<T[C]> | undefined | null;
             let typeIdentified: boolean = false;
             if(data.getType()===ChainSwapType.HTLC) {
                 if(data.isOfferer(signer)) {

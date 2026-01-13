@@ -22,7 +22,7 @@ import {
     parsePsbtTransaction,toBitcoinWallet
 } from "../../utils/BitcoinHelpers";
 import {Address, getInputType, OutScript, Transaction} from "@scure/btc-signer";
-import {BitcoinTokens, BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../Tokens";
+import {BitcoinTokens, BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../../Tokens";
 import {Buffer} from "buffer";
 import {Fee, FeeType} from "../fee/Fee";
 import {IBitcoinWallet, isIBitcoinWallet} from "../../btc/wallet/IBitcoinWallet";
@@ -165,7 +165,7 @@ export class SpvFromBTCSwap<T extends ChainType>
     constructor(wrapper: SpvFromBTCWrapper<T>, init: SpvFromBTCSwapInit);
     constructor(wrapper: SpvFromBTCWrapper<T>, obj: any);
     constructor(wrapper: SpvFromBTCWrapper<T>, initOrObject: SpvFromBTCSwapInit | any) {
-        if(isSpvFromBTCSwapInit(initOrObject)) initOrObject.url += "/frombtc_spv";
+        if(isSpvFromBTCSwapInit(initOrObject) && initOrObject.url!=null) initOrObject.url += "/frombtc_spv";
         super(wrapper, initOrObject);
         if(isSpvFromBTCSwapInit(initOrObject)) {
             this.state = SpvFromBTCSwapState.CREATED;
@@ -454,6 +454,10 @@ export class SpvFromBTCSwap<T extends ChainType>
         ];
     }
 
+    getOutputToken(): SCToken<T["ChainId"]> {
+        return this.wrapper.tokens[this.outputSwapToken];
+    }
+
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
         return toTokenAmount(this.outputTotalSwap, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices, this.pricingInfo);
     }
@@ -464,6 +468,10 @@ export class SpvFromBTCSwap<T extends ChainType>
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>> {
         return toTokenAmount(this.getInputAmountWithoutFee(), BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo);
+    }
+
+    getInputToken(): BtcToken<false> {
+        return BitcoinTokens.BTC;
     }
 
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>> {
@@ -641,6 +649,7 @@ export class SpvFromBTCSwap<T extends ChainType>
         if(this.state!==SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED && this.state!==SpvFromBTCSwapState.CREATED) {
             throw new Error("Invalid swap state!");
         }
+        if(this.url==null) throw new Error("LP URL not known, cannot submit PSBT!");
 
         //Ensure all inputs except the 1st are finalized
         for(let i=1;i<psbt.inputsLength;i++) {

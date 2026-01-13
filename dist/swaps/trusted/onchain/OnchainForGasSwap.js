@@ -37,7 +37,7 @@ function isOnchainForGasSwapInit(obj) {
 exports.isOnchainForGasSwapInit = isOnchainForGasSwapInit;
 class OnchainForGasSwap extends ISwap_1.ISwap {
     constructor(wrapper, initOrObj) {
-        if (isOnchainForGasSwapInit(initOrObj))
+        if (isOnchainForGasSwapInit(initOrObj) && initOrObj.url != null)
             initOrObj.url += "/frombtc_trusted";
         super(wrapper, initOrObj);
         this.getSmartChainNetworkFee = null;
@@ -139,8 +139,14 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
     getOutAmountWithoutFee() {
         return this.outputAmount + (this.swapFee ?? 0n);
     }
+    getOutputToken() {
+        return this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()];
+    }
     getOutput() {
         return (0, Tokens_1.toTokenAmount)(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices, this.pricingInfo);
+    }
+    getInputToken() {
+        return Tokens_1.BitcoinTokens.BTC;
     }
     getInput() {
         return (0, Tokens_1.toTokenAmount)(this.inputAmount, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo);
@@ -312,6 +318,8 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
             return false;
         if (this.state === OnchainForGasSwapState.FINISHED)
             return false;
+        if (this.url == null)
+            return false;
         const response = await TrustedIntermediaryAPI_1.TrustedIntermediaryAPI.getAddressStatus(this.url, this.paymentHash, this.sequence, this.wrapper.options.getRequestTimeout);
         switch (response.code) {
             case TrustedIntermediaryAPI_1.AddressStatusResponseCodes.AWAIT_PAYMENT:
@@ -386,6 +394,8 @@ class OnchainForGasSwap extends ISwap_1.ISwap {
                 throw new Error("Different refund address already set!");
             return;
         }
+        if (this.url == null)
+            throw new Error("LP URL not known, cannot set refund address!");
         await TrustedIntermediaryAPI_1.TrustedIntermediaryAPI.setRefundAddress(this.url, this.paymentHash, this.sequence, refundAddress, this.wrapper.options.getRequestTimeout);
         this.refundAddress = refundAddress;
     }

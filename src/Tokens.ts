@@ -171,16 +171,7 @@ export function toTokenAmount<
     prices: ISwapPrice,
     pricingInfo?: PriceInfoType
 ): TokenAmount<ChainIdentifier, T> {
-    if(amount==null) return {
-        rawAmount: null,
-        amount: null,
-        _amount: null,
-        token,
-        currentUsdValue: () => Promise.resolve(null),
-        pastUsdValue: null,
-        usdValue: () => Promise.resolve(null),
-        toString: () => "??? "+token.ticker
-    };
+    if(amount==null) return null!; //Shouldn't happen
     const amountStr = toDecimal(amount, token.decimals, undefined, token.displayDecimals);
     const _amount = parseFloat(amountStr);
 

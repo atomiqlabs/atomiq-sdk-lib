@@ -1151,7 +1151,11 @@ class Swapper extends events_1.EventEmitter {
         this.logger.debug(`recoverSwaps(): Fetching if swap escrowHashes are known: ${escrowHashes.join(", ")}`);
         const knownSwapsArray = await unifiedSwapStorage.query([[{ key: "escrowHash", value: escrowHashes }]], reviver);
         const knownSwaps = {};
-        knownSwapsArray.forEach(val => knownSwaps[val._getEscrowHash()] = val);
+        knownSwapsArray.forEach(val => {
+            const escrowHash = val._getEscrowHash();
+            if (escrowHash != null)
+                knownSwaps[escrowHash] = val;
+        });
         this.logger.debug(`recoverSwaps(): Fetched known swaps escrowHashes: ${Object.keys(knownSwaps).join(", ")}`);
         const recoveredSwaps = [];
         for (let escrowHash in swaps) {

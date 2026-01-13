@@ -128,9 +128,11 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
             fee: Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
         }
     ];
+    getOutputToken(): SCToken<T["ChainId"]>;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getGasDropOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>>;
+    getInputToken(): BtcToken<false>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>>;
     getRequiredConfirmationsCount(): number;
     getTransactionDetails(): Promise<{

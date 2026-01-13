@@ -12,10 +12,10 @@ const IEscrowSelfInitSwap_1 = require("../IEscrowSelfInitSwap");
 function isIToBTCSwapInit(obj) {
     return typeof (obj.networkFee) === "bigint" &&
         typeof (obj.networkFeeBtc) === "bigint" &&
-        (typeof (obj.signatureData) === 'object' &&
+        (obj.signatureData == null || (typeof (obj.signatureData) === 'object' &&
             typeof (obj.signatureData.prefix) === "string" &&
             typeof (obj.signatureData.timeout) === "string" &&
-            typeof (obj.signatureData.signature) === "string") &&
+            typeof (obj.signatureData.signature) === "string")) &&
         typeof (obj.data) === 'object' &&
         (0, IEscrowSelfInitSwap_1.isIEscrowSelfInitSwapInit)(obj);
 }
@@ -68,11 +68,14 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
      * @protected
      */
     tryRecomputeSwapPrice() {
-        if (this.swapFeeBtc == null) {
-            this.swapFeeBtc = this.swapFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
-        }
-        if (this.networkFeeBtc == null) {
-            this.networkFeeBtc = this.networkFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
+        const output = this.getOutput();
+        if (output != null) {
+            if (this.swapFeeBtc == null) {
+                this.swapFeeBtc = this.swapFee * output.rawAmount / this.getInputWithoutFee().rawAmount;
+            }
+            if (this.networkFeeBtc == null) {
+                this.networkFeeBtc = this.networkFee * output.rawAmount / this.getInputWithoutFee().rawAmount;
+            }
         }
         super.tryRecomputeSwapPrice();
     }
@@ -125,7 +128,7 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             throw new Error("No pricing info known, cannot estimate fee!");
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const output = this.getOutput();
-        const swapFeePPM = output.rawAmount == null ? 0n : feeWithoutBaseFee * 1000000n / output.rawAmount;
+        const swapFeePPM = output?.rawAmount == null ? 0n : feeWithoutBaseFee * 1000000n / output.rawAmount;
         const amountInDstToken = (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo);
         return {
             amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
@@ -174,6 +177,9 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
                 fee: this.getNetworkFee()
             }
         ];
+    }
+    getInputToken() {
+        return this.wrapper.tokens[this.data.getToken()];
     }
     getInput() {
         return (0, Tokens_1.toTokenAmount)(this.data.getAmount(), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo);
@@ -280,6 +286,8 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
     async txsCommit(skipChecks) {
         if (this.state !== ToBTCSwapState.CREATED)
             throw new Error("Must be in CREATED state!");
+        if (this.signatureData == null)
+            throw new Error("Init signature data not known, cannot commit!");
         if (!this.initiated) {
             this.initiated = true;
             await this._saveAndEmit();
@@ -506,6 +514,8 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             return await this.wrapper.contract.txsRefund(signer, this.data, true, true);
         }
         else {
+            if (this.url == null)
+                throw new Error("LP URL not known, cannot get cooperative refund message, wait till expiry to refund!");
             const res = await IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             if (res.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA) {
                 return await this.wrapper.contract.txsRefundWithAuthorization(signer, this.data, res.data, true, true);

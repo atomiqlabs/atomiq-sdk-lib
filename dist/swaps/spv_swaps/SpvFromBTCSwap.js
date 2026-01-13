@@ -61,7 +61,7 @@ function isSpvFromBTCSwapInit(obj) {
 exports.isSpvFromBTCSwapInit = isSpvFromBTCSwapInit;
 class SpvFromBTCSwap extends ISwap_1.ISwap {
     constructor(wrapper, initOrObject) {
-        if (isSpvFromBTCSwapInit(initOrObject))
+        if (isSpvFromBTCSwapInit(initOrObject) && initOrObject.url != null)
             initOrObject.url += "/frombtc_spv";
         super(wrapper, initOrObject);
         this.TYPE = SwapType_1.SwapType.SPV_VAULT_FROM_BTC;
@@ -286,6 +286,9 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
             }
         ];
     }
+    getOutputToken() {
+        return this.wrapper.tokens[this.outputSwapToken];
+    }
     getOutput() {
         return (0, Tokens_1.toTokenAmount)(this.outputTotalSwap, this.wrapper.tokens[this.outputSwapToken], this.wrapper.prices, this.pricingInfo);
     }
@@ -294,6 +297,9 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
     }
     getInputWithoutFee() {
         return (0, Tokens_1.toTokenAmount)(this.getInputAmountWithoutFee(), Tokens_1.BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo);
+    }
+    getInputToken() {
+        return Tokens_1.BitcoinTokens.BTC;
     }
     getInput() {
         return (0, Tokens_1.toTokenAmount)(this.btcAmount, Tokens_1.BitcoinTokens.BTC, this.wrapper.prices, this.pricingInfo);
@@ -433,6 +439,8 @@ class SpvFromBTCSwap extends ISwap_1.ISwap {
         if (this.state !== SpvFromBTCSwapState.QUOTE_SOFT_EXPIRED && this.state !== SpvFromBTCSwapState.CREATED) {
             throw new Error("Invalid swap state!");
         }
+        if (this.url == null)
+            throw new Error("LP URL not known, cannot submit PSBT!");
         //Ensure all inputs except the 1st are finalized
         for (let i = 1; i < psbt.inputsLength; i++) {
             if ((0, btc_signer_1.getInputType)(psbt.getInput(i)).txType === "legacy")

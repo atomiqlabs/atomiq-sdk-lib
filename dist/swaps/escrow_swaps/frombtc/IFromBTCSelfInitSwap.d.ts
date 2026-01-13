@@ -39,7 +39,9 @@ export declare abstract class IFromBTCSelfInitSwap<T extends ChainType = ChainTy
         type: FeeType.SWAP;
         fee: Fee<T["ChainId"], BtcToken, SCToken<T["ChainId"]>>;
     }];
+    getOutputToken(): SCToken<T["ChainId"]>;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
+    abstract getInput(): TokenAmount<T["ChainId"], BtcToken>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken>;
     getSecurityDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getTotalDeposit(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;

@@ -637,8 +637,11 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         return quotes.map(value => ({
             quote: value.quote.then(quote => {
                 quote.lnurl = resolved.url;
-                const successAction = successActions[quote.getOutputAddress()];
-                if(successAction!=null) quote.successAction = successAction;
+                const quoteAddress = quote.getOutputAddress();
+                if(quoteAddress!=null) {
+                    const successAction = successActions[quoteAddress];
+                    if(successAction!=null) quote.successAction = successAction;
+                }
                 return quote;
             }),
             intermediary: value.intermediary
@@ -648,11 +651,11 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
     async recoverFromSwapDataAndState(
         init: {data: T["Data"], getInitTxId: () => Promise<string>, getTxBlock: () => Promise<{blockTime: number, blockHeight: number}>},
         state: SwapCommitState,
-        lp: Intermediary
-    ): Promise<ToBTCLNSwap<T>> {
+        lp?: Intermediary
+    ): Promise<ToBTCLNSwap<T> | null> {
         const data = init.data;
 
-        let paymentHash: string = data.getHTLCHashHint();
+        let paymentHash = data.getHTLCHashHint();
         if(state.type===SwapCommitStateType.PAID) {
             const secret = await state.getClaimResult();
             paymentHash = Buffer.from(sha256(Buffer.from(secret, "hex"))).toString("hex");
@@ -672,7 +675,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
             swapFee: 0n,
             swapFeeBtc: 0n,
             feeRate: "",
-            signatureData: null,
+            signatureData: undefined,
             data,
             networkFee: 0n,
             networkFeeBtc: 0n,

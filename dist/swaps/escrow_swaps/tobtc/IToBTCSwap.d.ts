@@ -6,7 +6,7 @@ import { Fee, FeeType } from "../../fee/Fee";
 import { IEscrowSelfInitSwap, IEscrowSelfInitSwapInit } from "../IEscrowSelfInitSwap";
 import { IRefundableSwap } from "../../IRefundableSwap";
 export type IToBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
-    signatureData: SignatureData;
+    signatureData?: SignatureData;
     data: T;
     networkFee: bigint;
     networkFeeBtc: bigint;
@@ -17,7 +17,7 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType, D exte
     protected networkFeeBtc: bigint;
     protected readonly abstract outputToken: BtcToken;
     readonly data: T["Data"];
-    readonly signatureData: SignatureData;
+    readonly signatureData?: SignatureData;
     protected constructor(wrapper: D["Wrapper"], serializedObject: any);
     protected constructor(wrapper: D["Wrapper"], init: IToBTCSwapInit<T["Data"]>);
     protected getSwapData(): T["Data"];
@@ -74,6 +74,7 @@ export declare abstract class IToBTCSwap<T extends ChainType = ChainType, D exte
             fee: Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken>;
         }
     ];
+    getInputToken(): SCToken<T["ChainId"]>;
     getInput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     /**

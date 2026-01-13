@@ -5,7 +5,7 @@ import { ISwapWrapper, SwapTypeDefinition } from "./ISwapWrapper";
 import { ChainType } from "@atomiqlabs/base";
 import { PriceInfoType } from "../prices/abstract/ISwapPrice";
 import { LoggerType } from "../utils/Utils";
-import { TokenAmount } from "../Tokens";
+import { Token, TokenAmount } from "../Tokens";
 import { SwapDirection } from "./enums/SwapDirection";
 import { Fee, FeeBreakdown } from "./fee/Fee";
 export type ISwapInit = {
@@ -35,7 +35,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, D extends S
     protected readonly abstract logger: LoggerType;
     protected readonly currentVersion: number;
     protected readonly wrapper: D["Wrapper"];
-    readonly url: string;
+    readonly url?: string;
     readonly chainIdentifier: T["ChainId"];
     readonly exactIn: boolean;
     createdAt: number;
@@ -155,15 +155,23 @@ export declare abstract class ISwap<T extends ChainType = ChainType, D extends S
     /**
      * Returns output amount of the swap, user receives this much
      */
-    abstract getOutput(): TokenAmount;
+    abstract getOutput(): TokenAmount | null;
+    /**
+     * Returns the output token of the swap
+     */
+    abstract getOutputToken(): Token<T["ChainId"]>;
     /**
      * Returns input amount of the swap, user needs to pay this much
      */
-    abstract getInput(): TokenAmount;
+    abstract getInput(): TokenAmount | null;
+    /**
+     * Returns the input token of the swap
+     */
+    abstract getInputToken(): Token<T["ChainId"]>;
     /**
      * Returns input amount if the swap without the fees (swap fee, network fee)
      */
-    abstract getInputWithoutFee(): TokenAmount;
+    abstract getInputWithoutFee(): TokenAmount | null;
     /**
      * Returns total fee for the swap, the fee is represented in source currency & destination currency, but is
      *  paid only once
