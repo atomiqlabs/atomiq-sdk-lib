@@ -116,5 +116,8 @@ class IEscrowSwapWrapper extends ISwapWrapper_1.ISwapWrapper {
             removeSwaps
         };
     }
+    recoverFromSwapDataAndState(init, state, lp) {
+        return Promise.resolve(null);
+    }
 }
 exports.IEscrowSwapWrapper = IEscrowSwapWrapper;

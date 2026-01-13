@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { ISwapWrapper, ISwapWrapperOptions, SwapTypeDefinition, WrapperCtorTokens } from "../ISwapWrapper";
-import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, SignatureData, SwapEvent } from "@atomiqlabs/base";
+import { ChainType, ClaimEvent, InitializeEvent, RefundEvent, SignatureData, SwapCommitState, SwapEvent } from "@atomiqlabs/base";
 import { ISwap } from "../ISwap";
 import { UnifiedSwapStorage } from "../../storage/UnifiedSwapStorage";
 import { UnifiedSwapEventListener } from "../../events/UnifiedSwapEventListener";
@@ -8,6 +8,7 @@ import { ISwapPrice } from "../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { SwapType } from "../enums/SwapType";
 import { IEscrowSwap } from "./IEscrowSwap";
+import { Intermediary } from "../../intermediaries/Intermediary";
 export type IEscrowSwapDefinition<T extends ChainType, W extends IEscrowSwapWrapper<T, any>, S extends IEscrowSwap<T>> = SwapTypeDefinition<T, W, S>;
 export declare abstract class IEscrowSwapWrapper<T extends ChainType, D extends IEscrowSwapDefinition<T, IEscrowSwapWrapper<T, D>, IEscrowSwap<T, D>>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends ISwapWrapper<T, D, O> {
     readonly abstract TYPE: SwapType;
@@ -73,4 +74,12 @@ export declare abstract class IEscrowSwapWrapper<T extends ChainType, D extends 
         changedSwaps: D["Swap"][];
         removeSwaps: D["Swap"][];
     }>;
+    recoverFromSwapDataAndState(init: {
+        data: T["Data"];
+        getInitTxId: () => Promise<string>;
+        getTxBlock: () => Promise<{
+            blockTime: number;
+            blockHeight: number;
+        }>;
+    }, state: SwapCommitState, lp?: Intermediary): Promise<D["Swap"] | null>;
 }

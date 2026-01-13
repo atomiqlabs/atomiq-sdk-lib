@@ -5,7 +5,7 @@ import {
     InitializeEvent,
     RefundEvent,
     SignatureData,
-    SignatureVerificationError, SwapEvent
+    SignatureVerificationError, SwapCommitState, SwapEvent
 } from "@atomiqlabs/base";
 import {ISwap} from "../ISwap";
 import {tryWithRetries} from "../../utils/Utils";
@@ -15,6 +15,7 @@ import {ISwapPrice} from "../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {SwapType} from "../enums/SwapType";
 import {IEscrowSwap} from "./IEscrowSwap";
+import {Intermediary} from "../../intermediaries/Intermediary";
 
 export type IEscrowSwapDefinition<T extends ChainType, W extends IEscrowSwapWrapper<T, any>, S extends IEscrowSwap<T>> = SwapTypeDefinition<T, W, S>;
 
@@ -205,6 +206,14 @@ export abstract class IEscrowSwapWrapper<
             changedSwaps,
             removeSwaps
         };
+    }
+
+    recoverFromSwapDataAndState(
+        init: {data: T["Data"], getInitTxId: () => Promise<string>, getTxBlock: () => Promise<{blockTime: number, blockHeight: number}>},
+        state: SwapCommitState,
+        lp?: Intermediary
+    ): Promise<D["Swap"] | null> {
+        return Promise.resolve(null);
     }
 
 }
