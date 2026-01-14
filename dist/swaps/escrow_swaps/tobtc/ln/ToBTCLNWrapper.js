@@ -457,8 +457,9 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
     async recoverFromSwapDataAndState(init, state, lp) {
         const data = init.data;
         let paymentHash = data.getHTLCHashHint();
+        let secret;
         if (state.type === base_1.SwapCommitStateType.PAID) {
-            const secret = await state.getClaimResult();
+            secret = await state.getClaimResult();
             paymentHash = Buffer.from((0, sha2_1.sha256)(Buffer.from(secret, "hex"))).toString("hex");
         }
         const swap = new ToBTCLNSwap_1.ToBTCLNSwap(this, {
@@ -489,7 +490,7 @@ class ToBTCLNWrapper extends IToBTCWrapper_1.IToBTCWrapper {
         swap._setInitiated();
         switch (state.type) {
             case base_1.SwapCommitStateType.PAID:
-                const secret = await state.getClaimResult();
+                secret ??= await state.getClaimResult();
                 await swap._setPaymentResult({ secret }, false);
                 swap.claimTxId = await state.getClaimTxId();
                 swap.state = IToBTCSwap_1.ToBTCSwapState.CLAIMED;

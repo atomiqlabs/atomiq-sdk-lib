@@ -656,8 +656,9 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
         const data = init.data;
 
         let paymentHash = data.getHTLCHashHint();
+        let secret: string | undefined;
         if(state.type===SwapCommitStateType.PAID) {
-            const secret = await state.getClaimResult();
+            secret = await state.getClaimResult();
             paymentHash = Buffer.from(sha256(Buffer.from(secret, "hex"))).toString("hex");
         }
 
@@ -690,7 +691,7 @@ export class ToBTCLNWrapper<T extends ChainType> extends IToBTCWrapper<T, ToBTCL
 
         switch(state.type) {
             case SwapCommitStateType.PAID:
-                const secret = await state.getClaimResult();
+                secret ??= await state.getClaimResult();
                 await swap._setPaymentResult({secret}, false);
                 swap.claimTxId = await state.getClaimTxId();
                 swap.state = ToBTCSwapState.CLAIMED;
