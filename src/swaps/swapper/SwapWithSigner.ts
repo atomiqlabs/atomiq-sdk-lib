@@ -1,7 +1,7 @@
 import {ISwap} from "../ISwap";
 import {ChainType} from "@atomiqlabs/base";
 import {IToBTCSwap} from "../escrow_swaps/tobtc/IToBTCSwap";
-import {IFromBTCSwap} from "../escrow_swaps/frombtc/IFromBTCSwap";
+import {IFromBTCSelfInitSwap} from "../escrow_swaps/frombtc/IFromBTCSelfInitSwap";
 import {FromBTCLNSwap} from "../escrow_swaps/frombtc/ln/FromBTCLNSwap";
 
 export type SwapWithSigner<T extends ISwap> = {
@@ -18,7 +18,7 @@ export function wrapSwapWithSigner<C extends ChainType, T extends ISwap<C>>(swap
         get: (target, prop, receiver) => {
             // Override the "sayGoodbye" method
             if (prop === "commit") {
-                if(swap instanceof IToBTCSwap || swap instanceof IFromBTCSwap) {
+                if(swap instanceof IToBTCSwap || swap instanceof IFromBTCSelfInitSwap) {
                     return (abortSignal?: AbortSignal, skipChecks?: boolean) =>
                         swap.commit(signer, abortSignal, skipChecks);
                 }
@@ -30,7 +30,7 @@ export function wrapSwapWithSigner<C extends ChainType, T extends ISwap<C>>(swap
                 }
             }
             if (prop === "claim") {
-                if(swap instanceof IFromBTCSwap) {
+                if(swap instanceof IFromBTCSelfInitSwap) {
                     return (abortSignal?: AbortSignal) =>
                         swap.claim(signer, abortSignal);
                 }

@@ -1,8 +1,9 @@
-import { ToBTCWrapper } from "./ToBTCWrapper";
+import { ToBTCDefinition, ToBTCWrapper } from "./ToBTCWrapper";
 import { IToBTCSwap, IToBTCSwapInit } from "../IToBTCSwap";
 import { SwapType } from "../../../enums/SwapType";
 import { ChainType, SwapData } from "@atomiqlabs/base";
 import { BtcToken, TokenAmount } from "../../../../Tokens";
+import { LoggerType } from "../../../../utils/Utils";
 export type ToBTCSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     address: string;
     amount: bigint;
@@ -12,10 +13,10 @@ export type ToBTCSwapInit<T extends SwapData> = IToBTCSwapInit<T> & {
     nonce: bigint;
 };
 export declare function isToBTCSwapInit<T extends SwapData>(obj: any): obj is ToBTCSwapInit<T>;
-export declare class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T> {
+export declare class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSwap<T, ToBTCDefinition<T>> {
     protected readonly outputToken: BtcToken<false>;
     protected readonly TYPE = SwapType.TO_BTC;
-    protected readonly wrapper: ToBTCWrapper<T>;
+    protected readonly logger: LoggerType;
     private readonly address;
     private readonly amount;
     private readonly confirmationTarget;
@@ -29,6 +30,7 @@ export declare class ToBTCSwap<T extends ChainType = ChainType> extends IToBTCSw
         secret?: string;
         txId?: string;
     }, check?: boolean): Promise<boolean>;
+    getOutputToken(): BtcToken<false>;
     getOutput(): TokenAmount<T["ChainId"], BtcToken<false>>;
     /**
      * Returns the bitcoin address where the BTC will be sent to

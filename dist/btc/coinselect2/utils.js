@@ -28,6 +28,8 @@ const INPUT_BYTES = {
     "p2wsh": TX_INPUT_P2WSH
 };
 function inputBytes(input) {
+    if (input.script == null && input.type == null)
+        throw new Error("Needs either script or type defined!");
     return TX_INPUT_BASE + (input.script ? input.script.length : INPUT_BYTES[input.type]);
 }
 const OUTPUT_BYTES = {
@@ -38,6 +40,8 @@ const OUTPUT_BYTES = {
     "p2wsh": TX_OUTPUT_P2WSH
 };
 function outputBytes(output) {
+    if (output.script == null && output.type == null)
+        throw new Error("Needs either script or type defined!");
     return TX_OUTPUT_BASE + (output.script ? output.script.length : OUTPUT_BYTES[output.type]);
 }
 exports.DUST_THRESHOLDS = {
@@ -53,9 +57,9 @@ function dustThreshold(output) {
 function transactionBytes(inputs, outputs, changeType) {
     let size = TX_EMPTY_SIZE;
     let isSegwit = false;
-    if (changeType !== "p2pkh") {
+    if (changeType != null && changeType !== "p2pkh") {
         size += WITNESS_OVERHEAD;
-        let isSegwit = true;
+        isSegwit = true;
     }
     for (let input of inputs) {
         if (!isSegwit && (input.type !== "p2pkh")) {

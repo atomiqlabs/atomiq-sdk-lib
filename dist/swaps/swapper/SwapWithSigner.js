@@ -2,14 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.wrapSwapWithSigner = void 0;
 const IToBTCSwap_1 = require("../escrow_swaps/tobtc/IToBTCSwap");
-const IFromBTCSwap_1 = require("../escrow_swaps/frombtc/IFromBTCSwap");
+const IFromBTCSelfInitSwap_1 = require("../escrow_swaps/frombtc/IFromBTCSelfInitSwap");
 const FromBTCLNSwap_1 = require("../escrow_swaps/frombtc/ln/FromBTCLNSwap");
 function wrapSwapWithSigner(swap, signer) {
     return new Proxy(swap, {
         get: (target, prop, receiver) => {
             // Override the "sayGoodbye" method
             if (prop === "commit") {
-                if (swap instanceof IToBTCSwap_1.IToBTCSwap || swap instanceof IFromBTCSwap_1.IFromBTCSwap) {
+                if (swap instanceof IToBTCSwap_1.IToBTCSwap || swap instanceof IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap) {
                     return (abortSignal, skipChecks) => swap.commit(signer, abortSignal, skipChecks);
                 }
             }
@@ -19,7 +19,7 @@ function wrapSwapWithSigner(swap, signer) {
                 }
             }
             if (prop === "claim") {
-                if (swap instanceof IFromBTCSwap_1.IFromBTCSwap) {
+                if (swap instanceof IFromBTCSelfInitSwap_1.IFromBTCSelfInitSwap) {
                     return (abortSignal) => swap.claim(signer, abortSignal);
                 }
             }

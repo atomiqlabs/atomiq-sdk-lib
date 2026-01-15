@@ -1,9 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.randomBytes = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
+exports.getTxoHash = exports.throwIfUndefined = exports.toBigInt = exports.randomBytes = exports.bigIntCompare = exports.bigIntMax = exports.bigIntMin = exports.timeoutSignal = exports.timeoutPromise = exports.httpPost = exports.httpGet = exports.fetchWithTimeout = exports.tryWithRetries = exports.extendAbortController = exports.mapToArray = exports.objectMap = exports.promiseAny = exports.getLogger = void 0;
 const RequestError_1 = require("../errors/RequestError");
 const buffer_1 = require("buffer");
 const utils_1 = require("@noble/hashes/utils");
+const sha2_1 = require("@noble/hashes/sha2");
+const base_1 = require("@atomiqlabs/base");
 function isConstructor(fn) {
     return (typeof fn === 'function' &&
         fn.prototype != null &&
@@ -153,9 +155,9 @@ function fetchWithTimeout(input, init) {
     if (init == null)
         init = {};
     if (init.timeout != null)
-        init.signal = timeoutSignal(init.timeout, new Error("Network request timed out"), init.signal);
+        init.signal = timeoutSignal(init.timeout, new Error("Network request timed out"), init.signal ?? undefined);
     return fetch(input, init).catch(e => {
-        if (e.name === "AbortError") {
+        if (e.name === "AbortError" && init.signal != null) {
             throw init.signal.reason;
         }
         else {
@@ -242,7 +244,7 @@ function timeoutPromise(timeout, abortSignal) {
         }
         let abortSignalListener;
         let timeoutHandle = setTimeout(() => {
-            if (abortSignalListener != null)
+            if (abortSignalListener != null && abortSignal != null)
                 abortSignal.removeEventListener("abort", abortSignalListener);
             resolve();
         }, timeout);
@@ -266,7 +268,7 @@ exports.timeoutPromise = timeoutPromise;
  */
 function timeoutSignal(timeout, abortReason, abortSignal) {
     if (timeout == null)
-        return abortSignal;
+        throw new Error("Timeout seconds cannot be null!");
     const abortController = new AbortController();
     const timeoutHandle = setTimeout(() => abortController.abort(abortReason || new Error("Timed out")), timeout);
     if (abortSignal != null) {
@@ -279,10 +281,18 @@ function timeoutSignal(timeout, abortReason, abortSignal) {
 }
 exports.timeoutSignal = timeoutSignal;
 function bigIntMin(a, b) {
+    if (a == null)
+        return b;
+    if (b == null)
+        return a;
     return a > b ? b : a;
 }
 exports.bigIntMin = bigIntMin;
 function bigIntMax(a, b) {
+    if (a == null)
+        return b;
+    if (b == null)
+        return a;
     return b > a ? b : a;
 }
 exports.bigIntMax = bigIntMax;
@@ -294,3 +304,24 @@ function randomBytes(bytesLength) {
     return buffer_1.Buffer.from((0, utils_1.randomBytes)(bytesLength));
 }
 exports.randomBytes = randomBytes;
+function toBigInt(value) {
+    if (value == null)
+        return undefined;
+    return BigInt(value);
+}
+exports.toBigInt = toBigInt;
+function throwIfUndefined(promise, msg) {
+    return promise.then(val => {
+        if (val == undefined)
+            throw new Error(msg ?? "Promise value is undefined!");
+        return val;
+    });
+}
+exports.throwIfUndefined = throwIfUndefined;
+function getTxoHash(outputScriptHex, value) {
+    return buffer_1.Buffer.from((0, sha2_1.sha256)(buffer_1.Buffer.concat([
+        base_1.BigIntBufferUtils.toBuffer(BigInt(value), "le", 8),
+        buffer_1.Buffer.from(outputScriptHex, "hex")
+    ])));
+}
+exports.getTxoHash = getTxoHash;

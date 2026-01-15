@@ -1,6 +1,12 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import { Buffer } from "buffer";
+export type AllOptional<T> = {
+    [K in keyof T]?: T[K];
+};
+export type AllRequired<T> = {
+    [K in keyof T]-?: T[K];
+};
 type Constructor<T = any> = new (...args: any[]) => T;
 export type LoggerType = {
     debug: (msg: string, ...args: any[]) => void;
@@ -56,7 +62,7 @@ export declare function extendAbortController(abortSignal?: AbortSignal): AbortC
  * @param abortSignal
  * @returns Result of the action executing callback
  */
-export declare function tryWithRetries<T>(func: (retryCount?: number) => Promise<T>, retryPolicy?: {
+export declare function tryWithRetries<T>(func: (retryCount: number) => Promise<T>, retryPolicy?: {
     maxRetries?: number;
     delay?: number;
     exponential?: boolean;
@@ -104,7 +110,13 @@ export declare function timeoutPromise(timeout: number, abortSignal?: AbortSigna
  */
 export declare function timeoutSignal(timeout: number, abortReason?: any, abortSignal?: AbortSignal): AbortSignal;
 export declare function bigIntMin(a: bigint, b: bigint): bigint;
+export declare function bigIntMin(a?: bigint, b?: bigint): bigint | undefined;
 export declare function bigIntMax(a: bigint, b: bigint): bigint;
+export declare function bigIntMax(a?: bigint, b?: bigint): bigint | undefined;
 export declare function bigIntCompare(a: bigint, b: bigint): -1 | 0 | 1;
 export declare function randomBytes(bytesLength: number): Buffer;
+export declare function toBigInt(value: string): bigint;
+export declare function toBigInt(value: undefined): undefined;
+export declare function throwIfUndefined<T>(promise: Promise<T | undefined>, msg?: string): Promise<T>;
+export declare function getTxoHash(outputScriptHex: string, value: number): Buffer;
 export {};

@@ -14,7 +14,7 @@ import {SwapType} from "../swaps/enums/SwapType";
 import {UnifiedSwapStorage} from "../storage/UnifiedSwapStorage";
 import {getLogger} from "../utils/Utils";
 
-function chainEventToEscrowHash(event: ChainEvent<any>) {
+function chainEventToEscrowHash(event: ChainEvent<any>): string | undefined {
     if(event instanceof SwapEvent) return event.escrowHash;
     if(
         event instanceof SpvVaultFrontEvent ||
@@ -49,24 +49,30 @@ export class UnifiedSwapEventListener<
     }
 
     async processEvents(events: ChainEvent<T["Data"]>[]) {
-        const swapsByEscrowHash: {[key: string]: ISwap<T>} = {};
+        const escrowHashesDeduped = new Set<string>();
         events.forEach(event => {
-            swapsByEscrowHash[chainEventToEscrowHash(event)] = null;
+            const escrowHash = chainEventToEscrowHash(event);
+            if(escrowHash!=null) escrowHashesDeduped.add(escrowHash);
         });
+        const escrowHashes = Array.from(escrowHashesDeduped);
 
-        logger.debug("processEvents(): Processing events with escrow hashes: ", Object.keys(swapsByEscrowHash));
+        logger.debug("processEvents(): Processing events with escrow hashes: ", escrowHashes);
 
         const swaps = await this.storage.query<ISwap<T>>(
             [
-                [{key: "escrowHash", value: Object.keys(swapsByEscrowHash)}]
+                [{key: "escrowHash", value: escrowHashes}]
             ],
             (val: any) => {
-                const obj = this.listeners[val.type];
+                const obj = this.listeners?.[val.type as SwapType];
                 if(obj==null) return null;
                 return new obj.reviver(val);
             }
         );
-        swaps.forEach(swap => swapsByEscrowHash[swap._getEscrowHash()] = swap);
+        const swapsByEscrowHash: {[key: string]: ISwap<T>} = {};
+        swaps.forEach(swap => {
+            const escrowHash = swap._getEscrowHash();
+            if(escrowHash!=null) swapsByEscrowHash[escrowHash] = swap;
+        });
 
         //We need to do this because FromBTCLNAutoSwaps might not yet know its escrowHash
         // hence we try to get the claimHash and try to query based on that, FromBTCLNAutoSwaps
@@ -74,14 +80,17 @@ export class UnifiedSwapEventListener<
         const htlcCheckInitializeEvents: {[claimHash: string]: InitializeEvent<T["Data"]>} = {};
 
         for(let event of events) {
-            const swap = swapsByEscrowHash[chainEventToEscrowHash(event)];
-            if(swap!=null) {
-                const obj = this.listeners[swap.getType()];
-                if(obj==null) continue;
-                await obj.listener(event, swap);
-                continue;
+            const escrowHash = chainEventToEscrowHash(event);
+            if(escrowHash!=null) {
+                const swap = swapsByEscrowHash[escrowHash];
+                if(swap!=null) {
+                    const obj = this.listeners[swap.getType()];
+                    if(obj==null) continue;
+                    await obj.listener(event, swap);
+                    continue;
+                }
             }
-            if(event instanceof InitializeEvent<T["Data"]>) {
+            if(event instanceof InitializeEvent) {
                 if(event.swapType===ChainSwapType.HTLC) {
                     const swapData: T["Data"] = await event.swapData();
                     htlcCheckInitializeEvents[swapData.getClaimHash()] = event;
@@ -99,13 +108,16 @@ export class UnifiedSwapEventListener<
                 [{key: "escrowHash", value: Object.keys(htlcCheckInitializeEvents)}]
             ],
             (val: any) => {
-                const obj = this.listeners[val.type];
+                const obj = this.listeners?.[val.type as SwapType];
                 if(obj==null) return null;
                 return new obj.reviver(val);
             }
         );
-        const swapsByClaimDataHash: {[claimData: string]: ISwap} = {};
-        claimDataSwaps.forEach(swap => swapsByClaimDataHash[swap._getEscrowHash()] = swap);
+        const swapsByClaimDataHash: {[claimData: string]: ISwap<T>} = {};
+        claimDataSwaps.forEach(swap => {
+            const escrowHash = swap._getEscrowHash();
+            if(escrowHash!=null) swapsByClaimDataHash[escrowHash] = swap;
+        });
 
         logger.debug("processEvents(): Additional HTLC swaps founds: ", swapsByClaimDataHash);
 
@@ -121,7 +133,7 @@ export class UnifiedSwapEventListener<
 
     }
 
-    listener: EventListener<T["Data"]>;
+    listener?: EventListener<T["Data"]>;
     async start() {
         if(this.listener!=null) return;
         logger.info("start(): Starting unified swap event listener");
@@ -138,7 +150,7 @@ export class UnifiedSwapEventListener<
 
     stop(): Promise<void> {
         logger.info("stop(): Stopping unified swap event listener");
-        this.events.unregisterListener(this.listener);
+        if(this.listener!=null) this.events.unregisterListener(this.listener);
         return this.events.stop();
     }
 

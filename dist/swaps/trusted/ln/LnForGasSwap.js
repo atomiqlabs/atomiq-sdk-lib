@@ -27,17 +27,21 @@ function isLnForGasSwapInit(obj) {
 exports.isLnForGasSwapInit = isLnForGasSwapInit;
 class LnForGasSwap extends ISwap_1.ISwap {
     constructor(wrapper, initOrObj) {
-        if (isLnForGasSwapInit(initOrObj))
+        if (isLnForGasSwapInit(initOrObj) && initOrObj.url != null)
             initOrObj.url += "/lnforgas";
         super(wrapper, initOrObj);
         this.currentVersion = 2;
         this.TYPE = SwapType_1.SwapType.TRUSTED_FROM_BTCLN;
         if (isLnForGasSwapInit(initOrObj)) {
+            this.pr = initOrObj.pr;
+            this.outputAmount = initOrObj.outputAmount;
+            this.recipient = initOrObj.recipient;
+            this.token = initOrObj.token;
             this.state = LnForGasSwapState.PR_CREATED;
         }
         else {
             this.pr = initOrObj.pr;
-            this.outputAmount = initOrObj.outputAmount == null ? null : BigInt(initOrObj.outputAmount);
+            this.outputAmount = (0, Utils_1.toBigInt)(initOrObj.outputAmount);
             this.recipient = initOrObj.recipient;
             this.token = initOrObj.token;
             this.scTxId = initOrObj.scTxId;
@@ -45,7 +49,8 @@ class LnForGasSwap extends ISwap_1.ISwap {
         this.tryRecomputeSwapPrice();
         if (this.pr != null) {
             const decoded = (0, bolt11_1.decode)(this.pr);
-            this.expiry = decoded.timeExpireDate * 1000;
+            if (decoded.timeExpireDate != null)
+                this.expiry = decoded.timeExpireDate * 1000;
         }
         this.logger = (0, Utils_1.getLogger)("LnForGas(" + this.getId() + "): ");
     }
@@ -65,7 +70,7 @@ class LnForGasSwap extends ISwap_1.ISwap {
      * @protected
      */
     tryRecomputeSwapPrice() {
-        if (this.swapFeeBtc == null) {
+        if (this.swapFeeBtc == null && this.swapFee != null) {
             this.swapFeeBtc = this.swapFee * this.getInput().rawAmount / this.getOutAmountWithoutFee();
         }
         super.tryRecomputeSwapPrice();
@@ -78,16 +83,21 @@ class LnForGasSwap extends ISwap_1.ISwap {
     getOutputAddress() {
         return this.recipient;
     }
+    getInputAddress() {
+        return this.pr;
+    }
     getInputTxId() {
         return this.getId();
     }
     getOutputTxId() {
-        return this.scTxId;
+        return this.scTxId ?? null;
     }
     getId() {
         if (this.pr == null)
-            return null;
+            throw new Error("No payment request assigned to this swap!");
         const decodedPR = (0, bolt11_1.decode)(this.pr);
+        if (decodedPR.tagsObject.payment_hash == null)
+            throw new Error("Lightning invoice has no payment hash!");
         return decodedPR.tagsObject.payment_hash;
     }
     /**
@@ -126,30 +136,47 @@ class LnForGasSwap extends ISwap_1.ISwap {
     //////////////////////////////
     //// Amounts & fees
     getOutAmountWithoutFee() {
-        return this.outputAmount + this.swapFee;
+        return this.outputAmount + (this.swapFee ?? 0n);
+    }
+    getOutputToken() {
+        return this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()];
     }
     getOutput() {
-        return (0, Tokens_1.toTokenAmount)(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.outputAmount, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices, this.pricingInfo);
+    }
+    getInputToken() {
+        return Tokens_1.BitcoinTokens.BTCLN;
     }
     getInput() {
         const parsed = (0, bolt11_1.decode)(this.pr);
-        const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
-        return (0, Tokens_1.toTokenAmount)(amount, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices);
+        const msats = parsed.millisatoshis;
+        if (msats == null)
+            throw new Error("Swap lightning invoice has no msat amount field!");
+        const amount = (BigInt(msats) + 999n) / 1000n;
+        return (0, Tokens_1.toTokenAmount)(amount, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
     }
     getInputWithoutFee() {
         const parsed = (0, bolt11_1.decode)(this.pr);
-        const amount = (BigInt(parsed.millisatoshis) + 999n) / 1000n;
-        return (0, Tokens_1.toTokenAmount)(amount - this.swapFeeBtc, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices);
+        const msats = parsed.millisatoshis;
+        if (msats == null)
+            throw new Error("Swap lightning invoice has no msat amount field!");
+        const amount = (BigInt(msats) + 999n) / 1000n;
+        return (0, Tokens_1.toTokenAmount)(amount - (this.swapFeeBtc ?? 0n), Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
     }
     getSwapFee() {
-        const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
+        if (this.pricingInfo == null)
+            throw new Error("No pricing info known, cannot estimate swap fee!");
+        const feeWithoutBaseFee = this.swapFeeBtc == null ? 0n : this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const swapFeePPM = feeWithoutBaseFee * 1000000n / this.getInputWithoutFee().rawAmount;
+        const amountInSrcToken = (0, Tokens_1.toTokenAmount)(this.swapFeeBtc ?? 0n, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken,
+            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFee ?? 0n, this.wrapper.tokens[this.wrapper.chain.getNativeCurrencyAddress()], this.wrapper.prices, this.pricingInfo),
+            currentUsdValue: amountInSrcToken.currentUsdValue,
+            usdValue: amountInSrcToken.usdValue,
+            pastUsdValue: amountInSrcToken.pastUsdValue,
             composition: {
-                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices),
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, Tokens_1.BitcoinTokens.BTCLN, this.wrapper.prices, this.pricingInfo),
                 percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
             }
         };
@@ -165,13 +192,37 @@ class LnForGasSwap extends ISwap_1.ISwap {
     }
     //////////////////////////////
     //// Payment
+    async txsExecute() {
+        if (this.state === LnForGasSwapState.PR_CREATED) {
+            if (!await this.verifyQuoteValid())
+                throw new Error("Quote already expired or close to expiry!");
+            return [
+                {
+                    name: "Payment",
+                    description: "Initiates the swap by paying up the lightning network invoice",
+                    chain: "LIGHTNING",
+                    txs: [
+                        {
+                            address: this.pr,
+                            hyperlink: this.getHyperlink()
+                        }
+                    ]
+                }
+            ];
+        }
+        throw new Error("Invalid swap state to obtain execution txns, required PR_CREATED");
+    }
     async checkInvoicePaid(save = true) {
         if (this.state === LnForGasSwapState.FAILED || this.state === LnForGasSwapState.EXPIRED)
             return false;
         if (this.state === LnForGasSwapState.FINISHED)
             return true;
+        if (this.url == null)
+            return false;
         const decodedPR = (0, bolt11_1.decode)(this.pr);
         const paymentHash = decodedPR.tagsObject.payment_hash;
+        if (paymentHash == null)
+            throw new Error("Invalid swap invoice, payment hash not found!");
         const response = await TrustedIntermediaryAPI_1.TrustedIntermediaryAPI.getInvoiceStatus(this.url, paymentHash, this.wrapper.options.getRequestTimeout);
         this.logger.debug("checkInvoicePaid(): LP response: ", response);
         switch (response.code) {
@@ -235,10 +286,10 @@ class LnForGasSwap extends ISwap_1.ISwap {
             this.initiated = true;
             await this._saveAndEmit();
         }
-        while (!abortSignal.aborted && (this.state === LnForGasSwapState.PR_CREATED || this.state === LnForGasSwapState.PR_PAID)) {
+        while (!abortSignal?.aborted && (this.state === LnForGasSwapState.PR_CREATED || this.state === LnForGasSwapState.PR_PAID)) {
             await this.checkInvoicePaid(true);
             if (this.state === LnForGasSwapState.PR_CREATED || this.state === LnForGasSwapState.PR_PAID)
-                await (0, Utils_1.timeoutPromise)(checkIntervalSeconds * 1000, abortSignal);
+                await (0, Utils_1.timeoutPromise)((checkIntervalSeconds ?? 5) * 1000, abortSignal);
         }
         if (this.isFailed())
             throw new PaymentAuthError_1.PaymentAuthError("Swap failed");

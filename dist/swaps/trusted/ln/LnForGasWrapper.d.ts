@@ -1,9 +1,10 @@
 import { LnForGasSwap, LnForGasSwapState } from "./LnForGasSwap";
-import { ISwapWrapper } from "../../ISwapWrapper";
+import { ISwapWrapper, SwapTypeDefinition } from "../../ISwapWrapper";
 import { ChainType } from "@atomiqlabs/base";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { SwapType } from "../../enums/SwapType";
-export declare class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForGasSwap<T>> {
+export type LnForGasSwapTypeDefinition<T extends ChainType> = SwapTypeDefinition<T, LnForGasWrapper<T>, LnForGasSwap<T>>;
+export declare class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T, LnForGasSwapTypeDefinition<T>> {
     TYPE: SwapType;
     readonly swapDeserializer: typeof LnForGasSwap;
     /**
@@ -15,6 +16,6 @@ export declare class LnForGasWrapper<T extends ChainType> extends ISwapWrapper<T
      */
     create(signer: string, amount: bigint, lpOrUrl: Intermediary | string): Promise<LnForGasSwap<T>>;
     readonly pendingSwapStates: LnForGasSwapState[];
-    readonly tickSwapState: any;
-    protected processEvent: any;
+    readonly tickSwapState: undefined;
+    protected processEvent: undefined;
 }

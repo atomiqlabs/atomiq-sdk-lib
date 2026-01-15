@@ -57,6 +57,7 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
     constructor(swapper: SwapperWithChain<T, ChainIdentifier>, signer: T[ChainIdentifier]["Signer"]) {
         this.swapper = swapper;
         this.signer = signer;
+        this.chainIdentifier = swapper.chainIdentifier;
     }
 
     createToBTCSwap(
@@ -242,8 +243,8 @@ export class SwapperWithSigner<T extends MultiChain, ChainIdentifier extends Cha
      * @param dstToken
      */
     getSwapLimits<A extends Token<ChainIdentifier>, B extends Token<ChainIdentifier>>(srcToken: A, dstToken: B): {
-        input: {min: TokenAmount<string, A>, max: TokenAmount<string, A>},
-        output: {min: TokenAmount<string, B>, max: TokenAmount<string, B>}
+        input: {min: TokenAmount<string, A>, max?: TokenAmount<string, A>},
+        output: {min: TokenAmount<string, B>, max?: TokenAmount<string, B>}
     } {
         return this.swapper.getSwapLimits<A, B>(srcToken, dstToken);
     }

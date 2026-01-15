@@ -20,7 +20,7 @@ function toCompositeIndex(values: Array<any[]>): Array<any[]> {
         return values[0];
     } else {
         const compositeArray = [];
-        const firstValues = values.shift();
+        const firstValues = values.shift()!;
         const restValues = toCompositeIndex(values);
         for(let value of firstValues) {
             for(let restValue of restValues) {
@@ -48,7 +48,7 @@ function toSetConditions(input: Array<QueryParams>): Array<QuerySetCondition>  {
     })
 }
 
-const indexes = {
+const indexes: Record<string, {key: string | string[], unique: boolean}> = {
     "escrowHash": { key: "escrowHash", unique: true},
     "type": {key: "type", unique: false},
     "initiator": {key: "initiator", unique: false},
@@ -63,7 +63,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage<UnifiedSwapStora
     protected readonly logger: LoggerType;
 
     storageKey: string;
-    db: IDBDatabase;
+    db?: IDBDatabase;
 
     constructor(storageKey: string) {
         this.storageKey = storageKey;
@@ -175,6 +175,10 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage<UnifiedSwapStora
 
     private executeTransaction<T>(cbk: (tx: IDBObjectStore) => IDBRequest<T>, readonly: boolean): Promise<T> {
         return new Promise<T>((resolve, reject) => {
+            if(this.db==null) {
+                reject(new Error("Not initiated, call init() first!"));
+                return;
+            }
             const tx = this.db.transaction("swaps", readonly ? "readonly" : "readwrite", {durability: "strict"});
             const req = cbk(tx.objectStore("swaps"));
             req.onsuccess = (event: any) => resolve(event.target.result);
@@ -183,6 +187,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage<UnifiedSwapStora
     }
 
     private executeTransactionArr<T>(cbk: (tx: IDBObjectStore) => IDBRequest<T>[], readonly: boolean): Promise<T[]> {
+        if(this.db==null) throw new Error("Not initiated, call init() first!");
         const tx = this.db.transaction("swaps", readonly ? "readonly" : "readwrite", {durability: "strict"});
         const reqs = cbk(tx.objectStore("swaps"));
         return Promise.all(reqs.map(req => new Promise<T>((resolve, reject) => {
@@ -191,25 +196,35 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage<UnifiedSwapStora
         })));
     }
 
-    private executeTransactionWithCursor<T>(cbk: (tx: IDBObjectStore) => IDBRequest<IDBCursorWithValue>[], valueCbk: (value: T) => boolean): Promise<T[]> {
-        return new Promise<T[]>((resolve, reject) => {
-            const tx = this.db.transaction("swaps", "readonly", {durability: "strict"});
-            const cursorRequests = cbk(tx.objectStore("swaps"));
-            const resultObjects: T[] = [];
-            for(let cursorRequest of cursorRequests) {
-                cursorRequest.onsuccess = (event: any) => {
-                    const cursor = event.target.result;
-                    if(cursor!=null) {
-                        const value = cursor.value;
-                        if(valueCbk(value)) resultObjects.push(value);
-                        cursor.continue();
-                    } else {
-                        resolve(resultObjects);
+    private async executeTransactionWithCursor<T>(
+        cbk: (tx: IDBObjectStore) => IDBRequest<IDBCursorWithValue | null>[],
+        valueCbk: (value: T) => boolean
+    ): Promise<T[]> {
+        if(this.db==null) throw new Error("Not initiated, call init() first!");
+        const tx = this.db.transaction("swaps", "readonly", {durability: "strict"});
+        const cursorRequests = cbk(tx.objectStore("swaps"));
+
+        const promises = cursorRequests.map(
+            cursorRequest => new Promise<T[]>(
+                (resolve, reject) => {
+                    const resultObjects: T[] = [];
+                    cursorRequest.onsuccess = (event: any) => {
+                        const cursor = event.target.result;
+                        if(cursor!=null) {
+                            const value = cursor.value;
+                            if(valueCbk(value)) resultObjects.push(value);
+                            cursor.continue();
+                        } else {
+                            resolve(resultObjects);
+                        }
                     }
+                    cursorRequest.onerror = (event) => reject(event);
                 }
-                cursorRequest.onerror = (event) => reject(event);
-            }
-        });
+            )
+        );
+
+        const result = await Promise.all(promises);
+        return result.flat();
     }
 
     async init(): Promise<void> {
@@ -276,7 +291,10 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage<UnifiedSwapStora
             this.logger.warn("query(): Index cannot be used for query, required index: "+requiredIndex+" query params: ", params);
 
             const setConditions = toSetConditions(params);
-            return await this.executeTransactionWithCursor(objectStore => [objectStore.openCursor()], (val: any) => matches(setConditions, val));
+            return await this.executeTransactionWithCursor(
+                objectStore => [objectStore.openCursor()],
+                (val: any) => matches(setConditions, val)
+            );
         }
     }
 
@@ -287,7 +305,7 @@ export class IndexedDBUnifiedStorage implements IUnifiedStorage<UnifiedSwapStora
 
     async removeAll(arr: UnifiedStoredObject[]): Promise<void> {
         if(arr.length===0) return;
-        await this.executeTransactionArr<IDBValidKey>(store => arr.map(object => {
+        await this.executeTransactionArr<undefined>(store => arr.map(object => {
             return store.delete(object.id);
         }), false);
     }

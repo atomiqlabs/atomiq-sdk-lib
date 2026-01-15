@@ -1,11 +1,11 @@
 /// <reference types="node" />
 import { SwapType } from "./enums/SwapType";
 import { EventEmitter } from "events";
-import { ISwapWrapper } from "./ISwapWrapper";
+import { ISwapWrapper, SwapTypeDefinition } from "./ISwapWrapper";
 import { ChainType } from "@atomiqlabs/base";
 import { PriceInfoType } from "../prices/abstract/ISwapPrice";
 import { LoggerType } from "../utils/Utils";
-import { TokenAmount } from "../Tokens";
+import { Token, TokenAmount } from "../Tokens";
 import { SwapDirection } from "./enums/SwapDirection";
 import { Fee, FeeBreakdown } from "./fee/Fee";
 export type ISwapInit = {
@@ -13,7 +13,7 @@ export type ISwapInit = {
     url?: string;
     expiry: number;
     swapFee: bigint;
-    swapFeeBtc?: bigint;
+    swapFeeBtc: bigint;
     exactIn: boolean;
 };
 export declare function isISwapInit(obj: any): obj is ISwapInit;
@@ -24,22 +24,28 @@ export type PercentagePPM = {
     toString: (decimal?: number) => string;
 };
 export declare function ppmToPercentage(ppm: bigint): PercentagePPM;
-export declare abstract class ISwap<T extends ChainType = ChainType, S extends number = number> {
+export type SwapExecutionAction<T extends ChainType> = {
+    name: "Payment" | "Commit" | "Claim";
+    description: string;
+    chain: "LIGHTNING" | "BITCOIN" | T["ChainId"];
+    txs: any[];
+};
+export declare abstract class ISwap<T extends ChainType = ChainType, D extends SwapTypeDefinition<T, ISwapWrapper<T, D>, ISwap<T, D, S>> = SwapTypeDefinition<T, ISwapWrapper<T, any>, ISwap<T, any, any>>, S extends number = number> {
     protected readonly abstract TYPE: SwapType;
+    protected readonly abstract logger: LoggerType;
     protected readonly currentVersion: number;
-    protected readonly wrapper: ISwapWrapper<T, ISwap<T, S>>;
-    readonly url: string;
+    protected readonly wrapper: D["Wrapper"];
+    readonly url?: string;
     readonly chainIdentifier: T["ChainId"];
     readonly exactIn: boolean;
     createdAt: number;
     protected version: number;
     protected initiated: boolean;
-    protected logger: LoggerType;
-    expiry?: number;
     state: S;
-    pricingInfo: PriceInfoType;
+    expiry: number;
+    pricingInfo?: PriceInfoType;
     protected swapFee: bigint;
-    protected swapFeeBtc?: bigint;
+    protected swapFeeBtc: bigint;
     /**
      * Random nonce to differentiate the swap from others with the same identifier hash (i.e. when quoting the same swap
      *  from multiple LPs)
@@ -49,10 +55,10 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      * Event emitter emitting "swapState" event when swap's state changes
      */
     events: EventEmitter<{
-        swapState: [ISwap];
+        swapState: [D["Swap"]];
     }>;
-    protected constructor(wrapper: ISwapWrapper<T, ISwap<T, S>>, obj: any);
-    protected constructor(wrapper: ISwapWrapper<T, ISwap<T, S>>, swapInit: ISwapInit);
+    protected constructor(wrapper: D["Wrapper"], obj: any);
+    protected constructor(wrapper: D["Wrapper"], swapInit: ISwapInit);
     protected abstract upgradeVersion(): void;
     /**
      * Waits till the swap reaches a specific state
@@ -63,6 +69,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      * @protected
      */
     protected waitTillState(targetState: S, type?: "eq" | "gte" | "neq", abortSignal?: AbortSignal): Promise<void>;
+    abstract txsExecute(options?: any): Promise<SwapExecutionAction<T>[]>;
     protected tryRecomputeSwapPrice(): void;
     /**
      * Re-fetches & revalidates the price data
@@ -76,11 +83,11 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      * Returns pricing info about the swap
      */
     getPriceInfo(): {
-        marketPrice: number;
+        marketPrice?: number;
         swapPrice: number;
         difference: PercentagePPM;
     };
-    abstract _getEscrowHash(): string;
+    abstract _getEscrowHash(): string | null;
     /**
      * @param signer Signer to check with this swap's initiator
      * @throws {Error} When signer's address doesn't match with the swap's initiator one
@@ -90,6 +97,7 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
      * Checks if the swap's quote is still valid
      */
     abstract verifyQuoteValid(): Promise<boolean>;
+    abstract getInputAddress(): string | null;
     abstract getOutputAddress(): string | null;
     abstract getInputTxId(): string | null;
     abstract getOutputTxId(): string | null;
@@ -147,15 +155,23 @@ export declare abstract class ISwap<T extends ChainType = ChainType, S extends n
     /**
      * Returns output amount of the swap, user receives this much
      */
-    abstract getOutput(): TokenAmount;
+    abstract getOutput(): TokenAmount | null;
+    /**
+     * Returns the output token of the swap
+     */
+    abstract getOutputToken(): Token<T["ChainId"]>;
     /**
      * Returns input amount of the swap, user needs to pay this much
      */
-    abstract getInput(): TokenAmount;
+    abstract getInput(): TokenAmount | null;
+    /**
+     * Returns the input token of the swap
+     */
+    abstract getInputToken(): Token<T["ChainId"]>;
     /**
      * Returns input amount if the swap without the fees (swap fee, network fee)
      */
-    abstract getInputWithoutFee(): TokenAmount;
+    abstract getInputWithoutFee(): TokenAmount | null;
     /**
      * Returns total fee for the swap, the fee is represented in source currency & destination currency, but is
      *  paid only once

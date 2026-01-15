@@ -36,7 +36,7 @@ export declare class RedundantSwapPrice<T extends MultiChain> extends ICachedSwa
     coinsDecimals: CoinDecimals<T>;
     priceApis: {
         priceApi: IPriceProvider<T>;
-        operational: boolean;
+        operational?: boolean;
     }[];
     constructor(maxAllowedFeeDiffPPM: bigint, coinsDecimals: CtorCoinDecimals<T>, priceApis: IPriceProvider<T>[], cacheTimeout?: number);
     /**

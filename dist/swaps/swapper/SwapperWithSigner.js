@@ -27,6 +27,7 @@ class SwapperWithSigner {
     constructor(swapper, signer) {
         this.swapper = swapper;
         this.signer = signer;
+        this.chainIdentifier = swapper.chainIdentifier;
     }
     createToBTCSwap(tokenAddress, address, amount, exactIn, additionalParams, options) {
         return this.swapper.createToBTCSwap(this.signer.getAddress(), tokenAddress, address, amount, exactIn, additionalParams, options)

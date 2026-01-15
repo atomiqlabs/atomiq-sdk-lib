@@ -57,9 +57,10 @@ export async function streamingFetchPromise<T extends RequestSchema>(
     if(streamRequest==null) streamRequest = supportsRequestStreams;
     if(timeout!=null) signal = timeoutSignal(timeout, new Error("Network request timed out"), signal);
 
+    const headers: Record<string, string> = {};
     const init: RequestInit = {
         method: "POST",
-        headers: {}
+        headers
     };
 
     const startTime = Date.now();
@@ -70,7 +71,7 @@ export async function streamingFetchPromise<T extends RequestSchema>(
     if(!streamRequest) {
         for(let key in body) {
             if(body[key] instanceof Promise) {
-                promises.push(body[key].then((val) => {
+                promises.push(body[key].then((val: any) => {
                     immediateValues[key] = val;
                 }));
             } else {
@@ -80,7 +81,7 @@ export async function streamingFetchPromise<T extends RequestSchema>(
 
         try {
             await Promise.all(promises);
-        } catch (e) {
+        } catch (e: any) {
             e._inputPromiseError = true;
             throw e;
         }
@@ -89,14 +90,14 @@ export async function streamingFetchPromise<T extends RequestSchema>(
 
         logger.debug(url+": Sending request ("+(Date.now()-startTime)+"ms) (non-streaming): ", immediateValues);
         init.body = JSON.stringify(immediateValues);
-        init.headers['content-type'] = "application/json";
+        headers['content-type'] = "application/json";
     } else {
         const outputStream = new StreamParamEncoder();
 
         let hasPromiseInBody = false;
         for(let key in body) {
             if(body[key] instanceof Promise) {
-                promises.push(body[key].then((val) => {
+                promises.push(body[key].then((val: any) => {
                     logger.debug(url+": Send param ("+(Date.now()-startTime)+"ms) (streaming): ", {[key]: val});
                     return outputStream.writeParams({
                         [key]: val
@@ -110,7 +111,7 @@ export async function streamingFetchPromise<T extends RequestSchema>(
 
         if(hasPromiseInBody) {
             init.body = outputStream.getReadableStream();
-            init.headers['content-type'] = "application/x-multiple-json";
+            headers['content-type'] = "application/x-multiple-json";
             (init as any).duplex = "half";
 
             logger.debug(url+": Sending request ("+(Date.now()-startTime)+"ms) (streaming): ", immediateValues);
@@ -128,12 +129,12 @@ export async function streamingFetchPromise<T extends RequestSchema>(
         } else {
             logger.debug(url+": Sending request ("+(Date.now()-startTime)+"ms) (non-streaming): ", immediateValues);
             init.body = JSON.stringify(immediateValues);
-            init.headers['content-type'] = "application/json";
+            headers['content-type'] = "application/json";
         }
     }
 
     if(signal!=null) init.signal = signal;
-    init.headers['accept'] = "application/x-multiple-json";
+    headers['accept'] = "application/x-multiple-json";
 
     const resp = await fetch(url, init).catch(e => {
         if(init.signal!=null && e.name==="AbortError") {
@@ -172,7 +173,7 @@ export async function streamingFetchPromise<T extends RequestSchema>(
             }
         }) as any;
     } else {
-        const decoder = new ResponseParamDecoder(resp, init.signal);
+        const decoder = new ResponseParamDecoder(resp, init.signal ?? undefined);
 
         return objectMap(schema, (schemaValue, key) => decoder.getParam(key).catch(e => {
             if(isOptionalField(schemaValue)) return undefined;

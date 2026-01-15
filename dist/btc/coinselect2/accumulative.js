@@ -8,7 +8,7 @@ const logger = (0, Utils_1.getLogger)("CoinSelect: ");
 // worst-case: O(n)
 function accumulative(utxos, outputs, feeRate, type, requiredInputs) {
     if (!isFinite(utils_1.utils.uintOrNaN(feeRate)))
-        return null;
+        throw new Error("Invalid feeRate passed!");
     const inputs = requiredInputs == null ? [] : [...requiredInputs];
     let bytesAccum = utils_1.utils.transactionBytes(inputs, outputs, type);
     let fee = feeRate * bytesAccum;

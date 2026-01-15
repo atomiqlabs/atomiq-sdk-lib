@@ -128,7 +128,7 @@ export class TrustedIntermediaryAPI {
         return tryWithRetries(() => httpGet<InvoiceStatusResponse>(
             url+"/getInvoiceStatus?paymentHash="+encodeURIComponent(paymentHash),
             timeout, abortSignal
-        ), null, RequestError, abortSignal);
+        ), undefined, RequestError, abortSignal);
     }
 
     /**
@@ -157,11 +157,13 @@ export class TrustedIntermediaryAPI {
                     "&token="+encodeURIComponent(init.token),
                 timeout,
                 abortSignal
-            ), null, RequestError, abortSignal
+            ), undefined, RequestError, abortSignal
         );
 
         if(resp.code!==10000) throw RequestError.parse(JSON.stringify(resp), 400);
-        return verifySchema(resp.data, TrustedFromBTCLNResponseSchema);
+        const res = verifySchema(resp.data, TrustedFromBTCLNResponseSchema);
+        if(res==null) throw new Error("Invalid response returned from LP");
+        return res;
     }
 
     /**
@@ -184,7 +186,7 @@ export class TrustedIntermediaryAPI {
         return tryWithRetries(() => httpGet<AddressStatusResponse>(
             url+"/getAddressStatus?paymentHash="+encodeURIComponent(paymentHash)+"&sequence="+encodeURIComponent(sequence.toString(10)),
             timeout, abortSignal
-        ), null, RequestError, abortSignal);
+        ), undefined, RequestError, abortSignal);
     }
 
     /**
@@ -212,7 +214,7 @@ export class TrustedIntermediaryAPI {
                 "&sequence="+encodeURIComponent(sequence.toString(10))+
                 "&refundAddress="+encodeURIComponent(refundAddress),
             timeout, abortSignal
-        ), null, RequestError, abortSignal);
+        ), undefined, RequestError, abortSignal);
     }
 
     /**
@@ -237,16 +239,18 @@ export class TrustedIntermediaryAPI {
                 baseUrl+"/frombtc_trusted/getAddress?chain="+encodeURIComponent(chainIdentifier)+
                     "&address="+encodeURIComponent(init.address)+
                     "&amount="+encodeURIComponent(init.amount.toString(10))+
-                    "&refundAddress="+encodeURIComponent(init.refundAddress)+
+                    (init.refundAddress==null ? "" : "&refundAddress="+encodeURIComponent(init.refundAddress))+
                     "&exactIn=true"+
                     "&token="+encodeURIComponent(init.token),
                 timeout,
                 abortSignal
-            ), null, RequestError, abortSignal
+            ), undefined, RequestError, abortSignal
         );
 
         if(resp.code!==10000) throw RequestError.parse(JSON.stringify(resp), 400);
-        return verifySchema(resp.data, TrustedFromBTCResponseSchema);
+        const res = verifySchema(resp.data, TrustedFromBTCResponseSchema);
+        if(res==null) throw new Error("Invalid response returned from LP");
+        return res;
     }
 
 }

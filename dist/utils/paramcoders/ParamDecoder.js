@@ -4,7 +4,6 @@ exports.ParamDecoder = void 0;
 const buffer_1 = require("buffer");
 class ParamDecoder {
     constructor() {
-        this.frameHeader = null;
         this.frameData = [];
         this.frameDataLength = 0;
         this.closed = false;
@@ -21,16 +20,15 @@ class ParamDecoder {
         for (let key in obj) {
             if (this.params[key] == null) {
                 this.params[key] = {
-                    promise: Promise.resolve(obj[key]),
-                    resolve: null,
-                    reject: null
+                    promise: Promise.resolve(obj[key])
                 };
             }
             else {
-                if (this.params[key].resolve != null) {
-                    this.params[key].resolve(obj[key]);
-                    this.params[key].resolve = null;
-                    this.params[key].reject = null;
+                const resolveFn = this.params[key].resolve;
+                if (resolveFn != null) {
+                    resolveFn(obj[key]);
+                    delete this.params[key].resolve;
+                    delete this.params[key].reject;
                 }
             }
         }
@@ -84,7 +82,7 @@ class ParamDecoder {
             if (frameLength === this.frameDataLength) {
                 //Message read success
                 this.onFrameRead(buffer_1.Buffer.concat(this.frameData));
-                this.frameHeader = null;
+                delete this.frameHeader;
                 this.frameData = [];
                 this.frameDataLength = 0;
             }
@@ -96,9 +94,7 @@ class ParamDecoder {
      */
     onEnd() {
         for (let key in this.params) {
-            if (this.params[key].reject != null) {
-                this.params[key].reject(new Error("EOF before field seen!"));
-            }
+            this.params[key].reject?.(new Error("EOF before field seen!"));
         }
         this.closed = true;
     }
@@ -110,9 +106,7 @@ class ParamDecoder {
      */
     onError(e) {
         for (let key in this.params) {
-            if (this.params[key].reject != null) {
-                this.params[key].reject(e);
-            }
+            this.params[key].reject?.(e);
         }
         this.closed = true;
     }
@@ -127,8 +121,8 @@ class ParamDecoder {
                 reject = _reject;
             });
             this.params[key] = {
-                resolve,
-                reject,
+                resolve: resolve,
+                reject: reject,
                 promise
             };
         }

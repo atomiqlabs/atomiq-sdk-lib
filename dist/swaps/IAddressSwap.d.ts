@@ -1,3 +1,4 @@
+export declare function isIAddressSwap(obj: any): obj is IAddressSwap;
 /**
  * Interface for swaps which require a user to send funds to a specific address
  */

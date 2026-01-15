@@ -4,7 +4,7 @@ import {Buffer} from "buffer";
 
 export class ParamDecoder implements IParamReader {
 
-    frameHeader: Buffer = null;
+    frameHeader?: Buffer;
     frameData: Buffer[] = [];
     frameDataLength: number = 0;
 
@@ -13,8 +13,8 @@ export class ParamDecoder implements IParamReader {
     params: {
         [key: string]: {
             promise: Promise<any>,
-            resolve: (data: any) => void,
-            reject: (err: any) => void
+            resolve?: (data: any) => void,
+            reject?: (err: any) => void
         }
     } = {};
 
@@ -29,15 +29,14 @@ export class ParamDecoder implements IParamReader {
         for(let key in obj) {
             if(this.params[key]==null) {
                 this.params[key] = {
-                    promise: Promise.resolve(obj[key]),
-                    resolve: null,
-                    reject: null
+                    promise: Promise.resolve(obj[key])
                 };
             } else {
-                if(this.params[key].resolve!=null) {
-                    this.params[key].resolve(obj[key]);
-                    this.params[key].resolve = null;
-                    this.params[key].reject = null;
+                const resolveFn = this.params[key].resolve;
+                if(resolveFn!=null) {
+                    resolveFn(obj[key]);
+                    delete this.params[key].resolve;
+                    delete this.params[key].reject;
                 }
             }
         }
@@ -50,7 +49,7 @@ export class ParamDecoder implements IParamReader {
      * @protected
      */
     protected onData(data: Buffer): void {
-        let leavesBuffer = data;
+        let leavesBuffer: Buffer | null = data;
         while(leavesBuffer!=null && leavesBuffer.length>0) {
             if(this.frameHeader==null) {
                 if(leavesBuffer.length<=4) {
@@ -91,7 +90,7 @@ export class ParamDecoder implements IParamReader {
             if(frameLength===this.frameDataLength) {
                 //Message read success
                 this.onFrameRead(Buffer.concat(this.frameData));
-                this.frameHeader = null;
+                delete this.frameHeader;
                 this.frameData = [];
                 this.frameDataLength = 0;
             }
@@ -104,9 +103,7 @@ export class ParamDecoder implements IParamReader {
      */
     protected onEnd(): void {
         for(let key in this.params) {
-            if(this.params[key].reject!=null) {
-                this.params[key].reject(new Error("EOF before field seen!"));
-            }
+            this.params[key].reject?.(new Error("EOF before field seen!"));
         }
         this.closed = true;
     }
@@ -119,9 +116,7 @@ export class ParamDecoder implements IParamReader {
      */
     protected onError(e: any): void {
         for(let key in this.params) {
-            if(this.params[key].reject!=null) {
-                this.params[key].reject(e);
-            }
+            this.params[key].reject?.(e);
         }
         this.closed = true;
     }
@@ -136,8 +131,8 @@ export class ParamDecoder implements IParamReader {
                 reject = _reject;
             });
             this.params[key] = {
-                resolve,
-                reject,
+                resolve: resolve!,
+                reject: reject!,
                 promise
             }
         }

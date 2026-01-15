@@ -6,7 +6,7 @@ export type CoinType = {
 };
 
 export type CtorCoinTypes<T extends MultiChain> = {
-    coinId: string,
+    coinId?: string,
     chains: {
         [chainId in keyof T]?: {
             address: string,
@@ -29,7 +29,7 @@ export abstract class IPriceProvider<T extends MultiChain> {
         for(let coinData of coins) {
             if(coinData.coinId==null) continue;
             for(let chainId in coinData.chains) {
-                const {address, decimals} = coinData.chains[chainId];
+                const {address, decimals} = coinData.chains[chainId]!;
                 this.coinsMap[chainId] ??= {};
                 (this.coinsMap[chainId] as any)[address.toString()] = {
                     coinId: coinData.coinId,

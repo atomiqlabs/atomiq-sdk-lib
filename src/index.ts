@@ -36,7 +36,9 @@ export * from "./prices/SwapPriceWithChain";
 export * from "./Tokens";
 export * from "./swaps/ISwap";
 export * from "./swaps/IClaimableSwap";
+export * from "./swaps/IRefundableSwap";
 export * from "./swaps/IAddressSwap";
+export * from "./swaps/IBTCWalletSwap";
 export * from "./swaps/ISwapWithGasDrop";
 export * from "./swaps/ISwapWrapper";
 export * from "./swaps/IClaimableSwapWrapper";
@@ -56,7 +58,7 @@ export * from "./swaps/escrow_swaps/tobtc/ln/ToBTCLNSwap";
 export * from "./swaps/escrow_swaps/tobtc/ln/ToBTCLNWrapper";
 export * from "./swaps/escrow_swaps/tobtc/onchain/ToBTCSwap";
 export * from "./swaps/escrow_swaps/tobtc/onchain/ToBTCWrapper";
-export * from "./swaps/escrow_swaps/frombtc/IFromBTCSwap";
+export * from "./swaps/escrow_swaps/frombtc/IFromBTCSelfInitSwap";
 export * from "./swaps/escrow_swaps/frombtc/IFromBTCWrapper";
 export * from "./swaps/escrow_swaps/frombtc/IFromBTCLNWrapper";
 export * from "./swaps/escrow_swaps/frombtc/ln/FromBTCLNSwap";
@@ -73,6 +75,7 @@ export * from "./swaps/spv_swaps/SpvFromBTCSwap";
 export * from "./swaps/spv_swaps/SpvFromBTCWrapper";
 
 export * from "./utils/LNURL";
+export * from "./utils/SwapUtils";
 
 export * from "./storage/IUnifiedStorage";
 export * from "./browser-storage/IndexedDBUnifiedStorage";

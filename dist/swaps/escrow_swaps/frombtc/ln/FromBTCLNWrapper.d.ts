@@ -6,6 +6,7 @@ import { ChainType, ClaimEvent, InitializeEvent, RefundEvent } from "@atomiqlabs
 import { Intermediary } from "../../../../intermediaries/Intermediary";
 import { Buffer } from "buffer";
 import { SwapType } from "../../../enums/SwapType";
+import { AllOptional } from "../../../../utils/Utils";
 import { LightningNetworkApi } from "../../../../btc/LightningNetworkApi";
 import { ISwapPrice } from "../../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
@@ -14,18 +15,19 @@ import { LNURLWithdrawParamsWithUrl } from "../../../../utils/LNURL";
 import { UnifiedSwapEventListener } from "../../../../events/UnifiedSwapEventListener";
 import { UnifiedSwapStorage } from "../../../../storage/UnifiedSwapStorage";
 import { ISwap } from "../../../ISwap";
-import { IFromBTCLNWrapper } from "../IFromBTCLNWrapper";
+import { IFromBTCLNDefinition, IFromBTCLNWrapper } from "../IFromBTCLNWrapper";
 import { IClaimableSwapWrapper } from "../../../IClaimableSwapWrapper";
 export type FromBTCLNOptions = {
     descriptionHash?: Buffer;
     unsafeSkipLnNodeCheck?: boolean;
 };
 export type FromBTCLNWrapperOptions = ISwapWrapperOptions & {
-    unsafeSkipLnNodeCheck?: boolean;
-    safetyFactor?: number;
-    bitcoinBlocktime?: number;
+    unsafeSkipLnNodeCheck: boolean;
+    safetyFactor: number;
+    bitcoinBlocktime: number;
 };
-export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNSwap<T>, FromBTCLNWrapperOptions> implements IClaimableSwapWrapper<FromBTCLNSwap<T>> {
+export type FromBTCLNDefinition<T extends ChainType> = IFromBTCLNDefinition<T, FromBTCLNWrapper<T>, FromBTCLNSwap<T>>;
+export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNDefinition<T>, FromBTCLNWrapperOptions> implements IClaimableSwapWrapper<FromBTCLNSwap<T>> {
     readonly claimableSwapStates: FromBTCLNSwapState[];
     readonly TYPE = SwapType.FROM_BTCLN;
     readonly swapDeserializer: typeof FromBTCLNSwap;
@@ -42,7 +44,7 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWra
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options: FromBTCLNWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, options?: AllOptional<FromBTCLNWrapperOptions>, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     readonly pendingSwapStates: FromBTCLNSwapState[];
@@ -74,9 +76,10 @@ export declare class FromBTCLNWrapper<T extends ChainType> extends IFromBTCLNWra
      * @param abortSignal           Abort signal for aborting the process
      * @param preFetches
      */
-    create(signer: string, amountData: AmountData, lps: Intermediary[], options: FromBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
-        pricePrefetchPromise?: Promise<bigint>;
-        feeRatePromise?: Promise<any>;
+    create(signer: string, amountData: AmountData, lps: Intermediary[], options?: FromBTCLNOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
+        usdPricePrefetchPromise: Promise<number | undefined>;
+        pricePrefetchPromise?: Promise<bigint | undefined>;
+        feeRatePromise?: Promise<string | undefined>;
     }): {
         quote: Promise<FromBTCLNSwap<T>>;
         intermediary: Intermediary;

@@ -86,7 +86,8 @@ class MempoolApi {
                 }
             })()));
         }
-        catch (e) {
+        catch (_e) {
+            const e = _e;
             throw e.find(err => err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5) || e[0];
         }
     }
@@ -113,7 +114,7 @@ class MempoolApi {
                 });
             }
             return this.requestFromMaybeOperationalUrls(path, responseType, type, body);
-        }, null, (err) => err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5);
+        }, undefined, (err) => err instanceof RequestError_1.RequestError && Math.floor(err.httpCode / 100) !== 5);
     }
     constructor(url, timeout) {
         url = url ?? "https://mempool.space/testnet/api/";
@@ -127,7 +128,7 @@ class MempoolApi {
                 { url: url, operational: null }
             ];
         }
-        this.timeout = timeout;
+        this.timeout = timeout ?? 15 * 1000;
     }
     /**
      * Returns information about a specific lightning network node as identified by the public key (in hex encoding)

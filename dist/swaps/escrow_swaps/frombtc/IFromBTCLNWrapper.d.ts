@@ -2,7 +2,7 @@
 /// <reference types="node" />
 /// <reference types="node" />
 import { ChainType, SwapData } from "@atomiqlabs/base";
-import { IFromBTCWrapper } from "./IFromBTCWrapper";
+import { IFromBTCDefinition, IFromBTCWrapper } from "./IFromBTCWrapper";
 import { ISwapWrapperOptions, WrapperCtorTokens } from "../../ISwapWrapper";
 import { LightningNetworkApi, LNNodeLiquidity } from "../../../btc/LightningNetworkApi";
 import { UnifiedSwapStorage } from "../../../storage/UnifiedSwapStorage";
@@ -14,7 +14,8 @@ import { Intermediary } from "../../../intermediaries/Intermediary";
 import { PaymentRequestObject, TagsObject } from "@atomiqlabs/bolt11";
 import { LNURLWithdrawParamsWithUrl } from "../../../utils/LNURL";
 import { IEscrowSwap } from "../IEscrowSwap";
-export declare abstract class IFromBTCLNWrapper<T extends ChainType, S extends IEscrowSwap<T>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends IFromBTCWrapper<T, S, O> {
+export type IFromBTCLNDefinition<T extends ChainType, W extends IFromBTCLNWrapper<T, any>, S extends IEscrowSwap<T>> = IFromBTCDefinition<T, W, S>;
+export declare abstract class IFromBTCLNWrapper<T extends ChainType, D extends IFromBTCLNDefinition<T, IFromBTCLNWrapper<T, D>, IEscrowSwap<T, D>>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends IFromBTCWrapper<T, D, O> {
     protected readonly lnApi: LightningNetworkApi;
     /**
      * @param chainIdentifier
@@ -56,7 +57,7 @@ export declare abstract class IFromBTCLNWrapper<T extends ChainType, S extends I
      * @private
      * @returns LN Node liquidity
      */
-    protected preFetchLnCapacity(pubkeyPromise: Promise<string>): Promise<LNNodeLiquidity | null>;
+    protected preFetchLnCapacity(pubkeyPromise: Promise<string | null>): Promise<LNNodeLiquidity | null>;
     /**
      * Verifies whether the intermediary's lightning node has enough inbound capacity to receive the LN payment
      *
@@ -72,7 +73,7 @@ export declare abstract class IFromBTCLNWrapper<T extends ChainType, S extends I
      */
     protected verifyLnNodeCapacity(lp: Intermediary, decodedPr: PaymentRequestObject & {
         tagsObject: TagsObject;
-    }, lnCapacityPrefetchPromise: Promise<LNNodeLiquidity | null>, abortSignal?: AbortSignal): Promise<void>;
+    }, lnCapacityPrefetchPromise?: Promise<LNNodeLiquidity | null>, abortSignal?: AbortSignal): Promise<void>;
     /**
      * Parses and fetches lnurl withdraw params from the specified lnurl
      *

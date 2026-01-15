@@ -31,12 +31,12 @@ export declare class Intermediary {
             [chainIdentifier: string]: {
                 [tokenAddress: string]: {
                     input: {
-                        min: bigint;
-                        max: bigint;
+                        min?: bigint;
+                        max?: bigint;
                     };
                     output: {
-                        min: bigint;
-                        max: bigint;
+                        min?: bigint;
+                        max?: bigint;
                     };
                 };
             };
@@ -48,7 +48,7 @@ export declare class Intermediary {
     liquidity: {
         [chainIdentifier: string]: SCLiquidity;
     };
-    lnData: LNNodeLiquidity;
+    lnData?: LNNodeLiquidity;
     constructor(url: string, addresses: {
         [chainIdentifier: string]: string;
     }, services: ServicesType, reputation?: {
@@ -56,14 +56,14 @@ export declare class Intermediary {
     });
     getSwapLimits(swapType: SwapType, chainId: string, tokenAddress: string): {
         input: {
-            min: bigint;
-            max: bigint;
+            min?: bigint;
+            max?: bigint;
         };
         output: {
-            min: bigint;
-            max: bigint;
+            min?: bigint;
+            max?: bigint;
         };
-    };
+    } | undefined;
     /**
      * Returns tokens supported by the intermediary, optionally constrained to the specific swap types
      *

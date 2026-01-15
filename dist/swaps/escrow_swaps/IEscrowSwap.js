@@ -14,8 +14,12 @@ exports.isIEscrowSwapInit = isIEscrowSwapInit;
 class IEscrowSwap extends ISwap_1.ISwap {
     constructor(wrapper, swapInitOrObj) {
         super(wrapper, swapInitOrObj);
-        if (!isIEscrowSwapInit(swapInitOrObj)) {
-            this.data = swapInitOrObj.data != null ? new wrapper.swapDataDeserializer(swapInitOrObj.data) : null;
+        if (isIEscrowSwapInit(swapInitOrObj)) {
+            this.data = swapInitOrObj.data;
+        }
+        else {
+            if (swapInitOrObj.data != null)
+                this.data = new wrapper.swapDataDeserializer(swapInitOrObj.data);
             this.commitTxId = swapInitOrObj.commitTxId;
             this.claimTxId = swapInitOrObj.claimTxId;
             this.refundTxId = swapInitOrObj.refundTxId;
@@ -39,12 +43,10 @@ class IEscrowSwap extends ISwap_1.ISwap {
      */
     getIdentifierHashString() {
         const identifierHash = this.getIdentifierHash();
-        if (identifierHash == null)
-            return null;
         return identifierHash.toString("hex");
     }
     _getEscrowHash() {
-        return this.data?.getEscrowHash();
+        return this.data?.getEscrowHash() ?? null;
     }
     /**
      * Returns the escrow hash - i.e. hash of the escrow data
@@ -56,7 +58,7 @@ class IEscrowSwap extends ISwap_1.ISwap {
      * Returns the claim data hash - i.e. hash passed to the claim handler
      */
     getClaimHash() {
-        return this.data?.getClaimHash();
+        return this.getSwapData().getClaimHash();
     }
     getId() {
         return this.getIdentifierHashString();
@@ -71,6 +73,8 @@ class IEscrowSwap extends ISwap_1.ISwap {
      * @protected
      */
     async watchdogWaitTillCommited(intervalSeconds, abortSignal) {
+        if (this.data == null)
+            throw new Error("Tried to await commitment but data is null, invalid state?");
         intervalSeconds ??= 5;
         let status = { type: base_1.SwapCommitStateType.NOT_COMMITED };
         while (status?.type === base_1.SwapCommitStateType.NOT_COMMITED) {
@@ -97,6 +101,8 @@ class IEscrowSwap extends ISwap_1.ISwap {
      * @protected
      */
     async watchdogWaitTillResult(intervalSeconds, abortSignal) {
+        if (this.data == null)
+            throw new Error("Tried to await result but data is null, invalid state?");
         intervalSeconds ??= 5;
         let status = { type: base_1.SwapCommitStateType.COMMITED };
         while (status?.type === base_1.SwapCommitStateType.COMMITED || status?.type === base_1.SwapCommitStateType.REFUNDABLE) {

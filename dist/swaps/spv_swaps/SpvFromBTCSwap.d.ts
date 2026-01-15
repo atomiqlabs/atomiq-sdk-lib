@@ -1,7 +1,8 @@
 import { ISwap, ISwapInit } from "../ISwap";
 import { ChainType, SpvWithdrawalClaimedState, SpvWithdrawalClosedState, SpvWithdrawalFrontedState } from "@atomiqlabs/base";
 import { SwapType } from "../enums/SwapType";
-import { SpvFromBTCWrapper } from "./SpvFromBTCWrapper";
+import { SpvFromBTCTypeDefinition, SpvFromBTCWrapper } from "./SpvFromBTCWrapper";
+import { LoggerType } from "../../utils/Utils";
 import { Transaction } from "@scure/btc-signer";
 import { BtcToken, SCToken, TokenAmount } from "../../Tokens";
 import { Fee, FeeType } from "../fee/Fee";
@@ -10,6 +11,7 @@ import { IBTCWalletSwap } from "../IBTCWalletSwap";
 import { ISwapWithGasDrop } from "../ISwapWithGasDrop";
 import { MinimalBitcoinWalletInterface, MinimalBitcoinWalletInterfaceWithSigner } from "../../btc/wallet/MinimalBitcoinWalletInterface";
 import { IClaimableSwap } from "../IClaimableSwap";
+import { PriceInfoType } from "../../prices/abstract/ISwapPrice";
 export declare enum SpvFromBTCSwapState {
     CLOSED = -5,
     FAILED = -4,
@@ -49,11 +51,12 @@ export type SpvFromBTCSwapInit = ISwapInit & {
     frontingFeeShare: bigint;
     executionFeeShare: bigint;
     genesisSmartChainBlockHeight: number;
+    gasPricingInfo?: PriceInfoType;
 };
 export declare function isSpvFromBTCSwapInit(obj: any): obj is SpvFromBTCSwapInit;
-export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCSwapState> implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCSwapState> {
+export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFromBTCTypeDefinition<T>> implements IBTCWalletSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, SpvFromBTCTypeDefinition<T>, SpvFromBTCSwapState> {
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
-    readonly wrapper: SpvFromBTCWrapper<T>;
+    protected readonly logger: LoggerType;
     readonly quoteId: string;
     readonly recipient: string;
     readonly vaultOwner: string;
@@ -78,9 +81,11 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     readonly frontingFeeShare: bigint;
     readonly executionFeeShare: bigint;
     readonly genesisSmartChainBlockHeight: number;
-    claimTxId: string;
-    frontTxId: string;
-    data: T["SpvVaultWithdrawalData"];
+    gasPricingInfo?: PriceInfoType;
+    senderAddress?: string;
+    claimTxId?: string;
+    frontTxId?: string;
+    data?: T["SpvVaultWithdrawalData"];
     constructor(wrapper: SpvFromBTCWrapper<T>, init: SpvFromBTCSwapInit);
     constructor(wrapper: SpvFromBTCWrapper<T>, obj: any);
     protected upgradeVersion(): void;
@@ -91,12 +96,13 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     protected tryCalculateSwapFee(): void;
     refreshPriceData(): Promise<void>;
     _getInitiator(): string;
-    _getEscrowHash(): string;
+    _getEscrowHash(): string | null;
     getId(): string;
     getQuoteExpiry(): number;
     verifyQuoteValid(): Promise<boolean>;
     getOutputAddress(): string | null;
     getOutputTxId(): string | null;
+    getInputAddress(): string | null;
     getInputTxId(): string | null;
     requiresAction(): boolean;
     isFinished(): boolean;
@@ -122,9 +128,11 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
             fee: Fee<T["ChainId"], BtcToken<false>, SCToken<T["ChainId"]>>;
         }
     ];
+    getOutputToken(): SCToken<T["ChainId"]>;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getGasDropOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getInputWithoutFee(): TokenAmount<T["ChainId"], BtcToken<false>>;
+    getInputToken(): BtcToken<false>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<false>>;
     getRequiredConfirmationsCount(): number;
     getTransactionDetails(): Promise<{
@@ -177,7 +185,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * @param _psbt A psbt - either a Transaction object or a hex or base64 encoded PSBT string
      */
     submitPsbt(_psbt: Transaction | string): Promise<string>;
-    estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>>>;
+    estimateBitcoinFee(_bitcoinWallet: IBitcoinWallet | MinimalBitcoinWalletInterface, feeRate?: number): Promise<TokenAmount<any, BtcToken<false>> | null>;
     sendBitcoinTransaction(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, feeRate?: number): Promise<string>;
     /**
      * Executes the swap with the provided bitcoin wallet,
@@ -191,7 +199,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      */
     execute(wallet: IBitcoinWallet | MinimalBitcoinWalletInterfaceWithSigner, callbacks?: {
         onSourceTransactionSent?: (sourceTxId: string) => void;
-        onSourceTransactionConfirmationStatus?: (sourceTxId: string, confirmations: number, targetConfirations: number, etaMs: number) => void;
+        onSourceTransactionConfirmationStatus?: (sourceTxId?: string, confirmations?: number, targetConfirations?: number, etaMs?: number) => void;
         onSourceTransactionConfirmed?: (sourceTxId: string) => void;
         onSwapSettled?: (destinationTxId: string) => void;
     }, options?: {
@@ -200,6 +208,26 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         btcTxCheckIntervalSeconds?: number;
         maxWaitTillAutomaticSettlementSeconds?: number;
     }): Promise<boolean>;
+    txsExecute(options?: {
+        bitcoinWallet?: MinimalBitcoinWalletInterface;
+    }): Promise<{
+        name: "Payment";
+        description: string;
+        chain: string;
+        txs: ({
+            type: string;
+            psbt: Transaction;
+            psbtHex: string;
+            psbtBase64: string;
+            in1sequence: number;
+        } | {
+            type: string;
+            psbt: Transaction;
+            psbtHex: string;
+            psbtBase64: string;
+            signInputs: number[];
+        })[];
+    }[]>;
     /**
      * Checks whether a bitcoin payment was already made, returns the payment or null when no payment has been made.
      */
@@ -207,6 +235,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
         txId: string;
         confirmations: number;
         targetConfirmations: number;
+        inputAddresses?: string[];
     } | null>;
     /**
      * Waits till the bitcoin transaction confirms and swap becomes claimable
@@ -216,7 +245,7 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * @param abortSignal Abort signal
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitForBitcoinTransaction(updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
+    waitForBitcoinTransaction(updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<string>;
     /**
      * Returns transactions required to claim the swap on-chain (and possibly also sync the bitcoin light client)
      *  after a bitcoin transaction was sent and confirmed
@@ -258,9 +287,15 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
      * @param updateCallback Callback called when txId is found, and also called with subsequent confirmations
      * @throws {Error} if in invalid state (must be CLAIM_COMMITED)
      */
-    waitTillExecuted(updateCallback?: (txId: string, confirmations: number, targetConfirmations: number, txEtaMs: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<void>;
+    waitTillExecuted(updateCallback?: (txId?: string, confirmations?: number, targetConfirmations?: number, txEtaMs?: number) => void, checkIntervalSeconds?: number, abortSignal?: AbortSignal): Promise<void>;
     serialize(): any;
-    _syncStateFromBitcoin(save: boolean): Promise<boolean>;
+    /**
+     * For internal use! Used to set the txId of the bitcoin payment from the on-chain events listener
+     *
+     * @param txId
+     */
+    _setBitcoinTxId(txId: string): Promise<void>;
+    _syncStateFromBitcoin(save?: boolean): Promise<boolean>;
     /**
      * Checks the swap's state on-chain and compares it to its internal state, updates/changes it according to on-chain
      *  data
@@ -270,5 +305,5 @@ export declare class SpvFromBTCSwap<T extends ChainType> extends ISwap<T, SpvFro
     private syncStateFromChain;
     _sync(save?: boolean): Promise<boolean>;
     _tick(save?: boolean): Promise<boolean>;
-    _shouldCheckWithdrawalState(frontingAddress?: string, vaultDataUtxo?: string): Promise<boolean>;
+    _shouldCheckWithdrawalState(frontingAddress?: string | null, vaultDataUtxo?: string | null): Promise<boolean>;
 }

@@ -1,17 +1,19 @@
 import { IEscrowSwap, IEscrowSwapInit } from "./IEscrowSwap";
 import { ChainType, SignatureData, SwapData } from "@atomiqlabs/base";
 import { SCToken, TokenAmount } from "../../Tokens";
-import { IEscrowSwapWrapper } from "./IEscrowSwapWrapper";
+import { IEscrowSwapDefinition, IEscrowSwapWrapper } from "./IEscrowSwapWrapper";
+import { SwapTypeDefinition } from "../ISwapWrapper";
 export type IEscrowSelfInitSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
-    feeRate: any;
-    signatureData: SignatureData;
+    feeRate: string;
+    signatureData?: SignatureData;
 };
 export declare function isIEscrowSelfInitSwapInit<T extends SwapData>(obj: any): obj is IEscrowSelfInitSwapInit<T>;
-export declare abstract class IEscrowSelfInitSwap<T extends ChainType = ChainType, S extends number = number> extends IEscrowSwap<T, S> {
+export type IEscrowSelfInitSwapDefinition<T extends ChainType, W extends IEscrowSwapWrapper<T, any>, S extends IEscrowSelfInitSwap<T>> = SwapTypeDefinition<T, W, S>;
+export declare abstract class IEscrowSelfInitSwap<T extends ChainType = ChainType, D extends IEscrowSelfInitSwapDefinition<T, IEscrowSwapWrapper<T, D>, IEscrowSelfInitSwap<T, D, S>> = IEscrowSwapDefinition<T, IEscrowSwapWrapper<T, any>, IEscrowSelfInitSwap<T, any, any>>, S extends number = number> extends IEscrowSwap<T, D, S> {
+    feeRate: string;
     signatureData?: SignatureData;
-    feeRate?: any;
-    protected constructor(wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>, obj: any);
-    protected constructor(wrapper: IEscrowSwapWrapper<T, IEscrowSwap<T, S>>, swapInit: IEscrowSelfInitSwapInit<T["Data"]>);
+    protected constructor(wrapper: D["Wrapper"], obj: any);
+    protected constructor(wrapper: D["Wrapper"], swapInit: IEscrowSelfInitSwapInit<T["Data"]>);
     /**
      * Periodically checks for init signature's expiry
      *

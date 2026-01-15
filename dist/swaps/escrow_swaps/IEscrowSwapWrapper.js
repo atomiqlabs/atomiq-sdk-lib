@@ -19,14 +19,13 @@ class IEscrowSwapWrapper extends ISwapWrapper_1.ISwapWrapper {
      */
     preFetchSignData(signDataPrefetch) {
         if (this.contract.preFetchForInitSignatureVerification == null)
-            return Promise.resolve(null);
+            return Promise.resolve(undefined);
         return signDataPrefetch.then(obj => {
             if (obj == null)
-                return null;
+                return undefined;
             return this.contract.preFetchForInitSignatureVerification(obj);
         }).catch(e => {
             this.logger.error("preFetchSignData(): Error: ", e);
-            return null;
         });
     }
     /**
@@ -44,8 +43,8 @@ class IEscrowSwapWrapper extends ISwapWrapper_1.ISwapWrapper {
      */
     async verifyReturnedSignature(initiator, data, signature, feeRatePromise, preFetchSignatureVerificationData, abortSignal) {
         const [feeRate, preFetchedSignatureData] = await Promise.all([feeRatePromise, preFetchSignatureVerificationData]);
-        await (0, Utils_1.tryWithRetries)(() => this.contract.isValidInitAuthorization(initiator, data, signature, feeRate, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
-        return await (0, Utils_1.tryWithRetries)(() => this.contract.getInitAuthorizationExpiry(data, signature, preFetchedSignatureData), null, base_1.SignatureVerificationError, abortSignal);
+        await (0, Utils_1.tryWithRetries)(() => this.contract.isValidInitAuthorization(initiator, data, signature, feeRate, preFetchedSignatureData), undefined, base_1.SignatureVerificationError, abortSignal);
+        return await (0, Utils_1.tryWithRetries)(() => this.contract.getInitAuthorizationExpiry(data, signature, preFetchedSignatureData), undefined, base_1.SignatureVerificationError, abortSignal);
     }
     /**
      * Processes a single SC on-chain event
@@ -82,7 +81,6 @@ class IEscrowSwapWrapper extends ISwapWrapper_1.ISwapWrapper {
         if (swapChanged) {
             await swap._saveAndEmit();
         }
-        return true;
     }
     async _checkPastSwaps(pastSwaps) {
         const changedSwaps = [];
@@ -92,17 +90,18 @@ class IEscrowSwapWrapper extends ISwapWrapper_1.ISwapWrapper {
         for (let pastSwap of pastSwaps) {
             if (pastSwap._shouldFetchExpiryStatus()) {
                 //Check expiry
-                swapExpiredStatus[pastSwap.getEscrowHash()] = await pastSwap._verifyQuoteDefinitelyExpired();
+                swapExpiredStatus[pastSwap.getId()] = await pastSwap._verifyQuoteDefinitelyExpired();
             }
             if (pastSwap._shouldFetchCommitStatus()) {
                 //Add to swaps for which status should be checked
-                checkStatusSwaps.push(pastSwap);
+                if (pastSwap.data != null)
+                    checkStatusSwaps.push(pastSwap);
             }
         }
         const swapStatuses = await this.contract.getCommitStatuses(checkStatusSwaps.map(val => ({ signer: val._getInitiator(), swapData: val.data })));
         for (let pastSwap of checkStatusSwaps) {
             const escrowHash = pastSwap.getEscrowHash();
-            const shouldSave = await pastSwap._sync(false, swapExpiredStatus[escrowHash], swapStatuses[escrowHash]);
+            const shouldSave = await pastSwap._sync(false, swapExpiredStatus[pastSwap.getId()], escrowHash == null ? undefined : swapStatuses[escrowHash]);
             if (shouldSave) {
                 if (pastSwap.isQuoteExpired()) {
                     removeSwaps.push(pastSwap);
@@ -116,6 +115,9 @@ class IEscrowSwapWrapper extends ISwapWrapper_1.ISwapWrapper {
             changedSwaps,
             removeSwaps
         };
+    }
+    recoverFromSwapDataAndState(init, state, lp) {
+        return Promise.resolve(null);
     }
 }
 exports.IEscrowSwapWrapper = IEscrowSwapWrapper;

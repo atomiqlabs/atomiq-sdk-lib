@@ -19,34 +19,45 @@ class UnifiedSwapEventListener {
         this.events = events;
     }
     async processEvents(events) {
-        const swapsByEscrowHash = {};
+        const escrowHashesDeduped = new Set();
         events.forEach(event => {
-            swapsByEscrowHash[chainEventToEscrowHash(event)] = null;
+            const escrowHash = chainEventToEscrowHash(event);
+            if (escrowHash != null)
+                escrowHashesDeduped.add(escrowHash);
         });
-        logger.debug("processEvents(): Processing events with escrow hashes: ", Object.keys(swapsByEscrowHash));
+        const escrowHashes = Array.from(escrowHashesDeduped);
+        logger.debug("processEvents(): Processing events with escrow hashes: ", escrowHashes);
         const swaps = await this.storage.query([
-            [{ key: "escrowHash", value: Object.keys(swapsByEscrowHash) }]
+            [{ key: "escrowHash", value: escrowHashes }]
         ], (val) => {
-            const obj = this.listeners[val.type];
+            const obj = this.listeners?.[val.type];
             if (obj == null)
                 return null;
             return new obj.reviver(val);
         });
-        swaps.forEach(swap => swapsByEscrowHash[swap._getEscrowHash()] = swap);
+        const swapsByEscrowHash = {};
+        swaps.forEach(swap => {
+            const escrowHash = swap._getEscrowHash();
+            if (escrowHash != null)
+                swapsByEscrowHash[escrowHash] = swap;
+        });
         //We need to do this because FromBTCLNAutoSwaps might not yet know its escrowHash
         // hence we try to get the claimHash and try to query based on that, FromBTCLNAutoSwaps
         // will use their claimHash as escrowHash before they know the real escrowHash
         const htlcCheckInitializeEvents = {};
         for (let event of events) {
-            const swap = swapsByEscrowHash[chainEventToEscrowHash(event)];
-            if (swap != null) {
-                const obj = this.listeners[swap.getType()];
-                if (obj == null)
+            const escrowHash = chainEventToEscrowHash(event);
+            if (escrowHash != null) {
+                const swap = swapsByEscrowHash[escrowHash];
+                if (swap != null) {
+                    const obj = this.listeners[swap.getType()];
+                    if (obj == null)
+                        continue;
+                    await obj.listener(event, swap);
                     continue;
-                await obj.listener(event, swap);
-                continue;
+                }
             }
-            if (event instanceof (base_1.InitializeEvent)) {
+            if (event instanceof base_1.InitializeEvent) {
                 if (event.swapType === base_1.ChainSwapType.HTLC) {
                     const swapData = await event.swapData();
                     htlcCheckInitializeEvents[swapData.getClaimHash()] = event;
@@ -60,13 +71,17 @@ class UnifiedSwapEventListener {
         const claimDataSwaps = await this.storage.query([
             [{ key: "escrowHash", value: Object.keys(htlcCheckInitializeEvents) }]
         ], (val) => {
-            const obj = this.listeners[val.type];
+            const obj = this.listeners?.[val.type];
             if (obj == null)
                 return null;
             return new obj.reviver(val);
         });
         const swapsByClaimDataHash = {};
-        claimDataSwaps.forEach(swap => swapsByClaimDataHash[swap._getEscrowHash()] = swap);
+        claimDataSwaps.forEach(swap => {
+            const escrowHash = swap._getEscrowHash();
+            if (escrowHash != null)
+                swapsByClaimDataHash[escrowHash] = swap;
+        });
         logger.debug("processEvents(): Additional HTLC swaps founds: ", swapsByClaimDataHash);
         for (let claimData in htlcCheckInitializeEvents) {
             const event = htlcCheckInitializeEvents[claimData];
@@ -95,7 +110,8 @@ class UnifiedSwapEventListener {
     }
     stop() {
         logger.info("stop(): Stopping unified swap event listener");
-        this.events.unregisterListener(this.listener);
+        if (this.listener != null)
+            this.events.unregisterListener(this.listener);
         return this.events.stop();
     }
     registerListener(type, listener, reviver) {

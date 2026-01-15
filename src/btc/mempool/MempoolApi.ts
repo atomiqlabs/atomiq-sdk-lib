@@ -181,7 +181,7 @@ export class MempoolApi {
      *
      * @private
      */
-    private getOperationalApi(): {url: string, operational: boolean} {
+    private getOperationalApi(): {url: string, operational: boolean | null} | undefined {
         return this.backends.find(e => e.operational===true);
     }
 
@@ -191,7 +191,7 @@ export class MempoolApi {
      *
      * @private
      */
-    private getMaybeOperationalApis(): {url: string, operational: boolean}[] {
+    private getMaybeOperationalApis(): {url: string, operational: boolean | null}[] {
         let operational = this.backends.filter(e => e.operational===true || e.operational===null);
         if(operational.length===0) {
             this.backends.forEach(e => e.operational=null);
@@ -270,7 +270,8 @@ export class MempoolApi {
                     }
                 })()
             ))
-        } catch (e) {
+        } catch (_e: any) {
+            const e = _e as any[];
             throw e.find(err => err instanceof RequestError && Math.floor(err.httpCode/100)!==5) || e[0];
         }
     }
@@ -302,7 +303,7 @@ export class MempoolApi {
                 });
             }
             return this.requestFromMaybeOperationalUrls(path, responseType, type, body);
-        }, null, (err: any) => err instanceof RequestError && Math.floor(err.httpCode/100)!==5);
+        }, undefined, (err: any) => err instanceof RequestError && Math.floor(err.httpCode/100)!==5);
     }
 
     constructor(url?: string | string[], timeout?: number) {
@@ -316,7 +317,7 @@ export class MempoolApi {
                 {url: url, operational: null}
             ];
         }
-        this.timeout = timeout;
+        this.timeout = timeout ?? 15*1000;
     }
 
     /**
@@ -348,8 +349,8 @@ export class MempoolApi {
      *
      * @param txId
      */
-    async getRawTransaction(txId: string): Promise<Buffer> {
-        const rawTransaction: string = await this.request<string>("tx/"+txId+"/hex", "str").catch((e: Error) => {
+    async getRawTransaction(txId: string): Promise<Buffer | null> {
+        const rawTransaction: string | null = await this.request<string>("tx/"+txId+"/hex", "str").catch((e: Error) => {
             if(e.message==="Transaction not found") return null;
             throw e;
         });
@@ -403,7 +404,7 @@ export class MempoolApi {
         },
         value: bigint
     }[]> {
-        let jsonBody: any = await this.request<any>("address/"+address+"/utxo", "obj");
+        let jsonBody = await this.request<any[]>("address/"+address+"/utxo", "obj");
         jsonBody.forEach(e => e.value = BigInt(e.value));
 
         return jsonBody;

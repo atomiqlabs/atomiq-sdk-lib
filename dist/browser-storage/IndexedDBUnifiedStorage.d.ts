@@ -10,7 +10,7 @@ export type QuerySetCondition = {
 export declare class IndexedDBUnifiedStorage implements IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedStorageCompositeIndexes> {
     protected readonly logger: LoggerType;
     storageKey: string;
-    db: IDBDatabase;
+    db?: IDBDatabase;
     constructor(storageKey: string);
     private tryMigrateLocalStorage;
     private tryMigrateOldIndexedDB;

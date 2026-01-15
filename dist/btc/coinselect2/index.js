@@ -29,10 +29,10 @@ function coinSelect(utxos, outputs, feeRate, type, requiredInputs) {
 exports.coinSelect = coinSelect;
 function maxSendable(utxos, output, feeRate, requiredInputs, additionalOutputs) {
     if (!isFinite(utils_1.utils.uintOrNaN(feeRate)))
-        return null;
+        throw new Error("Invalid feeRate passed!");
     const outputs = additionalOutputs ?? [];
     const inputs = requiredInputs ?? [];
-    let bytesAccum = utils_1.utils.transactionBytes(inputs, outputs.concat([output]), null);
+    let bytesAccum = utils_1.utils.transactionBytes(inputs, outputs.concat([output]));
     let cpfpAddFee = 0;
     let inAccum = utils_1.utils.sumOrNaN(inputs);
     let outAccum = utils_1.utils.sumOrNaN(outputs);
