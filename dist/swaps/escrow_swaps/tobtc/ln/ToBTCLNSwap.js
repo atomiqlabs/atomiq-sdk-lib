@@ -58,7 +58,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     //////////////////////////////
     //// Amounts & fees
     getOutput() {
-        if (this.pr == null || !this.pr.startsWith("ln"))
+        if (this.pr == null || !this.pr.toLowerCase().startsWith("ln"))
             return (0, Tokens_1.toTokenAmount)(null, this.outputToken, this.wrapper.prices);
         const parsedPR = (0, bolt11_1.decode)(this.pr);
         const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
@@ -92,7 +92,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
      * Checks whether a swap is likely to fail, based on the confidence as reported by the LP
      */
     willLikelyFail() {
-        if (this.pr == null || !this.pr.startsWith("ln"))
+        if (this.pr == null || !this.pr.toLowerCase().startsWith("ln"))
             return false;
         const parsedRequest = (0, bolt11_1.decode)(this.pr);
         if (parsedRequest.tagsObject.routing_info != null) {
@@ -109,7 +109,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
      *  for such a wallet to be online when attempting to make a swap
      */
     isPayingToNonCustodialWallet() {
-        if (this.pr == null || !this.pr.startsWith("ln"))
+        if (this.pr == null || !this.pr.toLowerCase().startsWith("ln"))
             return false;
         const parsedRequest = (0, bolt11_1.decode)(this.pr);
         if (parsedRequest.tagsObject.routing_info != null) {
@@ -126,7 +126,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     getPaymentHash() {
         if (this.pr == null)
             return null;
-        if (this.pr.startsWith("ln")) {
+        if (this.pr.toLowerCase().startsWith("ln")) {
             const parsed = (0, bolt11_1.decode)(this.pr);
             return buffer_1.Buffer.from(parsed.tagsObject.payment_hash, "hex");
         }
@@ -135,7 +135,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     getLpIdentifier() {
         if (this.pr == null)
             return this.data.getEscrowHash();
-        if (this.pr.startsWith("ln")) {
+        if (this.pr.toLowerCase().startsWith("ln")) {
             const parsed = (0, bolt11_1.decode)(this.pr);
             return parsed.tagsObject.payment_hash;
         }
