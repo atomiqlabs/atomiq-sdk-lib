@@ -4,14 +4,16 @@ import { SwapType } from "../../../enums/SwapType";
 import { ChainType, SwapCommitState, SwapData } from "@atomiqlabs/base";
 import { Buffer } from "buffer";
 import { LNURLWithdraw } from "../../../../utils/LNURL";
+import { LoggerType } from "../../../../utils/Utils";
 import { BtcToken, SCToken, TokenAmount } from "../../../../Tokens";
 import { Fee, FeeType } from "../../../fee/Fee";
 import { IAddressSwap } from "../../../IAddressSwap";
-import { FromBTCLNAutoWrapper } from "./FromBTCLNAutoWrapper";
+import { FromBTCLNAutoDefinition, FromBTCLNAutoWrapper } from "./FromBTCLNAutoWrapper";
 import { ISwapWithGasDrop } from "../../../ISwapWithGasDrop";
 import { MinimalLightningNetworkWalletInterface } from "../../../../btc/wallet/MinimalLightningNetworkWalletInterface";
 import { IClaimableSwap } from "../../../IClaimableSwap";
 import { IEscrowSwap, IEscrowSwapInit } from "../../IEscrowSwap";
+import { PriceInfoType } from "../../../../prices/abstract/ISwapPrice";
 export declare enum FromBTCLNAutoSwapState {
     FAILED = -4,
     QUOTE_EXPIRED = -3,
@@ -30,12 +32,14 @@ export type FromBTCLNAutoSwapInit<T extends SwapData> = IEscrowSwapInit<T> & {
     btcAmountGas: bigint;
     gasSwapFeeBtc: bigint;
     gasSwapFee: bigint;
+    gasPricingInfo?: PriceInfoType;
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
 };
 export declare function isFromBTCLNAutoSwapInit<T extends SwapData>(obj: any): obj is FromBTCLNAutoSwapInit<T>;
-export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends IEscrowSwap<T, FromBTCLNAutoSwapState> implements IAddressSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, FromBTCLNAutoSwapState> {
+export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends IEscrowSwap<T, FromBTCLNAutoDefinition<T>> implements IAddressSwap, ISwapWithGasDrop<T>, IClaimableSwap<T, FromBTCLNAutoDefinition<T>, FromBTCLNAutoSwapState> {
+    protected readonly logger: LoggerType;
     protected readonly inputToken: BtcToken<true>;
     protected readonly TYPE = SwapType.FROM_BTCLN_AUTO;
     protected readonly lnurlFailSignal: AbortController;
@@ -46,11 +50,11 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     protected readonly btcAmountGas: bigint;
     protected readonly gasSwapFeeBtc: bigint;
     protected readonly gasSwapFee: bigint;
+    gasPricingInfo?: PriceInfoType;
     lnurl?: string;
     lnurlK1?: string;
     lnurlCallback?: string;
     prPosted?: boolean;
-    wrapper: FromBTCLNAutoWrapper<T>;
     protected getSwapData(): T["Data"];
     constructor(wrapper: FromBTCLNAutoWrapper<T>, init: FromBTCLNAutoSwapInit<T["Data"]>);
     constructor(wrapper: FromBTCLNAutoWrapper<T>, obj: any);
@@ -69,7 +73,8 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     requiresAction(): boolean;
     protected getIdentifierHashString(): string;
     protected getPaymentHash(): Buffer;
-    getInputTxId(): string | null;
+    getInputAddress(): string | null;
+    getInputTxId(): string;
     /**
      * Returns the lightning network BOLT11 invoice that needs to be paid as an input to the swap
      */
@@ -98,8 +103,10 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
     protected getInputGasAmountWithoutFee(): bigint;
     protected getInputAmountWithoutFee(): bigint;
     protected getOutputAmountWithoutFee(): bigint;
+    getInputToken(): BtcToken<true>;
     getInput(): TokenAmount<T["ChainId"], BtcToken<true>>;
     getInputWithoutFee(): TokenAmount;
+    getOutputToken(): SCToken<T["ChainId"]>;
     getOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     getGasDropOutput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>>;
     protected getSwapFee(): Fee<T["ChainId"], BtcToken<true>, SCToken<T["ChainId"]>>;
@@ -134,6 +141,15 @@ export declare class FromBTCLNAutoSwap<T extends ChainType = ChainType> extends 
         lightningTxCheckIntervalSeconds?: number;
         maxWaitTillAutomaticSettlementSeconds?: number;
     }): Promise<boolean>;
+    txsExecute(): Promise<{
+        name: "Payment";
+        description: string;
+        chain: string;
+        txs: {
+            address: string;
+            hyperlink: string;
+        }[];
+    }[]>;
     /**
      * Checks whether the LP received the LN payment and we can continue by committing & claiming the HTLC on-chain
      *

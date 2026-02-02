@@ -32,7 +32,7 @@ export class UnifiedSwapStorage<T extends ChainType> {
 
     readonly storage: IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedSwapStorageCompositeIndexes>;
     readonly weakRefCache: Map<string, WeakRef<ISwap<T>>> = new Map();
-    readonly noWeakRefMap: boolean;
+    readonly noWeakRefMap?: boolean;
 
     constructor(storage: IUnifiedStorage<UnifiedSwapStorageIndexes, UnifiedSwapStorageCompositeIndexes>, noWeakRefMap?: boolean) {
         this.storage = storage;
@@ -51,19 +51,26 @@ export class UnifiedSwapStorage<T extends ChainType> {
      * @param params
      * @param reviver
      */
-    async query<S extends ISwap<T>>(params: Array<Array<QueryParams>>, reviver: (obj: any) => S): Promise<Array<S>> {
+    async query<S extends ISwap<T>>(params: Array<Array<QueryParams>>, reviver: (obj: any) => S | null | undefined): Promise<Array<S>> {
         const rawSwaps = await this.storage.query(params);
 
-        return rawSwaps.map(rawObj => {
+        const result: Array<S> = [];
+        rawSwaps.forEach(rawObj => {
             if(!this.noWeakRefMap) {
                 const savedRef = this.weakRefCache.get(rawObj.id)?.deref();
-                if(savedRef!=null) return savedRef as S;
+                if(savedRef!=null) {
+                    result.push(savedRef as S);
+                    return;
+                }
                 logger.debug("query(): Reviving new swap instance: "+rawObj.id);
             }
             const value = reviver(rawObj);
+            if(value==null) return;
             if(!this.noWeakRefMap) this.weakRefCache.set(rawObj.id, new WeakRef<ISwap<T>>(value));
-            return value;
+            result.push(value);
         });
+
+        return result;
     }
 
     save<S extends ISwap<T>>(value: S): Promise<void> {

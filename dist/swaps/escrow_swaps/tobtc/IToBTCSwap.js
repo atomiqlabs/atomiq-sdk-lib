@@ -11,7 +11,12 @@ const ISwap_1 = require("../../ISwap");
 const IEscrowSelfInitSwap_1 = require("../IEscrowSelfInitSwap");
 function isIToBTCSwapInit(obj) {
     return typeof (obj.networkFee) === "bigint" &&
-        (obj.networkFeeBtc == null || typeof (obj.networkFeeBtc) === "bigint") &&
+        typeof (obj.networkFeeBtc) === "bigint" &&
+        (obj.signatureData == null || (typeof (obj.signatureData) === 'object' &&
+            typeof (obj.signatureData.prefix) === "string" &&
+            typeof (obj.signatureData.timeout) === "string" &&
+            typeof (obj.signatureData.signature) === "string")) &&
+        typeof (obj.data) === 'object' &&
         (0, IEscrowSelfInitSwap_1.isIEscrowSelfInitSwapInit)(obj);
 }
 exports.isIToBTCSwapInit = isIToBTCSwapInit;
@@ -20,11 +25,18 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
         super(wrapper, initOrObject);
         if (isIToBTCSwapInit(initOrObject)) {
             this.state = ToBTCSwapState.CREATED;
+            this.networkFee = initOrObject.networkFee;
+            this.networkFeeBtc = initOrObject.networkFeeBtc;
+            this.data = initOrObject.data;
+            this.signatureData = initOrObject.signatureData;
         }
         else {
-            this.networkFee = initOrObject.networkFee == null ? null : BigInt(initOrObject.networkFee);
-            this.networkFeeBtc = initOrObject.networkFeeBtc == null ? null : BigInt(initOrObject.networkFeeBtc);
+            this.networkFee = (0, Utils_1.toBigInt)(initOrObject.networkFee);
+            this.networkFeeBtc = (0, Utils_1.toBigInt)(initOrObject.networkFeeBtc);
         }
+    }
+    getSwapData() {
+        return this.data;
     }
     upgradeVersion() {
         if (this.version == null) {
@@ -56,11 +68,14 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
      * @protected
      */
     tryRecomputeSwapPrice() {
-        if (this.swapFeeBtc == null) {
-            this.swapFeeBtc = this.swapFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
-        }
-        if (this.networkFeeBtc == null) {
-            this.networkFeeBtc = this.networkFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
+        const output = this.getOutput();
+        if (output != null) {
+            if (this.swapFeeBtc == null) {
+                this.swapFeeBtc = this.swapFee * output.rawAmount / this.getInputWithoutFee().rawAmount;
+            }
+            if (this.networkFeeBtc == null) {
+                this.networkFeeBtc = this.networkFee * output.rawAmount / this.getInputWithoutFee().rawAmount;
+            }
         }
         super.tryRecomputeSwapPrice();
     }
@@ -73,8 +88,11 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
     }
     //////////////////////////////
     //// Getters & utils
+    getInputAddress() {
+        return this._getInitiator();
+    }
     getInputTxId() {
-        return this.commitTxId;
+        return this.commitTxId ?? null;
     }
     requiresAction() {
         return this.isRefundable();
@@ -106,15 +124,20 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
     //////////////////////////////
     //// Amounts & fees
     getSwapFee() {
+        if (this.pricingInfo == null)
+            throw new Error("No pricing info known, cannot estimate fee!");
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const output = this.getOutput();
-        const swapFeePPM = output.rawAmount == null ? 0n : feeWithoutBaseFee * 1000000n / output.rawAmount;
+        const swapFeePPM = output?.rawAmount == null ? 0n : feeWithoutBaseFee * 1000000n / output.rawAmount;
+        const amountInDstToken = (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue,
             composition: {
-                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, this.outputToken, this.wrapper.prices),
+                base: (0, Tokens_1.toTokenAmount)(this.pricingInfo.satsBaseFee, this.outputToken, this.wrapper.prices, this.pricingInfo),
                 percentage: (0, ISwap_1.ppmToPercentage)(swapFeePPM)
             }
         };
@@ -124,17 +147,23 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
      *  paid only once
      */
     getNetworkFee() {
+        const amountInDstToken = (0, Tokens_1.toTokenAmount)(this.networkFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.networkFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue
         };
     }
     getFee() {
+        const amountInDstToken = (0, Tokens_1.toTokenAmount)(this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo);
         return {
-            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: (0, Tokens_1.toTokenAmount)(this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal, preFetchedUsdPrice) => this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken: (0, Tokens_1.toTokenAmount)(this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue
         };
     }
     getFeeBreakdown() {
@@ -149,11 +178,14 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             }
         ];
     }
+    getInputToken() {
+        return this.wrapper.tokens[this.data.getToken()];
+    }
     getInput() {
-        return (0, Tokens_1.toTokenAmount)(this.data.getAmount(), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.data.getAmount(), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo);
     }
     getInputWithoutFee() {
-        return (0, Tokens_1.toTokenAmount)(this.data.getAmount() - (this.swapFee + this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.data.getAmount() - (this.swapFee + this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo);
     }
     /**
      * Checks if the intiator/sender has enough balance to go through with the swap
@@ -168,8 +200,8 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             required = required + commitFee;
         return {
             enoughBalance: balance >= required,
-            balance: (0, Tokens_1.toTokenAmount)(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            required: (0, Tokens_1.toTokenAmount)(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices)
+            balance: (0, Tokens_1.toTokenAmount)(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            required: (0, Tokens_1.toTokenAmount)(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo)
         };
     }
     /**
@@ -226,6 +258,20 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
                 return false;
             }
         }
+        throw new Error("Unexpected state reached!");
+    }
+    async txsExecute(options) {
+        if (this.state !== ToBTCSwapState.CREATED)
+            throw new Error("Invalid swap state, needs to be CREATED!");
+        const txsCommit = await this.txsCommit(options?.skipChecks);
+        return [
+            {
+                name: "Commit",
+                description: `Initiates the swap by commiting the funds to the escrow on the ${this.chainIdentifier} side`,
+                chain: this.chainIdentifier,
+                txs: txsCommit
+            }
+        ];
     }
     //////////////////////////////
     //// Commit
@@ -240,6 +286,8 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
     async txsCommit(skipChecks) {
         if (this.state !== ToBTCSwapState.CREATED)
             throw new Error("Must be in CREATED state!");
+        if (this.signatureData == null)
+            throw new Error("Init signature data not known, cannot commit!");
         if (!this.initiated) {
             this.initiated = true;
             await this._saveAndEmit();
@@ -319,7 +367,7 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             throw new Error("LP URL not specified!");
         checkIntervalSeconds ??= 5;
         let resp = { code: IntermediaryAPI_1.RefundAuthorizationResponseCodes.PENDING, msg: "" };
-        while (!abortSignal.aborted && (resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.PENDING || resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.NOT_FOUND)) {
+        while (!abortSignal?.aborted && (resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.PENDING || resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.NOT_FOUND)) {
             resp = await IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             if (resp.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.PAID) {
                 const validResponse = await this._setPaymentResult(resp.data, true);
@@ -364,7 +412,7 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
                 }
                 return processed;
             case IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA:
-                await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidRefundAuthorization(this.data, resp.data), null, base_1.SignatureVerificationError);
+                await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidRefundAuthorization(this.data, resp.data), undefined, base_1.SignatureVerificationError);
                 this.state = ToBTCSwapState.REFUNDABLE;
                 if (save)
                     await this._saveAndEmit();
@@ -429,7 +477,7 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
                 return true;
             case IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA:
                 const resultData = result.data;
-                await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidRefundAuthorization(this.data, resultData), null, base_1.SignatureVerificationError, abortSignal);
+                await (0, Utils_1.tryWithRetries)(() => this.wrapper.contract.isValidRefundAuthorization(this.data, resultData), undefined, base_1.SignatureVerificationError, abortSignal);
                 await this._saveAndEmit(ToBTCSwapState.REFUNDABLE);
                 return false;
             case IntermediaryAPI_1.RefundAuthorizationResponseCodes.EXPIRED:
@@ -439,8 +487,9 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             case IntermediaryAPI_1.RefundAuthorizationResponseCodes.NOT_FOUND:
                 if (this.state === ToBTCSwapState.CLAIMED)
                     return true;
-                throw new Error("Intermediary swap not found");
+                throw new Error("LP swap not found");
         }
+        throw new Error("Invalid response code returned by the LP");
     }
     //////////////////////////////
     //// Refund
@@ -465,6 +514,8 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
             return await this.wrapper.contract.txsRefund(signer, this.data, true, true);
         }
         else {
+            if (this.url == null)
+                throw new Error("LP URL not known, cannot get cooperative refund message, wait till expiry to refund!");
             const res = await IntermediaryAPI_1.IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             if (res.code === IntermediaryAPI_1.RefundAuthorizationResponseCodes.REFUND_DATA) {
                 return await this.wrapper.contract.txsRefundWithAuthorization(signer, this.data, res.data, true, true);
@@ -603,6 +654,7 @@ class IToBTCSwap extends IEscrowSelfInitSwap_1.IEscrowSelfInitSwap {
                 }
             }
         }
+        return false;
     }
     _shouldFetchCommitStatus() {
         return this.state === ToBTCSwapState.CREATED ||

@@ -19,7 +19,6 @@ class ISwapWrapper {
         this.logger = (0, Utils_1.getLogger)(this.constructor.name + ": ");
         this.pendingSwaps = new Map();
         this.isInitialized = false;
-        this.tickInterval = null;
         this.unifiedStorage = unifiedStorage;
         this.unifiedChainEvents = unifiedChainEvents;
         this.chainIdentifier = chainIdentifier;
@@ -53,8 +52,20 @@ class ISwapWrapper {
      */
     preFetchPrice(amountData, abortSignal) {
         return this.prices.preFetchPrice(this.chainIdentifier, amountData.token, abortSignal).catch(e => {
-            this.logger.error("preFetchPrice(): Error: ", e);
-            return null;
+            this.logger.error("preFetchPrice.token(): Error: ", e);
+            return undefined;
+        });
+    }
+    /**
+     * Pre-fetches bitcoin's USD price
+     *
+     * @param abortSignal
+     * @protected
+     */
+    preFetchUsdPrice(abortSignal) {
+        return this.prices.preFetchUsdPrice(abortSignal).catch(e => {
+            this.logger.error("preFetchPrice.usd(): Error: ", e);
+            return undefined;
         });
     }
     /**
@@ -67,21 +78,30 @@ class ISwapWrapper {
      * @param token Token used in the swap
      * @param feeData Fee data as returned by the intermediary
      * @param pricePrefetchPromise Price pre-fetch promise
+     * @param usdPricePrefetchPromise
      * @param abortSignal
      * @protected
      * @returns Price info object
      * @throws {IntermediaryError} if the calculated fee is too high
      */
-    async verifyReturnedPrice(lpServiceData, send, amountSats, amountToken, token, feeData, pricePrefetchPromise = Promise.resolve(null), abortSignal) {
+    async verifyReturnedPrice(lpServiceData, send, amountSats, amountToken, token, feeData, pricePrefetchPromise = Promise.resolve(undefined), usdPricePrefetchPromise = Promise.resolve(undefined), abortSignal) {
         const swapBaseFee = BigInt(lpServiceData.swapBaseFee);
         const swapFeePPM = BigInt(lpServiceData.swapFeePPM);
-        if (send)
+        if (send && feeData.networkFee != null)
             amountToken = amountToken - feeData.networkFee;
-        const isValidAmount = await (send ?
-            this.prices.isValidAmountSend(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, await pricePrefetchPromise) :
-            this.prices.isValidAmountReceive(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, await pricePrefetchPromise));
+        const [isValidAmount, usdPrice] = await Promise.all([
+            send ?
+                this.prices.isValidAmountSend(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, await pricePrefetchPromise) :
+                this.prices.isValidAmountReceive(this.chainIdentifier, amountSats, swapBaseFee, swapFeePPM, amountToken, token, abortSignal, await pricePrefetchPromise),
+            usdPricePrefetchPromise.then(value => {
+                if (value != null)
+                    return value;
+                return this.prices.preFetchUsdPrice(abortSignal);
+            })
+        ]);
         if (!isValidAmount.isValid)
             throw new IntermediaryError_1.IntermediaryError("Fee too high");
+        isValidAmount.realPriceUsdPerBitcoin = usdPrice;
         return isValidAmount;
     }
     /**
@@ -90,7 +110,6 @@ class ISwapWrapper {
     async init(noTimers = false, noCheckPastSwaps = false) {
         if (this.isInitialized)
             return;
-        const hasEventListener = this.processEvent != null;
         //Save events received in the meantime into the event queue and process them only after we've checked and
         // processed all the past swaps
         let eventQueue = [];
@@ -98,11 +117,11 @@ class ISwapWrapper {
             eventQueue.push({ event, swap });
             return Promise.resolve();
         };
-        if (hasEventListener)
+        if (this.processEvent != null)
             this.unifiedChainEvents.registerListener(this.TYPE, initListener, this.swapDeserializer.bind(null, this));
         if (!noCheckPastSwaps)
             await this.checkPastSwaps();
-        if (hasEventListener) {
+        if (this.processEvent != null) {
             //Process accumulated event queue
             for (let event of eventQueue) {
                 await this.processEvent(event.event, event.swap);
@@ -179,9 +198,6 @@ class ISwapWrapper {
         if (!swap.isInitiated())
             return Promise.resolve();
         return this.unifiedStorage.remove(swap);
-    }
-    recoverFromSwapDataAndState(init, state, lp) {
-        return Promise.resolve(null);
     }
     /**
      * Un-subscribes from event listeners on Solana

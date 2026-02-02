@@ -1,6 +1,16 @@
 import {RequestError} from "../errors/RequestError";
 import {Buffer} from "buffer";
 import {randomBytes as randomBytesNoble} from "@noble/hashes/utils";
+import {sha256} from "@noble/hashes/sha2";
+import {BigIntBufferUtils} from "@atomiqlabs/base";
+
+export type AllOptional<T> = {
+    [K in keyof T]?: T[K];
+};
+
+export type AllRequired<T> = {
+    [K in keyof T]-?: T[K];
+};
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
@@ -37,10 +47,10 @@ export type LoggerType = {
 
 export function getLogger(prefix: string): LoggerType {
     return {
-        debug: (msg, ...args) => global.atomiqLogLevel >= 3 && console.debug(prefix+msg, ...args),
-        info: (msg, ...args) => global.atomiqLogLevel >= 2 && console.info(prefix+msg, ...args),
-        warn: (msg, ...args) => (global.atomiqLogLevel==null || global.atomiqLogLevel >= 1) && console.warn(prefix+msg, ...args),
-        error: (msg, ...args) => (global.atomiqLogLevel==null || global.atomiqLogLevel >= 0) && console.error(prefix+msg, ...args)
+        debug: (msg, ...args) => (global as any).atomiqLogLevel >= 3 && console.debug(prefix+msg, ...args),
+        info: (msg, ...args) => (global as any).atomiqLogLevel >= 2 && console.info(prefix+msg, ...args),
+        warn: (msg, ...args) => ((global as any).atomiqLogLevel==null || (global as any).atomiqLogLevel >= 1) && console.warn(prefix+msg, ...args),
+        error: (msg, ...args) => ((global as any).atomiqLogLevel==null || (global as any).atomiqLogLevel >= 0) && console.error(prefix+msg, ...args)
     };
 }
 
@@ -53,7 +63,7 @@ const logger = getLogger("Utils: ");
  * @param promises
  */
 export function promiseAny<T>(promises: Promise<T>[]): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
+    return new Promise<T>((resolve: ((val: T) => void) | null, reject) => {
         let numRejected = 0;
         const rejectReasons = Array(promises.length);
 
@@ -138,7 +148,7 @@ export function extendAbortController(abortSignal?: AbortSignal) {
  * @param abortSignal
  * @returns Result of the action executing callback
  */
-export async function tryWithRetries<T>(func: (retryCount?: number) => Promise<T>, retryPolicy?: {
+export async function tryWithRetries<T>(func: (retryCount: number) => Promise<T>, retryPolicy?: {
     maxRetries?: number, delay?: number, exponential?: boolean
 }, errorAllowed?: ((e: any) => boolean) | Constructor<Error> | Constructor<Error>[], abortSignal?: AbortSignal): Promise<T> {
     retryPolicy = retryPolicy || {};
@@ -175,10 +185,10 @@ export function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit & {
     timeout?: number
 }): Promise<Response> {
     if (init == null) init = {};
-    if (init.timeout != null) init.signal = timeoutSignal(init.timeout, new Error("Network request timed out"), init.signal);
+    if (init.timeout != null) init.signal = timeoutSignal(init.timeout, new Error("Network request timed out"), init.signal ?? undefined);
 
     return fetch(input, init).catch(e => {
-        if (e.name === "AbortError") {
+        if (e.name === "AbortError" && init.signal!=null) {
             throw init.signal.reason;
         } else {
             throw e;
@@ -265,11 +275,13 @@ export function timeoutPromise(timeout: number, abortSignal?: AbortSignal): Prom
             reject(abortSignal.reason);
             return;
         }
+
         let abortSignalListener: () => void;
-        let timeoutHandle = setTimeout(() => {
-            if(abortSignalListener!=null) abortSignal.removeEventListener("abort", abortSignalListener);
+        let timeoutHandle: any | null = setTimeout(() => {
+            if(abortSignalListener!=null && abortSignal!=null) abortSignal.removeEventListener("abort", abortSignalListener);
             resolve();
         }, timeout);
+
         if (abortSignal != null) {
             abortSignal.addEventListener("abort", abortSignalListener = () => {
                 if (timeoutHandle != null) clearTimeout(timeoutHandle);
@@ -288,7 +300,7 @@ export function timeoutPromise(timeout: number, abortSignal?: AbortSignal): Prom
  * @param abortSignal Abort signal to extend
  */
 export function timeoutSignal(timeout: number, abortReason?: any, abortSignal?: AbortSignal): AbortSignal {
-    if(timeout==null) return abortSignal;
+    if(timeout==null) throw new Error("Timeout seconds cannot be null!");
     const abortController = new AbortController();
     const timeoutHandle = setTimeout(() => abortController.abort(abortReason || new Error("Timed out")), timeout);
     if(abortSignal!=null) {
@@ -300,11 +312,19 @@ export function timeoutSignal(timeout: number, abortReason?: any, abortSignal?: 
     return abortController.signal;
 }
 
-export function bigIntMin(a: bigint, b: bigint): bigint {
+export function bigIntMin(a: bigint, b: bigint): bigint;
+export function bigIntMin(a?: bigint, b?: bigint): bigint | undefined;
+export function bigIntMin(a?: bigint, b?: bigint): bigint | undefined {
+    if(a==null) return b;
+    if(b==null) return a;
     return a > b ? b : a;
 }
 
-export function bigIntMax(a: bigint, b: bigint): bigint {
+export function bigIntMax(a: bigint, b: bigint): bigint;
+export function bigIntMax(a?: bigint, b?: bigint): bigint | undefined;
+export function bigIntMax(a?: bigint, b?: bigint): bigint | undefined {
+    if(a==null) return b;
+    if(b==null) return a;
     return b > a ? b : a;
 }
 
@@ -314,4 +334,25 @@ export function bigIntCompare(a: bigint, b: bigint): -1 | 0 | 1 {
 
 export function randomBytes(bytesLength: number): Buffer {
     return Buffer.from(randomBytesNoble(bytesLength));
+}
+
+export function toBigInt(value: string): bigint;
+export function toBigInt(value: undefined): undefined;
+export function toBigInt(value: string | undefined): bigint | undefined {
+    if(value==null) return undefined;
+    return BigInt(value);
+}
+
+export function throwIfUndefined<T>(promise: Promise<T | undefined>, msg?: string): Promise<T> {
+    return promise.then(val => {
+        if(val==undefined) throw new Error(msg ?? "Promise value is undefined!");
+        return val;
+    })
+}
+
+export function getTxoHash(outputScriptHex: string, value: number) {
+    return Buffer.from(sha256(Buffer.concat([
+        BigIntBufferUtils.toBuffer(BigInt(value), "le", 8),
+        Buffer.from(outputScriptHex, "hex")
+    ])));
 }

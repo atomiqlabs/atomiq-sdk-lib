@@ -10,6 +10,7 @@ export declare class SwapperUtils<T extends MultiChain> {
     readonly bitcoinNetwork: BTC_NETWORK;
     private readonly root;
     constructor(root: Swapper<T>);
+    isValidSmartChainAddress(address: string, chainId?: ChainIds<T>): boolean;
     /**
      * Returns true if string is a valid BOLT11 bitcoin lightning invoice
      *
@@ -42,11 +43,11 @@ export declare class SwapperUtils<T extends MultiChain> {
      */
     getLNURLTypeAndData(lnurl: string, shouldRetry?: boolean): Promise<LNURLPay | LNURLWithdraw | null>;
     /**
-     * Returns satoshi value of BOLT11 bitcoin lightning invoice WITH AMOUNT
+     * Returns satoshi value of BOLT11 bitcoin lightning invoice WITH AMOUNT, returns null otherwise
      *
      * @param lnpr
      */
-    getLightningInvoiceValue(lnpr: string): bigint;
+    getLightningInvoiceValue(lnpr: string): bigint | null;
     private parseBitcoinAddress;
     private parseLNURLSync;
     private parseLNURL;
@@ -68,7 +69,7 @@ export declare class SwapperUtils<T extends MultiChain> {
         min?: TokenAmount;
         max?: TokenAmount;
         amount?: TokenAmount;
-    }>;
+    } | null>;
     /**
      * Synchronous general parser for bitcoin addresses, LNURLs, lightning invoices, smart chain addresses, doesn't fetch
      *  LNURL data, reports swapType: null instead to prevent returning a Promise
@@ -84,7 +85,7 @@ export declare class SwapperUtils<T extends MultiChain> {
         min?: TokenAmount;
         max?: TokenAmount;
         amount?: TokenAmount;
-    };
+    } | null;
     /**
      * Returns a random PSBT that can be used for fee estimation, the last output (the LP output) is omitted
      *  to allow for coinselection algorithm to determine maximum sendable amount there
@@ -131,4 +132,16 @@ export declare class SwapperUtils<T extends MultiChain> {
      * @param chainIdentifier
      */
     randomAddress<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier): string;
+    /**
+     * Signs and broadcasts the supplied smart chain transaction
+     */
+    sendAndConfirm<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, signer: T[ChainIdentifier]["NativeSigner"] | T[ChainIdentifier]["Signer"], txs: T[ChainIdentifier]["TX"][], abortSignal?: AbortSignal, onBeforePublish?: (txId: string, rawTx: string) => Promise<void>): Promise<string[]>;
+    /**
+     * Broadcasts already signed smart chain transactions
+     */
+    sendSignedAndConfirm<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, txs: T[ChainIdentifier]["SignedTXType"][], abortSignal?: AbortSignal, onBeforePublish?: (txId: string, rawTx: string) => Promise<void>): Promise<string[]>;
+    serializeUnsignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: T[ChainIdentifier]["TX"]): Promise<string>;
+    deserializeUnsignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: string): Promise<T[ChainIdentifier]["TX"]>;
+    serializeSignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: T[ChainIdentifier]["SignedTXType"]): Promise<string>;
+    deserializeSignedTransaction<ChainIdentifier extends ChainIds<T>>(chainIdentifier: ChainIdentifier, tx: string): Promise<T[ChainIdentifier]["SignedTXType"]>;
 }

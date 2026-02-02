@@ -11,7 +11,7 @@ export declare enum FieldTypeEnum {
     BigIntOptional = 103,
     AnyOptional = 104
 }
-export type FieldType<T extends FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any))> = T extends FieldTypeEnum.String ? string : T extends FieldTypeEnum.Boolean ? boolean : T extends FieldTypeEnum.Number ? number : T extends FieldTypeEnum.BigInt ? bigint : T extends FieldTypeEnum.Any ? any : T extends FieldTypeEnum.StringOptional ? string : T extends FieldTypeEnum.BooleanOptional ? boolean : T extends FieldTypeEnum.NumberOptional ? number : T extends FieldTypeEnum.BigIntOptional ? bigint : T extends FieldTypeEnum.AnyOptional ? any : T extends RequestSchema ? RequestSchemaResult<T> : T extends ((val: any) => string) ? string : T extends ((val: any) => boolean) ? boolean : T extends ((val: any) => number) ? number : T extends ((val: any) => bigint) ? bigint : T extends ((val: any) => any) ? any : never;
+export type FieldType<T extends FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any))> = T extends FieldTypeEnum.String ? string : T extends FieldTypeEnum.Boolean ? boolean : T extends FieldTypeEnum.Number ? number : T extends FieldTypeEnum.BigInt ? bigint : T extends FieldTypeEnum.Any ? any : T extends FieldTypeEnum.StringOptional ? (string | null) : T extends FieldTypeEnum.BooleanOptional ? (boolean | null) : T extends FieldTypeEnum.NumberOptional ? (number | null) : T extends FieldTypeEnum.BigIntOptional ? (bigint | null) : T extends FieldTypeEnum.AnyOptional ? (any | null) : T extends RequestSchema ? RequestSchemaResult<T> : T extends ((val: any) => string) ? string : T extends ((val: any) => boolean) ? boolean : T extends ((val: any) => number) ? number : T extends ((val: any) => bigint) ? bigint : T extends ((val: any) => any) ? any : never;
 export type RequestSchemaResult<T extends RequestSchema> = {
     [key in keyof T]: FieldType<T[key]>;
 };
@@ -22,5 +22,5 @@ export type RequestSchema = {
     [fieldName: string]: FieldTypeEnum | RequestSchema | ((val: any) => any);
 };
 export declare function isOptionalField(type: FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any))): boolean;
-export declare function verifyField<T extends FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any))>(fieldType: T, val: any): FieldType<T>;
-export declare function verifySchema<T extends RequestSchema>(req: any, schema: T): RequestSchemaResult<T>;
+export declare function verifyField<T extends FieldTypeEnum | RequestSchema | ((val: any) => (string | boolean | number | bigint | any))>(fieldType: T, val: any): FieldType<T> | undefined;
+export declare function verifySchema<T extends RequestSchema>(req: any, schema: T): RequestSchemaResult<T> | null;

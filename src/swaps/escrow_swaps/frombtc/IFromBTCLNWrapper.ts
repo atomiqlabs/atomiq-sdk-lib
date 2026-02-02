@@ -1,5 +1,5 @@
 import {ChainType, SwapData} from "@atomiqlabs/base";
-import {IFromBTCWrapper} from "./IFromBTCWrapper";
+import {IFromBTCDefinition, IFromBTCWrapper} from "./IFromBTCWrapper";
 import {ISwapWrapperOptions, WrapperCtorTokens} from "../../ISwapWrapper";
 import {LightningNetworkApi, LNNodeLiquidity} from "../../../btc/LightningNetworkApi";
 import {UnifiedSwapStorage} from "../../../storage/UnifiedSwapStorage";
@@ -16,11 +16,13 @@ import {UserError} from "../../../errors/UserError";
 import { sha256 } from "@noble/hashes/sha256";
 import {IEscrowSwap} from "../IEscrowSwap";
 
+export type IFromBTCLNDefinition<T extends ChainType, W extends IFromBTCLNWrapper<T, any>, S extends IEscrowSwap<T>> = IFromBTCDefinition<T, W, S>;
+
 export abstract class IFromBTCLNWrapper<
     T extends ChainType,
-    S extends IEscrowSwap<T>,
+    D extends IFromBTCLNDefinition<T, IFromBTCLNWrapper<T, D>, IEscrowSwap<T, D>>,
     O extends ISwapWrapperOptions = ISwapWrapperOptions
-> extends IFromBTCWrapper<T, S, O> {
+> extends IFromBTCWrapper<T, D, O> {
 
     protected readonly lnApi: LightningNetworkApi;
 
@@ -82,7 +84,7 @@ export abstract class IFromBTCLNWrapper<
      * @private
      * @returns LN Node liquidity
      */
-    protected preFetchLnCapacity(pubkeyPromise: Promise<string>): Promise<LNNodeLiquidity | null> {
+    protected preFetchLnCapacity(pubkeyPromise: Promise<string | null>): Promise<LNNodeLiquidity | null> {
         return pubkeyPromise.then(pubkey => {
             if(pubkey==null) return null;
             return this.lnApi.getLNNodeLiquidity(pubkey)
@@ -108,22 +110,22 @@ export abstract class IFromBTCLNWrapper<
     protected async verifyLnNodeCapacity(
         lp: Intermediary,
         decodedPr: PaymentRequestObject & {tagsObject: TagsObject},
-        lnCapacityPrefetchPromise: Promise<LNNodeLiquidity | null>,
+        lnCapacityPrefetchPromise?: Promise<LNNodeLiquidity | null>,
         abortSignal?: AbortSignal
     ): Promise<void> {
-        let result: LNNodeLiquidity = lnCapacityPrefetchPromise==null ? null : await lnCapacityPrefetchPromise;
-        if(result==null) result = await this.lnApi.getLNNodeLiquidity(decodedPr.payeeNodeKey);
-        if(abortSignal!=null) abortSignal.throwIfAborted();
+        if(decodedPr.payeeNodeKey==null) throw new Error("Unable to extract payee pubkey from the swap invoice!");
+        if(decodedPr.millisatoshis==null) throw new Error("Swap invoice doesn't contains msat amount field!");
 
-        if(result===null) throw new IntermediaryError("LP's lightning node not found in the lightning network graph!");
+        const _result = await lnCapacityPrefetchPromise ?? await this.lnApi.getLNNodeLiquidity(decodedPr.payeeNodeKey);
+        if(_result===null) throw new IntermediaryError("LP's lightning node not found in the lightning network graph!");
 
-        lp.lnData = result
+        lp.lnData = _result;
 
-        if(decodedPr.payeeNodeKey!==result.publicKey) throw new IntermediaryError("Invalid pr returned - payee pubkey");
+        if(decodedPr.payeeNodeKey!==_result.publicKey) throw new IntermediaryError("Invalid pr returned - payee pubkey");
         const amountIn = (BigInt(decodedPr.millisatoshis) + 999n) / 1000n;
-        if(result.capacity < amountIn)
+        if(_result.capacity < amountIn)
             throw new IntermediaryError("LP's lightning node doesn't have enough inbound capacity for the swap!");
-        if((result.capacity / 2n) < amountIn)
+        if((_result.capacity / 2n) < amountIn)
             throw new Error("LP's lightning node probably doesn't have enough inbound capacity for the swap!");
     }
 

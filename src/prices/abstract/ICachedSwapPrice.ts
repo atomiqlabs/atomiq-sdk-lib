@@ -13,7 +13,7 @@ export abstract class ICachedSwapPrice<T extends MultiChain> extends ISwapPrice<
             }
         }
     } = {};
-    usdCache: {
+    usdCache?: {
         price: Promise<number>,
         expiry: number
     };
@@ -48,9 +48,7 @@ export abstract class ICachedSwapPrice<T extends MultiChain> extends ISwapPrice<
         };
         thisFetch.catch(e => {
             if(
-                this.cache[chainIdentifier]!=null &&
-                this.cache[chainIdentifier][token]!=null &&
-                this.cache[chainIdentifier][token].price===thisFetch
+                this.cache?.[chainIdentifier]?.[token].price===thisFetch
             ) delete this.cache[token];
             throw e;
         });

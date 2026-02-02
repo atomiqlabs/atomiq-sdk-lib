@@ -15,6 +15,18 @@ class SwapperUtils {
         this.bitcoinNetwork = root.bitcoinNetwork;
         this.root = root;
     }
+    isValidSmartChainAddress(address, chainId) {
+        if (chainId != null) {
+            if (this.root.chains[chainId] == null)
+                throw new Error(`Unknown chain id: ${chainId}`);
+            return this.root.chains[chainId].chainInterface.isValidAddress(address);
+        }
+        for (let chainId of this.root.getSmartChains()) {
+            if (this.root.chains[chainId].chainInterface.isValidAddress(address))
+                return true;
+        }
+        return false;
+    }
     /**
      * Returns true if string is a valid BOLT11 bitcoin lightning invoice
      *
@@ -74,7 +86,7 @@ class SwapperUtils {
         return LNURL_1.LNURL.getLNURLType(lnurl, shouldRetry);
     }
     /**
-     * Returns satoshi value of BOLT11 bitcoin lightning invoice WITH AMOUNT
+     * Returns satoshi value of BOLT11 bitcoin lightning invoice WITH AMOUNT, returns null otherwise
      *
      * @param lnpr
      */
@@ -85,7 +97,7 @@ class SwapperUtils {
         return null;
     }
     parseBitcoinAddress(resultText) {
-        let _amount = null;
+        let _amount = undefined;
         if (resultText.includes("?")) {
             const arr = resultText.split("?");
             resultText = arr[0];
@@ -104,9 +116,10 @@ class SwapperUtils {
                 address: resultText,
                 type: "BITCOIN",
                 swapType: SwapType_1.SwapType.TO_BTC,
-                amount: _amount == null ? null : (0, Tokens_1.toTokenAmount)(_amount, Tokens_1.BitcoinTokens.BTC, this.root.prices)
+                amount: _amount == null ? undefined : (0, Tokens_1.toTokenAmount)(_amount, Tokens_1.BitcoinTokens.BTC, this.root.prices)
             };
         }
+        return null;
     }
     parseLNURLSync(resultText) {
         if (this.isValidLNURL(resultText)) {
@@ -116,6 +129,7 @@ class SwapperUtils {
                 swapType: null
             };
         }
+        return null;
     }
     async parseLNURL(resultText) {
         if (this.isValidLNURL(resultText)) {
@@ -123,23 +137,26 @@ class SwapperUtils {
                 const result = await this.getLNURLTypeAndData(resultText);
                 if (result == null)
                     throw new Error("Invalid LNURL specified!");
+                const swapType = (0, LNURL_1.isLNURLPay)(result) ? SwapType_1.SwapType.TO_BTCLN : (0, LNURL_1.isLNURLWithdraw)(result) ? SwapType_1.SwapType.FROM_BTCLN : null;
+                if (swapType == null)
+                    return null;
                 const response = {
                     address: resultText,
                     type: "LNURL",
-                    swapType: (0, LNURL_1.isLNURLPay)(result) ? SwapType_1.SwapType.TO_BTCLN : (0, LNURL_1.isLNURLWithdraw)(result) ? SwapType_1.SwapType.FROM_BTCLN : null,
+                    swapType,
                     lnurl: result
                 };
                 if (result.min === result.max) {
                     return {
                         ...response,
-                        amount: result.min == null ? null : (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
+                        amount: result.min == null ? undefined : (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
                     };
                 }
                 else {
                     return {
                         ...response,
-                        min: result.min == null ? null : (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices),
-                        max: result.min == null ? null : (0, Tokens_1.toTokenAmount)(result.max, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
+                        min: result.min == null ? undefined : (0, Tokens_1.toTokenAmount)(result.min, Tokens_1.BitcoinTokens.BTCLN, this.root.prices),
+                        max: result.min == null ? undefined : (0, Tokens_1.toTokenAmount)(result.max, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
                     };
                 }
             }
@@ -147,42 +164,38 @@ class SwapperUtils {
                 throw new Error("Failed to contact LNURL service, check your internet connection and retry later.");
             }
         }
+        return null;
     }
     parseLightningInvoice(resultText) {
         if (this.isLightningInvoice(resultText)) {
             if (this.isValidLightningInvoice(resultText)) {
-                const amountBN = this.getLightningInvoiceValue(resultText);
+                const amount = this.getLightningInvoiceValue(resultText);
+                if (amount == null)
+                    throw new Error();
                 return {
                     address: resultText,
                     type: "LIGHTNING",
                     swapType: SwapType_1.SwapType.TO_BTCLN,
-                    amount: (0, Tokens_1.toTokenAmount)(amountBN, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
+                    amount: (0, Tokens_1.toTokenAmount)(amount, Tokens_1.BitcoinTokens.BTCLN, this.root.prices)
                 };
             }
             else {
                 throw new Error("Lightning invoice needs to contain an amount!");
             }
         }
+        return null;
     }
     parseSmartchainAddress(resultText) {
         for (let chainId of this.root.getSmartChains()) {
             if (this.root.chains[chainId].chainInterface.isValidAddress(resultText)) {
-                if (this.root.supportsSwapType(chainId, SwapType_1.SwapType.SPV_VAULT_FROM_BTC)) {
-                    return {
-                        address: resultText,
-                        type: chainId,
-                        swapType: SwapType_1.SwapType.SPV_VAULT_FROM_BTC
-                    };
-                }
-                else {
-                    return {
-                        address: resultText,
-                        type: chainId,
-                        swapType: null
-                    };
-                }
+                return {
+                    address: resultText,
+                    type: chainId,
+                    swapType: null
+                };
             }
         }
+        return null;
     }
     /**
      * General parser for bitcoin addresses, LNURLs, lightning invoices, smart chain addresses, also fetches LNURL data
@@ -295,7 +308,7 @@ class SwapperUtils {
             result = await bitcoinWallet.getSpendableBalance(undefined, feeRate);
         }
         return {
-            balance: result.balance == null ? null : (0, Tokens_1.toTokenAmount)(result.balance, Tokens_1.BitcoinTokens.BTC, this.root.prices),
+            balance: (0, Tokens_1.toTokenAmount)(result.balance, Tokens_1.BitcoinTokens.BTC, this.root.prices),
             feeRate: result.feeRate
         };
     }
@@ -323,14 +336,14 @@ class SwapperUtils {
                 chainInterface.getBalance(signer, token.address),
                 swapContract.getCommitFee(signer, 
                 //Use large amount, such that the fee for wrapping more tokens is always included!
-                await swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, null, token.address, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn, swapContract.getHashForHtlc((0, Utils_1.randomBytes)(32)).toString("hex"), base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(8)), BigInt(Math.floor(Date.now() / 1000)), true, false, base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(2)), base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(2))), options?.feeRate)
+                await swapContract.createSwapData(base_1.ChainSwapType.HTLC, signer, chainInterface.randomAddress(), token.address, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffn, swapContract.getHashForHtlc((0, Utils_1.randomBytes)(32)).toString("hex"), base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(8)), BigInt(Math.floor(Date.now() / 1000)), true, false, base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(2)), base_1.BigIntBufferUtils.fromBuffer((0, Utils_1.randomBytes)(2))), options?.feeRate)
             ]);
             if (options?.feeMultiplier != null) {
                 commitFee = commitFee * (BigInt(Math.floor(options.feeMultiplier * 1000000))) / 1000000n;
             }
             finalBalance = (0, Utils_1.bigIntMax)(balance - commitFee, 0n);
         }
-        return finalBalance == null ? null : (0, Tokens_1.toTokenAmount)(finalBalance, token, this.root.prices);
+        return (0, Tokens_1.toTokenAmount)(finalBalance, token, this.root.prices);
     }
     /**
      * Returns the address of the native currency of the chain
@@ -359,6 +372,42 @@ class SwapperUtils {
         if (this.root.chains[chainIdentifier] == null)
             throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
         return this.root.chains[chainIdentifier].chainInterface.randomAddress();
+    }
+    /**
+     * Signs and broadcasts the supplied smart chain transaction
+     */
+    sendAndConfirm(chainIdentifier, signer, txs, abortSignal, onBeforePublish) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.sendAndConfirm(signer, txs, true, abortSignal, false, onBeforePublish);
+    }
+    /**
+     * Broadcasts already signed smart chain transactions
+     */
+    sendSignedAndConfirm(chainIdentifier, txs, abortSignal, onBeforePublish) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.sendSignedAndConfirm(txs, true, abortSignal, false, onBeforePublish);
+    }
+    serializeUnsignedTransaction(chainIdentifier, tx) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.serializeTx(tx);
+    }
+    deserializeUnsignedTransaction(chainIdentifier, tx) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.deserializeTx(tx);
+    }
+    serializeSignedTransaction(chainIdentifier, tx) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.serializeSignedTx(tx);
+    }
+    deserializeSignedTransaction(chainIdentifier, tx) {
+        if (this.root.chains[chainIdentifier] == null)
+            throw new Error("Invalid chain identifier! Unknown chain: " + chainIdentifier);
+        return this.root.chains[chainIdentifier].chainInterface.deserializeSignedTx(tx);
     }
 }
 exports.SwapperUtils = SwapperUtils;

@@ -1,7 +1,7 @@
-import {IToBTCWrapper} from "./IToBTCWrapper";
+import {IToBTCDefinition, IToBTCWrapper} from "./IToBTCWrapper";
 import {
     ChainType,
-    isAbstractSigner,
+    isAbstractSigner, SignatureData,
     SignatureVerificationError,
     SwapCommitState,
     SwapCommitStateType,
@@ -13,41 +13,65 @@ import {
     RefundAuthorizationResponseCodes
 } from "../../../intermediaries/IntermediaryAPI";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
-import {extendAbortController, timeoutPromise, tryWithRetries} from "../../../utils/Utils";
-import {BtcToken, SCToken, TokenAmount, toTokenAmount} from "../../../Tokens";
+import {extendAbortController, timeoutPromise, toBigInt, tryWithRetries} from "../../../utils/Utils";
+import {BtcToken, SCToken, Token, TokenAmount, toTokenAmount} from "../../../Tokens";
 import {Fee, FeeType} from "../../fee/Fee";
 import {ppmToPercentage} from "../../ISwap";
 import {IEscrowSelfInitSwap, IEscrowSelfInitSwapInit, isIEscrowSelfInitSwapInit} from "../IEscrowSelfInitSwap";
+import {IRefundableSwap} from "../../IRefundableSwap";
 
 export type IToBTCSwapInit<T extends SwapData> = IEscrowSelfInitSwapInit<T> & {
+    signatureData?: SignatureData,
+    data: T,
     networkFee: bigint,
-    networkFeeBtc?: bigint
+    networkFeeBtc: bigint
 };
 
 export function isIToBTCSwapInit<T extends SwapData>(obj: any): obj is IToBTCSwapInit<T> {
     return typeof(obj.networkFee) === "bigint" &&
-        (obj.networkFeeBtc==null || typeof(obj.networkFeeBtc) === "bigint") &&
+        typeof(obj.networkFeeBtc) === "bigint" &&
+        (obj.signatureData==null || (
+            typeof(obj.signatureData) === 'object' &&
+            typeof(obj.signatureData.prefix)==="string" &&
+            typeof(obj.signatureData.timeout)==="string" &&
+            typeof(obj.signatureData.signature)==="string"
+        )) &&
+        typeof(obj.data) === 'object' &&
         isIEscrowSelfInitSwapInit<T>(obj);
 }
 
-export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscrowSelfInitSwap<T, ToBTCSwapState> {
+export abstract class IToBTCSwap<
+    T extends ChainType = ChainType,
+    D extends IToBTCDefinition<T, IToBTCWrapper<T, D>, IToBTCSwap<T, D>> = IToBTCDefinition<T, IToBTCWrapper<T, any>, IToBTCSwap<T, any>>,
+> extends IEscrowSelfInitSwap<T, D, ToBTCSwapState> implements IRefundableSwap<T, D, ToBTCSwapState> {
     protected readonly networkFee: bigint;
-    protected networkFeeBtc?: bigint;
+    protected networkFeeBtc: bigint;
     protected readonly abstract outputToken: BtcToken;
 
-    protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, serializedObject: any);
-    protected constructor(wrapper: IToBTCWrapper<T, IToBTCSwap<T>>, init: IToBTCSwapInit<T["Data"]>);
+    readonly data!: T["Data"];
+    readonly signatureData?: SignatureData;
+
+    protected constructor(wrapper: D["Wrapper"], serializedObject: any);
+    protected constructor(wrapper: D["Wrapper"], init: IToBTCSwapInit<T["Data"]>);
     protected constructor(
-        wrapper: IToBTCWrapper<T, IToBTCSwap<T>>,
+        wrapper: D["Wrapper"],
         initOrObject: IToBTCSwapInit<T["Data"]> | any
     ) {
         super(wrapper, initOrObject);
         if(isIToBTCSwapInit<T["Data"]>(initOrObject)) {
             this.state = ToBTCSwapState.CREATED;
+            this.networkFee = initOrObject.networkFee;
+            this.networkFeeBtc = initOrObject.networkFeeBtc;
+            this.data = initOrObject.data;
+            this.signatureData = initOrObject.signatureData;
         } else {
-            this.networkFee = initOrObject.networkFee==null ? null : BigInt(initOrObject.networkFee);
-            this.networkFeeBtc = initOrObject.networkFeeBtc==null ? null : BigInt(initOrObject.networkFeeBtc);
+            this.networkFee = toBigInt(initOrObject.networkFee);
+            this.networkFeeBtc = toBigInt(initOrObject.networkFeeBtc);
         }
+    }
+
+    protected getSwapData(): T["Data"] {
+        return this.data;
     }
 
     protected upgradeVersion() {
@@ -81,11 +105,14 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
      * @protected
      */
     protected tryRecomputeSwapPrice() {
-        if(this.swapFeeBtc==null) {
-            this.swapFeeBtc = this.swapFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
-        }
-        if(this.networkFeeBtc==null) {
-            this.networkFeeBtc = this.networkFee * this.getOutput().rawAmount / this.getInputWithoutFee().rawAmount;
+        const output = this.getOutput();
+        if(output!=null) {
+            if(this.swapFeeBtc==null) {
+                this.swapFeeBtc = this.swapFee * output.rawAmount / this.getInputWithoutFee().rawAmount;
+            }
+            if(this.networkFeeBtc==null) {
+                this.networkFeeBtc = this.networkFee * output.rawAmount / this.getInputWithoutFee().rawAmount;
+            }
         }
         super.tryRecomputeSwapPrice();
     }
@@ -112,8 +139,12 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
     //////////////////////////////
     //// Getters & utils
 
+    getInputAddress(): string | null {
+        return this._getInitiator();
+    }
+
     getInputTxId(): string | null {
-        return this.commitTxId;
+        return this.commitTxId ?? null;
     }
 
     requiresAction(): boolean {
@@ -156,17 +187,23 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
     //// Amounts & fees
 
     protected getSwapFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken> {
+        if(this.pricingInfo==null) throw new Error("No pricing info known, cannot estimate fee!");
+
         const feeWithoutBaseFee = this.swapFeeBtc - this.pricingInfo.satsBaseFee;
         const output = this.getOutput();
-        const swapFeePPM = output.rawAmount==null ? 0n : feeWithoutBaseFee * 1000000n / output.rawAmount;
+        const swapFeePPM = output?.rawAmount==null ? 0n : feeWithoutBaseFee * 1000000n / output.rawAmount;
 
+        const amountInDstToken = toTokenAmount(
+            this.swapFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo
+        );
         return {
-            amountInSrcToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc, abortSignal, preFetchedUsdPrice),
+            amountInSrcToken: toTokenAmount(this.swapFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue,
             composition: {
-                base: toTokenAmount(this.pricingInfo.satsBaseFee, this.outputToken, this.wrapper.prices),
+                base: toTokenAmount(this.pricingInfo.satsBaseFee, this.outputToken, this.wrapper.prices, this.pricingInfo),
                 percentage: ppmToPercentage(swapFeePPM)
             }
         };
@@ -177,20 +214,33 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
      *  paid only once
      */
     protected getNetworkFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken> {
+        const amountInDstToken = toTokenAmount(
+            this.networkFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo
+        );
         return {
-            amountInSrcToken: toTokenAmount(this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.networkFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken: toTokenAmount(
+                this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo
+            ),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue
         };
     }
 
     getFee(): Fee<T["ChainId"], SCToken<T["ChainId"]>, BtcToken> {
+        const amountInDstToken = toTokenAmount(
+            this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices, this.pricingInfo
+        );
         return {
-            amountInSrcToken: toTokenAmount(this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            amountInDstToken: toTokenAmount(this.swapFeeBtc + this.networkFeeBtc, this.outputToken, this.wrapper.prices),
-            usdValue: (abortSignal?: AbortSignal, preFetchedUsdPrice?: number) =>
-                this.wrapper.prices.getBtcUsdValue(this.swapFeeBtc + this.networkFeeBtc, abortSignal, preFetchedUsdPrice)
+            amountInSrcToken: toTokenAmount(
+                this.swapFee + this.networkFee, this.wrapper.tokens[this.data.getToken()],
+                this.wrapper.prices, this.pricingInfo
+            ),
+            amountInDstToken,
+            currentUsdValue: amountInDstToken.currentUsdValue,
+            usdValue: amountInDstToken.usdValue,
+            pastUsdValue: amountInDstToken.pastUsdValue
         }
     }
 
@@ -210,12 +260,22 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         ];
     }
 
+    getInputToken(): SCToken<T["ChainId"]> {
+        return this.wrapper.tokens[this.data.getToken()];
+    }
+
     getInput(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getAmount(), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return toTokenAmount(
+            this.data.getAmount(), this.wrapper.tokens[this.data.getToken()],
+            this.wrapper.prices, this.pricingInfo
+        );
     }
 
     getInputWithoutFee(): TokenAmount<T["ChainId"], SCToken<T["ChainId"]>> {
-        return toTokenAmount(this.data.getAmount() - (this.swapFee + this.networkFee), this.wrapper.tokens[this.data.getToken()], this.wrapper.prices);
+        return toTokenAmount(
+            this.data.getAmount() - (this.swapFee + this.networkFee),
+            this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo
+        );
     }
 
     /**
@@ -224,14 +284,14 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
     async hasEnoughBalance(): Promise<{enoughBalance: boolean, balance: TokenAmount, required: TokenAmount}> {
         const [balance, commitFee] = await Promise.all([
             this.wrapper.contract.getBalance(this._getInitiator(), this.data.getToken(), false),
-            this.data.getToken()===this.wrapper.chain.getNativeCurrencyAddress() ? this.getCommitFee() : Promise.resolve<bigint>(null)
+            this.data.getToken()===this.wrapper.chain.getNativeCurrencyAddress() ? this.getCommitFee() : Promise.resolve(null)
         ]);
         let required = this.data.getAmount();
         if(commitFee!=null) required = required + commitFee;
         return {
             enoughBalance: balance >= required,
-            balance: toTokenAmount(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices),
-            required: toTokenAmount(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices)
+            balance: toTokenAmount(balance, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo),
+            required: toTokenAmount(required, this.wrapper.tokens[this.data.getToken()], this.wrapper.prices, this.pricingInfo)
         };
     }
 
@@ -293,12 +353,29 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         if(this.state===ToBTCSwapState.COMMITED) {
             const success = await this.waitForPayment(options?.maxWaitTillSwapProcessedSeconds ?? 120, options?.paymentCheckIntervalSeconds, options?.abortSignal);
             if(success) {
-                if(callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId());
+                if(callbacks?.onSwapSettled!=null) callbacks.onSwapSettled(this.getOutputTxId()!);
                 return true;
             } else {
                 return false;
             }
         }
+
+        throw new Error("Unexpected state reached!");
+    }
+
+    async txsExecute(options?: {
+        skipChecks?: boolean
+    }) {
+        if(this.state!==ToBTCSwapState.CREATED) throw new Error("Invalid swap state, needs to be CREATED!");
+        const txsCommit = await this.txsCommit(options?.skipChecks);
+        return [
+            {
+                name: "Commit" as const,
+                description: `Initiates the swap by commiting the funds to the escrow on the ${this.chainIdentifier} side`,
+                chain: this.chainIdentifier,
+                txs: txsCommit
+            }
+        ];
     }
 
 
@@ -315,6 +392,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
      */
     async txsCommit(skipChecks?: boolean): Promise<T["TX"][]> {
         if(this.state!==ToBTCSwapState.CREATED) throw new Error("Must be in CREATED state!");
+        if(this.signatureData==null) throw new Error("Init signature data not known, cannot commit!");
 
         if(!this.initiated) {
             this.initiated = true;
@@ -405,7 +483,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         if(this.url==null) throw new Error("LP URL not specified!");
         checkIntervalSeconds ??= 5;
         let resp: RefundAuthorizationResponse = {code: RefundAuthorizationResponseCodes.PENDING, msg: ""};
-        while(!abortSignal.aborted && (
+        while(!abortSignal?.aborted && (
             resp.code===RefundAuthorizationResponseCodes.PENDING || resp.code===RefundAuthorizationResponseCodes.NOT_FOUND
         )) {
             resp = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
@@ -452,7 +530,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
             case RefundAuthorizationResponseCodes.REFUND_DATA:
                 await tryWithRetries(
                     () => this.wrapper.contract.isValidRefundAuthorization(this.data, resp.data),
-                    null, SignatureVerificationError
+                    undefined, SignatureVerificationError
                 );
                 this.state = ToBTCSwapState.REFUNDABLE;
                 if(save) await this._saveAndEmit();
@@ -524,7 +602,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
                         this.data,
                         resultData
                     ),
-                    null, SignatureVerificationError, abortSignal
+                    undefined, SignatureVerificationError, abortSignal
                 );
                 await this._saveAndEmit(ToBTCSwapState.REFUNDABLE);
                 return false;
@@ -533,8 +611,10 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
                 throw new IntermediaryError("Swap expired");
             case RefundAuthorizationResponseCodes.NOT_FOUND:
                 if((this.state as ToBTCSwapState)===ToBTCSwapState.CLAIMED) return true;
-                throw new Error("Intermediary swap not found");
+                throw new Error("LP swap not found");
         }
+
+        throw new Error("Invalid response code returned by the LP");
     }
 
 
@@ -563,6 +643,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
         if(await this.wrapper.contract.isExpired(this._getInitiator(), this.data)) {
             return await this.wrapper.contract.txsRefund(signer, this.data, true, true);
         } else {
+            if(this.url==null) throw new Error("LP URL not known, cannot get cooperative refund message, wait till expiry to refund!");
             const res = await IntermediaryAPI.getRefundAuthorization(this.url, this.getLpIdentifier(), this.data.getSequence());
             if(res.code===RefundAuthorizationResponseCodes.REFUND_DATA) {
                 return await this.wrapper.contract.txsRefundWithAuthorization(
@@ -714,6 +795,7 @@ export abstract class IToBTCSwap<T extends ChainType = ChainType> extends IEscro
                 }
             }
         }
+        return false;
     }
 
     _shouldFetchCommitStatus(): boolean {

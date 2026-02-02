@@ -3,14 +3,16 @@ import {Intermediary} from "../../../intermediaries/Intermediary";
 import {IntermediaryError} from "../../../errors/IntermediaryError";
 import {randomBytes, tryWithRetries} from "../../../utils/Utils";
 import {BigIntBufferUtils, ChainType} from "@atomiqlabs/base";
-import {IEscrowSwapWrapper} from "../IEscrowSwapWrapper";
+import {IEscrowSwapDefinition, IEscrowSwapWrapper} from "../IEscrowSwapWrapper";
 import {IEscrowSwap} from "../IEscrowSwap";
+
+export type IFromBTCDefinition<T extends ChainType, W extends IFromBTCWrapper<T, any>, S extends IEscrowSwap<T>> = IEscrowSwapDefinition<T, W, S>;
 
 export abstract class IFromBTCWrapper<
     T extends ChainType,
-    S extends IEscrowSwap<T>,
+    D extends IFromBTCDefinition<T, IFromBTCWrapper<T, D>, IEscrowSwap<T, D>>,
     O extends ISwapWrapperOptions = ISwapWrapperOptions
-> extends IEscrowSwapWrapper<T, S, O> {
+> extends IEscrowSwapWrapper<T, D, O> {
 
     /**
      * Returns a random sequence to be used for swaps
@@ -35,16 +37,16 @@ export abstract class IFromBTCWrapper<
     protected preFetchFeeRate(
         signer: string,
         amountData: AmountData,
-        claimHash: string | null,
+        claimHash: string | undefined,
         abortController: AbortController
-    ): Promise<any | null> {
+    ): Promise<string | undefined> {
         return tryWithRetries(
-            () => this.contract.getInitFeeRate(null, signer, amountData.token, claimHash),
-            null, null, abortController.signal
+            () => this.contract.getInitFeeRate(this.chain.randomAddress(), signer, amountData.token, claimHash),
+            undefined, undefined, abortController.signal
         ).catch(e => {
             this.logger.warn("preFetchFeeRate(): Error: ", e);
             abortController.abort(e);
-            return null;
+            return undefined;
         });
     }
 
@@ -56,11 +58,11 @@ export abstract class IFromBTCWrapper<
      * @protected
      * @returns Intermediary's liquidity balance
      */
-    protected preFetchIntermediaryLiquidity(amountData: AmountData, lp: Intermediary, abortController: AbortController): Promise<bigint | null> {
+    protected preFetchIntermediaryLiquidity(amountData: AmountData, lp: Intermediary, abortController: AbortController): Promise<bigint | undefined> {
         return lp.getLiquidity(this.chainIdentifier, this.contract, amountData.token.toString(), abortController.signal).catch(e => {
             this.logger.warn("preFetchIntermediaryLiquidity(): Error: ", e);
             abortController.abort(e);
-            return null;
+            return undefined;
         })
     }
 

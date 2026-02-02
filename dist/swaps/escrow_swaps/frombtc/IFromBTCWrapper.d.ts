@@ -1,9 +1,10 @@
 import { AmountData, ISwapWrapperOptions } from "../../ISwapWrapper";
 import { Intermediary } from "../../../intermediaries/Intermediary";
 import { ChainType } from "@atomiqlabs/base";
-import { IEscrowSwapWrapper } from "../IEscrowSwapWrapper";
+import { IEscrowSwapDefinition, IEscrowSwapWrapper } from "../IEscrowSwapWrapper";
 import { IEscrowSwap } from "../IEscrowSwap";
-export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IEscrowSwap<T>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends IEscrowSwapWrapper<T, S, O> {
+export type IFromBTCDefinition<T extends ChainType, W extends IFromBTCWrapper<T, any>, S extends IEscrowSwap<T>> = IEscrowSwapDefinition<T, W, S>;
+export declare abstract class IFromBTCWrapper<T extends ChainType, D extends IFromBTCDefinition<T, IFromBTCWrapper<T, D>, IEscrowSwap<T, D>>, O extends ISwapWrapperOptions = ISwapWrapperOptions> extends IEscrowSwapWrapper<T, D, O> {
     /**
      * Returns a random sequence to be used for swaps
      *
@@ -21,7 +22,7 @@ export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IEs
      * @protected
      * @returns Fee rate
      */
-    protected preFetchFeeRate(signer: string, amountData: AmountData, claimHash: string | null, abortController: AbortController): Promise<any | null>;
+    protected preFetchFeeRate(signer: string, amountData: AmountData, claimHash: string | undefined, abortController: AbortController): Promise<string | undefined>;
     /**
      * Pre-fetches intermediary's available SC on-chain liquidity
      * @param amountData
@@ -30,7 +31,7 @@ export declare abstract class IFromBTCWrapper<T extends ChainType, S extends IEs
      * @protected
      * @returns Intermediary's liquidity balance
      */
-    protected preFetchIntermediaryLiquidity(amountData: AmountData, lp: Intermediary, abortController: AbortController): Promise<bigint | null>;
+    protected preFetchIntermediaryLiquidity(amountData: AmountData, lp: Intermediary, abortController: AbortController): Promise<bigint | undefined>;
     /**
      * Verifies whether the intermediary has enough available liquidity such that we can initiate the swap
      *

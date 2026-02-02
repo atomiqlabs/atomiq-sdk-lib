@@ -12,24 +12,34 @@ function isToBTCSwapInit(obj) {
         typeof (obj.amount) === "bigint" &&
         typeof (obj.confirmationTarget) === "number" &&
         typeof (obj.satsPerVByte) === "number" &&
+        typeof (obj.requiredConfirmations) === "number" &&
+        typeof (obj.nonce) === "bigint" &&
         (0, IToBTCSwap_1.isIToBTCSwapInit)(obj);
 }
 exports.isToBTCSwapInit = isToBTCSwapInit;
 class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
     constructor(wrapper, initOrObject) {
-        if (isToBTCSwapInit(initOrObject))
+        if (isToBTCSwapInit(initOrObject) && initOrObject.url != null)
             initOrObject.url += "/tobtc";
         super(wrapper, initOrObject);
         this.outputToken = Tokens_1.BitcoinTokens.BTC;
         this.TYPE = SwapType_1.SwapType.TO_BTC;
-        if (!isToBTCSwapInit(initOrObject)) {
+        if (isToBTCSwapInit(initOrObject)) {
+            this.address = initOrObject.address;
+            this.amount = initOrObject.amount;
+            this.confirmationTarget = initOrObject.confirmationTarget;
+            this.satsPerVByte = initOrObject.satsPerVByte;
+            this.requiredConfirmations = initOrObject.requiredConfirmations;
+            this.nonce = initOrObject.nonce;
+        }
+        else {
             this.address = initOrObject.address;
             this.amount = BigInt(initOrObject.amount);
             this.confirmationTarget = initOrObject.confirmationTarget;
             this.satsPerVByte = initOrObject.satsPerVByte;
             this.txId = initOrObject.txId;
             this.requiredConfirmations = initOrObject.requiredConfirmations ?? this.data.getConfirmationsHint();
-            this.nonce = (initOrObject.nonce == null ? null : BigInt(initOrObject.nonce)) ?? this.data.getNonceHint();
+            this.nonce = (0, Utils_1.toBigInt)(initOrObject.nonce) ?? this.data.getNonceHint();
         }
         this.logger = (0, Utils_1.getLogger)("ToBTC(" + this.getIdentifierHashString() + "): ");
         this.tryRecomputeSwapPrice();
@@ -52,8 +62,11 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
     }
     //////////////////////////////
     //// Amounts & fees
+    getOutputToken() {
+        return Tokens_1.BitcoinTokens.BTC;
+    }
     getOutput() {
-        return (0, Tokens_1.toTokenAmount)(this.amount, this.outputToken, this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(this.amount, this.outputToken, this.wrapper.prices, this.pricingInfo);
     }
     //////////////////////////////
     //// Getters & utils
@@ -64,7 +77,7 @@ class ToBTCSwap extends IToBTCSwap_1.IToBTCSwap {
         return this.address;
     }
     getOutputTxId() {
-        return this.txId;
+        return this.txId ?? null;
     }
     /**
      * Returns fee rate of the bitcoin transaction in sats/vB

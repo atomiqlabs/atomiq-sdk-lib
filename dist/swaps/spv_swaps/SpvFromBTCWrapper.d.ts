@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { AmountData, ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens } from "../ISwapWrapper";
+import { AmountData, ISwapWrapper, ISwapWrapperOptions, SwapTypeDefinition, WrapperCtorTokens } from "../ISwapWrapper";
 import { BtcRelay, ChainEvent, ChainType, RelaySynchronizer, SpvVaultClaimEvent, SpvVaultCloseEvent, SpvVaultFrontEvent } from "@atomiqlabs/base";
 import { SpvFromBTCSwap, SpvFromBTCSwapState } from "./SpvFromBTCSwap";
 import { BTC_NETWORK } from "@scure/btc-signer/utils";
@@ -10,6 +10,7 @@ import { UnifiedSwapEventListener } from "../../events/UnifiedSwapEventListener"
 import { ISwapPrice } from "../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
 import { Intermediary } from "../../intermediaries/Intermediary";
+import { AllOptional } from "../../utils/Utils";
 import { Transaction } from "@scure/btc-signer";
 import { ISwap } from "../ISwap";
 import { IClaimableSwapWrapper } from "../IClaimableSwapWrapper";
@@ -20,15 +21,16 @@ export type SpvFromBTCOptions = {
     maxAllowedNetworkFeeRate?: number;
 };
 export type SpvFromBTCWrapperOptions = ISwapWrapperOptions & {
-    maxConfirmations?: number;
-    bitcoinNetwork?: BTC_NETWORK;
-    bitcoinBlocktime?: number;
-    maxTransactionsDelta?: number;
-    maxRawAmountAdjustmentDifferencePPM?: number;
-    maxBtcFeeMultiplier?: number;
-    maxBtcFeeOffset?: number;
+    maxConfirmations: number;
+    bitcoinNetwork: BTC_NETWORK;
+    bitcoinBlocktime: number;
+    maxTransactionsDelta: number;
+    maxRawAmountAdjustmentDifferencePPM: number;
+    maxBtcFeeMultiplier: number;
+    maxBtcFeeOffset: number;
 };
-export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper<T, SpvFromBTCSwap<T>, SpvFromBTCWrapperOptions> implements IClaimableSwapWrapper<SpvFromBTCSwap<T>> {
+export type SpvFromBTCTypeDefinition<T extends ChainType> = SwapTypeDefinition<T, SpvFromBTCWrapper<T>, SpvFromBTCSwap<T>>;
+export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper<T, SpvFromBTCTypeDefinition<T>, SpvFromBTCWrapperOptions> implements IClaimableSwapWrapper<SpvFromBTCSwap<T>> {
     readonly claimableSwapStates: SpvFromBTCSwapState[];
     readonly TYPE = SwapType.SPV_VAULT_FROM_BTC;
     readonly swapDeserializer: typeof SpvFromBTCSwap;
@@ -52,15 +54,15 @@ export declare class SpvFromBTCWrapper<T extends ChainType> extends ISwapWrapper
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["SpvVaultContract"], prices: ISwapPrice, tokens: WrapperCtorTokens, spvWithdrawalDataDeserializer: new (data: any) => T["SpvVaultWithdrawalData"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithAddressIndex<any>, options?: SpvFromBTCWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["SpvVaultContract"], prices: ISwapPrice, tokens: WrapperCtorTokens, spvWithdrawalDataDeserializer: new (data: any) => T["SpvVaultWithdrawalData"], btcRelay: BtcRelay<any, T["TX"], any>, synchronizer: RelaySynchronizer<any, T["TX"], any>, btcRpc: BitcoinRpcWithAddressIndex<any>, options?: AllOptional<SpvFromBTCWrapperOptions>, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     readonly pendingSwapStates: Array<SpvFromBTCSwap<T>["state"]>;
     readonly tickSwapState: Array<SpvFromBTCSwap<T>["state"]>;
-    protected processEventFront(event: SpvVaultFrontEvent, swap: SpvFromBTCSwap<T>): boolean;
-    protected processEventClaim(event: SpvVaultClaimEvent, swap: SpvFromBTCSwap<T>): boolean;
-    protected processEventClose(event: SpvVaultCloseEvent, swap: SpvFromBTCSwap<T>): boolean;
-    protected processEvent(event: ChainEvent<T["Data"]>, swap: SpvFromBTCSwap<T>): Promise<boolean>;
+    protected processEventFront(event: SpvVaultFrontEvent, swap: SpvFromBTCSwap<T>): Promise<boolean>;
+    protected processEventClaim(event: SpvVaultClaimEvent, swap: SpvFromBTCSwap<T>): Promise<boolean>;
+    protected processEventClose(event: SpvVaultCloseEvent, swap: SpvFromBTCSwap<T>): Promise<boolean>;
+    protected processEvent(event: ChainEvent<T["Data"]>, swap: SpvFromBTCSwap<T>): Promise<void>;
     /**
      * Pre-fetches latest finalized block height of the smart chain
      *

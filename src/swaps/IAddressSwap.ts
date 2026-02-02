@@ -1,3 +1,9 @@
+export function isIAddressSwap(obj: any): obj is IAddressSwap {
+    return obj!=null &&
+        typeof(obj.getAddress) === "function" &&
+        typeof(obj.getHyperlink) === "function";
+}
+
 /**
  * Interface for swaps which require a user to send funds to a specific address
  */

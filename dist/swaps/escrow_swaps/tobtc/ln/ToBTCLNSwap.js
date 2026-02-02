@@ -25,19 +25,29 @@ const SNOWFLAKE_LIST = new Set([
 ]);
 class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     constructor(wrapper, initOrObj) {
-        if (isToBTCLNSwapInit(initOrObj))
+        if (isToBTCLNSwapInit(initOrObj) && initOrObj.url != null)
             initOrObj.url += "/tobtcln";
         super(wrapper, initOrObj);
         this.outputToken = Tokens_1.BitcoinTokens.BTCLN;
         this.TYPE = SwapType_1.SwapType.TO_BTCLN;
-        if (!isToBTCLNSwapInit(initOrObj)) {
+        if (isToBTCLNSwapInit(initOrObj)) {
+            this.confidence = initOrObj.confidence;
+            this.pr = initOrObj.pr;
+            this.lnurl = initOrObj.lnurl;
+            this.successAction = initOrObj.successAction;
+            this.usesClaimHashAsId = true;
+        }
+        else {
             this.confidence = initOrObj.confidence;
             this.pr = initOrObj.pr;
             this.lnurl = initOrObj.lnurl;
             this.successAction = initOrObj.successAction;
             this.secret = initOrObj.secret;
+            this.usesClaimHashAsId = initOrObj.usesClaimHashAsId ?? false;
         }
-        this.paymentHash = this.getPaymentHash().toString("hex");
+        const paymentHash = this.getPaymentHash();
+        if (paymentHash != null)
+            this.paymentHash = paymentHash.toString("hex");
         this.logger = (0, Utils_1.getLogger)("ToBTCLN(" + this.getIdentifierHashString() + "): ");
         this.tryRecomputeSwapPrice();
     }
@@ -49,7 +59,9 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
         if (check) {
             const secretBuffer = buffer_1.Buffer.from(result.secret, "hex");
             const hash = buffer_1.Buffer.from((0, sha2_1.sha256)(secretBuffer));
-            if (!hash.equals(this.getPaymentHash()))
+            const claimHash = this.wrapper.contract.getHashForHtlc(hash);
+            const expectedClaimHash = buffer_1.Buffer.from(this.getClaimHash(), "hex");
+            if (!claimHash.equals(expectedClaimHash))
                 throw new IntermediaryError_1.IntermediaryError("Invalid payment secret returned");
         }
         this.secret = result.secret;
@@ -57,12 +69,17 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     }
     //////////////////////////////
     //// Amounts & fees
+    getOutputToken() {
+        return Tokens_1.BitcoinTokens.BTCLN;
+    }
     getOutput() {
         if (this.pr == null || !this.pr.toLowerCase().startsWith("ln"))
             return (0, Tokens_1.toTokenAmount)(null, this.outputToken, this.wrapper.prices);
         const parsedPR = (0, bolt11_1.decode)(this.pr);
+        if (parsedPR.millisatoshis == null)
+            throw new Error("Swap invoice has no msat amount field!");
         const amount = (BigInt(parsedPR.millisatoshis) + 999n) / 1000n;
-        return (0, Tokens_1.toTokenAmount)(amount, this.outputToken, this.wrapper.prices);
+        return (0, Tokens_1.toTokenAmount)(amount, this.outputToken, this.wrapper.prices, this.pricingInfo);
     }
     //////////////////////////////
     //// Getters & utils
@@ -73,13 +90,13 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
      * Returns the lightning BOLT11 invoice where the BTC will be sent to
      */
     getOutputAddress() {
-        return this.lnurl ?? this.pr;
+        return this.lnurl ?? this.pr ?? null;
     }
     /**
      * Returns payment secret (pre-image) as a proof of payment
      */
     getSecret() {
-        return this.secret;
+        return this.secret ?? null;
     }
     /**
      * Returns the confidence of the intermediary that this payment will succeed
@@ -118,16 +135,20 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
         return false;
     }
     getIdentifierHash() {
-        const paymentHashBuffer = this.getPaymentHash();
+        const idBuffer = this.usesClaimHashAsId
+            ? buffer_1.Buffer.from(this.getClaimHash(), "hex")
+            : this.getPaymentHash();
         if (this.randomNonce == null)
-            return paymentHashBuffer;
-        return buffer_1.Buffer.concat([paymentHashBuffer, buffer_1.Buffer.from(this.randomNonce, "hex")]);
+            return idBuffer;
+        return buffer_1.Buffer.concat([idBuffer, buffer_1.Buffer.from(this.randomNonce, "hex")]);
     }
     getPaymentHash() {
         if (this.pr == null)
             return null;
         if (this.pr.toLowerCase().startsWith("ln")) {
             const parsed = (0, bolt11_1.decode)(this.pr);
+            if (parsed.tagsObject.payment_hash == null)
+                throw new Error("Swap invoice has no payment hash field!");
             return buffer_1.Buffer.from(parsed.tagsObject.payment_hash, "hex");
         }
         return buffer_1.Buffer.from(this.pr, "hex");
@@ -137,6 +158,8 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
             return this.data.getEscrowHash();
         if (this.pr.toLowerCase().startsWith("ln")) {
             const parsed = (0, bolt11_1.decode)(this.pr);
+            if (parsed.tagsObject.payment_hash == null)
+                throw new Error("Swap invoice has no payment hash field!");
             return parsed.tagsObject.payment_hash;
         }
         return this.pr;
@@ -153,7 +176,7 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
      * Gets the used LNURL or null if this is not an LNURL-pay swap
      */
     getLNURL() {
-        return this.lnurl;
+        return this.lnurl ?? null;
     }
     /**
      * Checks whether this LNURL payment contains a success message
@@ -172,12 +195,13 @@ class ToBTCLNSwap extends IToBTCSwap_1.IToBTCSwap {
     serialize() {
         return {
             ...super.serialize(),
-            paymentHash: this.getPaymentHash().toString("hex"),
+            paymentHash: this.getPaymentHash()?.toString("hex"),
             pr: this.pr,
             confidence: this.confidence,
             secret: this.secret,
             lnurl: this.lnurl,
-            successAction: this.successAction
+            successAction: this.successAction,
+            usesClaimHashAsId: this.usesClaimHashAsId
         };
     }
 }

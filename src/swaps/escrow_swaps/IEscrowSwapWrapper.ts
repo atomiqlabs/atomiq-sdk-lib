@@ -1,11 +1,11 @@
-import {AmountData, ISwapWrapper, ISwapWrapperOptions, WrapperCtorTokens} from "../ISwapWrapper";
+import {AmountData, ISwapWrapper, ISwapWrapperOptions, SwapTypeDefinition, WrapperCtorTokens} from "../ISwapWrapper";
 import {
     ChainType,
     ClaimEvent,
     InitializeEvent,
     RefundEvent,
     SignatureData,
-    SignatureVerificationError, SwapEvent
+    SignatureVerificationError, SwapCommitState, SwapEvent
 } from "@atomiqlabs/base";
 import {ISwap} from "../ISwap";
 import {tryWithRetries} from "../../utils/Utils";
@@ -15,16 +15,16 @@ import {ISwapPrice} from "../../prices/abstract/ISwapPrice";
 import {EventEmitter} from "events";
 import {SwapType} from "../enums/SwapType";
 import {IEscrowSwap} from "./IEscrowSwap";
+import {Intermediary} from "../../intermediaries/Intermediary";
+
+export type IEscrowSwapDefinition<T extends ChainType, W extends IEscrowSwapWrapper<T, any>, S extends IEscrowSwap<T>> = SwapTypeDefinition<T, W, S>;
 
 export abstract class IEscrowSwapWrapper<
     T extends ChainType,
-    S extends IEscrowSwap<T>,
+    D extends IEscrowSwapDefinition<T, IEscrowSwapWrapper<T, D>, IEscrowSwap<T, D>>,
     O extends ISwapWrapperOptions = ISwapWrapperOptions
-> extends ISwapWrapper<T, S, O> {
+> extends ISwapWrapper<T, D, O> {
     readonly abstract TYPE: SwapType;
-    readonly abstract pendingSwapStates: Array<S["state"]>;
-    readonly abstract swapDeserializer: { new(wrapper: ISwapWrapper<T, S, O>, data: any): S };
-    readonly abstract tickSwapState: Array<S["state"]>;
 
     readonly contract: T["Contract"];
     readonly swapDataDeserializer: new (data: any) => T["Data"];
@@ -53,14 +53,13 @@ export abstract class IEscrowSwapWrapper<
      * @protected
      * @returns Pre-fetched signature verification data or null if failed
      */
-    protected preFetchSignData(signDataPrefetch: Promise<any | null>): Promise<any | null> {
-        if(this.contract.preFetchForInitSignatureVerification==null) return Promise.resolve(null);
+    protected preFetchSignData(signDataPrefetch: Promise<any | null>): Promise<T["PreFetchVerification"] | undefined> {
+        if(this.contract.preFetchForInitSignatureVerification==null) return Promise.resolve(undefined);
         return signDataPrefetch.then(obj => {
-            if(obj==null) return null;
-            return this.contract.preFetchForInitSignatureVerification(obj);
+            if(obj==null) return undefined;
+            return this.contract.preFetchForInitSignatureVerification!(obj);
         }).catch(e => {
             this.logger.error("preFetchSignData(): Error: ", e);
-            return null;
         });
     }
 
@@ -88,13 +87,13 @@ export abstract class IEscrowSwapWrapper<
         const [feeRate, preFetchedSignatureData] = await Promise.all([feeRatePromise, preFetchSignatureVerificationData]);
         await tryWithRetries(
             () => this.contract.isValidInitAuthorization(initiator, data, signature, feeRate, preFetchedSignatureData),
-            null,
+            undefined,
             SignatureVerificationError,
             abortSignal
         );
         return await tryWithRetries(
             () => this.contract.getInitAuthorizationExpiry(data, signature, preFetchedSignatureData),
-            null,
+            undefined,
             SignatureVerificationError,
             abortSignal
         );
@@ -107,7 +106,7 @@ export abstract class IEscrowSwapWrapper<
      * @protected
      * @returns Whether the swap was updated/changed
      */
-    protected processEventInitialize?(swap: S, event: InitializeEvent<T["Data"]>): Promise<boolean>;
+    protected abstract processEventInitialize(swap: D["Swap"], event: InitializeEvent<T["Data"]>): Promise<boolean>;
 
     /**
      * Processes ClaimEvent for a given swap
@@ -116,7 +115,7 @@ export abstract class IEscrowSwapWrapper<
      * @protected
      * @returns Whether the swap was updated/changed
      */
-    protected processEventClaim?(swap: S, event: ClaimEvent<T["Data"]>): Promise<boolean>;
+    protected abstract processEventClaim(swap: D["Swap"], event: ClaimEvent<T["Data"]>): Promise<boolean>;
 
     /**
      * Processes RefundEvent for a given swap
@@ -125,7 +124,7 @@ export abstract class IEscrowSwapWrapper<
      * @protected
      * @returns Whether the swap was updated/changed
      */
-    protected processEventRefund?(swap: S, event: RefundEvent<T["Data"]>): Promise<boolean>;
+    protected abstract processEventRefund(swap: D["Swap"], event: RefundEvent<T["Data"]>): Promise<boolean>;
 
     /**
      * Processes a single SC on-chain event
@@ -133,7 +132,7 @@ export abstract class IEscrowSwapWrapper<
      * @param event
      * @param swap
      */
-    protected async processEvent(event: SwapEvent<T["Data"]>, swap: S): Promise<boolean> {
+    protected async processEvent(event: SwapEvent<T["Data"]>, swap: D["Swap"]): Promise<void> {
         if(swap==null) return;
 
         let swapChanged: boolean = false;
@@ -164,25 +163,24 @@ export abstract class IEscrowSwapWrapper<
         if(swapChanged) {
             await swap._saveAndEmit();
         }
-        return true;
     }
 
-    protected async _checkPastSwaps(pastSwaps: S[]): Promise<{ changedSwaps: S[]; removeSwaps: S[] }> {
-        const changedSwaps: S[] = [];
-        const removeSwaps: S[] = [];
+    protected async _checkPastSwaps(pastSwaps: D["Swap"][]): Promise<{ changedSwaps: D["Swap"][]; removeSwaps: D["Swap"][] }> {
+        const changedSwaps: D["Swap"][] = [];
+        const removeSwaps: D["Swap"][] = [];
 
-        const swapExpiredStatus: {[escrowHash: string]: boolean} = {};
+        const swapExpiredStatus: {[id: string]: boolean} = {};
 
-        const checkStatusSwaps: S[] = [];
+        const checkStatusSwaps: (D["Swap"] & {data: T["Data"]})[] = [];
 
         for(let pastSwap of pastSwaps) {
             if(pastSwap._shouldFetchExpiryStatus()) {
                 //Check expiry
-                swapExpiredStatus[pastSwap.getEscrowHash()] = await pastSwap._verifyQuoteDefinitelyExpired();
+                swapExpiredStatus[pastSwap.getId()] = await pastSwap._verifyQuoteDefinitelyExpired();
             }
             if(pastSwap._shouldFetchCommitStatus()) {
                 //Add to swaps for which status should be checked
-                checkStatusSwaps.push(pastSwap);
+                if(pastSwap.data!=null) checkStatusSwaps.push(pastSwap as (D["Swap"] & {data: T["Data"]}));
             }
         }
 
@@ -190,7 +188,11 @@ export abstract class IEscrowSwapWrapper<
 
         for(let pastSwap of checkStatusSwaps) {
             const escrowHash = pastSwap.getEscrowHash();
-            const shouldSave = await pastSwap._sync(false, swapExpiredStatus[escrowHash], swapStatuses[escrowHash]);
+            const shouldSave = await pastSwap._sync(
+                false,
+                swapExpiredStatus[pastSwap.getId()],
+                escrowHash==null ? undefined : swapStatuses[escrowHash]
+            );
             if(shouldSave) {
                 if(pastSwap.isQuoteExpired()) {
                     removeSwaps.push(pastSwap);
@@ -204,6 +206,14 @@ export abstract class IEscrowSwapWrapper<
             changedSwaps,
             removeSwaps
         };
+    }
+
+    recoverFromSwapDataAndState(
+        init: {data: T["Data"], getInitTxId: () => Promise<string>, getTxBlock: () => Promise<{blockTime: number, blockHeight: number}>},
+        state: SwapCommitState,
+        lp?: Intermediary
+    ): Promise<D["Swap"] | null> {
+        return Promise.resolve(null);
     }
 
 }

@@ -50,7 +50,7 @@ export type LNURLPay = {
     min: bigint;
     max: bigint;
     commentMaxLength: number;
-    shortDescription: string;
+    shortDescription?: string;
     longDescription?: string;
     icon?: string;
     params: LNURLPayParamsWithUrl;
@@ -161,5 +161,5 @@ export declare class LNURL {
      *  the specified LNURL-withdraw request
      */
     static useLNURLWithdraw(withdrawRequest: LNURLWithdrawParamsWithUrl, lnpr: string): Promise<void>;
-    static decodeSuccessAction(successAction: LNURLPaySuccessAction, secret: string): LNURLDecodedSuccessAction | null;
+    static decodeSuccessAction(successAction?: LNURLPaySuccessAction | null, secret?: string | null): LNURLDecodedSuccessAction | null;
 }

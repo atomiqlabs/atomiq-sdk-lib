@@ -16,7 +16,10 @@ class SingleAddressBitcoinWallet extends BitcoinWallet_1.BitcoinWallet {
                 this.privKey = (0, btc_signer_1.WIF)().decode(addressDataOrWIF);
             }
             this.pubkey = (0, utils_1.pubECDSA)(this.privKey);
-            this.address = (0, btc_signer_1.getAddress)("wpkh", this.privKey, network);
+            const address = (0, btc_signer_1.getAddress)("wpkh", this.privKey, network);
+            if (address == null)
+                throw new Error("Failed to generate p2wpkh address from the provided private key!");
+            this.address = address;
         }
         else {
             this.address = addressDataOrWIF.address;
@@ -32,7 +35,9 @@ class SingleAddressBitcoinWallet extends BitcoinWallet_1.BitcoinWallet {
     async sendTransaction(address, amount, feeRate) {
         if (!this.privKey)
             throw new Error("Not supported.");
-        const { psbt } = await super._getPsbt(this.toBitcoinWalletAccounts(), address, Number(amount), feeRate);
+        const { psbt, fee } = await super._getPsbt(this.toBitcoinWalletAccounts(), address, Number(amount), feeRate);
+        if (psbt == null)
+            throw new Error(`Not enough funds, required for fee: ${fee} sats!`);
         psbt.sign(this.privKey);
         psbt.finalize();
         const txHex = buffer_1.Buffer.from(psbt.extract()).toString("hex");
@@ -54,15 +59,11 @@ class SingleAddressBitcoinWallet extends BitcoinWallet_1.BitcoinWallet {
         return psbt;
     }
     async getTransactionFee(address, amount, feeRate) {
-        const { psbt, fee } = await super._getPsbt(this.toBitcoinWalletAccounts(), address, Number(amount), feeRate);
-        if (psbt == null)
-            return null;
+        const { fee } = await super._getPsbt(this.toBitcoinWalletAccounts(), address, Number(amount), feeRate);
         return fee;
     }
     async getFundedPsbtFee(basePsbt, feeRate) {
-        const { psbt, fee } = await super._fundPsbt(this.toBitcoinWalletAccounts(), basePsbt, feeRate);
-        if (psbt == null)
-            return null;
+        const { fee } = await super._fundPsbt(this.toBitcoinWalletAccounts(), basePsbt, feeRate);
         return fee;
     }
     getReceiveAddress() {

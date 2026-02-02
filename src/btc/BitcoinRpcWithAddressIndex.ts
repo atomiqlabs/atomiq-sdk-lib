@@ -2,7 +2,8 @@ import {BitcoinRpc, BtcBlock, BtcTx} from "@atomiqlabs/base";
 import {Buffer} from "buffer";
 
 export type BtcTxWithBlockheight = BtcTx & {
-    blockheight?: number
+    blockheight?: number,
+    inputAddresses?: string[]
 };
 
 export type BtcAddressUtxo = {
@@ -27,11 +28,11 @@ export interface BitcoinRpcWithAddressIndex<T extends BtcBlock> extends BitcoinR
         effectiveFeePerVsize: number,
         adjustedVsize: number
     }>;
-    getTransaction(txId: string): Promise<BtcTxWithBlockheight>;
+    getTransaction(txId: string): Promise<BtcTxWithBlockheight | null>;
     waitForTransaction(
         txId: string,
         requiredConfirmations: number,
-        stateUpdateCbk:(confirmations: number, txId: string, txEtaMS: number) => void,
+        stateUpdateCbk: (btcTx?: BtcTxWithBlockheight, txEtaMS?: number) => void,
         abortSignal?: AbortSignal,
         intervalSeconds?: number
     ): Promise<BtcTxWithBlockheight>;
@@ -57,7 +58,7 @@ export interface BitcoinRpcWithAddressIndex<T extends BtcBlock> extends BitcoinR
      * @param txoHash Required output txoHash
      */
     checkAddressTxos(address: string, txoHash: Buffer): Promise<{
-        tx: BtcTxWithBlockheight,
+        tx: Omit<BtcTxWithBlockheight, "hex" | "raw">,
         vout: number
     } | null>;
 
@@ -75,11 +76,11 @@ export interface BitcoinRpcWithAddressIndex<T extends BtcBlock> extends BitcoinR
         address: string,
         txoHash: Buffer,
         requiredConfirmations: number,
-        stateUpdateCbk:(confirmations: number, txId: string, vout: number, txEtaMS: number) => void,
+        stateUpdateCbk: (btcTx?: Omit<BtcTxWithBlockheight, "hex" | "raw">, vout?: number, txEtaMS?: number) => void,
         abortSignal?: AbortSignal,
         intervalSeconds?: number
     ): Promise<{
-        tx: BtcTxWithBlockheight,
+        tx: Omit<BtcTxWithBlockheight, "hex" | "raw">,
         vout: number
     }>;
 

@@ -5,6 +5,7 @@ import { ChainType, ClaimEvent, InitializeEvent, Messenger, RefundEvent } from "
 import { Intermediary } from "../../../../intermediaries/Intermediary";
 import { Buffer } from "buffer";
 import { SwapType } from "../../../enums/SwapType";
+import { AllOptional } from "../../../../utils/Utils";
 import { LightningNetworkApi } from "../../../../btc/LightningNetworkApi";
 import { ISwapPrice } from "../../../../prices/abstract/ISwapPrice";
 import { EventEmitter } from "events";
@@ -14,7 +15,7 @@ import { UnifiedSwapEventListener } from "../../../../events/UnifiedSwapEventLis
 import { UnifiedSwapStorage } from "../../../../storage/UnifiedSwapStorage";
 import { ISwap } from "../../../ISwap";
 import { FromBTCLNAutoSwap, FromBTCLNAutoSwapState } from "./FromBTCLNAutoSwap";
-import { IFromBTCLNWrapper } from "../IFromBTCLNWrapper";
+import { IFromBTCLNDefinition, IFromBTCLNWrapper } from "../IFromBTCLNWrapper";
 import { IClaimableSwapWrapper } from "../../../IClaimableSwapWrapper";
 export type FromBTCLNAutoOptions = {
     descriptionHash?: Buffer;
@@ -24,15 +25,15 @@ export type FromBTCLNAutoOptions = {
     feeSafetyFactor?: number;
 };
 export type FromBTCLNAutoWrapperOptions = ISwapWrapperOptions & {
-    safetyFactor?: number;
-    bitcoinBlocktime?: number;
-    unsafeSkipLnNodeCheck?: boolean;
+    safetyFactor: number;
+    bitcoinBlocktime: number;
+    unsafeSkipLnNodeCheck: boolean;
 };
-export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNAutoSwap<T>, FromBTCLNAutoWrapperOptions> implements IClaimableSwapWrapper<FromBTCLNAutoSwap<T>> {
+export type FromBTCLNAutoDefinition<T extends ChainType> = IFromBTCLNDefinition<T, FromBTCLNAutoWrapper<T>, FromBTCLNAutoSwap<T>>;
+export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCLNWrapper<T, FromBTCLNAutoDefinition<T>, FromBTCLNAutoWrapperOptions> implements IClaimableSwapWrapper<FromBTCLNAutoSwap<T>> {
     readonly claimableSwapStates: FromBTCLNAutoSwapState[];
     readonly TYPE = SwapType.FROM_BTCLN_AUTO;
     readonly swapDeserializer: typeof FromBTCLNAutoSwap;
-    protected readonly lnApi: LightningNetworkApi;
     readonly messenger: Messenger;
     /**
      * @param chainIdentifier
@@ -48,7 +49,7 @@ export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCL
      * @param options
      * @param events Instance to use for emitting events
      */
-    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, messenger: Messenger, options: FromBTCLNAutoWrapperOptions, events?: EventEmitter<{
+    constructor(chainIdentifier: string, unifiedStorage: UnifiedSwapStorage<T>, unifiedChainEvents: UnifiedSwapEventListener<T>, chain: T["ChainInterface"], contract: T["Contract"], prices: ISwapPrice, tokens: WrapperCtorTokens, swapDataDeserializer: new (data: any) => T["Data"], lnApi: LightningNetworkApi, messenger: Messenger, options?: AllOptional<FromBTCLNAutoWrapperOptions>, events?: EventEmitter<{
         swapState: [ISwap];
     }>);
     readonly pendingSwapStates: FromBTCLNAutoSwapState[];
@@ -92,10 +93,11 @@ export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCL
      * @param abortSignal           Abort signal for aborting the process
      * @param preFetches
      */
-    create(signer: string, amountData: AmountData, lps: Intermediary[], options: FromBTCLNAutoOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
-        pricePrefetchPromise?: Promise<bigint>;
-        gasTokenPricePrefetchPromise?: Promise<bigint>;
-        claimerBountyPrefetch?: Promise<bigint>;
+    create(signer: string, amountData: AmountData, lps: Intermediary[], options?: FromBTCLNAutoOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal, preFetches?: {
+        pricePrefetchPromise?: Promise<bigint | undefined>;
+        usdPricePrefetchPromise?: Promise<number | undefined>;
+        gasTokenPricePrefetchPromise?: Promise<bigint | undefined>;
+        claimerBountyPrefetch?: Promise<bigint | undefined>;
     }): {
         quote: Promise<FromBTCLNAutoSwap<T>>;
         intermediary: Intermediary;
@@ -111,7 +113,7 @@ export declare class FromBTCLNAutoWrapper<T extends ChainType> extends IFromBTCL
      * @param additionalParams      Additional parameters sent to the LP when creating the swap
      * @param abortSignal           Abort signal for aborting the process
      */
-    createViaLNURL(signer: string, lnurl: string | LNURLWithdrawParamsWithUrl, amountData: AmountData, lps: Intermediary[], options: FromBTCLNAutoOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal): Promise<{
+    createViaLNURL(signer: string, lnurl: string | LNURLWithdrawParamsWithUrl, amountData: AmountData, lps: Intermediary[], options?: FromBTCLNAutoOptions, additionalParams?: Record<string, any>, abortSignal?: AbortSignal): Promise<{
         quote: Promise<FromBTCLNAutoSwap<T>>;
         intermediary: Intermediary;
     }[]>;

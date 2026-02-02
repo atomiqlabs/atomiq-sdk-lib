@@ -326,8 +326,8 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
      * @param dstToken
      */
     getSwapLimits<A extends Token<ChainIdentifier>, B extends Token<ChainIdentifier>>(srcToken: A, dstToken: B): {
-        input: {min: TokenAmount<string, A>, max: TokenAmount<string, A>},
-        output: {min: TokenAmount<string, B>, max: TokenAmount<string, B>}
+        input: {min: TokenAmount<string, A>, max?: TokenAmount<string, A>},
+        output: {min: TokenAmount<string, B>, max?: TokenAmount<string, B>}
     } {
         return this.swapper.getSwapLimits<ChainIdentifier, A, B>(srcToken, dstToken);
     }
@@ -343,9 +343,9 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
             let swapType = _swapType;
             if(swapType===SwapType.FROM_BTCLN && this.supportsSwapType(SwapType.FROM_BTCLN_AUTO)) swapType = SwapType.FROM_BTCLN_AUTO;
             if(swapType===SwapType.FROM_BTC && this.supportsSwapType(SwapType.SPV_VAULT_FROM_BTC)) swapType = SwapType.SPV_VAULT_FROM_BTC;
-            if(lp.services[swapType]==null) return;
-            if(lp.services[swapType].chainTokens==null) return;
-            for(let tokenAddress of lp.services[swapType].chainTokens[this.chainIdentifier]) {
+            const chainTokens = lp.services[swapType]?.chainTokens?.[this.chainIdentifier];
+            if(chainTokens==null) return;
+            for(let tokenAddress of chainTokens) {
                 const token = this.swapper.tokens?.[this.chainIdentifier]?.[tokenAddress];
                 if(token!=null) tokens.push(token as SCToken<ChainIdentifier>);
             }
@@ -361,9 +361,9 @@ export class SwapperWithChain<T extends MultiChain, ChainIdentifier extends Chai
     private getSupportedTokenAddresses(swapType: SwapType): Set<string> {
         const set = new Set<string>();
         this.intermediaryDiscovery.intermediaries.forEach(lp => {
-            if(lp.services[swapType]==null) return;
-            if(lp.services[swapType].chainTokens==null || lp.services[swapType].chainTokens[this.chainIdentifier]==null) return;
-            lp.services[swapType].chainTokens[this.chainIdentifier].forEach(token => set.add(token));
+            const chainTokens = lp.services[swapType]?.chainTokens?.[this.chainIdentifier];
+            if(chainTokens==null) return;
+            chainTokens.forEach(token => set.add(token));
         });
         return set;
     }

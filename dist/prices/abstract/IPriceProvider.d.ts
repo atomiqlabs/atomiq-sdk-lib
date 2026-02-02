@@ -4,7 +4,7 @@ export type CoinType = {
     decimals: number;
 };
 export type CtorCoinTypes<T extends MultiChain> = {
-    coinId: string;
+    coinId?: string;
     chains: {
         [chainId in keyof T]?: {
             address: string;
